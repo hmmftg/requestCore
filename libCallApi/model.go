@@ -1,0 +1,18 @@
+package libCallApi
+
+type RemoteApi struct {
+	User     string `yaml:"user"`
+	Password string `yaml:"password"`
+	Domain   string `yaml:"domain"`
+	Name     string `yaml:"name"`
+}
+
+type RemoteApiModel struct {
+	RemoteApiList map[string]RemoteApi
+}
+
+type CallApiInterface interface {
+	GetApi(apiName string) RemoteApi
+	ConsumeRestBasicAuthApi(requestJson []byte, apiName, path, contentType, method string, headers map[string]string) ([]byte, string, error)
+	ConsumeRestApi(requestJson []byte, apiName, path, contentType, method string, headers map[string]string) ([]byte, string, int, error)
+}
