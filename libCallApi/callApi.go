@@ -2,6 +2,7 @@ package libCallApi
 
 import (
 	"bytes"
+	"crypto/tls"
 	"encoding/base64"
 	"encoding/json"
 	"encoding/xml"
@@ -18,8 +19,8 @@ import (
 func (m RemoteApiModel) ConsumeRestBasicAuthApi(requestJson []byte, apiName, path, contentType, method string, headers map[string]string) ([]byte, string, error) {
 	timeout := time.Duration(30 * time.Second)
 	if timeOutString, ok := headers["Time-Out"]; ok {
-		timeoutSecounds, _ := strconv.Atoi(timeOutString)
-		timeout = time.Duration(timeoutSecounds * int(time.Second))
+		timeoutSeconds, _ := strconv.Atoi(timeOutString)
+		timeout = time.Duration(timeoutSeconds * int(time.Second))
 	}
 	client := &http.Client{Timeout: timeout}
 	req, err := http.NewRequest(method, m.RemoteApiList[apiName].Domain+"/"+path, bytes.NewBuffer(requestJson))
@@ -67,10 +68,14 @@ func (m RemoteApiModel) GetApi(apiName string) RemoteApi {
 func (m RemoteApiModel) ConsumeRestApi(requestJson []byte, apiName, path, contentType, method string, headers map[string]string) ([]byte, string, int, error) {
 	timeout := time.Duration(30 * time.Second)
 	if timeOutString, ok := headers["Time-Out"]; ok {
-		timeoutSecounds, _ := strconv.Atoi(timeOutString)
-		timeout = time.Duration(timeoutSecounds * int(time.Second))
+		timeoutSeconds, _ := strconv.Atoi(timeOutString)
+		timeout = time.Duration(timeoutSeconds * int(time.Second))
 	}
-	client := &http.Client{Timeout: timeout}
+	client := &http.Client{
+		Timeout: timeout,
+		Transport: &http.Transport{
+			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+		}}
 	req, err := http.NewRequest(method, m.RemoteApiList[apiName].Domain+"/"+path, bytes.NewBuffer(requestJson))
 	if err != nil {
 		return nil, "Generate Request Failed", http.StatusInternalServerError, err
