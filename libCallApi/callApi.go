@@ -141,7 +141,8 @@ func GetResp[Resp any](api RemoteApi, resp *http.Response) (*CallResp, *response
 		return nil, response.Error(http.StatusRequestTimeout, "API_UNABLE_TO_READ", api.Name, err)
 	}
 	var respJson Resp
-	if json.Unmarshal(responseData, &respJson) == nil {
+	err = json.Unmarshal(responseData, &respJson)
+	if err != nil {
 		return nil, response.Error(resp.StatusCode, "API_NOK", api.Name, err)
 	}
 	headerMap := make(map[string]string, 0)
