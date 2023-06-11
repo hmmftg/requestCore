@@ -128,28 +128,36 @@ type CallData struct {
 
 type CallResp struct {
 	Headers map[string]string
-	Resp    any
 	Status  int
 }
 
-func GetResp[Resp any](api RemoteApi, resp *http.Response) (*CallResp, *response.ErrorState) {
+func GetResp[Resp any, Error any](api RemoteApi, resp *http.Response) (*Resp, *Error, *CallResp, *response.ErrorState) {
 	responseData, err := io.ReadAll(resp.Body)
 	if err != nil {
 		if os.IsTimeout(err) {
-			return nil, response.Error(http.StatusRequestTimeout, "API_READ_TIMED_OUT", api.Name, err)
+			return nil, nil, nil, response.Error(http.StatusRequestTimeout, "API_READ_TIMED_OUT", api.Name, err)
 		}
-		return nil, response.Error(http.StatusRequestTimeout, "API_UNABLE_TO_READ", api.Name, err)
+		return nil, nil, nil, response.Error(http.StatusRequestTimeout, "API_UNABLE_TO_READ", api.Name, err)
 	}
 	var respJson Resp
-	err = json.Unmarshal(responseData, &respJson)
-	if err != nil {
-		return nil, response.Error(resp.StatusCode, "API_NOK", api.Name, err)
+	var errJson Error
+	switch resp.StatusCode {
+	case http.StatusOK:
+		err = json.Unmarshal(responseData, &respJson)
+		if err != nil {
+			return nil, nil, nil, response.Error(resp.StatusCode, "API_NOK", api.Name, err)
+		}
+	default:
+		err = json.Unmarshal(responseData, &errJson)
+		if err != nil {
+			return nil, nil, nil, response.Error(resp.StatusCode, "API_NOK", api.Name, err)
+		}
 	}
 	headerMap := make(map[string]string, 0)
 	for key, header := range resp.Header {
 		headerMap[key] = header[0]
 	}
-	return &CallResp{Resp: respJson, Status: resp.StatusCode, Headers: headerMap}, nil
+	return &respJson, &errJson, &CallResp{Status: resp.StatusCode, Headers: headerMap}, nil
 }
 
 func PrepareCall(c CallData) (*http.Request, *response.ErrorState) {
@@ -176,14 +184,14 @@ func PrepareCall(c CallData) (*http.Request, *response.ErrorState) {
 	return req, nil
 }
 
-func ConsumeRest[Resp any](c CallData) (*CallResp, *response.ErrorState) {
+func ConsumeRest[Resp any](c CallData) (*Resp, *response.WsRemoteResponse, *CallResp, *response.ErrorState) {
 	if c.Timeout == 0 {
 		c.Timeout = time.Duration(30 * time.Second)
 	}
 
 	req, errPrepare := PrepareCall(c)
 	if errPrepare != nil {
-		return nil, errPrepare
+		return nil, nil, nil, errPrepare
 	}
 
 	client := &http.Client{
@@ -194,17 +202,19 @@ func ConsumeRest[Resp any](c CallData) (*CallResp, *response.ErrorState) {
 	resp, err := client.Do(req)
 	if err != nil {
 		if os.IsTimeout(err) {
-			return nil, response.Error(http.StatusRequestTimeout, "API_CONNECT_TIMED_OUT", c, err)
+			return nil, nil, nil, response.Error(http.StatusRequestTimeout, "API_CONNECT_TIMED_OUT", c, err)
 		}
-		return nil, response.Error(http.StatusRequestTimeout, "API_UNABLE_TO_CALL", c, err)
+		return nil, nil, nil, response.Error(http.StatusRequestTimeout, "API_UNABLE_TO_CALL", c, err)
 	}
+	var respJson *Resp
+	var errResp *response.WsRemoteResponse
 
-	callResp, errParse := GetResp[Resp](c.Api, resp)
+	respJson, errResp, callResp, errParse := GetResp[Resp, response.WsRemoteResponse](c.Api, resp)
 	if errParse != nil {
-		return nil, errParse
+		return nil, nil, callResp, errParse
 	}
 
-	return callResp, nil
+	return respJson, errResp, callResp, nil
 }
 
 func TransmitRequestWithAuth(
