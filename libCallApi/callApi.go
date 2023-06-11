@@ -116,6 +116,96 @@ func (m RemoteApiModel) ConsumeRestApi(requestJson []byte, apiName, path, conten
 	return responseData, resp.Status, resp.StatusCode, nil
 }
 
+type CallData struct {
+	Api       RemoteApi
+	Path      string
+	Method    string
+	Headers   map[string]string
+	Req       any
+	SslVerify bool
+	Timeout   time.Duration
+}
+
+type CallResp struct {
+	Headers map[string]string
+	Resp    []byte
+	Status  int
+}
+
+func GetResp[Resp any](api RemoteApi, resp *http.Response) (*CallResp, *response.ErrorState) {
+	responseData, err := io.ReadAll(resp.Body)
+	if err != nil {
+		if os.IsTimeout(err) {
+			return nil, response.Error(http.StatusRequestTimeout, "API_READ_TIMED_OUT", api.Name, err)
+		}
+		return nil, response.Error(http.StatusRequestTimeout, "API_UNABLE_TO_READ", api.Name, err)
+	}
+	var respJson Resp
+	if json.Unmarshal(responseData, &respJson) == nil {
+		return nil, response.Error(resp.StatusCode, "API_NOK", api.Name, err)
+	}
+	headerMap := make(map[string]string, 0)
+	for key, header := range resp.Header {
+		headerMap[key] = header[0]
+	}
+	return &CallResp{Resp: responseData, Status: resp.StatusCode, Headers: headerMap}, nil
+}
+
+func PrepareCall(c CallData) (*http.Request, *response.ErrorState) {
+	if timeOutString, ok := c.Headers["Time-Out"]; ok {
+		timeoutSeconds, _ := strconv.Atoi(timeOutString)
+		c.Timeout = time.Duration(timeoutSeconds * int(time.Second))
+	}
+	requestJson, err := json.Marshal(c.Req)
+	if err != nil {
+		return nil, response.Error(http.StatusInternalServerError, "Generate Request Failed", c.Req, err)
+	}
+	req, err := http.NewRequest(c.Method, c.Api.Domain+"/"+c.Path, bytes.NewBuffer(requestJson))
+	if err != nil {
+		return nil, response.Error(http.StatusInternalServerError, "Generate Request Failed", fmt.Sprintf("M=%s,Url:%s,json:%s", c.Method, c.Api.Domain+"/"+c.Path, string(requestJson)), err)
+	}
+	if _, ok := c.Headers["Authorization"]; !ok {
+		req.SetBasicAuth(c.Api.User, c.Api.Password)
+	}
+	req.Header.Add("Content-Type", "")
+	for header, value := range c.Headers {
+		req.Header.Add(header, value)
+	}
+
+	return req, nil
+}
+
+func ConsumeRest[Resp any](c CallData) (*CallResp, *response.ErrorState) {
+	if c.Timeout == 0 {
+		c.Timeout = time.Duration(30 * time.Second)
+	}
+
+	req, errPrepare := PrepareCall(c)
+	if errPrepare != nil {
+		return nil, errPrepare
+	}
+
+	client := &http.Client{
+		Timeout: c.Timeout,
+		Transport: &http.Transport{
+			TLSClientConfig: &tls.Config{InsecureSkipVerify: c.SslVerify},
+		}}
+	resp, err := client.Do(req)
+	if err != nil {
+		if os.IsTimeout(err) {
+			return nil, response.Error(http.StatusRequestTimeout, "API_CONNECT_TIMED_OUT", c, err)
+		}
+		return nil, response.Error(http.StatusRequestTimeout, "API_UNABLE_TO_CALL", c, err)
+	}
+
+	callResp, errParse := GetResp[Resp](c.Api, resp)
+	if errParse != nil {
+		return nil, errParse
+	}
+
+	return callResp, nil
+}
+
 func TransmitRequestWithAuth(
 	path, api, method string,
 	requestByte []byte,

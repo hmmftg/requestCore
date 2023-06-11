@@ -44,6 +44,48 @@ type DbResponse struct {
 	ErrorCode   string `json:"error_code,omitempty"`
 }
 
+type ErrorState struct {
+	ErrorDesc   string
+	Status      int
+	Description string
+	Message     any
+	Child       error
+}
+
+func (e ErrorState) Error() string {
+	return e.ErrorDesc
+}
+
+func (e ErrorState) WsResponse() string {
+	return fmt.Sprintf("%s#%s#%s#%d", e.Description, e.ErrorDesc, e.Message, e.Status)
+}
+
+func ToErrorState(err error) *ErrorState {
+	return &ErrorState{
+		ErrorDesc: err.Error(),
+		Child:     err,
+	}
+}
+
+func ToError(desc string, message any, err error) *ErrorState {
+	return &ErrorState{
+		ErrorDesc:   err.Error(),
+		Child:       err,
+		Description: desc,
+		Message:     message,
+	}
+}
+
+func Error(status int, desc string, message any, err error) *ErrorState {
+	return &ErrorState{
+		ErrorDesc:   err.Error(),
+		Child:       err,
+		Description: desc,
+		Message:     message,
+		Status:      status,
+	}
+}
+
 func FormatErrorResp(errs error, trans ut.Translator) []ErrorResponse {
 	fmt.Println(errs)
 	err := errs.(validator.ValidationErrors)
