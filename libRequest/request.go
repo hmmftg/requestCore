@@ -16,9 +16,11 @@ func (m RequestModel) Initialize(c webFramework.WebFramework, method, url string
 		return http.StatusBadRequest, map[string]string{"desc": "DUPLICATE_REQUEST", "message": "Duplicate Request"}, err
 	}
 	m.AddRequestEvent(c, req.BranchId, method, "start", req)
-	req.Header.Program, req.Header.Module = m.QueryInterface.GetModule()
-	req.Header.User = c.Parser.GetLocalString("userId")
-	req.Header.Method = method
+	prg, mdl := m.QueryInterface.GetModule()
+	req.Header.SetProgram(prg)
+	req.Header.SetModule(mdl)
+	req.Header.SetUser(c.Parser.GetLocalString("userId"))
+	req.Header.SetMethod(method)
 	m.InsertRequest(*req)
 	if err != nil {
 		return http.StatusServiceUnavailable, map[string]string{"desc": "PWC_REGISTER", "message": "Unable To Register Request"}, err
@@ -122,10 +124,10 @@ func (m RequestModel) InsertRequest(request Request) error {
 	}
 	row := string(rowByte)
 	args := make([]any, 5)
-	args[0] = request.Header.User
-	args[1] = request.Header.Program
-	args[2] = request.Header.Module
-	args[3] = request.Header.Method
+	args[0] = request.Header.GetUser()
+	args[1] = request.Header.GetProgram()
+	args[2] = request.Header.GetModule()
+	args[3] = request.Header.GetMethod()
 	args[4] = row
 	if strings.Contains(m.InsertInDb, "$6") {
 		args = append(args, request.Req)
@@ -142,18 +144,18 @@ func (m RequestModel) InsertRequest(request Request) error {
 }
 
 func (m RequestModel) CheckDuplicateRequest(request Request) error {
-	ret, result, err := m.QueryInterface.QueryRunner(m.QueryInDb, request.Header.RequestId)
+	ret, result, err := m.QueryInterface.QueryRunner(m.QueryInDb, request.Header.GetId())
 	if err != nil {
 		return err
 	}
 	if ret != 0 {
 		if len(result) > 0 {
-			return fmt.Errorf("query(%s)=>%d", request.Header.RequestId, ret)
+			return fmt.Errorf("query(%s)=>%d", request.Header.GetId(), ret)
 		}
-		return fmt.Errorf("query(%s)=>%d,%s", request.Header.RequestId, ret, result[0])
+		return fmt.Errorf("query(%s)=>%d,%s", request.Header.GetId(), ret, result[0])
 	}
 	if len(result) > 0 {
-		return fmt.Errorf("duplicate Request: id: %s", request.Header.RequestId)
+		return fmt.Errorf("duplicate Request: id: %s", request.Header.GetId())
 	}
 	return nil
 }
