@@ -23,6 +23,25 @@ type WsRemoteResponse struct {
 	ErrorData   []ErrorResponse `json:"errors,omitempty"`
 }
 
+func (e WsRemoteResponse) ToErrorState() ErrorState {
+	if len(e.Description) > 0 {
+		return ErrorState{
+			Description: e.Description,
+			Status:      e.Status,
+			Message:     e.Result,
+			ErrorDesc:   e.Description,
+		}
+	}
+	lastId := len(e.ErrorData)
+	return ErrorState{
+		Description: e.ErrorData[0].Code,
+		Status:      1,
+		Message:     e.ErrorData[0].Description,
+		ErrorDesc:   e.ErrorData[0].Code,
+		Child:       fmt.Errorf("%s#%s", e.ErrorData[lastId].Code, e.ErrorData[lastId].Description),
+	}
+}
+
 type WsResponse struct {
 	Status       int     `json:"status"`
 	Description  string  `json:"description"`
