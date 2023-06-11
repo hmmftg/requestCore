@@ -52,6 +52,18 @@ func (m FiberModel) HandleErrorState(err error, status int, message string, data
 	m.Respond(status, 1, message, data, true, c)
 }
 
+func (m FiberModel) ErrorState(ctx any, err *response.ErrorState) {
+	c := ctx.(*fiber.Ctx)
+	fmt.Println(err.Error(), stacktrace.PropagateWithDepth(err, 1, ""))
+
+	if r := c.Locals("reqLog"); r != nil {
+		reqLog := r.(*libRequest.Request)
+		m.RequestInterface.LogEnd("HandleError", fmt.Sprintf("desc: %s, err: %v, data: %v", err.Description, err, err.Message), reqLog)
+	}
+
+	m.Respond(err.Status, 1, err.Description, err.Message, true, c)
+}
+
 func Respond(code, status int, message string, data any, abort bool, ctx any) {
 	c := ctx.(*fiber.Ctx)
 	var resp response.WsResponse

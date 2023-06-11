@@ -26,6 +26,18 @@ func (m GinModel) HandleErrorState(err error, status int, message string, data a
 	m.Respond(status, 1, message, data, true, c)
 }
 
+func (m GinModel) ErrorState(ctx any, err *response.ErrorState) {
+	c := ctx.(*gin.Context)
+	fmt.Println(err.Error(), stacktrace.PropagateWithDepth(err, 1, ""))
+
+	if r, ok := c.Get("reqLog"); ok {
+		reqLog := r.(*libRequest.Request)
+		m.RequestInterface.LogEnd("HandleError", fmt.Sprintf("desc: %s, err: %v, data: %v", err.Description, err, err.Message), reqLog)
+	}
+
+	m.Respond(err.Status, 1, err.Description, err.Message, true, c)
+}
+
 func (m GinModel) Respond(code, status int, message string, data any, abort bool, ctx any) {
 	m.RespondWithReceipt(code, status, message, data, response.Receipt{}, abort, ctx)
 }

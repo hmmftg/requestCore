@@ -128,7 +128,7 @@ type CallData struct {
 
 type CallResp struct {
 	Headers map[string]string
-	Resp    []byte
+	Resp    any
 	Status  int
 }
 
@@ -148,7 +148,7 @@ func GetResp[Resp any](api RemoteApi, resp *http.Response) (*CallResp, *response
 	for key, header := range resp.Header {
 		headerMap[key] = header[0]
 	}
-	return &CallResp{Resp: responseData, Status: resp.StatusCode, Headers: headerMap}, nil
+	return &CallResp{Resp: respJson, Status: resp.StatusCode, Headers: headerMap}, nil
 }
 
 func PrepareCall(c CallData) (*http.Request, *response.ErrorState) {
@@ -167,7 +167,7 @@ func PrepareCall(c CallData) (*http.Request, *response.ErrorState) {
 	if _, ok := c.Headers["Authorization"]; !ok {
 		req.SetBasicAuth(c.Api.User, c.Api.Password)
 	}
-	req.Header.Add("Content-Type", "")
+	req.Header.Add("Content-Type", "application/json")
 	for header, value := range c.Headers {
 		req.Header.Add(header, value)
 	}
