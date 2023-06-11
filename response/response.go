@@ -32,7 +32,7 @@ func (e WsRemoteResponse) ToErrorState() *ErrorState {
 			ErrorDesc:   e.Description,
 		}
 	}
-	lastId := len(e.ErrorData)
+	lastId := len(e.ErrorData) - 1
 	return &ErrorState{
 		Description: e.ErrorData[0].Code,
 		Status:      1,
