@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -94,7 +95,7 @@ func ConsumeRemoteGetApi(
 	api, url string,
 	core RequestCoreInterface,
 	args ...any) any {
-	fmt.Println("ConsumeRemoteGetApi...")
+	log.Println("ConsumeRemoteGetApi...")
 	return func(c any) {
 		w := libContext.InitContext(c)
 		fullPath := url
@@ -103,7 +104,7 @@ func ConsumeRemoteGetApi(
 		}
 		status, code, desc, message, broken, err := ConsumeRemoteGet(w, api, fullPath, core, args...)
 		if err != nil {
-			fmt.Println(err.Error(), stacktrace.Propagate(err, ""))
+			log.Println(err.Error(), stacktrace.Propagate(err, ""))
 		}
 		core.Responder().Respond(status, code, desc, message, broken, c)
 	}
@@ -122,7 +123,7 @@ func CallRemote[Req any, Resp any](
 	core RequestCoreInterface,
 	args ...string,
 ) any {
-	fmt.Println("Registering: ", title)
+	log.Println("Registering: ", title)
 	return func(c any) {
 		w := libContext.InitContext(c)
 		headers := make(map[string]string, 0)
@@ -176,7 +177,7 @@ func CallRemoteWithRespParser[Req any, Resp any](
 	parseRemoteResp func([]byte, string, int) (int, map[string]string, any, error),
 	args ...string,
 ) any {
-	fmt.Println("Registering: ", title)
+	log.Println("Registering: ", title)
 	return func(c any) {
 		w := libContext.InitContext(c)
 		headers := make(map[string]string, 0)

@@ -1,7 +1,7 @@
 package libRequest
 
 import (
-	"fmt"
+	"log"
 	"time"
 
 	"github.com/hmmftg/requestCore/libValidate"
@@ -20,7 +20,7 @@ func GetRequest[Q any](ctx webFramework.WebFramework, isJson bool) (int, string,
 	var header RequestHeader
 	err = ctx.Parser.GetHeader(&header)
 	if err != nil {
-		fmt.Println(ctx.Parser.GetHttpHeader())
+		log.Println(ctx.Parser.GetHttpHeader())
 		return 400, "HEADER_ABSENT", nil, request, req, err
 	}
 
@@ -73,7 +73,7 @@ func Req[Req any, Header HeaderInterface](ctx webFramework.WebFramework, isJson 
 	var header Header
 	err = ctx.Parser.GetHeader(&header)
 	if err != nil {
-		fmt.Println(ctx.Parser.GetHttpHeader())
+		log.Println(ctx.Parser.GetHttpHeader())
 		return 400, "HEADER_ABSENT", nil, request, req, err
 	}
 

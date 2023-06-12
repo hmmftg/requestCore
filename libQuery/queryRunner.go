@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"reflect"
 	"strconv"
@@ -55,7 +56,7 @@ func (m QueryRunnerModel) InsertRow(insert string, args ...any) (sql.Result, err
 		insert,
 		args...)
 	if err != nil {
-		fmt.Println("InsertRow(", insert, args, ")=>", result, err)
+		log.Println("InsertRow(", insert, args, ")=>", result, err)
 		return nil, err
 	}
 	return result, nil
@@ -112,7 +113,7 @@ func (m QueryRunnerModel) QueryRunner(querySql string, args ...any) (int, []any,
 			case "INT4", "NUMBER":
 				scanArgs[i] = new(sql.NullInt64)
 			default:
-				fmt.Println("Undefined Type Name: ", v.DatabaseTypeName())
+				log.Println("Undefined Type Name: ", v.DatabaseTypeName())
 				scanArgs[i] = new(sql.NullString)
 			}
 		}
@@ -197,15 +198,15 @@ func ConvertJsonToStruct[Q any](row string) (Q, error) {
 
 func GetQueryResp[R any](query string, core QueryRunnerInterface, args ...any) (int, string, string, bool, any, error) {
 	//Query
-	//fmt.Println("Fetching Query: ", query, "args:", len(args), "arg[0]", args[0])
+	//log.Println("Fetching Query: ", query, "args:", len(args), "arg[0]", args[0])
 	var target R
 	nRet, result, err := core.QueryToStruct(query, target, args...)
 	if nRet != 0 || err != nil {
-		fmt.Printf("Error Query: %+v, %+v, %v, %s\n", err, result, args, query)
+		log.Printf("Error Query: %+v, %+v, %v, %s\n", err, result, args, query)
 		return 500, "DB_READ_ERROR", err.Error(), true, nil, err
 	}
 	if err != nil {
-		fmt.Printf("Error Conversion: %+v, %+v\n", err, result)
+		log.Printf("Error Conversion: %+v, %+v\n", err, result)
 		return 400, "", "Unable to parse response", true, nil, err
 	}
 	return 200, "", "", false, result, nil
@@ -218,10 +219,10 @@ func CallSql[R any](query string,
 	if err != nil {
 		return code, desc, data, nil, err
 	}
-	//fmt.Println(resultQuery)
+	//log.Println(resultQuery)
 	array := resultQuery.([]R)
 	if len(array) == 0 {
-		fmt.Println("No Data Found", query, args)
+		log.Println("No Data Found", query, args)
 		return 400, "PWC_WS_0008", "No Data Found", nil, fmt.Errorf("no data found")
 	}
 	return 200, desc, data, array, nil

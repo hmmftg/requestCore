@@ -10,6 +10,7 @@ require (
 	github.com/gofiber/fiber/v2 v2.46.0
 	github.com/hmmftg/stacktrace v0.0.0-20221203072522-92b9b7adfc8d
 	github.com/valyala/fasttemplate v1.2.2
+	gopkg.in/natefinch/lumberjack.v2 v2.2.1
 )
 
 require (

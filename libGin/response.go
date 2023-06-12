@@ -2,6 +2,7 @@ package libGin
 
 import (
 	"fmt"
+	"log"
 
 	"github.com/hmmftg/requestCore/libRequest"
 	"github.com/hmmftg/requestCore/response"
@@ -12,7 +13,7 @@ import (
 
 func (m GinModel) HandleErrorState(err error, status int, message string, data any, ctx any) {
 	c := ctx.(*gin.Context)
-	fmt.Println(err.Error(), stacktrace.PropagateWithDepth(err, 1, ""))
+	log.Println(err.Error(), stacktrace.PropagateWithDepth(err, 1, ""))
 
 	if r, ok := c.Get("reqLog"); ok {
 		reqLog := r.(*libRequest.Request)
@@ -28,7 +29,7 @@ func (m GinModel) HandleErrorState(err error, status int, message string, data a
 
 func (m GinModel) ErrorState(ctx any, err *response.ErrorState) {
 	c := ctx.(*gin.Context)
-	fmt.Println(err.Error(), stacktrace.PropagateWithDepth(err, 1, ""))
+	log.Println(err.Error(), stacktrace.PropagateWithDepth(err, 1, ""))
 
 	if r, ok := c.Get("reqLog"); ok {
 		reqLog := r.(*libRequest.Request)

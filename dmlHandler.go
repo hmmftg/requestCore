@@ -2,6 +2,7 @@ package requestCore
 
 import (
 	"fmt"
+	"log"
 	"net/http"
 	"net/url"
 	"strings"
@@ -17,7 +18,7 @@ func PostHandler[Req libQuery.RecordDataDml](title string,
 	finalizer func(request Req, c any),
 	args ...any,
 ) any {
-	fmt.Println("Registering: ", title)
+	log.Println("Registering: ", title)
 	return func(c any) {
 		w := libContext.InitContext(c)
 		code, desc, arrayErr, request, reqLog, err := libRequest.GetRequest[Req](w, true)
@@ -75,7 +76,7 @@ func PutHandler[Req libQuery.RecordDataDml](title string,
 	finalizer func(request Req, c any),
 	args ...any,
 ) any {
-	fmt.Println("Registering: ", title)
+	log.Println("Registering: ", title)
 	return func(c any) {
 		w := libContext.InitContext(c)
 		id := w.Parser.GetUrlParam("id")
@@ -122,7 +123,7 @@ func DeleteHandler[Req libQuery.RecordData](title, delete, checkQuery string,
 	core RequestCoreInterface,
 	hasInitializer bool, parser libQuery.FieldParser,
 ) any {
-	fmt.Println("Registering: ", title)
+	log.Println("Registering: ", title)
 	return func(c any) {
 		w := libContext.InitContext(c)
 		id := w.Parser.GetUrlParam("id")
@@ -176,7 +177,7 @@ func UpdateHandler[Req libQuery.Updatable](title string, hasreqLog bool,
 	finalizer func(request Req, c any),
 	args ...string,
 ) any {
-	fmt.Println("Registering: ", title)
+	log.Println("Registering: ", title)
 	return func(c any) {
 		w := libContext.InitContext(c)
 		params := make(map[string]string, 0)

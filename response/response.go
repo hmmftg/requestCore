@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
 	"net/http"
 	"strings"
 
@@ -106,7 +107,7 @@ func Error(status int, desc string, message any, err error) *ErrorState {
 }
 
 func FormatErrorResp(errs error, trans ut.Translator) []ErrorResponse {
-	fmt.Println(errs)
+	log.Println(errs)
 	err := errs.(validator.ValidationErrors)
 	errorResponses := make([]ErrorResponse, 0)
 	for _, validationError := range err {
@@ -161,9 +162,9 @@ func JustPrintResp(respBytes []byte, desc string, status int) (int, map[string]s
 	var resp WsRemoteResponse
 	err = json.Unmarshal(respBytes, &resp)
 	if err != nil {
-		fmt.Println(string(respBytes))
+		log.Println(string(respBytes))
 	}
-	fmt.Println(resp)
+	log.Println(resp)
 	return status, nil, nil, nil
 }
 

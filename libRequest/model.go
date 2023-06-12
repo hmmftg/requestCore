@@ -14,6 +14,12 @@ type RequestModel struct {
 	QueryInDb      string
 }
 
+type LoggerInterface interface {
+	GetLogPath() string
+	GetLogSize() int
+	GetLogCompress() bool
+}
+
 type RequestInterface interface {
 	Initialize(c webFramework.WebFramework, method, url string, req *Request, args ...any) (int, map[string]string, error)
 	InitializeNoLog(c webFramework.WebFramework, method, url string, req *Request, args ...any) (int, map[string]string, error)

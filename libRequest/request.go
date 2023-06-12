@@ -3,6 +3,7 @@ package libRequest
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"strings"
 	"time"
@@ -137,7 +138,7 @@ func (m RequestModel) InsertRequest(request Request) error {
 		args...,
 	)
 	if err != nil {
-		fmt.Println("InsertNewRequest(", row, ")=>", ret, msg, err)
+		log.Println("InsertNewRequest(", row, ")=>", ret, msg, err)
 		return err
 	}
 	return nil
@@ -178,7 +179,7 @@ func (m RequestModel) UpdateRequest(request Request) error {
 		args...,
 	)
 	if err != nil {
-		fmt.Println("UpdateRequest(", request.Id, string(requestBytes), ")=>", ret, msg, err)
+		log.Println("UpdateRequest(", request.Id, string(requestBytes), ")=>", ret, msg, err)
 		return err
 	}
 	return nil

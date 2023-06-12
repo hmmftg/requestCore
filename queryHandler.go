@@ -3,6 +3,7 @@ package requestCore
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"strings"
 
@@ -18,7 +19,7 @@ type Empty struct {
 func GetSingleRecordHandler[Req, Resp any](title, sql string,
 	core RequestCoreInterface,
 ) any {
-	fmt.Println("Registering: ", title)
+	log.Println("Registering: ", title)
 	return func(c any) {
 		w := libContext.InitContext(c)
 		id := w.Parser.GetUrlParam("id")
@@ -42,7 +43,7 @@ func GetSingleRecordHandler[Req, Resp any](title, sql string,
 		var result []Resp
 		err = json.Unmarshal([]byte(respRaw[0].DataRaw), &result)
 		if err != nil {
-			fmt.Println(title, "Unmarshal DataRaw", err, respRaw[0].DataRaw)
+			log.Println(title, "Unmarshal DataRaw", err, respRaw[0].DataRaw)
 			core.Responder().HandleErrorState(err, http.StatusInternalServerError, "DB_RESP_PARSE_ERROR", respRaw[0].DataRaw, c)
 			return
 		}
@@ -53,7 +54,7 @@ func GetSingleRecordHandler[Req, Resp any](title, sql string,
 func GetMapHandler[Req any, Resp libQuery.RecordData](title, sql string,
 	core RequestCoreInterface,
 	hasParam bool) any {
-	fmt.Println("Registering: ", title)
+	log.Println("Registering: ", title)
 	return func(c any) {
 		w := libContext.InitContext(c)
 		id := ""
@@ -90,7 +91,7 @@ func GetMapHandler[Req any, Resp libQuery.RecordData](title, sql string,
 		var result []Resp
 		err = json.Unmarshal([]byte(respRaw[0].DataRaw), &result)
 		if err != nil {
-			fmt.Println(title, "Unmarshal DataRaw", err, respRaw[0].DataRaw)
+			log.Println(title, "Unmarshal DataRaw", err, respRaw[0].DataRaw)
 			core.Responder().HandleErrorState(err, http.StatusInternalServerError, "DB_RESP_PARSE_ERROR", respRaw[0].DataRaw, c)
 			return
 		}
@@ -105,7 +106,7 @@ func GetMapHandler[Req any, Resp libQuery.RecordData](title, sql string,
 func GetMapBySubHandler[Req any, Resp libQuery.RecordData](title, sql string,
 	core RequestCoreInterface,
 	hasParam bool) any {
-	fmt.Println("Registering: ", title)
+	log.Println("Registering: ", title)
 	return func(c any) {
 		w := libContext.InitContext(c)
 		id := ""
@@ -142,7 +143,7 @@ func GetMapBySubHandler[Req any, Resp libQuery.RecordData](title, sql string,
 		var result []Resp
 		err = json.Unmarshal([]byte(respRaw[0].DataRaw), &result)
 		if err != nil {
-			fmt.Println(title, "Unmarshal DataRaw", err, respRaw[0].DataRaw)
+			log.Println(title, "Unmarshal DataRaw", err, respRaw[0].DataRaw)
 			core.Responder().HandleErrorState(err, http.StatusInternalServerError, "DB_RESP_PARSE_ERROR", respRaw[0].DataRaw, c)
 			return
 		}
@@ -162,7 +163,7 @@ func GetMapBySubHandler[Req any, Resp libQuery.RecordData](title, sql string,
 func GetQuery[Req any](title, sql string,
 	core RequestCoreInterface,
 	hasParam bool) any {
-	fmt.Println("Registering: ", title)
+	log.Println("Registering: ", title)
 	return func(c any) {
 		w := libContext.InitContext(c)
 		id := ""
@@ -198,7 +199,7 @@ func GetQuery[Req any](title, sql string,
 		var result []map[string]any
 		err = json.Unmarshal([]byte(respRaw[0].DataRaw), &result)
 		if err != nil {
-			fmt.Println(title, "Unmarshal DataRaw", err, respRaw[0].DataRaw)
+			log.Println(title, "Unmarshal DataRaw", err, respRaw[0].DataRaw)
 			core.Responder().HandleErrorState(err, http.StatusInternalServerError, "DB_RESP_PARSE_ERROR", respRaw[0].DataRaw, c)
 			return
 		}
@@ -209,7 +210,7 @@ func GetQuery[Req any](title, sql string,
 func GetQueryMap[Req any](title, sql string,
 	core RequestCoreInterface,
 	hasParam bool) any {
-	fmt.Println("Registering: ", title)
+	log.Println("Registering: ", title)
 	return func(c any) {
 		w := libContext.InitContext(c)
 		id := ""
@@ -248,7 +249,7 @@ func GetQueryMap[Req any](title, sql string,
 				var mapData []map[string]map[string]any
 				err = json.Unmarshal([]byte(row.MapList), &mapData)
 				if err != nil {
-					fmt.Println(title, "Unmarshal DataRaw", err, row.MapList)
+					log.Println(title, "Unmarshal DataRaw", err, row.MapList)
 					core.Responder().HandleErrorState(err, http.StatusInternalServerError, "DB_RESP_PARSE_ERROR", row.MapList, c)
 					return
 				}
@@ -273,7 +274,7 @@ func GetQueryMap[Req any](title, sql string,
 func GetQueryHandler[Req, Resp any](title, sql string,
 	core RequestCoreInterface,
 	args ...any) any {
-	fmt.Println("Registering: ", title)
+	log.Println("Registering: ", title)
 	return func(c any) {
 		w := libContext.InitContext(c)
 		code, desc, arrayErr, _, _, err := libRequest.GetRequest[Req](w, false)
@@ -295,7 +296,7 @@ func GetQueryHandler[Req, Resp any](title, sql string,
 		var result []Resp
 		err = json.Unmarshal([]byte(respRaw[0].DataRaw), &result)
 		if err != nil {
-			fmt.Println(title, "Unmarshal DataRaw", err, respRaw[0].DataRaw)
+			log.Println(title, "Unmarshal DataRaw", err, respRaw[0].DataRaw)
 			core.Responder().HandleErrorState(err, http.StatusInternalServerError, "DB_RESP_PARSE_ERROR", respRaw[0].DataRaw, c)
 			return
 		}
@@ -308,7 +309,7 @@ func GetQueryFillable[Resp libQuery.QueryWithDeps](
 	core RequestCoreInterface,
 	args ...string,
 ) any {
-	fmt.Println(title + "...")
+	log.Println(title + "...")
 	return func(c any) {
 		w := libContext.InitContext(c)
 		params := []any{}
@@ -331,7 +332,7 @@ func GetQueryFillable[Resp libQuery.QueryWithDeps](
 		for _, row := range result {
 			fillResp, err := row.GetFillables(core.GetDB())
 			if err != nil {
-				fmt.Println(fillResp["Desc"], fillResp["Field"], fillResp["Data"])
+				log.Println(fillResp["Desc"], fillResp["Field"], fillResp["Data"])
 				core.Responder().Respond(code, 1, fillResp["Desc"].(string), fillResp["Data"], true, c)
 				return
 			}
@@ -351,7 +352,7 @@ func GetAllMapHandler[Model MapHandler](title string,
 	core RequestCoreInterface,
 	respHandler response.ResponseHandler,
 	args ...any) any {
-	fmt.Println("Registering: ", title)
+	log.Println("Registering: ", title)
 	return func(c any) {
 		var model Model
 		result, desc, err := model.GetAllMap(core)
@@ -380,7 +381,7 @@ func GetSingleRecord[Model GetHandler](title string,
 	core RequestCoreInterface,
 	respHandler response.ResponseHandler,
 	args ...any) any {
-	fmt.Println("Registering: ", title)
+	log.Println("Registering: ", title)
 	return func(c any) {
 		w := libContext.InitContext(c)
 		code, desc, arrayErr, model, _, err := libRequest.GetRequest[Model](w, false)
@@ -401,7 +402,7 @@ func GetAll[Model GetHandler](title string,
 	core RequestCoreInterface,
 	respHandler response.ResponseHandler,
 	args ...any) any {
-	fmt.Println("Registering: ", title)
+	log.Println("Registering: ", title)
 	return func(c any) {
 		var model Model
 		result, desc, err := model.GetAll(core)
@@ -425,7 +426,7 @@ func GetPage[Model GetPageHandler](title string,
 	core RequestCoreInterface,
 	respHandler response.ResponseHandler,
 	args ...any) any {
-	fmt.Println("Registering: ", title)
+	log.Println("Registering: ", title)
 	return func(c any) {
 		w := libContext.InitContext(c)
 		code, desc, arrayErr, model, _, err := libRequest.GetRequest[Model](w, false)

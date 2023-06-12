@@ -8,6 +8,7 @@ import (
 	"encoding/xml"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"os"
 	"strconv"
@@ -254,7 +255,7 @@ func TransmitSoap[Resp any](request any, url string, debug bool, timeout time.Du
 		return nil, err
 	}
 	if debug {
-		fmt.Println(string(result))
+		log.Println(string(result))
 	}
 	var respXml Resp
 	err = xml.Unmarshal(result, &respXml)

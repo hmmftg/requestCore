@@ -2,6 +2,7 @@ package libFiber
 
 import (
 	"fmt"
+	"log"
 	"net/http"
 
 	"github.com/hmmftg/requestCore/libRequest"
@@ -48,13 +49,13 @@ func (m FiberModel) RespondWithReceipt(code, status int, message string, data an
 
 func (m FiberModel) HandleErrorState(err error, status int, message string, data any, ctx any) {
 	c := ctx.(*fiber.Ctx)
-	fmt.Println(err.Error(), stacktrace.PropagateWithDepth(err, 1, message, data))
+	log.Println(err.Error(), stacktrace.PropagateWithDepth(err, 1, message, data))
 	m.Respond(status, 1, message, data, true, c)
 }
 
 func (m FiberModel) ErrorState(ctx any, err *response.ErrorState) {
 	c := ctx.(*fiber.Ctx)
-	fmt.Println(err.Error(), stacktrace.PropagateWithDepth(err, 1, ""))
+	log.Println(err.Error(), stacktrace.PropagateWithDepth(err, 1, ""))
 
 	if r := c.Locals("reqLog"); r != nil {
 		reqLog := r.(*libRequest.Request)
@@ -85,9 +86,9 @@ func Respond(code, status int, message string, data any, abort bool, ctx any) {
 }
 
 func ErrorHandler(path, title string, respondHandler func(int, int, string, any, bool, any)) fiber.ErrorHandler {
-	fmt.Println("ErrorHandler: ", path, title)
+	log.Println("ErrorHandler: ", path, title)
 	return func(c *fiber.Ctx, err error) error {
-		fmt.Println(path, title, "ErrorHandler", err)
+		log.Println(path, title, "ErrorHandler", err)
 		switch err := err.(type) {
 		case *fiber.Error:
 			switch err.Code {
@@ -95,19 +96,19 @@ func ErrorHandler(path, title string, respondHandler func(int, int, string, any,
 				respondHandler(http.StatusNotFound, 1, "PAGE_NOT_FOUND", err, true, c)
 				return nil
 			}
-			fmt.Println("Fiber Error", err.Code, err.Message)
+			log.Println("Fiber Error", err.Code, err.Message)
 			respondHandler(http.StatusInternalServerError, 1, "INTERNAL_ERROR", err, true, c)
 		default:
 			if c.Locals("LastError") != nil {
-				fmt.Println("LocalError", err)
+				log.Println("LocalError", err)
 				respondHandler(http.StatusInternalServerError, 1, c.Locals("LastError").(string), nil, true, c)
 				return nil
 			}
-			fmt.Println("Unknown", err)
+			log.Println("Unknown", err)
 			respondHandler(http.StatusInternalServerError, 1, "INTERNAL_ERROR", nil, true, c)
 			return nil
 		}
-		fmt.Println("Unknown", err)
+		log.Println("Unknown", err)
 		respondHandler(http.StatusInternalServerError, 1, "INTERNAL_ERROR", nil, true, c)
 		return nil
 	}
