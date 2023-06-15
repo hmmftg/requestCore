@@ -67,14 +67,14 @@ func ConsumeRemoteGet(
 
 	respBytes, desc, err := core.Consumer().ConsumeRestBasicAuthApi(nil, api, path, "application/x-www-form-urlencoded", "GET", nil)
 	if err != nil {
-		return 401, 1, desc, string(respBytes), true, err
+		return http.StatusInternalServerError, 1, desc, string(respBytes), true, err
 	}
 	core.RequestTools().LogEnd("ConsumeRemoteGet", desc, reqLog)
 
 	var resp response.WsRemoteResponse
 	err = json.Unmarshal(respBytes, &resp)
 	if err != nil {
-		return 401, 1, "invalid resp from api:" + api, err.Error(), true, err
+		return http.StatusInternalServerError, 1, "invalid resp from " + api, err.Error(), true, err
 	}
 	stat, err := strconv.Atoi(strings.Split(desc, " ")[0])
 	if stat != http.StatusOK {
@@ -83,12 +83,12 @@ func ConsumeRemoteGet(
 			return stat, 1, errorDesc[0].Code, errorDesc[0].Description, true, errors.New(errorDesc[0].Description.(string))
 		}
 		if len(resp.Description) > 0 {
-			return stat, 1, "Switch Resp", resp.Description, true, err
+			return stat, 1, api + " Resp", resp.Description, true, err
 		}
-		return 401, 1, "invalid resp from switch-api", err.Error(), true, err
+		return http.StatusInternalServerError, 1, "invalid resp from " + api, err.Error(), true, err
 	}
 
-	return 200, 0, "OK", resp.Result, false, nil
+	return http.StatusOK, 0, "OK", resp.Result, false, nil
 }
 
 func ConsumeRemoteGetApi(

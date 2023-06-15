@@ -65,6 +65,8 @@ type DbResponse struct {
 }
 
 type ErrorState struct {
+	Source      string
+	Input       any
 	ErrorDesc   string
 	Status      int
 	Description string
@@ -76,8 +78,18 @@ func (e ErrorState) Error() string {
 	return e.ErrorDesc
 }
 
+func (e ErrorState) AddSource(src string) *ErrorState {
+	e.Source = src
+	return &e
+}
+
+func (e ErrorState) AddInput(in string) *ErrorState {
+	e.Input = in
+	return &e
+}
+
 func (e ErrorState) WsResponse() string {
-	return fmt.Sprintf("%s#%s#%s#%d", e.Description, e.ErrorDesc, e.Message, e.Status)
+	return fmt.Sprintf("%s#%s#%s#%v#%v#%d", e.Description, e.ErrorDesc, e.Source, e.Input, e.Message, e.Status)
 }
 
 func ToErrorState(err error) *ErrorState {
