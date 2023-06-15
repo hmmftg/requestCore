@@ -10,6 +10,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"net/http/httptrace"
 	"os"
 	"strconv"
 	"time"
@@ -125,6 +126,8 @@ type CallData struct {
 	Req       any
 	SslVerify bool
 	Timeout   time.Duration
+	EnableLog bool
+	LogLevel  int
 }
 
 type CallResp struct {
@@ -185,6 +188,32 @@ func PrepareCall(c CallData) (*http.Request, *response.ErrorState) {
 	return req, nil
 }
 
+func (c CallData) SetLogs(req *http.Request) *http.Request {
+	trace := &httptrace.ClientTrace{
+		GotConn: func(connInfo httptrace.GotConnInfo) {
+			log.Println("Got Conn:", connInfo)
+		},
+		ConnectStart: func(network, addr string) {
+			log.Println("Dial start:", network, addr)
+		},
+		ConnectDone: func(network, addr string, err error) {
+			log.Println("Dial done:", network, addr, err)
+		},
+		GotFirstResponseByte: func() {
+			log.Println("First response byte!")
+		},
+		WroteHeaders: func() {
+			log.Println("Wrote headers")
+		},
+		WroteRequest: func(wr httptrace.WroteRequestInfo) {
+			log.Println("Wrote request", wr)
+		},
+	}
+	req = req.WithContext(httptrace.WithClientTrace(req.Context(), trace))
+	log.Println("Starting request!")
+	return req
+}
+
 func ConsumeRest[Resp any](c CallData) (*Resp, *response.WsRemoteResponse, *CallResp, *response.ErrorState) {
 	if c.Timeout == 0 {
 		c.Timeout = time.Duration(30 * time.Second)
@@ -200,6 +229,10 @@ func ConsumeRest[Resp any](c CallData) (*Resp, *response.WsRemoteResponse, *Call
 		Transport: &http.Transport{
 			TLSClientConfig: &tls.Config{InsecureSkipVerify: c.SslVerify},
 		}}
+
+	if c.EnableLog {
+		req = c.SetLogs(req)
+	}
 	resp, err := client.Do(req)
 	if err != nil {
 		if os.IsTimeout(err) {
