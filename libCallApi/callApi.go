@@ -146,12 +146,12 @@ func GetResp[Resp any, Error any](api RemoteApi, resp *http.Response) (*Resp, *E
 	case http.StatusOK:
 		err = json.Unmarshal(responseData, &respJson)
 		if err != nil {
-			return nil, nil, nil, response.Error(resp.StatusCode, "API_OK_RESP_JSON", api.Name, err).AddSource("GetResp.Unmarshal")
+			return nil, nil, nil, response.Error(resp.StatusCode, "API_OK_RESP_JSON", api.Name, err).AddSource("GetResp.Unmarshal").AddInput(responseData)
 		}
 	default:
 		err = json.Unmarshal(responseData, &errJson)
 		if err != nil {
-			return nil, nil, nil, response.Error(resp.StatusCode, "API_NOK_RESP_JSON", api.Name, err).AddSource("GetResp.Unmarshal")
+			return nil, nil, nil, response.Error(resp.StatusCode, "API_NOK_RESP_JSON", api.Name, err).AddSource("GetResp.Unmarshal").AddInput(responseData)
 		}
 	}
 	headerMap := make(map[string]string, 0)
@@ -168,11 +168,11 @@ func PrepareCall(c CallData) (*http.Request, *response.ErrorState) {
 	}
 	requestJson, err := json.Marshal(c.Req)
 	if err != nil {
-		return nil, response.Error(http.StatusInternalServerError, "Generate Request Failed", c.Req, err).AddSource("PrepareCall.Marshal")
+		return nil, response.Error(http.StatusInternalServerError, "Generate Request Failed", c.Req, err).AddSource("PrepareCall.Marshal").AddInput(c.Req)
 	}
 	req, err := http.NewRequest(c.Method, c.Api.Domain+"/"+c.Path, bytes.NewBuffer(requestJson))
 	if err != nil {
-		return nil, response.Error(http.StatusInternalServerError, "Generate Request Failed", fmt.Sprintf("M=%s,Url:%s,json:%s", c.Method, c.Api.Domain+"/"+c.Path, string(requestJson)), err).AddSource("PrepareCall.NewRequest")
+		return nil, response.Error(http.StatusInternalServerError, "Generate Request Failed", fmt.Sprintf("M=%s,Url:%s,json:%s", c.Method, c.Api.Domain+"/"+c.Path, string(requestJson)), err).AddSource("PrepareCall.NewRequest").AddInput(c)
 	}
 	if _, ok := c.Headers["Authorization"]; !ok {
 		req.SetBasicAuth(c.Api.User, c.Api.Password)
@@ -203,9 +203,9 @@ func ConsumeRest[Resp any](c CallData) (*Resp, *response.WsRemoteResponse, *Call
 	resp, err := client.Do(req)
 	if err != nil {
 		if os.IsTimeout(err) {
-			return nil, nil, nil, response.Error(http.StatusRequestTimeout, "API_CONNECT_TIMED_OUT", c, err).AddSource("ConsumeRest.ClientDo")
+			return nil, nil, nil, response.Error(http.StatusRequestTimeout, "API_CONNECT_TIMED_OUT", c, err).AddSource("ConsumeRest.ClientDo").AddInput(req)
 		}
-		return nil, nil, nil, response.Error(http.StatusRequestTimeout, "API_UNABLE_TO_CALL", c, err).AddSource("ConsumeRest.ClientDo")
+		return nil, nil, nil, response.Error(http.StatusRequestTimeout, "API_UNABLE_TO_CALL", c, err).AddSource("ConsumeRest.ClientDo").AddInput(req)
 	}
 	var respJson *Resp
 	var errResp *response.WsRemoteResponse

@@ -83,7 +83,7 @@ func (e ErrorState) AddSource(src string) *ErrorState {
 	return &e
 }
 
-func (e ErrorState) AddInput(in string) *ErrorState {
+func (e ErrorState) AddInput(in any) *ErrorState {
 	e.Input = in
 	return &e
 }
