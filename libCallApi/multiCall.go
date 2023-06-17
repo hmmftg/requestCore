@@ -1,6 +1,7 @@
 package libCallApi
 
 import (
+	"net/http"
 	"time"
 
 	"github.com/hmmftg/requestCore/response"
@@ -39,4 +40,20 @@ func Call[RespType any](param CallParam) CallResult[RespType] {
 	}
 	resp, wsResp, callResp, err := ConsumeRest[RespType](callData)
 	return CallResult[RespType]{resp, wsResp, callResp, err}
+}
+
+type TypeList interface {
+	GetType(int) any
+}
+
+func MultiCall(paramList []CallParam, core CallApiInterface) []CallResult[response.WsRemoteResponse] {
+	resultList := make([]CallResult[response.WsRemoteResponse], 0)
+	for i := 0; i < len(paramList); i++ {
+		resp := Call[response.WsRemoteResponse](paramList[i])
+		resultList = append(resultList, resp)
+		if resp.Status.Status != http.StatusOK {
+			return resultList
+		}
+	}
+	return resultList
 }
