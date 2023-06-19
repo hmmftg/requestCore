@@ -171,7 +171,7 @@ func DeleteHandler[Req libQuery.RecordData](title, delete, checkQuery string,
 	}
 }
 
-func UpdateHandler[Req libQuery.Updatable](title string, hasreqLog bool,
+func UpdateHandler[Req libQuery.Updatable](title string, hasReqLog bool,
 	core RequestCoreInterface,
 	hasInitializer bool,
 	finalizer func(request Req, c any),
@@ -192,7 +192,7 @@ func UpdateHandler[Req libQuery.Updatable](title string, hasreqLog bool,
 			core.Responder().HandleErrorState(err, code, desc, arrayErr, c)
 			return
 		}
-		if hasreqLog {
+		if hasReqLog {
 			w.Parser.SetLocal("reqLog", &reqLog)
 		}
 		filledRequest := request.SetParams(params).(Req)

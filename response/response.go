@@ -249,7 +249,7 @@ func GetErrorsArrayWithMap(incomingDesc string, data any, errDescList map[string
 					incomingDesc = messageParts[0]
 					desc = ""
 					//DESC_DB1 $P1$ DESC_DB2 $P2$
-					//MESG1#G1#G2#
+					//MESSAGE1#G1#G2#
 					//=>
 					//DESC_DB1 G1 DESC_DB2 G2
 					for i, j := 0, 1; i < len(descParts); i += 2 {

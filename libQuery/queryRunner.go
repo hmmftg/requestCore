@@ -275,7 +275,7 @@ func HandleCheckDuplicate(code int, desc, dupDesc string, record []QueryData, er
 	return http.StatusOK, "", nil
 }
 
-func HandleCheckExistance(code int, desc, notExistDesc string, record []QueryData, err error) (int, string, error) {
+func HandleCheckExistence(code int, desc, notExistDesc string, record []QueryData, err error) (int, string, error) {
 	if err != nil {
 		if desc == "PWC_WS_0008" || len(record) == 0 {
 			return http.StatusBadRequest, notExistDesc, fmt.Errorf(notExistDesc)
@@ -286,9 +286,9 @@ func HandleCheckExistance(code int, desc, notExistDesc string, record []QueryDat
 }
 
 type DmlResult struct {
-	Rows         map[string]string `json:"rows"`
-	LastInsertId int64             `json:"lastId"`
-	RowsAffected int64             `json:"rowsAffected"`
+	Rows         map[string]string `json:"rows" form:"rows"`
+	LastInsertId int64             `json:"lastId" form:"lastId"`
+	RowsAffected int64             `json:"rowsAffected" form:"rowsAffected"`
 }
 
 func (c *DmlResult) LoadFromMap(m any) error {
@@ -318,7 +318,7 @@ func ParseCommand(command, user, app, action, title string, value map[string]str
 }
 
 type QueryWithDeps interface {
-	GetFillables(core QueryRunnerInterface) (map[string]any, error)
+	GetFillable(core QueryRunnerInterface) (map[string]any, error)
 }
 
 func Filler[Data any](

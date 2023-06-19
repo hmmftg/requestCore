@@ -330,7 +330,7 @@ func GetQueryFillable[Resp libQuery.QueryWithDeps](
 		}
 		var filledResp []Resp
 		for _, row := range result {
-			fillResp, err := row.GetFillables(core.GetDB())
+			fillResp, err := row.GetFillable(core.GetDB())
 			if err != nil {
 				log.Println(fillResp["Desc"], fillResp["Field"], fillResp["Data"])
 				core.Responder().Respond(code, 1, fillResp["Desc"].(string), fillResp["Data"], true, c)
