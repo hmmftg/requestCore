@@ -6,6 +6,7 @@
         "finalizer",
         "Insertable",
         "NCHAR",
+        "oneof",
         "ROWID",
         "valyala",
         "VARCHAR"

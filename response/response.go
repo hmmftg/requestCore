@@ -138,33 +138,27 @@ func FormatErrorResp(errs error, trans ut.Translator) []ErrorResponse {
 		}
 
 		switch validationError.Tag() {
-		case "padded_ip":
-			errorResp.Code = "INVALID-INPUT-DATA"
-			errorResp.Description = parent + " " + validationError.Translate(trans)
-			errorResponses = append(errorResponses, errorResp)
-		case "alphanum":
-			fallthrough
-		case "numeric":
-			errorResp.Code = "INVALID-INPUT-DATA"
-			errorResp.Description = parent + " " + validationError.Translate(trans)
-			errorResponses = append(errorResponses, errorResp)
 		case "required":
 			errorResp.Code = "REQUIRED-FIELD"
-			errorResp.Description = parent + " " + validationError.Translate(trans)
-			errorResponses = append(errorResponses, errorResp)
+		case "padded_ip":
+			fallthrough
+		case "alphanum":
+			fallthrough
+		case "oneof":
+			fallthrough
+		case "numeric":
+			fallthrough
 		case "len":
 			fallthrough
 		case "min":
 			fallthrough
 		case "max":
 			errorResp.Code = "INVALID-INPUT-DATA"
-			errorResp.Description = parent + " " + validationError.Translate(trans)
-			errorResponses = append(errorResponses, errorResp)
 		default:
 			errorResp.Code = "INVALID-INPUT-DATA"
-			errorResp.Description = parent + " " + validationError.ActualTag()
-			errorResponses = append(errorResponses, errorResp)
 		}
+		errorResp.Description = parent + " " + validationError.Translate(trans)
+		errorResponses = append(errorResponses, errorResp)
 	}
 	return errorResponses
 }
