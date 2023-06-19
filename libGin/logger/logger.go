@@ -22,7 +22,8 @@ func ConfigGinLogger(params libRequest.LoggerInterface) gin.LoggerConfig {
 	}
 	log.SetOutput(&logger)
 	return gin.LoggerConfig{
-		Output: &logger,
+		Output:    &logger,
+		SkipPaths: params.GetSkipPaths(),
 		Formatter: func(param gin.LogFormatterParams) string {
 			var statusColor, methodColor, resetColor string
 			if param.IsOutputColor() {
@@ -34,7 +35,8 @@ func ConfigGinLogger(params libRequest.LoggerInterface) gin.LoggerConfig {
 			if param.Latency > time.Minute {
 				param.Latency = param.Latency.Truncate(time.Second)
 			}
-			return fmt.Sprintf("[GIN] %v |%s %3d %s| %13v | %15s |%s %-7s %s %#v\n%s",
+			return fmt.Sprintf("[%s] %v |%s %3d %s| %13v | %15s |%s %-7s %s %#v\n%s",
+				params.GetHeaderName(),
 				param.TimeStamp.Format("2006/01/02 - 15:04:05"),
 				statusColor, param.StatusCode, resetColor,
 				param.Latency,

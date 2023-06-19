@@ -9,11 +9,15 @@ type testLogger struct {
 	LogPath     string
 	LogSize     int
 	LogCompress bool
+	SkipPaths   []string
+	HeaderName  string
 }
 
-func (t testLogger) GetLogPath() string   { return t.LogPath }
-func (t testLogger) GetLogSize() int      { return t.LogSize }
-func (t testLogger) GetLogCompress() bool { return t.LogCompress }
+func (t testLogger) GetLogPath() string     { return t.LogPath }
+func (t testLogger) GetLogSize() int        { return t.LogSize }
+func (t testLogger) GetLogCompress() bool   { return t.LogCompress }
+func (t testLogger) GetSkipPaths() []string { return t.SkipPaths }
+func (t testLogger) GetHeaderName() string  { return t.HeaderName }
 
 func TestGinLogger(t *testing.T) {
 	configs := []testLogger{
