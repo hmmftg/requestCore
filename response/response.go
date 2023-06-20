@@ -26,19 +26,32 @@ type WsRemoteResponse struct {
 
 func (e WsRemoteResponse) ToErrorState() *ErrorState {
 	if len(e.Description) > 0 {
+		if len(e.ErrorData) == 0 {
+			return &ErrorState{
+				Description: e.Description,
+				Status:      e.Status,
+				Message:     e.Result,
+				ErrorDesc:   e.Description,
+			}
+		}
 		return &ErrorState{
 			Description: e.Description,
 			Status:      e.Status,
-			Message:     e.Result,
+			Message:     e.ErrorData,
 			ErrorDesc:   e.Description,
 		}
 	}
 	lastId := len(e.ErrorData) - 1
+	var errDesc string
+	switch casted := e.ErrorData[0].Description.(type) {
+	case string:
+		errDesc = casted
+	}
 	return &ErrorState{
 		Description: e.ErrorData[0].Code,
-		Status:      1,
-		Message:     e.ErrorData[0].Description,
-		ErrorDesc:   e.ErrorData[0].Code,
+		Status:      e.Status,
+		Message:     e.ErrorData,
+		ErrorDesc:   errDesc,
 		Child:       fmt.Errorf("%s#%s", e.ErrorData[lastId].Code, e.ErrorData[lastId].Description),
 	}
 }
@@ -155,6 +168,7 @@ func FormatErrorResp(errs error, trans ut.Translator) []ErrorResponse {
 		case "max":
 			errorResp.Code = "INVALID-INPUT-DATA"
 		default:
+			parent += validationError.Tag()
 			errorResp.Code = "INVALID-INPUT-DATA"
 		}
 		errorResp.Description = parent + " " + validationError.Translate(trans)

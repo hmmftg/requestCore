@@ -62,7 +62,18 @@ func GetRequest[Q any](ctx webFramework.WebFramework, isJson bool) (int, string,
 	return 200, "OK", nil, request, req, nil
 }
 
-func Req[Req any, Header HeaderInterface](ctx webFramework.WebFramework, isJson bool) (int, string, []response.ErrorResponse, Req, Request, error) {
+func Req[Req any, Header any, PT interface {
+	GetId() string
+	GetUser() string
+	GetProgram() string
+	GetModule() string
+	GetMethod() string
+	SetUser(string)
+	SetProgram(string)
+	SetModule(string)
+	SetMethod(string)
+	*Header
+}](ctx webFramework.WebFramework, isJson bool) (int, string, []response.ErrorResponse, Req, Request, error) {
 	var request Req
 	var req Request
 	var err error
@@ -70,7 +81,7 @@ func Req[Req any, Header HeaderInterface](ctx webFramework.WebFramework, isJson 
 	libValidate.Init()
 
 	// bind the headers to data
-	var header Header
+	header := PT(new(Header))
 	err = ctx.Parser.GetHeader(&header)
 	if err != nil {
 		log.Println(ctx.Parser.GetHttpHeader())
