@@ -19,6 +19,6 @@ func ConfigFiberLogger(params libRequest.LoggerInterface) logger.Config {
 	log.SetOutput(&logWriter)
 	return logger.Config{
 		Output: &logWriter,
-		Format: "[${time}] ${status} - ${latency} ${method} ${path}\n",
+		Format: "[${time}] ${ip} ${status} - ${latency} ${method} ${route} ${path} ${error}\n",
 	}
 }
