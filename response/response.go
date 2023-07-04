@@ -213,9 +213,9 @@ func ParseWsRemoteResp(respBytes []byte, desc string, status int) (int, map[stri
 	}
 	if status != http.StatusOK {
 		if len(resp.ErrorData) > 0 {
-			errorDesc := resp.ErrorData[0] //.(ErrorResponse)
-			errorMessage := errorDesc.Description.(string)
-			return status, map[string]string{"desc": errorDesc.Code, "message": errorMessage}, resp, errors.New(errorMessage)
+			errorDesc := strings.ReplaceAll(resp.ErrorData[0].Code, "-", "_") //.(ErrorResponse)
+			errorMessage := resp.ErrorData[0].Description.(string)
+			return status, map[string]string{"desc": errorDesc, "message": errorMessage}, resp, errors.New(errorMessage)
 		}
 		return status, map[string]string{"desc": "Remote Resp", "message": resp.Description}, resp, errors.New(resp.Description)
 	}
