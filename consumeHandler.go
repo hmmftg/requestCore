@@ -263,3 +263,27 @@ func ConsumeRemotePost(c any, reqLog *libRequest.Request, request any, method, m
 	}
 	return http.StatusOK, "", resp, nil
 }
+
+type WsResponse[Result any] struct {
+	Status      int                      `json:"status"`
+	Description string                   `json:"description"`
+	Result      Result                   `json:"result,omitempty"`
+	ErrorData   []response.ErrorResponse `json:"errors,omitempty"`
+}
+
+func CallApi[Resp any](
+	w webFramework.WebFramework,
+	core RequestCoreInterface,
+	method string,
+	param libCallApi.CallParam) (*Resp, *response.ErrorState) {
+	reqLog := core.RequestTools().LogStart(w, method, fmt.Sprintf("%v", param))
+	resp1 := libCallApi.Call[WsResponse[Resp]](param)
+	core.RequestTools().LogEnd(method, fmt.Sprintf("resp: %v", resp1), reqLog)
+	if resp1.Error != nil {
+		return nil, resp1.Error
+	}
+	if resp1.Status.Status != http.StatusOK {
+		return nil, resp1.WsResp.ToErrorState()
+	}
+	return &resp1.Resp.Result, nil
+}
