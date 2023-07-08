@@ -65,7 +65,7 @@ func (m GinModel) RespondWithReceipt(code, status int, message string, data any,
 
 	if r, ok := c.Get("reqLog"); ok {
 		reqLog := r.(*libRequest.Request)
-		reqLog.Result = message
+		reqLog.Result = message[:63]
 
 		reqLog.Outgoing = resp //string(respB)
 		if message != "DUPLICATE_REQUEST" {

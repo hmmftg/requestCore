@@ -32,7 +32,7 @@ func (m FiberModel) RespondWithReceipt(code, status int, message string, data an
 
 	if r := c.Locals("reqLog"); r != nil {
 		reqLog := r.(*libRequest.Request)
-		reqLog.Result = message
+		reqLog.Result = message[:63]
 		//respB, _ := json.Marshal(resp)
 		reqLog.Outgoing = resp //string(respB)
 		if message != "DUPLICATE_REQUEST" {
