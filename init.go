@@ -10,6 +10,9 @@ import (
 	ut "github.com/go-playground/universal-translator"
 	"github.com/go-playground/validator/v10"
 	fa_translations "github.com/go-playground/validator/v10/translations/fa"
+	"github.com/hmmftg/requestCore/libRequest"
+	"github.com/hmmftg/requestCore/response"
+	"github.com/hmmftg/requestCore/webFramework"
 )
 
 var Validate *validator.Validate
@@ -70,4 +73,13 @@ func Init() (ut.Translator, *validator.Validate, error) {
 	addTranslation("padded_ip", "{0} بایستی به فرمت 000.000.000.000 باشد", trans)
 
 	return trans, Validate, nil
+}
+
+func InitReqLog(w webFramework.WebFramework, reqLog *libRequest.Request, core RequestCoreInterface) *response.ErrorState {
+	w.Parser.SetLocal("reqLog", reqLog)
+	status, result, err := core.RequestTools().Initialize(w, "POST", "GenCardNumber", reqLog)
+	if err != nil {
+		return response.Error(status, result["desc"], result["message"], err)
+	}
+	return nil
 }
