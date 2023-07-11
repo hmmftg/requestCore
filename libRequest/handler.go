@@ -42,7 +42,17 @@ func GetRequest[Q any](ctx webFramework.WebFramework, isJson bool) (int, string,
 		UserId:   ctx.Parser.GetLocalString("userId"),
 		ActionId: ctx.Parser.GetLocalString("action"),
 		BranchId: ctx.Parser.GetLocalString("branchId"),
+		PersonId: ctx.Parser.GetLocalString("personId"),
 		BankId:   ctx.Parser.GetLocalString("bankCode"),
+	}
+	if len(header.Branch) > 0 {
+		req.BranchId = header.Branch
+	}
+	if len(header.Bank) > 0 {
+		req.BankId = header.Bank
+	}
+	if len(header.Person) > 0 {
+		req.PersonId = header.Person
 	}
 
 	if ctx.Parser.GetMethod() != "GET" {
@@ -65,10 +75,16 @@ func GetRequest[Q any](ctx webFramework.WebFramework, isJson bool) (int, string,
 func Req[Req any, Header any, PT interface {
 	GetId() string
 	GetUser() string
+	GetBranch() string
+	GetBank() string
+	GetPerson() string
 	GetProgram() string
 	GetModule() string
 	GetMethod() string
 	SetUser(string)
+	SetBranch(string)
+	SetBank(string)
+	SetPerson(string)
 	SetProgram(string)
 	SetModule(string)
 	SetMethod(string)
@@ -106,7 +122,17 @@ func Req[Req any, Header any, PT interface {
 		UserId:   ctx.Parser.GetLocalString("userId"),
 		ActionId: ctx.Parser.GetLocalString("action"),
 		BranchId: ctx.Parser.GetLocalString("branchId"),
+		PersonId: ctx.Parser.GetLocalString("personId"),
 		BankId:   ctx.Parser.GetLocalString("bankCode"),
+	}
+	if len(header.GetBranch()) > 0 {
+		req.BranchId = header.GetBranch()
+	}
+	if len(header.GetBank()) > 0 {
+		req.BankId = header.GetBank()
+	}
+	if len(header.GetPerson()) > 0 {
+		req.PersonId = header.GetPerson()
 	}
 
 	if ctx.Parser.GetMethod() != "GET" {

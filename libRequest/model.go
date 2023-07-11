@@ -57,6 +57,7 @@ type RequestHeader struct {
 	Method    string `header:"Method-Id"  reqHeader:"Method-Id"`
 	User      string `header:"User-Id"    reqHeader:"User-Id"`
 	Branch    string `header:"Branch-Id"  reqHeader:"Branch-Id"`
+	Bank      string `header:"Branch-Id"  reqHeader:"Bank-Id"`
 	Person    string `header:"Person-Id"  reqHeader:"Person-Id"`
 }
 
