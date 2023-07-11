@@ -171,7 +171,7 @@ func (m RequestModel) UpdateRequest(request Request) error {
 	args[3] = "UpdateRequest"
 	args[4] = string(requestBytes)
 	args[5] = request.Id
-	if strings.Contains(m.UpdateInDb, "$7") {
+	if strings.Contains(m.UpdateInDb, "$7") || strings.Contains(m.UpdateInDb, ":7") {
 		args = append(args, request.Resp)
 	}
 	ret, msg, err := m.QueryInterface.CallDbFunction(
