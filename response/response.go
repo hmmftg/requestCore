@@ -237,6 +237,10 @@ func GetErrorsArray(message string, data any) []ErrorResponse {
 
 func GetDescFromCode(code string, data any, errDescList map[string]string) (string, any) {
 	if strings.Contains(code, "#") {
+		code := code
+		if strings.Contains(code, "-") {
+			code = strings.ReplaceAll(code, "-", "_")
+		}
 		messageParts := strings.Split(code, "#")
 		if descInDb, ok := errDescList[messageParts[0]]; ok {
 			descParts := strings.Split(descInDb, "$")
