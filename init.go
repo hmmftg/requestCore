@@ -75,9 +75,9 @@ func Init() (ut.Translator, *validator.Validate, error) {
 	return trans, Validate, nil
 }
 
-func InitReqLog(w webFramework.WebFramework, reqLog *libRequest.Request, core RequestCoreInterface) *response.ErrorState {
+func InitReqLog(w webFramework.WebFramework, reqLog *libRequest.Request, core RequestCoreInterface, method, path string) *response.ErrorState {
 	w.Parser.SetLocal("reqLog", reqLog)
-	status, result, err := core.RequestTools().Initialize(w, "POST", "GenCardNumber", reqLog)
+	status, result, err := core.RequestTools().Initialize(w, method, path, reqLog)
 	if err != nil {
 		return response.Error(status, result["desc"], result["message"], err)
 	}
