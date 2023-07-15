@@ -276,7 +276,7 @@ func GetErrorsArrayWithMap(incomingDesc string, data any, errDescList map[string
 	}
 	for i := 0; i < len(errorResponses); i++ {
 		if !strings.Contains(errorResponses[i].Code, "-") || strings.Contains(errorResponses[i].Code, "#") {
-			errorResponses[i].Code, errorResponses[i].Description = GetDescFromCode(incomingDesc, data, errDescList)
+			errorResponses[i].Code, errorResponses[i].Description = GetDescFromCode(errorResponses[i].Code, errorResponses[i].Description, errDescList)
 		}
 	}
 	return errorResponses
