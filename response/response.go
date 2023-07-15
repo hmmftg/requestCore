@@ -235,6 +235,31 @@ func GetErrorsArray(message string, data any) []ErrorResponse {
 	return errorResponses
 }
 
+func GetDescFromCode(code string, data any, errDescList map[string]string) (string, any) {
+	if strings.Contains(code, "#") {
+		messageParts := strings.Split(code, "#")
+		if descInDb, ok := errDescList[messageParts[0]]; ok {
+			descParts := strings.Split(descInDb, "$")
+			incomingDesc := messageParts[0]
+			desc := ""
+			//DESC_DB1 $P1$ DESC_DB2 $P2$
+			//MESSAGE1#G1#G2#
+			//=>
+			//DESC_DB1 G1 DESC_DB2 G2
+			for i, j := 0, 1; i < len(descParts); i += 2 {
+				desc += descParts[i] + messageParts[j]
+				j++
+			}
+			return strings.ReplaceAll(incomingDesc, "_", "-"), desc
+		}
+		return strings.ReplaceAll(code, "_", "-"), data
+	}
+	if desc, ok := errDescList[code]; ok {
+		return strings.ReplaceAll(code, "_", "-"), desc
+	}
+	return code, data
+}
+
 func GetErrorsArrayWithMap(incomingDesc string, data any, errDescList map[string]string) []ErrorResponse {
 	var errorResponses []ErrorResponse
 	errorResponses, ok := data.([]ErrorResponse)
@@ -246,33 +271,13 @@ func GetErrorsArrayWithMap(incomingDesc string, data any, errDescList map[string
 			errorResp.Description = data
 			return append(errorResponses, errorResp)
 		}
-		if desc, ok := errDescList[incomingDesc]; ok {
-			errorResp.Code = strings.ReplaceAll(incomingDesc, "_", "-")
-			errorResp.Description = desc
-		} else {
-			if strings.Contains(incomingDesc, "#") {
-				messageParts := strings.Split(incomingDesc, "#")
-				if descInDb, ok := errDescList[messageParts[0]]; ok {
-					descParts := strings.Split(descInDb, "$")
-					incomingDesc = messageParts[0]
-					desc = ""
-					//DESC_DB1 $P1$ DESC_DB2 $P2$
-					//MESSAGE1#G1#G2#
-					//=>
-					//DESC_DB1 G1 DESC_DB2 G2
-					for i, j := 0, 1; i < len(descParts); i += 2 {
-						desc += descParts[i] + messageParts[j]
-						j++
-					}
-				}
-				errorResp.Code = strings.ReplaceAll(incomingDesc, "_", "-")
-				errorResp.Description = desc
-			} else {
-				errorResp.Code = incomingDesc
-				errorResp.Description = data
-			}
-		}
+		errorResp.Code, errorResp.Description = GetDescFromCode(incomingDesc, data, errDescList)
 		errorResponses = append(errorResponses, errorResp)
+	}
+	for i := 0; i < len(errorResponses); i++ {
+		if !strings.Contains(errorResponses[i].Code, "-") || strings.Contains(errorResponses[i].Code, "#") {
+			errorResponses[i].Code, errorResponses[i].Description = GetDescFromCode(incomingDesc, data, errDescList)
+		}
 	}
 	return errorResponses
 }
