@@ -23,7 +23,7 @@ func (m FiberModel) RespondWithReceipt(code, status int, message string, data an
 	if code == 200 {
 		resp.Description = m.MessageDesc[message]
 		resp.Result = data
-		resp.PrintReceipt = printData
+		resp.PrintReceipt = &printData
 	} else {
 		resp.ErrorData = m.GetErrorsArray(message, data)
 	}

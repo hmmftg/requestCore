@@ -50,7 +50,7 @@ func (m GinModel) RespondWithReceipt(code, status int, message string, data any,
 	if code == 200 {
 		resp.Description = m.MessageDesc[message]
 		resp.Result = data
-		resp.PrintReceipt = printData
+		resp.PrintReceipt = &printData
 	} else {
 		resp.ErrorData = m.GetErrorsArray(message, data)
 	}

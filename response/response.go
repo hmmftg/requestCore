@@ -57,11 +57,11 @@ func (e WsRemoteResponse) ToErrorState() *ErrorState {
 }
 
 type WsResponse struct {
-	Status       int     `json:"status"`
-	Description  string  `json:"description"`
-	Result       any     `json:"result,omitempty"`
-	ErrorData    any     `json:"errors,omitempty"`
-	PrintReceipt Receipt `json:"printReceipt,omitempty"`
+	Status       int      `json:"status"`
+	Description  string   `json:"description"`
+	Result       any      `json:"result,omitempty"`
+	ErrorData    any      `json:"errors,omitempty"`
+	PrintReceipt *Receipt `json:"printReceipt,omitempty"`
 }
 
 type Receipt struct {
