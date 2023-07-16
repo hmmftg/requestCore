@@ -13,17 +13,17 @@ import (
 )
 
 func (m FiberModel) Respond(code, status int, message string, data any, abort bool, ctx any) {
-	m.RespondWithReceipt(code, status, message, data, response.Receipt{}, abort, ctx)
+	m.RespondWithReceipt(code, status, message, data, nil, abort, ctx)
 }
 
-func (m FiberModel) RespondWithReceipt(code, status int, message string, data any, printData response.Receipt, abort bool, ctx any) {
+func (m FiberModel) RespondWithReceipt(code, status int, message string, data any, printData *response.Receipt, abort bool, ctx any) {
 	c := ctx.(*fiber.Ctx)
 	var resp response.WsResponse
 	resp.Status = status
 	if code == 200 {
 		resp.Description = m.MessageDesc[message]
 		resp.Result = data
-		resp.PrintReceipt = &printData
+		resp.PrintReceipt = printData
 	} else {
 		resp.ErrorData = m.GetErrorsArray(message, data)
 	}
