@@ -113,7 +113,7 @@ func (m QueryRunnerModel) QueryRunner(querySql string, args ...any) (int, []any,
 			case "INT4", "NUMBER":
 				scanArgs[i] = new(sql.NullInt64)
 			default:
-				log.Println("Undefined Type Name: ", v.DatabaseTypeName())
+				//log.Println("Undefined Type Name: ", v.DatabaseTypeName())
 				scanArgs[i] = new(sql.NullString)
 			}
 		}
@@ -202,7 +202,7 @@ func GetQueryResp[R any](query string, core QueryRunnerInterface, args ...any) (
 	var target R
 	nRet, result, err := core.QueryToStruct(query, target, args...)
 	if nRet != 0 || err != nil {
-		log.Printf("Error Query: %+v, %+v, %v, %s\n", err, result, args, query)
+		//log.Printf("Error Query: %+v, %+v, %v, %s\n", err, result, args, query)
 		return 500, "DB_READ_ERROR", err.Error(), true, nil, err
 	}
 	if err != nil {
