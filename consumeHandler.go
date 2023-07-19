@@ -80,7 +80,14 @@ func ConsumeRemoteGet(
 	if stat != http.StatusOK {
 		if len(resp.ErrorData) > 0 {
 			errorDesc := resp.ErrorData // .(requestCore.ErrorResponse)
-			return stat, 1, errorDesc[0].Code, errorDesc[0].Description, true, errors.New(errorDesc[0].Description.(string))
+			err = errors.New(errorDesc[0].Code)
+			if errorDesc[0].Description != nil {
+				switch v := errorDesc[0].Description.(type) {
+				case string:
+					err = errors.New(v)
+				}
+			}
+			return stat, 1, errorDesc[0].Code, errorDesc[0].Description, true, err
 		}
 		if len(resp.Description) > 0 {
 			return stat, 1, api + " Resp", resp.Description, true, err
