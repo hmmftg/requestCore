@@ -278,17 +278,17 @@ func CallApi[Resp any](
 	param libCallApi.CallParam) (*Resp, *response.ErrorState) {
 	var reqLog *libRequest.Request
 	dump, err := json.MarshalIndent(param, "", "  ")
-	if err != nil {
+	if err == nil {
 		reqLog = core.RequestTools().LogStart(w, method, string(dump))
 	} else {
-		reqLog = core.RequestTools().LogStart(w, method, fmt.Sprintf("params: %+v", dump))
+		reqLog = core.RequestTools().LogStart(w, method, fmt.Sprintf("params: %+v", param))
 	}
 	resp1 := libCallApi.Call[WsResponse[Resp]](param)
 	dump, err = json.MarshalIndent(resp1, "", "  ")
-	if err != nil {
+	if err == nil {
 		core.RequestTools().LogEnd(method, string(dump), reqLog)
 	} else {
-		core.RequestTools().LogEnd(method, fmt.Sprintf("resp: %v", resp1), reqLog)
+		core.RequestTools().LogEnd(method, fmt.Sprintf("resp: %+v", resp1), reqLog)
 	}
 
 	if resp1.Error != nil {
