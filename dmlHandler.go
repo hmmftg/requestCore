@@ -41,7 +41,7 @@ func PostHandler[Req libQuery.RecordDataDml](title string,
 
 		desc, err = request.Filler(w.Parser.GetHttpHeader(), core.GetDB(), w.Parser.GetArgs(args...))
 		if err != nil {
-			core.Responder().HandleErrorState(err, code, desc, "error in Filler", c)
+			core.Responder().HandleErrorState(err, http.StatusInternalServerError, desc, "error in Filler", c)
 			return
 		}
 
