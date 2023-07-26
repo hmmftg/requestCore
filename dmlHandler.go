@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/hmmftg/requestCore/libContext"
+	"github.com/hmmftg/requestCore/libError"
 	"github.com/hmmftg/requestCore/libQuery"
 	"github.com/hmmftg/requestCore/libRequest"
 )
@@ -47,19 +48,19 @@ func PostHandler[Req libQuery.RecordDataDml](title string,
 
 		code, desc, err = request.CheckDuplicate(core.GetDB())
 		if err != nil {
-			core.Responder().HandleErrorState(fmt.Errorf("error in CheckDuplicate"), code, desc, "", c)
+			core.Responder().HandleErrorState(libError.Join(err, "error in CheckDuplicate"), code, desc, "", c)
 			return
 		}
 
 		code, desc, err = request.PreControl(core.GetDB())
 		if err != nil {
-			core.Responder().HandleErrorState(fmt.Errorf("error in PreControl"), code, desc, "", c)
+			core.Responder().HandleErrorState(libError.Join(err, "error in PreControl"), code, desc, "", c)
 			return
 		}
 
 		resp, code, desc, err := request.Post(core.GetDB(), w.Parser.GetArgs(args...))
 		if err != nil {
-			core.Responder().HandleErrorState(fmt.Errorf("error in Post"), code, desc, "", c)
+			core.Responder().HandleErrorState(libError.Join(err, "error in Post"), code, desc, "", c)
 			return
 		}
 
@@ -148,7 +149,7 @@ func DeleteHandler[Req libQuery.RecordData](title, delete, checkQuery string,
 
 		code, desc, data, _, err := libQuery.CallSql[libQuery.QueryData](checkQuery, core.GetDB(), id)
 		if code == 400 && desc == libQuery.NO_DATA_FOUND && data == "No Data Found" {
-			core.Responder().HandleErrorState(fmt.Errorf("DELETE_NOT_ALLOWED"), http.StatusBadRequest, "DELETE_NOT_ALLOWED", data, c)
+			core.Responder().HandleErrorState(libError.Join(err, "DELETE_NOT_ALLOWED"), http.StatusBadRequest, "DELETE_NOT_ALLOWED", data, c)
 			return
 		}
 		if err != nil {
@@ -159,7 +160,7 @@ func DeleteHandler[Req libQuery.RecordData](title, delete, checkQuery string,
 		deleteParsed := w.Parser.ParseCommand(delete, title, request, parser)
 		resultDb, err := core.GetDB().InsertRow(deleteParsed, id)
 		if err != nil {
-			core.Responder().HandleErrorState(err, http.StatusInternalServerError, "ERROR_CALLING_DB_FUNCTION", resultDb, c)
+			core.Responder().HandleErrorState(libError.Join(err, "Exec failed"), http.StatusInternalServerError, "ERROR_CALLING_DB_FUNCTION", resultDb, c)
 			return
 		}
 
