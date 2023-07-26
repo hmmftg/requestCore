@@ -3,11 +3,11 @@ package libRequest
 import (
 	"encoding/json"
 	"fmt"
-	"log"
 	"net/http"
 	"strings"
 	"time"
 
+	"github.com/hmmftg/requestCore/libError"
 	"github.com/hmmftg/requestCore/webFramework"
 )
 
@@ -138,8 +138,7 @@ func (m RequestModel) InsertRequest(request Request) error {
 		args...,
 	)
 	if err != nil {
-		log.Println("InsertNewRequest(", row, ")=>", ret, msg, err)
-		return err
+		return libError.Join(err, "InsertNewRequest[CallDbFunction](%v)=>%d,%s", row, ret, msg)
 	}
 	return nil
 }
@@ -179,8 +178,7 @@ func (m RequestModel) UpdateRequest(request Request) error {
 		args...,
 	)
 	if err != nil {
-		log.Println("UpdateRequest(", request.Id, string(requestBytes), ")=>", ret, msg, err)
-		return err
+		return libError.Join(err, "UpdateRequest[CallDbFunction](%s)=>%d,%s", request.Id, ret, msg)
 	}
 	return nil
 }

@@ -1,75 +1,16 @@
 package libRequest
 
 import (
-	"log"
 	"time"
 
+	"github.com/hmmftg/requestCore/libError"
 	"github.com/hmmftg/requestCore/libValidate"
 	"github.com/hmmftg/requestCore/response"
 	"github.com/hmmftg/requestCore/webFramework"
 )
 
 func GetRequest[Q any](ctx webFramework.WebFramework, isJson bool) (int, string, []response.ErrorResponse, Q, Request, error) {
-	var request Q
-	var req Request
-	var err error
-
-	libValidate.Init()
-
-	// bind the headers to data
-	var header RequestHeader
-	err = ctx.Parser.GetHeader(&header)
-	if err != nil {
-		log.Println(ctx.Parser.GetHttpHeader())
-		return 400, "HEADER_ABSENT", nil, request, req, err
-	}
-
-	//Check Input JSON
-	if isJson {
-		err = ctx.Parser.GetBody(&request)
-	} else {
-		err = ctx.Parser.GetUrlQuery(&request)
-	}
-	if err != nil {
-		return 400, "JSON_ABSENT", nil, request, req, err
-	}
-
-	req = Request{
-		Header:   &header,
-		Id:       header.RequestId,
-		Time:     time.Now(),
-		Incoming: request, //string(requestJson),
-		UserId:   ctx.Parser.GetLocalString("userId"),
-		ActionId: ctx.Parser.GetLocalString("action"),
-		BranchId: ctx.Parser.GetLocalString("branchId"),
-		PersonId: ctx.Parser.GetLocalString("personId"),
-		BankId:   ctx.Parser.GetLocalString("bankCode"),
-	}
-	if len(header.Branch) > 0 {
-		req.BranchId = header.Branch
-	}
-	if len(header.Bank) > 0 {
-		req.BankId = header.Bank
-	}
-	if len(header.Person) > 0 {
-		req.PersonId = header.Person
-	}
-
-	if ctx.Parser.GetMethod() != "GET" {
-		err = libValidate.ValidateStruct(header)
-		if err != nil {
-			errorResponses := response.FormatErrorResp(err, libValidate.GetTranslator())
-			return 400, "Header Validation Failed", errorResponses, request, req, err
-		}
-	}
-
-	err = libValidate.ValidateStruct(request)
-	if err != nil {
-		errorResponses := response.FormatErrorResp(err, libValidate.GetTranslator())
-		return 400, "Validation Failed", errorResponses, request, req, err
-	}
-
-	return 200, "OK", nil, request, req, nil
+	return Req[Q, RequestHeader](ctx, isJson)
 }
 
 func Req[Req any, Header any, PT interface {
@@ -100,15 +41,20 @@ func Req[Req any, Header any, PT interface {
 	header := PT(new(Header))
 	err = ctx.Parser.GetHeader(&header)
 	if err != nil {
-		log.Println(ctx.Parser.GetHttpHeader())
-		return 400, "HEADER_ABSENT", nil, request, req, err
+		return 400, "HEADER_ABSENT", nil, request, req, libError.Join(err, "GetRequest[GetHeader](%v)", ctx.Parser.GetHttpHeader())
 	}
 
 	//Check Input JSON
 	if isJson {
 		err = ctx.Parser.GetBody(&request)
+		if err != nil {
+			err = libError.Join(err, "GetRequest[GetBody](fails)")
+		}
 	} else {
 		err = ctx.Parser.GetUrlQuery(&request)
+		if err != nil {
+			err = libError.Join(err, "GetRequest[GetUrlQuery](fails)")
+		}
 	}
 	if err != nil {
 		return 400, "JSON_ABSENT", nil, request, req, err
@@ -139,14 +85,14 @@ func Req[Req any, Header any, PT interface {
 		err = libValidate.ValidateStruct(header)
 		if err != nil {
 			errorResponses := response.FormatErrorResp(err, libValidate.GetTranslator())
-			return 400, "Header Validation Failed", errorResponses, request, req, err
+			return 400, "Header Validation Failed", errorResponses, request, req, libError.Join(err, "GetRequest[ValidateHeader](fails)")
 		}
 	}
 
 	err = libValidate.ValidateStruct(request)
 	if err != nil {
 		errorResponses := response.FormatErrorResp(err, libValidate.GetTranslator())
-		return 400, "Validation Failed", errorResponses, request, req, err
+		return 400, "Validation Failed", errorResponses, request, req, libError.Join(err, "GetRequest[ValidateRequest](fails)")
 	}
 
 	return 200, "OK", nil, request, req, nil

@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/hmmftg/requestCore/libContext"
+	"github.com/hmmftg/requestCore/libError"
 	"github.com/hmmftg/requestCore/libQuery"
 	"github.com/hmmftg/requestCore/libRequest"
 	"github.com/hmmftg/requestCore/response"
@@ -43,8 +44,9 @@ func GetSingleRecordHandler[Req, Resp any](title, sql string,
 		var result []Resp
 		err = json.Unmarshal([]byte(respRaw[0].DataRaw), &result)
 		if err != nil {
-			log.Println(title, "Unmarshal DataRaw", err, respRaw[0].DataRaw)
-			core.Responder().HandleErrorState(err, http.StatusInternalServerError, "DB_RESP_PARSE_ERROR", respRaw[0].DataRaw, c)
+			core.Responder().HandleErrorState(
+				libError.Join(err, "%s[json.Unmarsha](%s)", title, respRaw[0].DataRaw),
+				http.StatusInternalServerError, "DB_RESP_PARSE_ERROR", respRaw[0].DataRaw, c)
 			return
 		}
 		core.Responder().Respond(200, 0, "OK", result[0], false, c)
@@ -91,8 +93,9 @@ func GetMapHandler[Req any, Resp libQuery.RecordData](title, sql string,
 		var result []Resp
 		err = json.Unmarshal([]byte(respRaw[0].DataRaw), &result)
 		if err != nil {
-			log.Println(title, "Unmarshal DataRaw", err, respRaw[0].DataRaw)
-			core.Responder().HandleErrorState(err, http.StatusInternalServerError, "DB_RESP_PARSE_ERROR", respRaw[0].DataRaw, c)
+			core.Responder().HandleErrorState(
+				libError.Join(err, "%s[json.Unmarsha](%s)", title, respRaw[0].DataRaw),
+				http.StatusInternalServerError, "DB_RESP_PARSE_ERROR", respRaw[0].DataRaw, c)
 			return
 		}
 		respMap := make(map[string]any, 0)
@@ -143,8 +146,9 @@ func GetMapBySubHandler[Req any, Resp libQuery.RecordData](title, sql string,
 		var result []Resp
 		err = json.Unmarshal([]byte(respRaw[0].DataRaw), &result)
 		if err != nil {
-			log.Println(title, "Unmarshal DataRaw", err, respRaw[0].DataRaw)
-			core.Responder().HandleErrorState(err, http.StatusInternalServerError, "DB_RESP_PARSE_ERROR", respRaw[0].DataRaw, c)
+			core.Responder().HandleErrorState(
+				libError.Join(err, "%s[json.Unmarsha](%s)", title, respRaw[0].DataRaw),
+				http.StatusInternalServerError, "DB_RESP_PARSE_ERROR", respRaw[0].DataRaw, c)
 			return
 		}
 		respMap := make(map[string]map[string]any, 0)
@@ -199,8 +203,9 @@ func GetQuery[Req any](title, sql string,
 		var result []map[string]any
 		err = json.Unmarshal([]byte(respRaw[0].DataRaw), &result)
 		if err != nil {
-			log.Println(title, "Unmarshal DataRaw", err, respRaw[0].DataRaw)
-			core.Responder().HandleErrorState(err, http.StatusInternalServerError, "DB_RESP_PARSE_ERROR", respRaw[0].DataRaw, c)
+			core.Responder().HandleErrorState(
+				libError.Join(err, "%s[json.Unmarsha](%s)", title, respRaw[0].DataRaw),
+				http.StatusInternalServerError, "DB_RESP_PARSE_ERROR", respRaw[0].DataRaw, c)
 			return
 		}
 		core.Responder().Respond(200, 0, "OK", result, false, c)
@@ -249,8 +254,9 @@ func GetQueryMap[Req any](title, sql string,
 				var mapData []map[string]map[string]any
 				err = json.Unmarshal([]byte(row.MapList), &mapData)
 				if err != nil {
-					log.Println(title, "Unmarshal DataRaw", err, row.MapList)
-					core.Responder().HandleErrorState(err, http.StatusInternalServerError, "DB_RESP_PARSE_ERROR", row.MapList, c)
+					core.Responder().HandleErrorState(
+						libError.Join(err, "%s[json.Unmarsha](%s)", title, row.MapList),
+						http.StatusInternalServerError, "DB_RESP_PARSE_ERROR", row.MapList, c)
 					return
 				}
 				mapFlat := make([]any, 0)
@@ -296,8 +302,9 @@ func GetQueryHandler[Req, Resp any](title, sql string,
 		var result []Resp
 		err = json.Unmarshal([]byte(respRaw[0].DataRaw), &result)
 		if err != nil {
-			log.Println(title, "Unmarshal DataRaw", err, respRaw[0].DataRaw)
-			core.Responder().HandleErrorState(err, http.StatusInternalServerError, "DB_RESP_PARSE_ERROR", respRaw[0].DataRaw, c)
+			core.Responder().HandleErrorState(
+				libError.Join(err, "%s[json.Unmarsha](%s)", title, respRaw[0].DataRaw),
+				http.StatusInternalServerError, "DB_RESP_PARSE_ERROR", respRaw[0].DataRaw, c)
 			return
 		}
 		core.Responder().Respond(200, 0, "OK", result, false, c)
@@ -309,7 +316,7 @@ func GetQueryFillable[Resp libQuery.QueryWithDeps](
 	core RequestCoreInterface,
 	args ...string,
 ) any {
-	log.Println(title + "...")
+	log.Println("Registering: ", title)
 	return func(c any) {
 		w := libContext.InitContext(c)
 		params := []any{}
@@ -332,8 +339,9 @@ func GetQueryFillable[Resp libQuery.QueryWithDeps](
 		for _, row := range result {
 			fillResp, err := row.GetFillable(core.GetDB())
 			if err != nil {
-				log.Println(fillResp["Desc"], fillResp["Field"], fillResp["Data"])
-				core.Responder().Respond(code, 1, fillResp["Desc"].(string), fillResp["Data"], true, c)
+				core.Responder().HandleErrorState(
+					libError.Join(err, "%s[GetFillable](%v)=>%v", title, row, fillResp),
+					code, fillResp["Desc"].(string), fillResp["Data"], c)
 				return
 			}
 			filledResp = append(filledResp, fillResp["Filled"].(Resp))

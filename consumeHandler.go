@@ -16,8 +16,6 @@ import (
 	"github.com/hmmftg/requestCore/libRequest"
 	"github.com/hmmftg/requestCore/response"
 	"github.com/hmmftg/requestCore/webFramework"
-
-	"github.com/hmmftg/stacktrace"
 )
 
 func ConsumeRemoteGet(
@@ -111,7 +109,7 @@ func ConsumeRemoteGetApi(
 		}
 		status, code, desc, message, broken, err := ConsumeRemoteGet(w, api, fullPath, core, args...)
 		if err != nil {
-			log.Println(err.Error(), stacktrace.Propagate(err, ""))
+			core.Responder().HandleErrorState(err, status, desc, message, w.Ctx)
 		}
 		core.Responder().Respond(status, code, desc, message, broken, c)
 	}

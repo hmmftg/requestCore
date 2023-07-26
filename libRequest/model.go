@@ -67,6 +67,15 @@ func (r RequestHeader) GetId() string {
 func (r RequestHeader) GetUser() string {
 	return r.User
 }
+func (r RequestHeader) GetBank() string {
+	return r.Bank
+}
+func (r RequestHeader) GetBranch() string {
+	return r.Branch
+}
+func (r RequestHeader) GetPerson() string {
+	return r.Person
+}
 func (r RequestHeader) GetProgram() string {
 	return r.Program
 }
@@ -88,6 +97,16 @@ func (r *RequestHeader) SetModule(module string) {
 }
 func (r *RequestHeader) SetMethod(method string) {
 	r.Method = method
+}
+
+func (r *RequestHeader) SetBranch(branch string) {
+	r.Branch = branch
+}
+func (r *RequestHeader) SetBank(bank string) {
+	r.Bank = bank
+}
+func (r *RequestHeader) SetPerson(person string) {
+	r.Person = person
 }
 
 type HeaderInterface interface {
