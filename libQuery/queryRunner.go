@@ -206,14 +206,14 @@ func GetQueryResp[R any](query string, core QueryRunnerInterface, args ...any) (
 	//Query
 	var target R
 	nRet, result, err := core.QueryToStruct(query, target, args...)
-	if nRet == QUERY_ERROR || strings.HasPrefix(err.Error(), "no data found") {
+	if nRet == QUERY_ERROR && strings.HasPrefix(err.Error(), "no data found") {
 		return http.StatusBadRequest, NO_DATA_FOUND, "No Data Found", true, nil, err
 	}
 	if nRet != 0 || err != nil {
-		return http.StatusInternalServerError, "DB_READ_ERROR", err.Error(), true, nil, err
+		return http.StatusInternalServerError, DB_READ_ERROR, err.Error(), true, nil, err
 	}
 	if err != nil {
-		return http.StatusBadRequest, "", "Unable to parse response", true, nil, err
+		return http.StatusBadRequest, PARSE_DB_RESP_ERROR, "Unable to parse response", true, nil, err
 	}
 	return http.StatusOK, "", "", false, result, nil
 }
@@ -260,7 +260,9 @@ type RecordData interface {
 }
 
 const (
-	NO_DATA_FOUND = "NO_DATA_FOUND"
+	NO_DATA_FOUND       = "NO_DATA_FOUND"
+	DB_READ_ERROR       = "DB_READ_ERROR"
+	PARSE_DB_RESP_ERROR = "PARSE_DB_RESP_ERROR"
 )
 
 type RecordDataDml interface {
