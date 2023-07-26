@@ -70,6 +70,13 @@ func (m QueryRunnerModel) CallDbFunction(callString string, args ...any) (int, s
 	return 0, "OK", nil
 }
 
+const (
+	PREPARE_ERROR = -1
+	QUERY_ERROR   = -2
+	PARSE_ERROR   = -3
+	SCAN_ERROR    = -4
+)
+
 func (m QueryRunnerModel) QueryRunner(querySql string, args ...any) (int, []any, error) {
 	stmt, err := m.DB.Prepare(querySql)
 	finalRows := []any{}
@@ -77,14 +84,14 @@ func (m QueryRunnerModel) QueryRunner(querySql string, args ...any) (int, []any,
 	if err != nil {
 		errorData["step"] = "prepare"
 		finalRows = append(finalRows, errorData)
-		return -1, finalRows, libError.Join(err, "QueryRunner[prepare](%s,%v)", querySql, args)
+		return PREPARE_ERROR, finalRows, libError.Join(err, "QueryRunner[prepare](%s,%v)", querySql, args)
 	}
 	defer stmt.Close()
 	rows, err := stmt.Query(args...)
 	if err != nil {
 		errorData["step"] = "query"
 		finalRows = append(finalRows, errorData)
-		return -2, finalRows, libError.Join(err, "QueryRunner[query](%s,%v)", querySql, args)
+		return QUERY_ERROR, finalRows, libError.Join(err, "QueryRunner[query](%s,%v)", querySql, args)
 	}
 	defer rows.Close()
 
@@ -93,7 +100,7 @@ func (m QueryRunnerModel) QueryRunner(querySql string, args ...any) (int, []any,
 	if err != nil {
 		errorData["step"] = "column types"
 		finalRows = append(finalRows, errorData)
-		return -3, finalRows, libError.Join(err, "QueryRunner[ColumnTypes](%s,%v)", querySql, args)
+		return PARSE_ERROR, finalRows, libError.Join(err, "QueryRunner[ColumnTypes](%s,%v)", querySql, args)
 	}
 
 	count := len(columnTypes)
@@ -122,7 +129,7 @@ func (m QueryRunnerModel) QueryRunner(querySql string, args ...any) (int, []any,
 		if err != nil {
 			errorData["step"] = "column scan"
 			finalRows = append(finalRows, errorData)
-			return -3, finalRows, libError.Join(err, "QueryRunner[Scan](%s,%v)", querySql, scanArgs)
+			return SCAN_ERROR, finalRows, libError.Join(err, "QueryRunner[Scan](%s,%v)", querySql, scanArgs)
 		}
 
 		masterData := map[string]any{}
@@ -199,13 +206,16 @@ func GetQueryResp[R any](query string, core QueryRunnerInterface, args ...any) (
 	//Query
 	var target R
 	nRet, result, err := core.QueryToStruct(query, target, args...)
+	if nRet == QUERY_ERROR || strings.HasPrefix(err.Error(), "no data found") {
+		return http.StatusBadRequest, NO_DATA_FOUND, "No Data Found", true, nil, err
+	}
 	if nRet != 0 || err != nil {
-		return 500, "DB_READ_ERROR", err.Error(), true, nil, err
+		return http.StatusInternalServerError, "DB_READ_ERROR", err.Error(), true, nil, err
 	}
 	if err != nil {
-		return 400, "", "Unable to parse response", true, nil, err
+		return http.StatusBadRequest, "", "Unable to parse response", true, nil, err
 	}
-	return 200, "", "", false, result, nil
+	return http.StatusOK, "", "", false, result, nil
 }
 
 func CallSql[R any](query string,
@@ -217,9 +227,9 @@ func CallSql[R any](query string,
 	}
 	array := resultQuery.([]R)
 	if len(array) == 0 {
-		return 400, "PWC_WS_0008", "No Data Found", nil, fmt.Errorf("no data found: %s,%v", query, args)
+		return http.StatusBadRequest, NO_DATA_FOUND, "No Data Found", nil, fmt.Errorf("no data found: %s,%v", query, args)
 	}
-	return 200, desc, data, array, nil
+	return http.StatusOK, desc, data, array, nil
 }
 
 type QueryData struct {
@@ -249,6 +259,10 @@ type RecordData interface {
 	GetValueMap() map[string]string
 }
 
+const (
+	NO_DATA_FOUND = "NO_DATA_FOUND"
+)
+
 type RecordDataDml interface {
 	SetId(string)
 	CheckDuplicate(core QueryRunnerInterface) (int, string, error)
@@ -260,10 +274,10 @@ type RecordDataDml interface {
 }
 
 func HandleCheckDuplicate(code int, desc, dupDesc string, record []QueryData, err error) (int, string, error) {
-	if desc != "PWC_WS_0008" && len(record) != 0 {
+	if desc != NO_DATA_FOUND && len(record) != 0 {
 		return http.StatusBadRequest, dupDesc, fmt.Errorf(dupDesc)
 	}
-	if desc != "PWC_WS_0008" && err != nil {
+	if desc != NO_DATA_FOUND && err != nil {
 		return code, desc, err
 	}
 	return http.StatusOK, "", nil
@@ -271,7 +285,7 @@ func HandleCheckDuplicate(code int, desc, dupDesc string, record []QueryData, er
 
 func HandleCheckExistence(code int, desc, notExistDesc string, record []QueryData, err error) (int, string, error) {
 	if err != nil {
-		if desc == "PWC_WS_0008" || len(record) == 0 {
+		if desc == NO_DATA_FOUND || len(record) == 0 {
 			return http.StatusBadRequest, notExistDesc, fmt.Errorf(notExistDesc)
 		}
 		return code, desc, err

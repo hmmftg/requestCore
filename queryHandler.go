@@ -37,7 +37,7 @@ func GetSingleRecordHandler[Req, Resp any](title, sql string,
 		}
 
 		if len(respRaw[0].DataRaw) == 0 {
-			core.Responder().HandleErrorState(fmt.Errorf("NO_DATA_FOUND"), http.StatusBadRequest, "NO_DATA_FOUND", arrayErr, c)
+			core.Responder().HandleErrorState(fmt.Errorf(libQuery.NO_DATA_FOUND), http.StatusBadRequest, libQuery.NO_DATA_FOUND, arrayErr, c)
 			return
 		}
 
@@ -86,7 +86,7 @@ func GetMapHandler[Req any, Resp libQuery.RecordData](title, sql string,
 		}
 
 		if len(respRaw[0].DataRaw) == 0 {
-			core.Responder().HandleErrorState(fmt.Errorf("NO_DATA_FOUND"), http.StatusBadRequest, "NO_DATA_FOUND", arrayErr, c)
+			core.Responder().HandleErrorState(fmt.Errorf(libQuery.NO_DATA_FOUND), http.StatusBadRequest, libQuery.NO_DATA_FOUND, arrayErr, c)
 			return
 		}
 
@@ -139,7 +139,7 @@ func GetMapBySubHandler[Req any, Resp libQuery.RecordData](title, sql string,
 		}
 
 		if len(respRaw[0].DataRaw) == 0 {
-			core.Responder().HandleErrorState(fmt.Errorf("NO_DATA_FOUND"), http.StatusBadRequest, "NO_DATA_FOUND", arrayErr, c)
+			core.Responder().HandleErrorState(fmt.Errorf(libQuery.NO_DATA_FOUND), http.StatusBadRequest, libQuery.NO_DATA_FOUND, arrayErr, c)
 			return
 		}
 
@@ -197,7 +197,7 @@ func GetQuery[Req any](title, sql string,
 		}
 
 		if len(respRaw[0].DataRaw) == 0 {
-			core.Responder().HandleErrorState(fmt.Errorf("NO_DATA_FOUND"), http.StatusBadRequest, "NO_DATA_FOUND", arrayErr, c)
+			core.Responder().HandleErrorState(fmt.Errorf(libQuery.NO_DATA_FOUND), http.StatusBadRequest, libQuery.NO_DATA_FOUND, arrayErr, c)
 			return
 		}
 		var result []map[string]any
@@ -245,7 +245,7 @@ func GetQueryMap[Req any](title, sql string,
 		}
 
 		if len(respRaw) == 0 {
-			core.Responder().HandleErrorState(fmt.Errorf("NO_DATA_FOUND"), http.StatusBadRequest, "NO_DATA_FOUND", arrayErr, c)
+			core.Responder().HandleErrorState(fmt.Errorf(libQuery.NO_DATA_FOUND), http.StatusBadRequest, libQuery.NO_DATA_FOUND, arrayErr, c)
 			return
 		}
 		result := make([]any, 0)
@@ -295,7 +295,7 @@ func GetQueryHandler[Req, Resp any](title, sql string,
 		}
 
 		if len(respRaw[0].DataRaw) == 0 {
-			core.Responder().HandleErrorState(fmt.Errorf("NO_DATA_FOUND"), http.StatusBadRequest, "NO_DATA_FOUND", arrayErr, c)
+			core.Responder().HandleErrorState(fmt.Errorf(libQuery.NO_DATA_FOUND), http.StatusBadRequest, libQuery.NO_DATA_FOUND, arrayErr, c)
 			return
 		}
 
@@ -332,7 +332,7 @@ func GetQueryFillable[Resp libQuery.QueryWithDeps](
 			return
 		}
 		if len(result) == 0 {
-			core.Responder().Respond(http.StatusBadRequest, 1, "PWC_WS_0008", "No Data Found", true, c)
+			core.Responder().Respond(http.StatusBadRequest, 1, libQuery.NO_DATA_FOUND, "No Data Found", true, c)
 			return
 		}
 		var filledResp []Resp
@@ -369,7 +369,7 @@ func GetAllMapHandler[Model MapHandler](title string,
 			return
 		}
 		if len(result) == 0 {
-			respHandler.Respond(http.StatusBadRequest, 1, "PWC_WS_0008", "No Data Found", true, c)
+			respHandler.Respond(http.StatusBadRequest, 1, libQuery.NO_DATA_FOUND, "No Data Found", true, c)
 			return
 		}
 		respHandler.Respond(http.StatusOK, 0, "OK", result, false, c)

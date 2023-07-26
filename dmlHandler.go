@@ -147,7 +147,7 @@ func DeleteHandler[Req libQuery.RecordData](title, delete, checkQuery string,
 		}
 
 		code, desc, data, _, err := libQuery.CallSql[libQuery.QueryData](checkQuery, core.GetDB(), id)
-		if code == 400 && desc == "PWC_WS_0008" && data == "No Data Found" {
+		if code == 400 && desc == libQuery.NO_DATA_FOUND && data == "No Data Found" {
 			core.Responder().HandleErrorState(fmt.Errorf("DELETE_NOT_ALLOWED"), http.StatusBadRequest, "DELETE_NOT_ALLOWED", data, c)
 			return
 		}
@@ -214,8 +214,8 @@ func UpdateHandler[Req libQuery.Updatable](title string, hasReqLog bool,
 			return
 		}
 
-		if desc == "PWC_WS_0008" {
-			core.Responder().HandleErrorState(fmt.Errorf("NO_DATA_FOUND"), http.StatusBadRequest, "NO_DATA_FOUND", arrayErr, c)
+		if desc == libQuery.NO_DATA_FOUND {
+			core.Responder().HandleErrorState(fmt.Errorf(libQuery.NO_DATA_FOUND), http.StatusBadRequest, libQuery.NO_DATA_FOUND, arrayErr, c)
 			return
 		}
 
@@ -231,7 +231,7 @@ func UpdateHandler[Req libQuery.Updatable](title string, hasReqLog bool,
 		resp.RowsAffected, _ = resultDb.RowsAffected()
 
 		if resp.RowsAffected == 0 {
-			core.Responder().HandleErrorState(fmt.Errorf("NO_DATA_FOUND"), http.StatusBadRequest, "NO_DATA_FOUND", arrayErr, c)
+			core.Responder().HandleErrorState(fmt.Errorf(libQuery.NO_DATA_FOUND), http.StatusBadRequest, libQuery.NO_DATA_FOUND, arrayErr, c)
 			return
 		}
 
