@@ -12,6 +12,10 @@ import (
 	"github.com/go-playground/validator/v10"
 )
 
+const (
+	NO_DATA_FOUND = "NO-DATA-FOUND"
+)
+
 type ErrorResponse struct {
 	Code        string `json:"code"`
 	Description any    `json:"description"`
