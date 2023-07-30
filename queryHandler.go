@@ -412,7 +412,12 @@ func GetAll[Model GetHandler](title string,
 	args ...any) any {
 	log.Println("Registering: ", title)
 	return func(c any) {
-		var model Model
+		w := libContext.InitContext(c)
+		code, desc, arrayErr, model, _, err := libRequest.GetRequest[Model](w, false)
+		if err != nil {
+			respHandler.Respond(code, 1, desc, arrayErr, true, c)
+			return
+		}
 		result, desc, err := model.GetAll(core)
 		if err != nil {
 			respHandler.Respond(http.StatusBadRequest, 1, desc, err.Error(), true, c)
