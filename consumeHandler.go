@@ -110,6 +110,7 @@ func ConsumeRemoteGetApi(
 		status, code, desc, message, broken, err := ConsumeRemoteGet(w, api, fullPath, core, args...)
 		if err != nil {
 			core.Responder().HandleErrorState(err, status, desc, message, w.Ctx)
+			return
 		}
 		core.Responder().Respond(status, code, desc, message, broken, c)
 	}
