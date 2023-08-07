@@ -3,6 +3,7 @@ package requestCore
 import (
 	"github.com/hmmftg/requestCore/libCallApi"
 	"github.com/hmmftg/requestCore/libDictionary"
+	"github.com/hmmftg/requestCore/libParams"
 	"github.com/hmmftg/requestCore/libQuery"
 	"github.com/hmmftg/requestCore/libRequest"
 	"github.com/hmmftg/requestCore/response"
@@ -14,6 +15,7 @@ type RequestCoreModel struct {
 	RemoteApiInterface libCallApi.CallApiInterface
 	RespHandler        response.ResponseHandler
 	Dict               libDictionary.DictionaryInterface
+	Params             libParams.ParamsInterface
 }
 
 type RequestCoreInterface interface {
@@ -22,4 +24,5 @@ type RequestCoreInterface interface {
 	Consumer() libCallApi.CallApiInterface
 	Responder() response.ResponseHandler
 	Dictionary() libDictionary.DictionaryInterface
+	Params() libParams.ParamsInterface
 }
