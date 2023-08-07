@@ -15,7 +15,7 @@ type RequestCoreModel struct {
 	RemoteApiInterface libCallApi.CallApiInterface
 	RespHandler        response.ResponseHandler
 	Dict               libDictionary.DictionaryInterface
-	Params             libParams.ParamsInterface
+	ParamMap           libParams.ParamsInterface
 }
 
 type RequestCoreInterface interface {

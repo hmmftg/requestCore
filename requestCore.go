@@ -3,6 +3,7 @@ package requestCore
 import (
 	"github.com/hmmftg/requestCore/libCallApi"
 	"github.com/hmmftg/requestCore/libDictionary"
+	"github.com/hmmftg/requestCore/libParams"
 	"github.com/hmmftg/requestCore/libQuery"
 	"github.com/hmmftg/requestCore/libRequest"
 	"github.com/hmmftg/requestCore/response"
@@ -26,4 +27,8 @@ func (m RequestCoreModel) Responder() response.ResponseHandler {
 
 func (m RequestCoreModel) Dictionary() libDictionary.DictionaryInterface {
 	return m.Dict
+}
+
+func (m RequestCoreModel) Params() libParams.ParamsInterface {
+	return m.ParamMap
 }
