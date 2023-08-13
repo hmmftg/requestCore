@@ -352,7 +352,7 @@ func GetQueryFillable[Resp libQuery.QueryWithDeps](
 
 type MapHandler interface {
 	GetAllMap(
-		core RequestCoreInterface,
+		core RequestCoreInterface, args ...any,
 	) (map[string]any, string, error)
 }
 
@@ -378,10 +378,10 @@ func GetAllMapHandler[Model MapHandler](title string,
 
 type GetHandler interface {
 	GetSingle(
-		core RequestCoreInterface,
+		core RequestCoreInterface, args ...any,
 	) (any, string, error)
 	GetAll(
-		core RequestCoreInterface,
+		core RequestCoreInterface, args ...any,
 	) (any, string, error)
 }
 
@@ -431,6 +431,7 @@ type GetPageHandler interface {
 	GetPage(
 		core RequestCoreInterface,
 		pageSize, pageId int,
+		args ...any,
 	) (any, string, error)
 	GetPageParams() (int, int)
 }
