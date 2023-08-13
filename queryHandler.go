@@ -453,17 +453,18 @@ type GetPageHandler interface {
 func GetPage[Model GetPageHandler](title string,
 	core RequestCoreInterface,
 	respHandler response.ResponseHandler,
-	args map[string]string) any {
+	args ...any) any {
 	log.Println("Registering: ", title)
 	return func(c any) {
 		w := libContext.InitContext(c)
+		params := GetParams(w, args...)
 		code, desc, arrayErr, model, _, err := libRequest.GetRequest[Model](w, false)
 		if err != nil {
 			respHandler.Respond(code, 1, desc, arrayErr, true, c)
 			return
 		}
 		pageSize, pageId := model.GetPageParams()
-		result, desc, err := model.GetPage(core, pageSize, pageId, args)
+		result, desc, err := model.GetPage(core, pageSize, pageId, params)
 		if err != nil {
 			respHandler.HandleErrorState(err, http.StatusBadRequest, desc, err.Error(), c)
 			return
