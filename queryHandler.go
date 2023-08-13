@@ -12,6 +12,7 @@ import (
 	"github.com/hmmftg/requestCore/libQuery"
 	"github.com/hmmftg/requestCore/libRequest"
 	"github.com/hmmftg/requestCore/response"
+	"github.com/hmmftg/requestCore/webFramework"
 )
 
 type Empty struct {
@@ -378,11 +379,22 @@ func GetAllMapHandler[Model MapHandler](title string,
 
 type GetHandler interface {
 	GetSingle(
-		core RequestCoreInterface, args ...any,
+		core RequestCoreInterface, args map[string]string,
 	) (any, string, error)
 	GetAll(
-		core RequestCoreInterface, args ...any,
+		core RequestCoreInterface, args map[string]string,
 	) (any, string, error)
+}
+
+func GetParams(w webFramework.WebFramework, args ...any) map[string]string {
+	params := make(map[string]string, 0)
+	for _, arg := range args {
+		val, exists := w.Parser.CheckUrlParam(arg.(string))
+		if exists {
+			params[arg.(string)] = val
+		}
+	}
+	return params
 }
 
 func GetSingleRecord[Model GetHandler](title string,
@@ -392,12 +404,13 @@ func GetSingleRecord[Model GetHandler](title string,
 	log.Println("Registering: ", title)
 	return func(c any) {
 		w := libContext.InitContext(c)
+		params := GetParams(w, args...)
 		code, desc, arrayErr, model, _, err := libRequest.GetRequest[Model](w, false)
 		if err != nil {
 			respHandler.Respond(code, 1, desc, arrayErr, true, c)
 			return
 		}
-		result, desc, err := model.GetSingle(core)
+		result, desc, err := model.GetSingle(core, params)
 		if err != nil {
 			respHandler.Respond(http.StatusBadRequest, 1, desc, err.Error(), true, c)
 			return
@@ -413,12 +426,13 @@ func GetAll[Model GetHandler](title string,
 	log.Println("Registering: ", title)
 	return func(c any) {
 		w := libContext.InitContext(c)
+		params := GetParams(w, args...)
 		code, desc, arrayErr, model, _, err := libRequest.GetRequest[Model](w, false)
 		if err != nil {
 			respHandler.Respond(code, 1, desc, arrayErr, true, c)
 			return
 		}
-		result, desc, err := model.GetAll(core)
+		result, desc, err := model.GetAll(core, params)
 		if err != nil {
 			respHandler.Respond(http.StatusBadRequest, 1, desc, err.Error(), true, c)
 			return
@@ -431,7 +445,7 @@ type GetPageHandler interface {
 	GetPage(
 		core RequestCoreInterface,
 		pageSize, pageId int,
-		args ...any,
+		args map[string]string,
 	) (any, string, error)
 	GetPageParams() (int, int)
 }
@@ -439,7 +453,7 @@ type GetPageHandler interface {
 func GetPage[Model GetPageHandler](title string,
 	core RequestCoreInterface,
 	respHandler response.ResponseHandler,
-	args ...any) any {
+	args map[string]string) any {
 	log.Println("Registering: ", title)
 	return func(c any) {
 		w := libContext.InitContext(c)
@@ -449,7 +463,7 @@ func GetPage[Model GetPageHandler](title string,
 			return
 		}
 		pageSize, pageId := model.GetPageParams()
-		result, desc, err := model.GetPage(core, pageSize, pageId)
+		result, desc, err := model.GetPage(core, pageSize, pageId, args)
 		if err != nil {
 			respHandler.HandleErrorState(err, http.StatusBadRequest, desc, err.Error(), c)
 			return
