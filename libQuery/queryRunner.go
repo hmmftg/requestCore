@@ -417,9 +417,9 @@ func (command DmlCommand) Execute(core QueryRunnerInterface) (any, *response.Err
 }
 
 type DmlModel interface {
-	PreControlCommands() []DmlCommand
-	InsertCommands() []DmlCommand
-	FinalizeCommands() []DmlCommand
+	PreControlCommands() map[string][]DmlCommand
+	DmlCommands() map[string][]DmlCommand
+	FinalizeCommands() map[string][]DmlCommand
 }
 
 type Updatable interface {

@@ -72,7 +72,7 @@ func PostHandler[Req libQuery.RecordDataDml](title string,
 }
 
 func Dml[Req libQuery.DmlModel](
-	title string,
+	title, key string,
 	core RequestCoreInterface,
 ) any {
 	log.Println("Registering: ", title)
@@ -95,7 +95,7 @@ func Dml[Req libQuery.DmlModel](
 		}
 
 		preControl := request.PreControlCommands()
-		for _, command := range preControl {
+		for _, command := range preControl[key] {
 			core.RequestTools().LogStart(w, fmt.Sprintf("PreControl: %s", command.Name), "Execute")
 			_, errPreControl := command.Execute(core.GetDB())
 			if errPreControl != nil {
@@ -103,9 +103,9 @@ func Dml[Req libQuery.DmlModel](
 				return
 			}
 		}
-		insert := request.InsertCommands()
+		dml := request.DmlCommands()
 		resp := map[string]any{}
-		for _, command := range insert {
+		for _, command := range dml[key] {
 			core.RequestTools().LogStart(w, fmt.Sprintf("Insert: %s", command.Name), "Execute")
 			result, errInsert := command.Execute(core.GetDB())
 			if errInsert != nil {
@@ -118,7 +118,7 @@ func Dml[Req libQuery.DmlModel](
 		core.Responder().Respond(http.StatusOK, 0, "OK", resp, false, c)
 
 		finalize := request.FinalizeCommands()
-		for _, command := range finalize {
+		for _, command := range finalize[key] {
 			_, errFinalize := command.Execute(core.GetDB())
 			if errFinalize != nil {
 				log.Printf("Error executing finalize command: %s=>%v", command.Name, errFinalize)
