@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/hmmftg/requestCore/libError"
+	"github.com/hmmftg/requestCore/response"
 	"github.com/valyala/fasttemplate"
 )
 
@@ -260,9 +261,11 @@ type RecordData interface {
 }
 
 const (
-	NO_DATA_FOUND       = "NO_DATA_FOUND"
-	DB_READ_ERROR       = "DB_READ_ERROR"
-	PARSE_DB_RESP_ERROR = "PARSE_DB_RESP_ERROR"
+	NO_DATA_FOUND             = "NO_DATA_FOUND"
+	DUPLICATE_FOUND           = "DUPLICATE_FOUND"
+	DB_READ_ERROR             = "DB_READ_ERROR"
+	PARSE_DB_RESP_ERROR       = "PARSE_DB_RESP_ERROR"
+	ERROR_CALLING_DB_FUNCTION = "ERROR_CALLING_DB_FUNCTION"
 )
 
 type RecordDataDml interface {
@@ -356,10 +359,67 @@ func Fill[Data any](
 	return resultD, "", "", nil
 }
 
-type Insertable interface {
-	GetUniqueId() string
-	GetCountCommand() string
-	GetInsertCommand() (string, []any)
+const (
+	DmlCommandQueryCheckNotExists = 0
+	DmlCommandQueryCheckExists    = 1
+	DmlCommandInsert              = 2
+	DmlCommandUpdate              = 3
+	DmlCommandDelete              = 4
+)
+
+type DmlCommand struct {
+	Name    string
+	Command string
+	Args    []any
+	Type    int
+}
+
+func (command DmlCommand) Execute(core QueryRunnerInterface) (any, *response.ErrorState) {
+	switch command.Type {
+	case DmlCommandQueryCheckExists:
+		_, desc, data, resp, err := CallSql[QueryData](command.Command, core, command.Args...)
+		if err != nil {
+			return nil, response.ToError(desc, data, libError.Join(err, "CheckExists: %s", command.Name))
+		}
+		if desc == NO_DATA_FOUND {
+			return nil, response.ToError(NO_DATA_FOUND, nil, fmt.Errorf("CheckExists: %s=> %s", command.Name, NO_DATA_FOUND))
+		}
+		return resp, nil
+	case DmlCommandQueryCheckNotExists:
+		_, desc, data, resp, err := CallSql[QueryData](command.Command, core, command.Args...)
+		if err != nil {
+			return nil, response.ToError(desc, data, libError.Join(err, "CheckNotExists: %s", command.Name))
+		}
+		if desc != NO_DATA_FOUND {
+			return nil, response.ToError(NO_DATA_FOUND, nil, fmt.Errorf("CheckNotExists: %s=> %s", command.Name, DUPLICATE_FOUND))
+		}
+		return resp, nil
+	case DmlCommandInsert:
+		resp, err := core.InsertRow(command.Command, command.Args...)
+		if err != nil {
+			return nil, response.ToError(ERROR_CALLING_DB_FUNCTION, nil, libError.Join(err, "Insert: %s", command.Name))
+		}
+		return resp, nil
+	case DmlCommandUpdate:
+		resp, err := core.InsertRow(command.Command, command.Args...)
+		if err != nil {
+			return nil, response.ToError(ERROR_CALLING_DB_FUNCTION, nil, libError.Join(err, "Update: %s", command.Name))
+		}
+		return resp, nil
+	case DmlCommandDelete:
+		resp, err := core.InsertRow(command.Command, command.Args...)
+		if err != nil {
+			return nil, response.ToError(ERROR_CALLING_DB_FUNCTION, nil, libError.Join(err, "Delete: %s", command.Name))
+		}
+		return resp, nil
+	}
+	return nil, nil
+}
+
+type DmlModel interface {
+	PreControlCommands() []DmlCommand
+	InsertCommands() []DmlCommand
+	FinalizeCommands() []DmlCommand
 }
 
 type Updatable interface {

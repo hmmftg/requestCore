@@ -71,6 +71,62 @@ func PostHandler[Req libQuery.RecordDataDml](title string,
 	}
 }
 
+func Dml[Req libQuery.DmlModel](
+	title string,
+	core RequestCoreInterface,
+) any {
+	log.Println("Registering: ", title)
+	return func(c any) {
+		w := libContext.InitContext(c)
+		code, desc, arrayErr, request, reqLog, err := libRequest.GetRequest[Req](w, true)
+		if err != nil {
+			core.Responder().HandleErrorState(err, code, desc, arrayErr, c)
+			return
+		}
+
+		w.Parser.SetLocal("reqLog", &reqLog)
+		method := title
+		reqLog.Incoming = request
+		u, _ := url.Parse(w.Parser.GetPath())
+		code, result, err := core.RequestTools().Initialize(w, method, u.Path, &reqLog)
+		if err != nil {
+			core.Responder().HandleErrorState(err, code, result["desc"], result["message"], c)
+			return
+		}
+
+		preControl := request.PreControlCommands()
+		for _, command := range preControl {
+			core.RequestTools().LogStart(w, fmt.Sprintf("PreControl: %s", command.Name), "Execute")
+			_, errPreControl := command.Execute(core.GetDB())
+			if errPreControl != nil {
+				core.Responder().HandleErrorState(libError.Join(errPreControl, "PreControl"), http.StatusBadRequest, errPreControl.Description, errPreControl.Message, c)
+				return
+			}
+		}
+		insert := request.InsertCommands()
+		resp := map[string]any{}
+		for _, command := range insert {
+			core.RequestTools().LogStart(w, fmt.Sprintf("Insert: %s", command.Name), "Execute")
+			result, errInsert := command.Execute(core.GetDB())
+			if errInsert != nil {
+				core.Responder().HandleErrorState(libError.Join(errInsert, "Insert"), http.StatusBadRequest, errInsert.Description, errInsert.Message, c)
+				return
+			}
+			resp[command.Name] = result
+		}
+
+		core.Responder().Respond(http.StatusOK, 0, "OK", resp, false, c)
+
+		finalize := request.FinalizeCommands()
+		for _, command := range finalize {
+			_, errFinalize := command.Execute(core.GetDB())
+			if errFinalize != nil {
+				log.Printf("Error executing finalize command: %s=>%v", command.Name, errFinalize)
+			}
+		}
+	}
+}
+
 func PutHandler[Req libQuery.RecordDataDml](title string,
 	core RequestCoreInterface,
 	hasInitializer bool,
