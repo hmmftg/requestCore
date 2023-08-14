@@ -392,6 +392,8 @@ func GetParams(w webFramework.WebFramework, args ...any) map[string]string {
 		val, exists := w.Parser.CheckUrlParam(arg.(string))
 		if exists {
 			params[arg.(string)] = val
+		} else {
+			params[arg.(string)] = arg.(string)
 		}
 	}
 	return params
