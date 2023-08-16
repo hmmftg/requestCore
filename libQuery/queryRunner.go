@@ -262,7 +262,9 @@ type RecordData interface {
 
 const (
 	NO_DATA_FOUND             = "NO_DATA_FOUND"
+	NO_DATA_FOUND_DESC        = "رکوردی یافت نشد"
 	DUPLICATE_FOUND           = "DUPLICATE_FOUND"
+	DUPLICATE_FOUND_DESC      = "رکورد تکراری است"
 	DB_READ_ERROR             = "DB_READ_ERROR"
 	PARSE_DB_RESP_ERROR       = "PARSE_DB_RESP_ERROR"
 	ERROR_CALLING_DB_FUNCTION = "ERROR_CALLING_DB_FUNCTION"
@@ -382,7 +384,7 @@ func (command DmlCommand) Execute(core QueryRunnerInterface) (any, *response.Err
 			return nil, response.ToError(desc, data, libError.Join(err, "CheckExists: %s", command.Name))
 		}
 		if desc == NO_DATA_FOUND {
-			return nil, response.ToError(NO_DATA_FOUND, nil, fmt.Errorf("CheckExists: %s=> %s", command.Name, NO_DATA_FOUND))
+			return nil, response.ToError(NO_DATA_FOUND, NO_DATA_FOUND_DESC, fmt.Errorf("CheckExists: %s=> %s", command.Name, NO_DATA_FOUND))
 		}
 		return resp, nil
 	case DmlCommandQueryCheckNotExists:
@@ -390,8 +392,8 @@ func (command DmlCommand) Execute(core QueryRunnerInterface) (any, *response.Err
 		if err != nil {
 			return nil, response.ToError(desc, data, libError.Join(err, "CheckNotExists: %s", command.Name))
 		}
-		if desc != NO_DATA_FOUND {
-			return nil, response.ToError(NO_DATA_FOUND, nil, fmt.Errorf("CheckNotExists: %s=> %s", command.Name, DUPLICATE_FOUND))
+		if (len(desc) > 0 && desc != NO_DATA_FOUND) || len(resp) > 0 {
+			return nil, response.ToError(DUPLICATE_FOUND, DUPLICATE_FOUND_DESC, fmt.Errorf("CheckNotExists: %s=> %s", command.Name, DUPLICATE_FOUND))
 		}
 		return resp, nil
 	case DmlCommandInsert:
