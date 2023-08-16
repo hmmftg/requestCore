@@ -389,13 +389,13 @@ func (command DmlCommand) Execute(core QueryRunnerInterface) (any, *response.Err
 		return resp, nil
 	case DmlCommandQueryCheckNotExists:
 		_, desc, data, resp, err := CallSql[QueryData](command.Command, core, command.Args...)
+		if len(desc) > 0 && desc == NO_DATA_FOUND && resp == nil {
+			return nil, nil // OK
+		}
 		if err != nil {
 			return nil, response.ToError(desc, data, libError.Join(err, "CheckNotExists: %s", command.Name))
 		}
-		if (len(desc) > 0 && desc != NO_DATA_FOUND) || len(resp) > 0 {
-			return nil, response.ToError(DUPLICATE_FOUND, DUPLICATE_FOUND_DESC, fmt.Errorf("CheckNotExists: %s=> %s", command.Name, DUPLICATE_FOUND))
-		}
-		return resp, nil
+		return nil, response.ToError(DUPLICATE_FOUND, DUPLICATE_FOUND_DESC, fmt.Errorf("CheckNotExists: %s=> %s", command.Name, DUPLICATE_FOUND))
 	case DmlCommandInsert:
 		resp, err := core.InsertRow(command.Command, command.Args...)
 		if err != nil {
