@@ -13,7 +13,9 @@ import (
 )
 
 const (
-	NO_DATA_FOUND = "NO-DATA-FOUND"
+	NO_DATA_FOUND     = "NO-DATA-FOUND"
+	SYSTEM_FAULT      = "SYSTEM_FAULT"
+	SYSTEM_FAULT_DESC = "خطای سیستمی"
 )
 
 type ErrorResponse struct {

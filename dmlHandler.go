@@ -11,6 +11,7 @@ import (
 	"github.com/hmmftg/requestCore/libError"
 	"github.com/hmmftg/requestCore/libQuery"
 	"github.com/hmmftg/requestCore/libRequest"
+	"github.com/hmmftg/requestCore/response"
 )
 
 func PostHandler[Req libQuery.RecordDataDml](title string,
@@ -77,6 +78,12 @@ func Dml[Req libQuery.DmlModel](
 ) any {
 	log.Println("Registering: ", title)
 	return func(c any) {
+		defer func() {
+			if r := recover(); r != nil {
+				core.Responder().HandleErrorState(libError.Join(r.(error), "error in Dml"), http.StatusInternalServerError, response.SYSTEM_FAULT, response.SYSTEM_FAULT_DESC, c)
+				panic(r)
+			}
+		}()
 		w := libContext.InitContext(c)
 		code, desc, arrayErr, request, reqLog, err := libRequest.GetRequest[Req](w, true)
 		if err != nil {

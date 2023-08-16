@@ -48,8 +48,11 @@ func (m RequestModel) LogStart(w webFramework.WebFramework, method, log string) 
 	r := w.Parser.GetLocal("reqLog")
 	if r != nil {
 		reqLog := r.(*Request)
-		branch := w.Parser.GetLocal("branchId").(string)
-		m.AddRequestEvent(w, branch, method, log, reqLog)
+		branch := w.Parser.GetLocal("branchId")
+		if branch == nil {
+			branch = ""
+		}
+		m.AddRequestEvent(w, branch.(string), method, log, reqLog)
 		return reqLog
 	}
 	return &Request{ActionId: "NONE"}
