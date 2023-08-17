@@ -2,6 +2,7 @@ package requestCore
 
 import (
 	"github.com/hmmftg/requestCore/libCallApi"
+	"github.com/hmmftg/requestCore/libCrypto"
 	"github.com/hmmftg/requestCore/libDictionary"
 	"github.com/hmmftg/requestCore/libParams"
 	"github.com/hmmftg/requestCore/libQuery"
@@ -16,6 +17,7 @@ type RequestCoreModel struct {
 	RespHandler        response.ResponseHandler
 	Dict               libDictionary.DictionaryInterface
 	ParamMap           libParams.ParamsInterface
+	Sm                 libCrypto.Sm
 }
 
 type RequestCoreInterface interface {
@@ -25,4 +27,5 @@ type RequestCoreInterface interface {
 	Responder() response.ResponseHandler
 	Dictionary() libDictionary.DictionaryInterface
 	Params() libParams.ParamsInterface
+	Sm() libCrypto.Sm
 }
