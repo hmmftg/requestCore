@@ -17,7 +17,7 @@ type RequestCoreModel struct {
 	RespHandler        response.ResponseHandler
 	Dict               libDictionary.DictionaryInterface
 	ParamMap           libParams.ParamsInterface
-	Sm                 libCrypto.Sm
+	CryptoSm           libCrypto.Sm
 }
 
 type RequestCoreInterface interface {
