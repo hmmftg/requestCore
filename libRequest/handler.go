@@ -1,6 +1,7 @@
 package libRequest
 
 import (
+	"net/http"
 	"time"
 
 	"github.com/hmmftg/requestCore/libError"
@@ -41,23 +42,26 @@ func Req[Req any, Header any, PT interface {
 	header := PT(new(Header))
 	err = ctx.Parser.GetHeader(&header)
 	if err != nil {
-		return 400, "HEADER_ABSENT", nil, request, req, libError.Join(err, "GetRequest[GetHeader](%v)", ctx.Parser.GetHttpHeader())
+		return http.StatusBadRequest, "HEADER_ABSENT", nil, request, req, libError.Join(err, "GetRequest[GetHeader](%v)", ctx.Parser.GetHttpHeader())
 	}
 
 	//Check Input JSON
+	desc := "ERROR_IN_GET_REQUEST_"
 	if isJson {
 		err = ctx.Parser.GetBody(&request)
 		if err != nil {
 			err = libError.Join(err, "GetRequest[GetBody](fails)")
+			desc += "BODY"
 		}
 	} else {
 		err = ctx.Parser.GetUrlQuery(&request)
 		if err != nil {
 			err = libError.Join(err, "GetRequest[GetUrlQuery](fails)")
+			desc += "QUERY"
 		}
 	}
 	if err != nil {
-		return 400, "JSON_ABSENT", nil, request, req, err
+		return http.StatusBadRequest, desc, nil, request, req, err
 	}
 
 	req = Request{
@@ -81,21 +85,25 @@ func Req[Req any, Header any, PT interface {
 		req.PersonId = header.GetPerson()
 	}
 
+	errorResponses := []response.ErrorResponse{}
 	if ctx.Parser.GetMethod() != "GET" {
 		err = libValidate.ValidateStruct(header)
 		if err != nil {
-			errorResponses := response.FormatErrorResp(err, libValidate.GetTranslator())
-			return 400, "Header Validation Failed", errorResponses, request, req, libError.Join(err, "GetRequest[ValidateHeader](fails)")
+			errorResponsesHeader := response.FormatErrorResp(err, libValidate.GetTranslator())
+			errorResponses = append(errorResponses, errorResponsesHeader...)
 		}
 	}
 
 	err = libValidate.ValidateStruct(request)
 	if err != nil {
-		errorResponses := response.FormatErrorResp(err, libValidate.GetTranslator())
-		return 400, "Validation Failed", errorResponses, request, req, libError.Join(err, "GetRequest[ValidateRequest](fails)")
+		errorResponsesRequest := response.FormatErrorResp(err, libValidate.GetTranslator())
+		errorResponses = append(errorResponses, errorResponsesRequest...)
+	}
+	if len(errorResponses) > 0 {
+		return http.StatusBadRequest, "VALIDATION_FAILED", errorResponses, request, req, libError.Join(err, "ParseRequest[ValidateRequest](fails)")
 	}
 
-	return 200, "OK", nil, request, req, nil
+	return http.StatusOK, "OK", nil, request, req, nil
 }
 
 func GetEmptyRequest(ctx webFramework.WebFramework) (int, string, []response.ErrorResponse, Request, error) {
