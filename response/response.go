@@ -143,8 +143,8 @@ func FormatErrorResp(errs error, trans ut.Translator) []ErrorResponse {
 	errorResponses := make([]ErrorResponse, 0)
 	for _, validationError := range err {
 		var errorResp ErrorResponse
-		path := strings.Split(validationError.StructNamespace(), ".")
-		parent := ""
+		path := strings.Split(validationError.Namespace(), ".")
+		parent := "Request"
 
 		if path[0] == "RequestHeader" {
 			parent = "Header"
