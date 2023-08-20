@@ -144,10 +144,10 @@ func FormatErrorResp(errs error, trans ut.Translator) []ErrorResponse {
 	for _, validationError := range err {
 		var errorResp ErrorResponse
 		path := strings.Split(validationError.Namespace(), ".")
-		parent := "Request"
+		parent := "Request."
 
 		if path[0] == "RequestHeader" {
-			parent = "Header"
+			parent = "Header."
 		}
 
 		if len(path) > 2 {
@@ -155,6 +155,7 @@ func FormatErrorResp(errs error, trans ut.Translator) []ErrorResponse {
 				parent = parent + path[i] + "."
 			}
 		}
+		parent = parent[:len(parent)-1]
 
 		switch validationError.Tag() {
 		case "required":
