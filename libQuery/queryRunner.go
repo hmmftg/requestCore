@@ -117,7 +117,7 @@ func (m QueryRunnerModel) QueryRunner(querySql string, args ...any) (int, []any,
 				scanArgs[i] = new(sql.NullString)
 			case "BOOL":
 				scanArgs[i] = new(sql.NullBool)
-			case "INT4", "NUMBER":
+			case "INT4", "INT64", "NUMBER":
 				scanArgs[i] = new(sql.NullInt64)
 			default:
 				//log.Println("Undefined Type Name: ", v.DatabaseTypeName())
