@@ -361,24 +361,89 @@ func Fill[Data any](
 	return resultD, "", "", nil
 }
 
+//go:generate enumer -type=QueryCommandType -json -output queryEnum.go
+type QueryCommandType int
+
 const (
-	DmlCommandQueryCheckNotExists = 0
-	DmlCommandQueryCheckExists    = 1
-	DmlCommandInsert              = 2
-	DmlCommandUpdate              = 3
-	DmlCommandDelete              = 4
+	QuerySingle QueryCommandType = iota
+	QueryAll
+	QueryMap
+)
+
+type QueryCommand struct {
+	Name    string
+	Command string
+	Args    []any
+	Type    QueryCommandType
+}
+
+type QueryModel interface {
+	QueryList() map[string]QueryCommand
+}
+
+type QueryResult interface {
+	Id() string
+	Value() any
+}
+
+func Query[Result QueryResult](core QueryRunnerInterface, command QueryCommand) (any, *response.ErrorState) {
+	switch command.Type {
+	case QuerySingle:
+		_, desc, data, resp, err := CallSql[Result](command.Command, core, command.Args...)
+		if err != nil {
+			return nil, response.ToError(desc, data, libError.Join(err, "QuerySingle: %s", command.Name))
+		}
+		if desc == NO_DATA_FOUND {
+			return nil, response.ToError(NO_DATA_FOUND, NO_DATA_FOUND_DESC, fmt.Errorf("QuerySingle: %s=> %s", command.Name, NO_DATA_FOUND))
+		}
+		return resp[0], nil
+	case QueryAll:
+		_, desc, data, resp, err := CallSql[Result](command.Command, core, command.Args...)
+		if err != nil {
+			return nil, response.ToError(desc, data, libError.Join(err, "QueryAll: %s", command.Name))
+		}
+		if desc == NO_DATA_FOUND {
+			return nil, response.ToError(NO_DATA_FOUND, NO_DATA_FOUND_DESC, fmt.Errorf("QueryAll: %s=> %s", command.Name, NO_DATA_FOUND))
+		}
+		return resp, nil
+	case QueryMap:
+		_, desc, data, resp, err := CallSql[Result](command.Command, core, command.Args...)
+		if err != nil {
+			return nil, response.ToError(desc, data, libError.Join(err, "QueryMap: %s", command.Name))
+		}
+		if desc == NO_DATA_FOUND {
+			return nil, response.ToError(NO_DATA_FOUND, NO_DATA_FOUND_DESC, fmt.Errorf("QueryMap: %s=> %s", command.Name, NO_DATA_FOUND))
+		}
+		respMap := make(map[string]any)
+		for _, record := range resp {
+			respMap[record.Id()] = record.Value()
+		}
+		return respMap, nil
+	}
+	return nil, nil
+}
+
+//go:generate enumer -type=DmlCommandType -json -output dmlEnum.go
+type DmlCommandType int
+
+const (
+	QueryCheckNotExists DmlCommandType = iota
+	QueryCheckExists
+	Insert
+	Update
+	Delete
 )
 
 type DmlCommand struct {
 	Name    string
 	Command string
 	Args    []any
-	Type    int
+	Type    DmlCommandType
 }
 
 func (command DmlCommand) Execute(core QueryRunnerInterface) (any, *response.ErrorState) {
 	switch command.Type {
-	case DmlCommandQueryCheckExists:
+	case QueryCheckExists:
 		_, desc, data, resp, err := CallSql[QueryData](command.Command, core, command.Args...)
 		if err != nil {
 			return nil, response.ToError(desc, data, libError.Join(err, "CheckExists: %s", command.Name))
@@ -387,7 +452,7 @@ func (command DmlCommand) Execute(core QueryRunnerInterface) (any, *response.Err
 			return nil, response.ToError(NO_DATA_FOUND, NO_DATA_FOUND_DESC, fmt.Errorf("CheckExists: %s=> %s", command.Name, NO_DATA_FOUND))
 		}
 		return resp, nil
-	case DmlCommandQueryCheckNotExists:
+	case QueryCheckNotExists:
 		_, desc, data, resp, err := CallSql[QueryData](command.Command, core, command.Args...)
 		if len(desc) > 0 && desc == NO_DATA_FOUND && resp == nil {
 			return nil, nil // OK
@@ -396,19 +461,19 @@ func (command DmlCommand) Execute(core QueryRunnerInterface) (any, *response.Err
 			return nil, response.ToError(desc, data, libError.Join(err, "CheckNotExists: %s", command.Name))
 		}
 		return nil, response.ToError(DUPLICATE_FOUND, DUPLICATE_FOUND_DESC, fmt.Errorf("CheckNotExists: %s=> %s", command.Name, DUPLICATE_FOUND))
-	case DmlCommandInsert:
+	case Insert:
 		resp, err := core.InsertRow(command.Command, command.Args...)
 		if err != nil {
 			return nil, response.ToError(ERROR_CALLING_DB_FUNCTION, nil, libError.Join(err, "Insert: %s", command.Name))
 		}
 		return resp, nil
-	case DmlCommandUpdate:
+	case Update:
 		resp, err := core.InsertRow(command.Command, command.Args...)
 		if err != nil {
 			return nil, response.ToError(ERROR_CALLING_DB_FUNCTION, nil, libError.Join(err, "Update: %s", command.Name))
 		}
 		return resp, nil
-	case DmlCommandDelete:
+	case Delete:
 		resp, err := core.InsertRow(command.Command, command.Args...)
 		if err != nil {
 			return nil, response.ToError(ERROR_CALLING_DB_FUNCTION, nil, libError.Join(err, "Delete: %s", command.Name))

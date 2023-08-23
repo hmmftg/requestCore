@@ -76,6 +76,13 @@ func Dml[Req libQuery.DmlModel](
 	title, key string,
 	core RequestCoreInterface,
 ) any {
+	return DmlHandler[Req](title, key, core)
+}
+
+func DmlHandler[Req libQuery.DmlModel](
+	title, key string,
+	core RequestCoreInterface,
+) any {
 	log.Println("Registering: ", title)
 	return func(c any) {
 		defer func() {

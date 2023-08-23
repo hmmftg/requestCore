@@ -305,3 +305,53 @@ func CallApi[Resp any](
 	}
 	return &resp1.Resp.Result, nil
 }
+
+func CallHandler[Req any, Resp any](
+	title, path, api, method, query string, isJson bool,
+	hasInitializer bool,
+	headers map[string]string,
+	core RequestCoreInterface,
+) any {
+	log.Println("Registering: ", title)
+	return func(c any) {
+		w := libContext.InitContext(c)
+		finalPath := path
+		for _, value := range w.Parser.GetUrlParams() {
+			//normalized := strings.ReplaceAll(param.Value, "*", "/")
+			finalPath += "/" + value //normalized
+		}
+		code, desc, arrayErr, req, reqLog, err := libRequest.GetRequest[Req](w, isJson)
+		if err != nil {
+			core.Responder().HandleErrorState(err, code, desc, arrayErr, c)
+			return
+		}
+		w.Parser.SetLocal("reqLog", &reqLog)
+		reqLog.Incoming = req
+
+		if hasInitializer {
+			u, _ := url.Parse(w.Parser.GetPath())
+			code, result, err := core.RequestTools().Initialize(w, title, u.Path, &reqLog)
+			if err != nil {
+				core.Responder().HandleErrorState(err, code, result["desc"], result["message"], c)
+				return
+			}
+		}
+		resp, errCall := CallApi[Resp](w, core, title,
+			libCallApi.CallParam{
+				Api:         core.Consumer().GetApi(api),
+				Method:      method,
+				Path:        finalPath,
+				Query:       query,
+				JsonBody:    req,
+				ValidateTls: false,
+				EnableLog:   false,
+				Headers:     headers,
+			})
+		if errCall != nil {
+			core.Responder().HandleErrorState(errCall, errCall.Status, errCall.Description, errCall.Message, w.Ctx)
+			return
+		}
+
+		core.Responder().Respond(http.StatusOK, 0, "OK", resp, false, c)
+	}
+}

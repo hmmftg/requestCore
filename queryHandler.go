@@ -474,3 +474,34 @@ func GetPage[Model GetPageHandler](title string,
 		respHandler.Respond(http.StatusOK, 0, "OK", result, false, c)
 	}
 }
+
+func QueryHandler[Req libQuery.QueryModel, Resp libQuery.QueryResult](
+	title, key string,
+	core RequestCoreInterface,
+) any {
+	log.Println("Registering: ", title)
+	return func(c any) {
+		defer func() {
+			if r := recover(); r != nil {
+				core.Responder().HandleErrorState(libError.Join(r.(error), "error in query"), http.StatusInternalServerError, response.SYSTEM_FAULT, response.SYSTEM_FAULT_DESC, c)
+				panic(r)
+			}
+		}()
+		w := libContext.InitContext(c)
+		code, desc, arrayErr, request, _, err := libRequest.GetRequest[Req](w, true)
+		if err != nil {
+			core.Responder().HandleErrorState(err, code, desc, arrayErr, c)
+			return
+		}
+
+		queries := request.QueryList()
+		core.RequestTools().LogStart(w, fmt.Sprintf("Query: %s", queries[key].Name), "Call")
+		resp, errQuery := libQuery.Query[Resp](core.GetDB(), queries[key])
+		if errQuery != nil {
+			core.Responder().HandleErrorState(libError.Join(errQuery, "query"), http.StatusBadRequest, errQuery.Description, errQuery.Message, c)
+			return
+		}
+
+		core.Responder().Respond(http.StatusOK, 0, "OK", resp, false, c)
+	}
+}
