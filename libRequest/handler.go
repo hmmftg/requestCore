@@ -15,21 +15,7 @@ func GetRequest[Q any](ctx webFramework.WebFramework, isJson bool) (int, string,
 }
 
 func Req[Req any, Header any, PT interface {
-	GetId() string
-	GetUser() string
-	GetBranch() string
-	GetBank() string
-	GetPerson() string
-	GetProgram() string
-	GetModule() string
-	GetMethod() string
-	SetUser(string)
-	SetBranch(string)
-	SetBank(string)
-	SetPerson(string)
-	SetProgram(string)
-	SetModule(string)
-	SetMethod(string)
+	HeaderInterface
 	*Header
 }](ctx webFramework.WebFramework, isJson bool) (int, string, []response.ErrorResponse, Req, Request, error) {
 	var request Req

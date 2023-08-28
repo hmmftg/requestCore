@@ -373,12 +373,11 @@ const (
 type QueryCommand struct {
 	Name    string
 	Command string
-	Args    []any
 	Type    QueryCommandType
 }
 
-type QueryModel interface {
-	QueryList() map[string]QueryCommand
+type QueryRequest interface {
+	QueryArgs() map[string][]any
 }
 
 type QueryResult interface {
@@ -386,10 +385,10 @@ type QueryResult interface {
 	Value() any
 }
 
-func Query[Result QueryResult](core QueryRunnerInterface, command QueryCommand) (any, *response.ErrorState) {
+func Query[Result QueryResult](core QueryRunnerInterface, command QueryCommand, args ...any) (any, *response.ErrorState) {
 	switch command.Type {
 	case QuerySingle:
-		_, desc, data, resp, err := CallSql[Result](command.Command, core, command.Args...)
+		_, desc, data, resp, err := CallSql[Result](command.Command, core, args...)
 		if err != nil {
 			return nil, response.ToError(desc, data, libError.Join(err, "QuerySingle: %s", command.Name))
 		}
@@ -398,7 +397,7 @@ func Query[Result QueryResult](core QueryRunnerInterface, command QueryCommand) 
 		}
 		return resp[0], nil
 	case QueryAll:
-		_, desc, data, resp, err := CallSql[Result](command.Command, core, command.Args...)
+		_, desc, data, resp, err := CallSql[Result](command.Command, core, args...)
 		if err != nil {
 			return nil, response.ToError(desc, data, libError.Join(err, "QueryAll: %s", command.Name))
 		}
@@ -407,7 +406,7 @@ func Query[Result QueryResult](core QueryRunnerInterface, command QueryCommand) 
 		}
 		return resp, nil
 	case QueryMap:
-		_, desc, data, resp, err := CallSql[Result](command.Command, core, command.Args...)
+		_, desc, data, resp, err := CallSql[Result](command.Command, core, args...)
 		if err != nil {
 			return nil, response.ToError(desc, data, libError.Join(err, "QueryMap: %s", command.Name))
 		}

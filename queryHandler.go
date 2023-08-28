@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"reflect"
 	"strings"
 
 	"github.com/hmmftg/requestCore/libContext"
@@ -475,11 +476,8 @@ func GetPage[Model GetPageHandler](title string,
 	}
 }
 
-func QueryHandler[Req any, PT interface {
-	libQuery.QueryModel
-	*Req
-}, Resp libQuery.QueryResult](
-	title, key string,
+func QueryHandler[Req libQuery.QueryRequest, Resp libQuery.QueryResult](
+	title, key string, queryMap map[string]libQuery.QueryCommand,
 	core RequestCoreInterface,
 ) any {
 	log.Println("Registering: ", title)
@@ -491,19 +489,18 @@ func QueryHandler[Req any, PT interface {
 			}
 		}()
 		w := libContext.InitContext(c)
-		code, desc, arrayErr, request, _, err := libRequest.GetRequest[PT](w, false)
+		code, desc, arrayErr, request, _, err := libRequest.GetRequest[Req](w, false)
 		if err != nil {
 			core.Responder().HandleErrorState(err, code, desc, arrayErr, c)
 			return
 		}
 
-		if request == nil {
-			request = PT(new(Req))
+		core.RequestTools().LogStart(w, fmt.Sprintf("Query: %s", queryMap[key].Name), "Call")
+		args := make([]any, 0)
+		if !reflect.ValueOf(&request).Elem().IsZero() {
+			args = request.QueryArgs()[key]
 		}
-
-		queries := request.QueryList()
-		core.RequestTools().LogStart(w, fmt.Sprintf("Query: %s", queries[key].Name), "Call")
-		resp, errQuery := libQuery.Query[Resp](core.GetDB(), queries[key])
+		resp, errQuery := libQuery.Query[Resp](core.GetDB(), queryMap[key], args)
 		if errQuery != nil {
 			core.Responder().HandleErrorState(libError.Join(errQuery, "query"), http.StatusBadRequest, errQuery.Description, errQuery.Message, c)
 			return

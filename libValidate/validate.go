@@ -10,6 +10,7 @@ import (
 	ut "github.com/go-playground/universal-translator"
 	"github.com/go-playground/validator/v10"
 	fa_translations "github.com/go-playground/validator/v10/translations/fa"
+	"github.com/hmmftg/requestCore/libError"
 )
 
 var (
@@ -56,7 +57,10 @@ func firstTime() (ut.Translator, *validator.Validate, error) {
 	uni := ut.New(fa.New())
 	Translator, _ := uni.GetTranslator("fa")
 	Validator = validator.New() //(config)
-	Validator.RegisterValidation("padded_ip", PaddedIpValidator)
+	err := Validator.RegisterValidation("padded_ip", PaddedIpValidator)
+	if err != nil {
+		return nil, nil, libError.Join(err, "error in RegisterValidation(padded_ip)")
+	}
 	Validator.RegisterTagNameFunc(func(fld reflect.StructField) string {
 		name := strings.SplitN(fld.Tag.Get("json"), ",", 2)[0]
 		if name == "-" {
@@ -65,9 +69,9 @@ func firstTime() (ut.Translator, *validator.Validate, error) {
 		return name
 	})
 	//Validate.RegisterStructValidation(CustomerStructLevelValidation, GetCustomerInfoRequest{})
-	err := fa_translations.RegisterDefaultTranslations(Validator, Translator)
+	err = fa_translations.RegisterDefaultTranslations(Validator, Translator)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, libError.Join(err, "error in RegisterDefaultTranslations(fa_translations)")
 	}
 
 	addTranslation("padded_ip", "{0} بایستی به فرمت 000.000.000.000 باشد", Translator)
