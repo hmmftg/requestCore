@@ -22,7 +22,7 @@ func (m RequestModel) Initialize(c webFramework.WebFramework, method, url string
 	req.Header.SetModule(mdl)
 	req.Header.SetUser(c.Parser.GetLocalString("userId"))
 	req.Header.SetMethod(method)
-	m.InsertRequest(*req)
+	err = m.InsertRequest(*req)
 	if err != nil {
 		return http.StatusServiceUnavailable, map[string]string{"desc": "PWC_REGISTER", "message": "Unable To Register Request"}, err
 	}

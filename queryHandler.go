@@ -476,8 +476,7 @@ func GetPage[Model GetPageHandler](title string,
 }
 
 func QueryHandler[Req any, PT interface {
-	libRequest.HeaderInterface
-	QueryList() map[string]libQuery.QueryCommand
+	libQuery.QueryModel
 	*Req
 }, Resp libQuery.QueryResult](
 	title, key string,
