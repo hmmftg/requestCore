@@ -488,7 +488,7 @@ func QueryHandler[Req libQuery.QueryModel, Resp libQuery.QueryResult](
 			}
 		}()
 		w := libContext.InitContext(c)
-		code, desc, arrayErr, request, _, err := libRequest.GetRequest[Req](w, true)
+		code, desc, arrayErr, request, _, err := libRequest.GetRequest[Req](w, false)
 		if err != nil {
 			core.Responder().HandleErrorState(err, code, desc, arrayErr, c)
 			return
