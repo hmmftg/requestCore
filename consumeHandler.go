@@ -242,7 +242,7 @@ func InitPostRequest(
 		return http.StatusBadRequest, map[string]string{"desc": "DUPLICATE_REQUEST", "message": "Duplicate Request"}, err
 	}
 	addEvent(ctx, reqLog.BranchId, method, "start", reqLog)
-	insertRequest(*reqLog)
+	err = insertRequest(*reqLog)
 	if err != nil {
 		return http.StatusServiceUnavailable, map[string]string{"desc": "PWC_REGISTER", "message": "Unable To Register Request"}, err
 	}

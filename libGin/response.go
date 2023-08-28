@@ -73,7 +73,10 @@ func (m GinModel) RespondWithReceipt(code, status int, message string, data any,
 
 		reqLog.Outgoing = resp //string(respB)
 		if message != "DUPLICATE_REQUEST" {
-			m.RequestInterface.UpdateRequest(*reqLog)
+			err := m.RequestInterface.UpdateRequest(*reqLog)
+			if err != nil {
+				log.Println("error in UpdateRequest", err)
+			}
 		}
 	}
 	if abort {

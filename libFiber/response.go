@@ -28,7 +28,10 @@ func (m FiberModel) RespondWithReceipt(code, status int, message string, data an
 		resp.ErrorData = m.GetErrorsArray(message, data)
 	}
 
-	c.JSON(resp)
+	err := c.JSON(resp)
+	if err != nil {
+		log.Println("error in set json body", err)
+	}
 
 	if r := c.Locals("reqLog"); r != nil {
 		reqLog := r.(*libRequest.Request)
@@ -37,17 +40,26 @@ func (m FiberModel) RespondWithReceipt(code, status int, message string, data an
 		} else {
 			reqLog.Result = message
 		}
-		//respB, _ := json.Marshal(resp)
-		reqLog.Outgoing = resp //string(respB)
+
+		reqLog.Outgoing = resp
 		if message != "DUPLICATE_REQUEST" {
-			m.RequestInterface.UpdateRequest(*reqLog)
+			err = m.RequestInterface.UpdateRequest(*reqLog)
+			if err != nil {
+				log.Println("error in UpdateRequest", err)
+			}
 		}
 	}
 	c.Status(code)
 	if abort {
-		c.SendStatus(code)
+		err = c.SendStatus(code)
+		if err != nil {
+			log.Println("error in SendStatus", err)
+		}
 	} else {
-		c.Next()
+		err = c.Next()
+		if err != nil {
+			log.Println("error in calling next", err)
+		}
 	}
 }
 
@@ -80,12 +92,21 @@ func Respond(code, status int, message string, data any, abort bool, ctx any) {
 		resp.ErrorData = response.GetErrorsArray(message, data)
 	}
 
-	c.JSON(resp)
+	err := c.JSON(resp)
+	if err != nil {
+		log.Println("error in set json body", err)
+	}
 	c.Status(code)
 	if abort {
-		c.SendStatus(code)
+		err = c.SendStatus(code)
+		if err != nil {
+			log.Println("error in SendStatus", err)
+		}
 	} else {
-		c.Next()
+		err = c.Next()
+		if err != nil {
+			log.Println("error in calling next", err)
+		}
 	}
 }
 

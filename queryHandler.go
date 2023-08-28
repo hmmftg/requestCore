@@ -475,7 +475,11 @@ func GetPage[Model GetPageHandler](title string,
 	}
 }
 
-func QueryHandler[Req libQuery.QueryModel, Resp libQuery.QueryResult](
+func QueryHandler[Req any, PT interface {
+	libRequest.HeaderInterface
+	QueryList() map[string]libQuery.QueryCommand
+	*Req
+}, Resp libQuery.QueryResult](
 	title, key string,
 	core RequestCoreInterface,
 ) any {
@@ -488,10 +492,14 @@ func QueryHandler[Req libQuery.QueryModel, Resp libQuery.QueryResult](
 			}
 		}()
 		w := libContext.InitContext(c)
-		code, desc, arrayErr, request, _, err := libRequest.GetRequest[Req](w, false)
+		code, desc, arrayErr, request, _, err := libRequest.GetRequest[PT](w, false)
 		if err != nil {
 			core.Responder().HandleErrorState(err, code, desc, arrayErr, c)
 			return
+		}
+
+		if request == nil {
+			request = PT(new(Req))
 		}
 
 		queries := request.QueryList()
