@@ -22,9 +22,12 @@ func GetRequest[Q any](ctx webFramework.WebFramework, isJson bool) (int, string,
 type Type int
 
 const (
-	JSON Type = iota
-	JSONWithUri
+	NoBinding Type = iota
+	JSON
+	JSONWithURI
 	Query
+	QueryWithURI
+	URI
 )
 
 func Req[Req any, Header any, PT interface {
@@ -46,16 +49,17 @@ func Req[Req any, Header any, PT interface {
 
 	//Check Input
 	desc := "ERROR_IN_GET_REQUEST_"
-	if mode == JSON {
+	switch mode {
+	case JSON:
 		err = ctx.Parser.GetBody(&request)
 		if err != nil {
 			err = libError.Join(err, "GetRequest[GetBody](fails)")
 			desc += "BODY"
 		}
-	} else if mode == JSONWithUri {
-		errBody := ctx.Parser.GetBody(&request)
-		if errBody != nil {
-			err = libError.Join(errBody, "GetRequest[GetBody](fails)")
+	case JSONWithURI:
+		err = ctx.Parser.GetBody(&request)
+		if err != nil {
+			err = libError.Join(err, "GetRequest[GetBody](fails)")
 			desc += "BODY"
 		}
 		errUri := ctx.Parser.GetUri(&request)
@@ -63,12 +67,31 @@ func Req[Req any, Header any, PT interface {
 			err = libError.Append(err, errUri, "GetRequest[GetUri](fails)")
 			desc += "URI"
 		}
-	} else if mode == Query {
+	case Query:
 		err = ctx.Parser.GetUrlQuery(&request)
 		if err != nil {
 			err = libError.Join(err, "GetRequest[GetUrlQuery](fails)")
 			desc += "QUERY"
 		}
+	case QueryWithURI:
+		err = ctx.Parser.GetUrlQuery(&request)
+		if err != nil {
+			err = libError.Join(err, "GetRequest[GetUrlQuery](fails)")
+			desc += "QUERY"
+		}
+		errUri := ctx.Parser.GetUri(&request)
+		if errUri != nil {
+			err = libError.Append(err, errUri, "GetRequest[GetUri](fails)")
+			desc += "URI"
+		}
+	case URI:
+		err = ctx.Parser.GetUri(&request)
+		if err != nil {
+			err = libError.Join(err, "GetRequest[GetUri](fails)")
+			desc += "URI"
+		}
+	default:
+		err = nil
 	}
 	if err != nil {
 		return http.StatusBadRequest, desc, nil, request, req, err
@@ -104,10 +127,12 @@ func Req[Req any, Header any, PT interface {
 		}
 	}
 
-	err = libValidate.ValidateStruct(request)
-	if err != nil {
-		errorResponsesRequest := response.FormatErrorResp(err, libValidate.GetTranslator())
-		errorResponses = append(errorResponses, errorResponsesRequest...)
+	if mode != NoBinding {
+		err = libValidate.ValidateStruct(request)
+		if err != nil {
+			errorResponsesRequest := response.FormatErrorResp(err, libValidate.GetTranslator())
+			errorResponses = append(errorResponses, errorResponsesRequest...)
+		}
 	}
 	if len(errorResponses) > 0 {
 		return http.StatusBadRequest, "VALIDATION_FAILED", errorResponses, request, req, libError.Join(err, "ParseRequest[ValidateRequest](fails)")

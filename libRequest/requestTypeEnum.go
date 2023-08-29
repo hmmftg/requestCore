@@ -8,11 +8,11 @@ import (
 	"strings"
 )
 
-const _TypeName = "JSONJSONWithUriQuery"
+const _TypeName = "NoBindingJSONJSONWithURIQueryQueryWithURIURI"
 
-var _TypeIndex = [...]uint8{0, 4, 15, 20}
+var _TypeIndex = [...]uint8{0, 9, 13, 24, 29, 41, 44}
 
-const _TypeLowerName = "jsonjsonwithuriquery"
+const _TypeLowerName = "nobindingjsonjsonwithuriqueryquerywithuriuri"
 
 func (i Type) String() string {
 	if i < 0 || i >= Type(len(_TypeIndex)-1) {
@@ -25,26 +25,38 @@ func (i Type) String() string {
 // Re-run the stringer command to generate them again.
 func _TypeNoOp() {
 	var x [1]struct{}
-	_ = x[JSON-(0)]
-	_ = x[JSONWithUri-(1)]
-	_ = x[Query-(2)]
+	_ = x[NoBinding-(0)]
+	_ = x[JSON-(1)]
+	_ = x[JSONWithURI-(2)]
+	_ = x[Query-(3)]
+	_ = x[QueryWithURI-(4)]
+	_ = x[URI-(5)]
 }
 
-var _TypeValues = []Type{JSON, JSONWithUri, Query}
+var _TypeValues = []Type{NoBinding, JSON, JSONWithURI, Query, QueryWithURI, URI}
 
 var _TypeNameToValueMap = map[string]Type{
-	_TypeName[0:4]:        JSON,
-	_TypeLowerName[0:4]:   JSON,
-	_TypeName[4:15]:       JSONWithUri,
-	_TypeLowerName[4:15]:  JSONWithUri,
-	_TypeName[15:20]:      Query,
-	_TypeLowerName[15:20]: Query,
+	_TypeName[0:9]:        NoBinding,
+	_TypeLowerName[0:9]:   NoBinding,
+	_TypeName[9:13]:       JSON,
+	_TypeLowerName[9:13]:  JSON,
+	_TypeName[13:24]:      JSONWithURI,
+	_TypeLowerName[13:24]: JSONWithURI,
+	_TypeName[24:29]:      Query,
+	_TypeLowerName[24:29]: Query,
+	_TypeName[29:41]:      QueryWithURI,
+	_TypeLowerName[29:41]: QueryWithURI,
+	_TypeName[41:44]:      URI,
+	_TypeLowerName[41:44]: URI,
 }
 
 var _TypeNames = []string{
-	_TypeName[0:4],
-	_TypeName[4:15],
-	_TypeName[15:20],
+	_TypeName[0:9],
+	_TypeName[9:13],
+	_TypeName[13:24],
+	_TypeName[24:29],
+	_TypeName[29:41],
+	_TypeName[41:44],
 }
 
 // TypeString retrieves an enum value from the enum constants string name.
