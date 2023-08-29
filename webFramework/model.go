@@ -13,6 +13,7 @@ type RequestParser interface {
 	GetHeaderValue(name string) string
 	GetHttpHeader() http.Header
 	GetBody(target any) error
+	GetUri(target any) error
 	GetUrlQuery(target any) error
 	GetRawUrlQuery() string
 	GetLocal(name string) any

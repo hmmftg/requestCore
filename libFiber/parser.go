@@ -34,6 +34,9 @@ func (c FiberParser) GetHeaderValue(name string) string {
 func (c FiberParser) GetBody(target any) error {
 	return c.Ctx.BodyParser(target)
 }
+func (c FiberParser) GetUri(target any) error {
+	return c.Ctx.ParamsParser(target)
+}
 func (c FiberParser) GetUrlQuery(target any) error {
 	return c.Ctx.BodyParser(target)
 }

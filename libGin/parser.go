@@ -36,6 +36,9 @@ func (c GinParser) GetRawUrlQuery() string {
 func (c GinParser) GetBody(target any) error {
 	return c.Ctx.ShouldBindJSON(target)
 }
+func (c GinParser) GetUri(target any) error {
+	return c.Ctx.ShouldBindUri(target)
+}
 func (c GinParser) GetUrlQuery(target any) error {
 	return c.Ctx.ShouldBindQuery(target)
 }

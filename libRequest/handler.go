@@ -11,13 +11,25 @@ import (
 )
 
 func GetRequest[Q any](ctx webFramework.WebFramework, isJson bool) (int, string, []response.ErrorResponse, Q, Request, error) {
-	return Req[Q, RequestHeader](ctx, isJson)
+	if isJson {
+		return Req[Q, RequestHeader](ctx, JSON)
+	}
+	return Req[Q, RequestHeader](ctx, Query)
 }
+
+//go:generate enumer -type=Type -json -output requestTypeEnum.go
+type Type int
+
+const (
+	JSON Type = iota
+	JSONWithUri
+	Query
+)
 
 func Req[Req any, Header any, PT interface {
 	HeaderInterface
 	*Header
-}](ctx webFramework.WebFramework, isJson bool) (int, string, []response.ErrorResponse, Req, Request, error) {
+}](ctx webFramework.WebFramework, mode Type) (int, string, []response.ErrorResponse, Req, Request, error) {
 	var request Req
 	var req Request
 	var err error
@@ -31,15 +43,26 @@ func Req[Req any, Header any, PT interface {
 		return http.StatusBadRequest, "HEADER_ABSENT", nil, request, req, libError.Join(err, "GetRequest[GetHeader](%v)", ctx.Parser.GetHttpHeader())
 	}
 
-	//Check Input JSON
+	//Check Input
 	desc := "ERROR_IN_GET_REQUEST_"
-	if isJson {
+	if mode == JSON {
 		err = ctx.Parser.GetBody(&request)
 		if err != nil {
 			err = libError.Join(err, "GetRequest[GetBody](fails)")
 			desc += "BODY"
 		}
-	} else {
+	} else if mode == JSONWithUri {
+		errBody := ctx.Parser.GetBody(&request)
+		if errBody != nil {
+			err = libError.Join(errBody, "GetRequest[GetBody](fails)")
+			desc += "BODY"
+		}
+		errUri := ctx.Parser.GetUri(&request)
+		if errUri != nil {
+			err = libError.Append(err, errUri, "GetRequest[GetUri](fails)")
+			desc += "URI"
+		}
+	} else if mode == Query {
 		err = ctx.Parser.GetUrlQuery(&request)
 		if err != nil {
 			err = libError.Join(err, "GetRequest[GetUrlQuery](fails)")
