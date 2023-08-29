@@ -479,6 +479,8 @@ func GetPage[Model GetPageHandler](title string,
 func QueryHandler[Req libQuery.QueryRequest, Resp libQuery.QueryResult](
 	title, key string, queryMap map[string]libQuery.QueryCommand,
 	core RequestCoreInterface,
+	mode libRequest.Type,
+	validateHeader bool,
 ) any {
 	log.Println("Registering: ", title)
 	return func(c any) {
@@ -489,7 +491,7 @@ func QueryHandler[Req libQuery.QueryRequest, Resp libQuery.QueryResult](
 			}
 		}()
 		w := libContext.InitContext(c)
-		code, desc, arrayErr, request, _, err := libRequest.GetRequest[Req](w, false)
+		code, desc, arrayErr, request, _, err := libRequest.Req[Req, libRequest.RequestHeader](w, mode, validateHeader)
 		if err != nil {
 			core.Responder().HandleErrorState(err, code, desc, arrayErr, c)
 			return

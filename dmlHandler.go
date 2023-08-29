@@ -76,12 +76,14 @@ func Dml[Req libQuery.DmlModel](
 	title, key string,
 	core RequestCoreInterface,
 ) any {
-	return DmlHandler[Req](title, key, core)
+	return DmlHandler[Req](title, key, core, libRequest.JSON, true)
 }
 
 func DmlHandler[Req libQuery.DmlModel](
 	title, key string,
 	core RequestCoreInterface,
+	mode libRequest.Type,
+	validateHeader bool,
 ) any {
 	log.Println("Registering: ", title)
 	return func(c any) {
@@ -92,7 +94,7 @@ func DmlHandler[Req libQuery.DmlModel](
 			}
 		}()
 		w := libContext.InitContext(c)
-		code, desc, arrayErr, request, reqLog, err := libRequest.GetRequest[Req](w, true)
+		code, desc, arrayErr, request, reqLog, err := libRequest.Req[Req, libRequest.RequestHeader](w, mode, validateHeader)
 		if err != nil {
 			core.Responder().HandleErrorState(err, code, desc, arrayErr, c)
 			return

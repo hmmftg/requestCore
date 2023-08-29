@@ -11,10 +11,11 @@ import (
 )
 
 func GetRequest[Q any](ctx webFramework.WebFramework, isJson bool) (int, string, []response.ErrorResponse, Q, Request, error) {
+	validateHeader := ctx.Parser.GetMethod() != "GET"
 	if isJson {
-		return Req[Q, RequestHeader](ctx, JSON)
+		return Req[Q, RequestHeader](ctx, JSON, validateHeader)
 	}
-	return Req[Q, RequestHeader](ctx, Query)
+	return Req[Q, RequestHeader](ctx, Query, validateHeader)
 }
 
 //go:generate enumer -type=Type -json -output requestTypeEnum.go
@@ -29,7 +30,7 @@ const (
 func Req[Req any, Header any, PT interface {
 	HeaderInterface
 	*Header
-}](ctx webFramework.WebFramework, mode Type) (int, string, []response.ErrorResponse, Req, Request, error) {
+}](ctx webFramework.WebFramework, mode Type, validateHeader bool) (int, string, []response.ErrorResponse, Req, Request, error) {
 	var request Req
 	var req Request
 	var err error
@@ -95,7 +96,7 @@ func Req[Req any, Header any, PT interface {
 	}
 
 	errorResponses := []response.ErrorResponse{}
-	if ctx.Parser.GetMethod() != "GET" {
+	if validateHeader {
 		err = libValidate.ValidateStruct(header)
 		if err != nil {
 			errorResponsesHeader := response.FormatErrorResp(err, libValidate.GetTranslator())
