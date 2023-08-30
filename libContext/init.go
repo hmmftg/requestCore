@@ -1,38 +1,38 @@
 package libContext
 
 import (
+	"context"
+	"log"
+
 	"github.com/hmmftg/requestCore/libFiber"
 	"github.com/hmmftg/requestCore/libGin"
 	"github.com/hmmftg/requestCore/response"
 	"github.com/hmmftg/requestCore/webFramework"
-
-	"github.com/gin-gonic/gin"
-	"github.com/gofiber/fiber/v2"
 )
 
-func InitContext(c any) webFramework.WebFramework {
-	w := webFramework.WebFramework{
-		Ctx: c,
-	}
-	switch c.(type) {
-	case *fiber.Ctx:
+type ContextKey string
+
+const (
+	WebFrameworkKey = ContextKey("webFramework")
+	Gin             = "gin"
+	Fiber           = "fiber"
+	USER            = ContextKey("USER")
+)
+
+func InitContext(c context.Context) webFramework.WebFramework {
+	w := webFramework.WebFramework{}
+	switch c.Value(WebFrameworkKey) {
+	case Fiber:
 		w.Parser = libFiber.InitContext(c)
-	case *gin.Context:
+	case Gin:
 		w.Parser = libGin.InitContext(c)
+	default:
+		log.Fatalf("error in InitContext: %s is unknown webFramework", c.Value(WebFrameworkKey).(string))
 	}
+	w.Ctx = context.WithValue(c, USER, w.Parser.GetHeaderValue("User-Id"))
 	return w
 }
 
-func InitContextWithHandler(c any, handler response.ResponseHandler) webFramework.WebFramework {
-	w := webFramework.WebFramework{
-		Ctx: c,
-		//Handler: handler,
-	}
-	switch c.(type) {
-	case *fiber.Ctx:
-		w.Parser = libFiber.InitContext(c)
-	case *gin.Context:
-		w.Parser = libGin.InitContext(c)
-	}
-	return w
+func InitContextWithHandler(c context.Context, handler response.ResponseHandler) webFramework.WebFramework {
+	return InitContext(c)
 }

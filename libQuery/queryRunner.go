@@ -2,73 +2,17 @@ package libQuery
 
 import (
 	"database/sql"
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"reflect"
-	"strconv"
 	"strings"
 
 	"github.com/hmmftg/requestCore/libError"
 	"github.com/hmmftg/requestCore/response"
-	"github.com/valyala/fasttemplate"
 )
-
-func ParseQueryResult(result map[string]any, t reflect.Type, v reflect.Value) {
-	for i := 0; i < t.NumField(); i++ {
-		tag := t.Field(i).Tag.Get("db")
-		switch result[tag].(type) {
-		case string:
-			value := result[tag].(string)
-			if value == "true" || value == "false" {
-				bl, _ := strconv.ParseBool(value)
-				v.FieldByName(t.Field(i).Name).SetBool(bl)
-			} else if strings.HasPrefix(value, "{") && strings.HasSuffix(value, "}") {
-				values := strings.Split(value[1:len(value)-1], ",")
-				slice := reflect.MakeSlice(reflect.TypeOf([]string{}), 0, 0)
-				for _, member := range values {
-					newSlice := reflect.Append(slice, reflect.ValueOf(member))
-					v.FieldByName(t.Field(i).Name).Set(newSlice)
-					slice = v.FieldByName(t.Field(i).Name)
-				}
-			} else {
-				if t.Field(i).Type.Kind() == reflect.Slice {
-					v.FieldByName(t.Field(i).Name).Set(reflect.MakeSlice(reflect.TypeOf([]string{}), 0, 0))
-				} else {
-					v.FieldByName(t.Field(i).Name).SetString(value)
-				}
-			}
-		case bool:
-			v.FieldByName(t.Field(i).Name).SetBool(result[tag].(bool))
-		case int64:
-			v.FieldByName(t.Field(i).Name).SetInt(result[tag].(int64))
-		case float64:
-			v.FieldByName(t.Field(i).Name).SetFloat(result[tag].(float64))
-		}
-	}
-}
 
 func (m QueryRunnerModel) GetModule() (string, string) {
 	return m.ModuleName, m.ProgramName
-}
-
-func (m QueryRunnerModel) InsertRow(insert string, args ...any) (sql.Result, error) {
-	result, err := m.DB.Exec(
-		insert,
-		args...)
-	if err != nil {
-		return nil, libError.Join(err, "InsertRow(%s,%s)=>%v", insert, args, result)
-	}
-	return result, nil
-}
-
-func (m QueryRunnerModel) CallDbFunction(callString string, args ...any) (int, string, error) {
-	_, err := m.DB.Exec(callString, args...)
-	if err != nil {
-		return -3, "ERROR_CALLING_DB_FUNCTION", libError.Join(err, "CallDbFunction[Exec](%s,%v)", callString, args)
-	}
-
-	return 0, "OK", nil
 }
 
 const (
@@ -193,15 +137,14 @@ func (m QueryRunnerModel) QueryToStruct(querySql string, target any, args ...any
 	return 0, elemSlice.Interface(), nil
 }
 
-func ConvertJsonToStruct[Q any](row string) (Q, error) {
-	var rowObj Q
-	err := json.Unmarshal([]byte(row), &rowObj)
-	if err != nil {
-		return rowObj, err
-	}
-
-	return rowObj, nil
-}
+const (
+	NO_DATA_FOUND        = "NO_DATA_FOUND"
+	NO_DATA_FOUND_DESC   = "رکوردی یافت نشد"
+	DUPLICATE_FOUND      = "DUPLICATE_FOUND"
+	DUPLICATE_FOUND_DESC = "رکورد تکراری است"
+	DB_READ_ERROR        = "DB_READ_ERROR"
+	PARSE_DB_RESP_ERROR  = "PARSE_DB_RESP_ERROR"
+)
 
 func GetQueryResp[R any](query string, core QueryRunnerInterface, args ...any) (int, string, string, bool, any, error) {
 	//Query
@@ -233,109 +176,6 @@ func CallSql[R any](query string,
 	return http.StatusOK, desc, data, array, nil
 }
 
-type QueryData struct {
-	DataRaw    string   `json:"result,omitempty" db:"result"`
-	Key        string   `json:"key,omitempty" db:"key"`
-	Value      string   `json:"value,omitempty" db:"value"`
-	ValueArray []string `json:"valueArray,omitempty" db:"values"`
-	MapList    string   `json:"mapList,omitempty" db:"map_list"`
-}
-
-type RecordDataGet interface {
-	GetId() string
-	GetControlId(string) string
-	GetIdList() []any
-	GetSubCategory() string
-	GetValue() any
-}
-
-type RecordData interface {
-	GetId() string
-	GetControlId(string) string
-	GetIdList() []any
-	SetId(string)
-	SetValue(string)
-	GetSubCategory() string
-	GetValue() any
-	GetValueMap() map[string]string
-}
-
-const (
-	NO_DATA_FOUND             = "NO_DATA_FOUND"
-	NO_DATA_FOUND_DESC        = "رکوردی یافت نشد"
-	DUPLICATE_FOUND           = "DUPLICATE_FOUND"
-	DUPLICATE_FOUND_DESC      = "رکورد تکراری است"
-	DB_READ_ERROR             = "DB_READ_ERROR"
-	PARSE_DB_RESP_ERROR       = "PARSE_DB_RESP_ERROR"
-	ERROR_CALLING_DB_FUNCTION = "ERROR_CALLING_DB_FUNCTION"
-)
-
-type RecordDataDml interface {
-	SetId(string)
-	CheckDuplicate(core QueryRunnerInterface) (int, string, error)
-	Filler(headers map[string][]string, core QueryRunnerInterface, args ...any) (string, error)
-	Post(core QueryRunnerInterface, args map[string]string) (DmlResult, int, string, error)
-	CheckExistence(core QueryRunnerInterface) (int, string, error)
-	PreControl(core QueryRunnerInterface) (int, string, error)
-	Put(core QueryRunnerInterface, args map[string]string) (DmlResult, int, string, error)
-}
-
-func HandleCheckDuplicate(code int, desc, dupDesc string, record []QueryData, err error) (int, string, error) {
-	if desc != NO_DATA_FOUND && len(record) != 0 {
-		return http.StatusBadRequest, dupDesc, fmt.Errorf(dupDesc)
-	}
-	if desc != NO_DATA_FOUND && err != nil {
-		return code, desc, err
-	}
-	return http.StatusOK, "", nil
-}
-
-func HandleCheckExistence(code int, desc, notExistDesc string, record []QueryData, err error) (int, string, error) {
-	if err != nil {
-		if desc == NO_DATA_FOUND || len(record) == 0 {
-			return http.StatusBadRequest, notExistDesc, fmt.Errorf(notExistDesc)
-		}
-		return code, desc, err
-	}
-	return http.StatusOK, "", nil
-}
-
-type DmlResult struct {
-	Rows         map[string]string `json:"rows" form:"rows"`
-	LastInsertId int64             `json:"lastId" form:"lastId"`
-	RowsAffected int64             `json:"rowsAffected" form:"rowsAffected"`
-}
-
-func (c *DmlResult) LoadFromMap(m any) error {
-	data, err := json.Marshal(m.(map[string]any))
-	if err == nil {
-		err = json.Unmarshal(data, c)
-	}
-	return err
-}
-
-type FieldParser interface {
-	Parse(string) string
-}
-
-func ParseCommand(command, user, app, action, title string, value map[string]string, parser FieldParser) string {
-	//template := "http://{{host}}/?q={{query}}&foo={{bar}}{{bar}}"
-	return fasttemplate.New(command, "{{", "}}").ExecuteString(
-		map[string]any{
-			"_user":             user,
-			"_appName":          app,
-			"_path":             action,
-			"_name":             title,
-			"hash3:password":    "'" + parser.Parse(value["password"]) + "'",
-			"hash3:newPassword": "'" + parser.Parse(value["newPassword"]) + "'",
-		},
-	)
-}
-
-type QueryWithDeps interface {
-	GetFillable(core QueryRunnerInterface) (map[string]any, error)
-}
-
 func Filler[Data any](
 	query string,
 	core QueryRunnerInterface,
@@ -361,29 +201,11 @@ func Fill[Data any](
 	return resultD, "", "", nil
 }
 
-//go:generate enumer -type=QueryCommandType -json -output queryEnum.go
-type QueryCommandType int
-
 const (
 	QuerySingle QueryCommandType = iota
 	QueryAll
 	QueryMap
 )
-
-type QueryCommand struct {
-	Name    string
-	Command string
-	Type    QueryCommandType
-}
-
-type QueryRequest interface {
-	QueryArgs() map[string][]any
-}
-
-type QueryResult interface {
-	Id() string
-	Value() any
-}
 
 func Query[Result QueryResult](core QueryRunnerInterface, command QueryCommand, args ...any) (any, *response.ErrorState) {
 	switch command.Type {
@@ -420,78 +242,4 @@ func Query[Result QueryResult](core QueryRunnerInterface, command QueryCommand, 
 		return respMap, nil
 	}
 	return nil, nil
-}
-
-//go:generate enumer -type=DmlCommandType -json -output dmlEnum.go
-type DmlCommandType int
-
-const (
-	QueryCheckNotExists DmlCommandType = iota
-	QueryCheckExists
-	Insert
-	Update
-	Delete
-)
-
-type DmlCommand struct {
-	Name    string
-	Command string
-	Args    []any
-	Type    DmlCommandType
-}
-
-func (command DmlCommand) Execute(core QueryRunnerInterface) (any, *response.ErrorState) {
-	switch command.Type {
-	case QueryCheckExists:
-		_, desc, data, resp, err := CallSql[QueryData](command.Command, core, command.Args...)
-		if err != nil {
-			return nil, response.ToError(desc, data, libError.Join(err, "CheckExists: %s", command.Name))
-		}
-		if desc == NO_DATA_FOUND {
-			return nil, response.ToError(NO_DATA_FOUND, NO_DATA_FOUND_DESC, fmt.Errorf("CheckExists: %s=> %s", command.Name, NO_DATA_FOUND))
-		}
-		return resp, nil
-	case QueryCheckNotExists:
-		_, desc, data, resp, err := CallSql[QueryData](command.Command, core, command.Args...)
-		if len(desc) > 0 && desc == NO_DATA_FOUND && resp == nil {
-			return nil, nil // OK
-		}
-		if err != nil {
-			return nil, response.ToError(desc, data, libError.Join(err, "CheckNotExists: %s", command.Name))
-		}
-		return nil, response.ToError(DUPLICATE_FOUND, DUPLICATE_FOUND_DESC, fmt.Errorf("CheckNotExists: %s=> %s", command.Name, DUPLICATE_FOUND))
-	case Insert:
-		resp, err := core.InsertRow(command.Command, command.Args...)
-		if err != nil {
-			return nil, response.ToError(ERROR_CALLING_DB_FUNCTION, nil, libError.Join(err, "Insert: %s", command.Name))
-		}
-		return resp, nil
-	case Update:
-		resp, err := core.InsertRow(command.Command, command.Args...)
-		if err != nil {
-			return nil, response.ToError(ERROR_CALLING_DB_FUNCTION, nil, libError.Join(err, "Update: %s", command.Name))
-		}
-		return resp, nil
-	case Delete:
-		resp, err := core.InsertRow(command.Command, command.Args...)
-		if err != nil {
-			return nil, response.ToError(ERROR_CALLING_DB_FUNCTION, nil, libError.Join(err, "Delete: %s", command.Name))
-		}
-		return resp, nil
-	}
-	return nil, nil
-}
-
-type DmlModel interface {
-	PreControlCommands() map[string][]DmlCommand
-	DmlCommands() map[string][]DmlCommand
-	FinalizeCommands() map[string][]DmlCommand
-}
-
-type Updatable interface {
-	SetParams(args map[string]string) any
-	GetUniqueId() []any
-	GetCountCommand() string
-	GetUpdateCommand() (string, []any)
-	Finalize(QueryRunnerInterface) (string, error)
 }

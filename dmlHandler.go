@@ -1,6 +1,7 @@
 package requestCore
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"net/http"
@@ -21,7 +22,7 @@ func PostHandler[Req libQuery.RecordDataDml](title string,
 	args ...any,
 ) any {
 	log.Println("Registering: ", title)
-	return func(c any) {
+	return func(c context.Context) {
 		w := libContext.InitContext(c)
 		code, desc, arrayErr, request, reqLog, err := libRequest.GetRequest[Req](w, true)
 		if err != nil {
@@ -86,7 +87,7 @@ func DmlHandler[Req libQuery.DmlModel](
 	validateHeader bool,
 ) any {
 	log.Println("Registering: ", title)
-	return func(c any) {
+	return func(c context.Context) {
 		defer func() {
 			if r := recover(); r != nil {
 				core.Responder().HandleErrorState(libError.Join(r.(error), "error in Dml"), http.StatusInternalServerError, response.SYSTEM_FAULT, response.SYSTEM_FAULT_DESC, c)
@@ -113,7 +114,7 @@ func DmlHandler[Req libQuery.DmlModel](
 		preControl := request.PreControlCommands()
 		for _, command := range preControl[key] {
 			core.RequestTools().LogStart(w, fmt.Sprintf("PreControl: %s", command.Name), "Execute")
-			_, errPreControl := command.Execute(core.GetDB())
+			_, errPreControl := command.ExecuteWithContext(w.Ctx, fmt.Sprintf("%s.%s", title, "preControl"), core.GetDB())
 			if errPreControl != nil {
 				core.Responder().HandleErrorState(libError.Join(errPreControl, "PreControl"), http.StatusBadRequest, errPreControl.Description, errPreControl.Message, c)
 				return
@@ -123,7 +124,7 @@ func DmlHandler[Req libQuery.DmlModel](
 		resp := map[string]any{}
 		for _, command := range dml[key] {
 			core.RequestTools().LogStart(w, fmt.Sprintf("Insert: %s", command.Name), "Execute")
-			result, errInsert := command.Execute(core.GetDB())
+			result, errInsert := command.ExecuteWithContext(w.Ctx, fmt.Sprintf("%s.%s", title, "dml"), core.GetDB())
 			if errInsert != nil {
 				core.Responder().HandleErrorState(libError.Join(errInsert, "Insert"), http.StatusBadRequest, errInsert.Description, errInsert.Message, c)
 				return
@@ -135,7 +136,7 @@ func DmlHandler[Req libQuery.DmlModel](
 
 		finalize := request.FinalizeCommands()
 		for _, command := range finalize[key] {
-			_, errFinalize := command.Execute(core.GetDB())
+			_, errFinalize := command.ExecuteWithContext(w.Ctx, fmt.Sprintf("%s.%s", title, "finalize"), core.GetDB())
 			if errFinalize != nil {
 				log.Printf("Error executing finalize command: %s=>%v", command.Name, errFinalize)
 			}
@@ -150,7 +151,7 @@ func PutHandler[Req libQuery.RecordDataDml](title string,
 	args ...any,
 ) any {
 	log.Println("Registering: ", title)
-	return func(c any) {
+	return func(c context.Context) {
 		w := libContext.InitContext(c)
 		id := w.Parser.GetUrlParam("id")
 		id = strings.ReplaceAll(id, "*", "/")
@@ -197,7 +198,7 @@ func DeleteHandler[Req libQuery.RecordData](title, delete, checkQuery string,
 	hasInitializer bool, parser libQuery.FieldParser,
 ) any {
 	log.Println("Registering: ", title)
-	return func(c any) {
+	return func(c context.Context) {
 		w := libContext.InitContext(c)
 		id := w.Parser.GetUrlParam("id")
 		id = strings.ReplaceAll(id, "*", "/")
@@ -251,7 +252,7 @@ func UpdateHandler[Req libQuery.Updatable](title string, hasReqLog bool,
 	args ...string,
 ) any {
 	log.Println("Registering: ", title)
-	return func(c any) {
+	return func(c context.Context) {
 		w := libContext.InitContext(c)
 		params := make(map[string]string, 0)
 		for _, arg := range args {

@@ -1,6 +1,7 @@
 package webFramework
 
 import (
+	"context"
 	"net/http"
 
 	"github.com/hmmftg/requestCore/libQuery"
@@ -32,7 +33,7 @@ type RequestHandler interface {
 }
 
 type WebFramework struct {
-	Ctx any
+	Ctx context.Context
 	//Handler response.ResponseHandler
 	Parser RequestParser
 }

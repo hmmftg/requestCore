@@ -1,6 +1,7 @@
 package requestCore
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -101,7 +102,7 @@ func ConsumeRemoteGetApi(
 	core RequestCoreInterface,
 	args ...any) any {
 	log.Println("ConsumeRemoteGetApi...")
-	return func(c any) {
+	return func(c context.Context) {
 		w := libContext.InitContext(c)
 		fullPath := url
 		if len(args) > 0 && args[0] == "QUERY" {
@@ -130,7 +131,7 @@ func CallRemote[Req any, Resp any](
 	args ...string,
 ) any {
 	log.Println("Registering: ", title)
-	return func(c any) {
+	return func(c context.Context) {
 		w := libContext.InitContext(c)
 		headers := make(map[string]string, 0)
 		headers["Authorization"] = w.Parser.GetHeaderValue("Authorization")
@@ -184,7 +185,7 @@ func CallRemoteWithRespParser[Req any, Resp any](
 	args ...string,
 ) any {
 	log.Println("Registering: ", title)
-	return func(c any) {
+	return func(c context.Context) {
 		w := libContext.InitContext(c)
 		headers := make(map[string]string, 0)
 		if forwardAuth {
@@ -313,7 +314,7 @@ func CallHandler[Req any, Resp any](
 	core RequestCoreInterface,
 ) any {
 	log.Println("Registering: ", title)
-	return func(c any) {
+	return func(c context.Context) {
 		w := libContext.InitContext(c)
 		finalPath := path
 		for _, value := range w.Parser.GetUrlParams() {
