@@ -12,6 +12,36 @@ type QueryRunnerModel struct {
 	SetVariable string
 }
 
+//go:generate enumer -type=DBMode -json -output dbModeEnum.go
+type DBMode int
+
+const (
+	Oracle DBMode = iota
+	Postgres
+)
+
+func Init(
+	DB *sql.DB,
+	ProgramName string,
+	ModuleName string,
+	mode DBMode) QueryRunnerModel {
+	model := QueryRunnerModel{
+		DB:          DB,
+		ProgramName: ProgramName,
+		ModuleName:  ModuleName,
+	}
+	switch mode {
+	case Oracle:
+		model.SetVariable = OracleSetVariableCommand
+	case Postgres:
+		model.SetVariable = PostgresSetVariableCommand
+	default:
+		model.SetVariable = "none"
+	}
+
+	return model
+}
+
 type QueryRunnerInterface interface {
 	QueryRunner(querySql string, args ...any) (int, []any, error)
 	QueryToStruct(querySql string, target any, args ...any) (int, any, error)

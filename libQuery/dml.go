@@ -22,12 +22,14 @@ func (m QueryRunnerModel) InsertRow(insert string, args ...any) (sql.Result, err
 type ContextKey string
 
 const (
-	APP               = "APP"
-	USER              = "USER"
-	MODULE            = "MODULE"
-	METHOD            = "METHOD"
-	SetCommandError   = "error in Dml->SetTrxVariable(%s,%s,%s)"
-	ERROR_EXECUTE_DML = "ERROR_EXECUTE_DML"
+	APP                        = "APP"
+	USER                       = "USER"
+	MODULE                     = "MODULE"
+	METHOD                     = "METHOD"
+	SetCommandError            = "error in Dml->SetTrxVariable(%s,%s,%s)"
+	ERROR_EXECUTE_DML          = "ERROR_EXECUTE_DML"
+	OracleSetVariableCommand   = "BEGIN DBMS_SESSION.SET_CONTEXT('request', :1, :2); END"
+	PostgresSetVariableCommand = "SET LOCAL $1 = $2;"
 )
 
 func SetVariable(ctx context.Context, tx *sql.Tx, command, key, value string) error {
