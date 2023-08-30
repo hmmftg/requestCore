@@ -1,6 +1,7 @@
 package libFiber
 
 import (
+	"context"
 	"net/http"
 
 	"github.com/hmmftg/requestCore/libQuery"
@@ -108,7 +109,7 @@ func (c FiberParser) GetHttpHeader() http.Header {
 
 func Fiber(handler any) func(c *fiber.Ctx) error {
 	return func(c *fiber.Ctx) error {
-		handler.(func(c any))(c)
+		handler.(func(c context.Context))(c.Context())
 		return nil
 	}
 }

@@ -1,6 +1,7 @@
 package libGin
 
 import (
+	"context"
 	"net/http"
 
 	"github.com/hmmftg/requestCore/libQuery"
@@ -97,6 +98,6 @@ func (c GinParser) GetHttpHeader() http.Header {
 
 func Gin(handler any) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		handler.(func(c any))(c)
+		handler.(func(c context.Context))(c)
 	}
 }
