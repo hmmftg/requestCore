@@ -142,7 +142,7 @@ func (m RequestModel) InsertRequest(request Request) error {
 		args...,
 	)
 	if err != nil {
-		return libError.Join(err, "InsertNewRequest[CallDbFunction](%v)=>%v", row, ret)
+		return libError.Join(err, "error in InsertNewRequest[Dml](%v)=>%v", row, ret)
 	}
 	return nil
 }
@@ -177,12 +177,14 @@ func (m RequestModel) UpdateRequest(request Request) error {
 	if strings.Contains(m.UpdateInDb, "$7") || strings.Contains(m.UpdateInDb, ":7") {
 		args = append(args, request.Resp)
 	}
-	ret, msg, err := m.QueryInterface.CallDbFunction(
+
+	ret, err := m.QueryInterface.Dml(context.Background(), "UpdateRequest",
 		m.UpdateInDb,
 		args...,
 	)
 	if err != nil {
-		return libError.Join(err, "UpdateRequest[CallDbFunction](%s)=>%d,%s", request.Id, ret, msg)
+		return libError.Join(err, "error in UpdateRequest[Dml]()=>%v", ret)
 	}
+
 	return nil
 }
