@@ -1,6 +1,7 @@
 package libRequest
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -136,12 +137,12 @@ func (m RequestModel) InsertRequest(request Request) error {
 	if strings.Contains(m.InsertInDb, "$6") {
 		args = append(args, request.Req)
 	}
-	ret, msg, err := m.QueryInterface.CallDbFunction(
+	ret, err := m.QueryInterface.Dml(context.Background(), "InsertRequest",
 		m.InsertInDb,
 		args...,
 	)
 	if err != nil {
-		return libError.Join(err, "InsertNewRequest[CallDbFunction](%v)=>%d,%s", row, ret, msg)
+		return libError.Join(err, "InsertNewRequest[CallDbFunction](%v)=>%v", row, ret)
 	}
 	return nil
 }
