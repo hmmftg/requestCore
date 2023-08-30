@@ -60,8 +60,8 @@ type QueryRequest interface {
 }
 
 type QueryResult interface {
-	Id() string
-	Value() any
+	GetID() string
+	GetValue() any
 }
 
 type QueryWithDeps interface {

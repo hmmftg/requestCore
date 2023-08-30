@@ -237,7 +237,7 @@ func Query[Result QueryResult](core QueryRunnerInterface, command QueryCommand, 
 		}
 		respMap := make(map[string]any)
 		for _, record := range resp {
-			respMap[record.Id()] = record.Value()
+			respMap[record.GetID()] = record.GetValue()
 		}
 		return respMap, nil
 	}
