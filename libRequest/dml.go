@@ -36,7 +36,7 @@ func (m RequestModel) InsertRequestWithContext(ctx context.Context, request Requ
 		return err
 	}
 	args := []any{string(rowByte)}
-	if strings.Contains(m.InsertInDb, "$1") {
+	if strings.Contains(m.InsertInDb, "$2") {
 		args = append(args, request.Req)
 	}
 	ret, err := m.QueryInterface.Dml(ctx, "InsertRequest",
