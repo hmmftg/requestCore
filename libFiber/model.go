@@ -1,16 +1,7 @@
 package libFiber
 
-import (
-	"github.com/hmmftg/requestCore/libRequest"
-	"github.com/hmmftg/requestCore/response"
-)
+import "github.com/gofiber/fiber/v2"
 
-type FiberModel struct {
-	MessageDesc      map[string]string
-	ErrorDesc        map[string]string
-	RequestInterface libRequest.RequestInterface
-}
-
-func (m FiberModel) GetErrorsArray(message string, data any) []response.ErrorResponse {
-	return response.GetErrorsArrayWithMap(message, data, m.ErrorDesc)
+type FiberParser struct {
+	Ctx *fiber.Ctx
 }

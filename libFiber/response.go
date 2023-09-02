@@ -1,114 +1,11 @@
 package libFiber
 
 import (
-	"fmt"
 	"log"
 	"net/http"
 
-	"github.com/hmmftg/requestCore/libRequest"
-	"github.com/hmmftg/requestCore/response"
-
 	"github.com/gofiber/fiber/v2"
-	"github.com/hmmftg/stacktrace"
 )
-
-func (m FiberModel) Respond(code, status int, message string, data any, abort bool, ctx any) {
-	m.RespondWithReceipt(code, status, message, data, nil, abort, ctx)
-}
-
-func (m FiberModel) RespondWithReceipt(code, status int, message string, data any, printData *response.Receipt, abort bool, ctx any) {
-	c := ctx.(*fiber.Ctx)
-	var resp response.WsResponse
-	resp.Status = status
-	if code == 200 {
-		resp.Description = m.MessageDesc[message]
-		resp.Result = data
-		resp.PrintReceipt = printData
-	} else {
-		resp.ErrorData = m.GetErrorsArray(message, data)
-	}
-
-	err := c.JSON(resp)
-	if err != nil {
-		log.Println("error in set json body", err)
-	}
-
-	if r := c.Locals("reqLog"); r != nil {
-		reqLog := r.(*libRequest.Request)
-		if len(message) > 63 {
-			reqLog.Result = message[:63]
-		} else {
-			reqLog.Result = message
-		}
-
-		reqLog.Outgoing = resp
-		if message != "DUPLICATE_REQUEST" {
-			err = m.RequestInterface.UpdateRequest(*reqLog)
-			if err != nil {
-				log.Println("error in UpdateRequest", err)
-			}
-		}
-	}
-	c.Status(code)
-	if abort {
-		err = c.SendStatus(code)
-		if err != nil {
-			log.Println("error in SendStatus", err)
-		}
-	} else {
-		err = c.Next()
-		if err != nil {
-			log.Println("error in calling next", err)
-		}
-	}
-}
-
-func (m FiberModel) HandleErrorState(err error, status int, message string, data any, ctx any) {
-	c := ctx.(*fiber.Ctx)
-	log.Println(err.Error(), stacktrace.PropagateWithDepth(err, 1, message, data))
-	m.Respond(status, 1, message, data, true, c)
-}
-
-func (m FiberModel) ErrorState(ctx any, err *response.ErrorState) {
-	c := ctx.(*fiber.Ctx)
-	log.Println(err.Error(), stacktrace.PropagateWithDepth(err, 1, ""))
-
-	if r := c.Locals("reqLog"); r != nil {
-		reqLog := r.(*libRequest.Request)
-		m.RequestInterface.LogEnd("HandleError", fmt.Sprintf("desc: %s, err: %v, data: %v", err.Description, err, err.Message), reqLog)
-	}
-
-	m.Respond(err.Status, 1, err.Description, err.Message, true, c)
-}
-
-func Respond(code, status int, message string, data any, abort bool, ctx any) {
-	c := ctx.(*fiber.Ctx)
-	var resp response.WsResponse
-	resp.Status = status
-	if code == 200 {
-		resp.Description = message
-		resp.Result = data
-	} else {
-		resp.ErrorData = response.GetErrorsArray(message, data)
-	}
-
-	err := c.JSON(resp)
-	if err != nil {
-		log.Println("error in set json body", err)
-	}
-	c.Status(code)
-	if abort {
-		err = c.SendStatus(code)
-		if err != nil {
-			log.Println("error in SendStatus", err)
-		}
-	} else {
-		err = c.Next()
-		if err != nil {
-			log.Println("error in calling next", err)
-		}
-	}
-}
 
 func ErrorHandler(path, title string, respondHandler func(int, int, string, any, bool, any)) fiber.ErrorHandler {
 	log.Println("ErrorHandler: ", path, title)

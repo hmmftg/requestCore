@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"github.com/hmmftg/requestCore/libQuery"
+	"github.com/hmmftg/requestCore/response"
 
 	"github.com/gofiber/fiber/v2"
 )
@@ -13,10 +14,6 @@ func InitContext(c any) FiberParser {
 	return FiberParser{
 		Ctx: c.(*fiber.Ctx),
 	}
-}
-
-type FiberParser struct {
-	Ctx *fiber.Ctx
 }
 
 func (c FiberParser) GetMethod() string {
@@ -105,6 +102,18 @@ func (c FiberParser) ParseCommand(command, title string, request libQuery.Record
 
 func (c FiberParser) GetHttpHeader() http.Header {
 	return ExtendMap(c.Ctx.GetReqHeaders())
+}
+
+func (c FiberParser) SendJSONRespBody(status int, resp response.WsResponse) error {
+	err := c.Ctx.JSON(resp)
+	c.Ctx.Status(status)
+	return err
+}
+func (c FiberParser) Next() error {
+	return c.Ctx.Next()
+}
+func (c FiberParser) Abort() error {
+	return c.Ctx.SendStatus(c.Ctx.Response().StatusCode())
 }
 
 func Fiber(handler any) func(c *fiber.Ctx) error {

@@ -5,16 +5,13 @@ import (
 	"net/http"
 
 	"github.com/hmmftg/requestCore/libQuery"
+	"github.com/hmmftg/requestCore/response"
 
 	"github.com/gin-gonic/gin"
 )
 
 func InitContext(c any) GinParser {
 	return GinParser{Ctx: c.(*gin.Context)}
-}
-
-type GinParser struct {
-	Ctx *gin.Context
 }
 
 func (c GinParser) GetMethod() string {
@@ -94,6 +91,19 @@ func (c GinParser) ParseCommand(command, title string, request libQuery.RecordDa
 
 func (c GinParser) GetHttpHeader() http.Header {
 	return c.Ctx.Request.Header
+}
+
+func (c GinParser) SendJSONRespBody(status int, resp response.WsResponse) error {
+	c.Ctx.JSON(status, resp)
+	return nil
+}
+func (c GinParser) Next() error {
+	c.Ctx.Next()
+	return nil
+}
+func (c GinParser) Abort() error {
+	c.Ctx.Abort()
+	return nil
 }
 
 func Gin(handler any) gin.HandlerFunc {

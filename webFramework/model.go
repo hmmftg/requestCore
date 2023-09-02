@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"github.com/hmmftg/requestCore/libQuery"
+	"github.com/hmmftg/requestCore/response"
 )
 
 type RequestParser interface {
@@ -25,6 +26,9 @@ type RequestParser interface {
 	SetLocal(name string, value any)
 	GetArgs(args ...any) map[string]string
 	ParseCommand(command, title string, request libQuery.RecordData, parser libQuery.FieldParser) string
+	SendJSONRespBody(status int, resp response.WsResponse) error
+	Next() error
+	Abort() error
 }
 
 type RequestHandler interface {
