@@ -2,6 +2,7 @@ package libQuery
 
 import (
 	"encoding/json"
+	"fmt"
 	"reflect"
 	"strconv"
 	"strings"
@@ -73,4 +74,35 @@ func ParseCommand(command, user, app, action, title string, value map[string]str
 			"hash3:newPassword": "'" + parser.Parse(value["newPassword"]) + "'",
 		},
 	)
+}
+
+func SerializeStringArray(arr []string) string {
+	var result strings.Builder
+	result.WriteRune('{')
+	result.WriteString(strings.Join(arr, ","))
+	result.WriteRune('}')
+	return result.String()
+}
+
+func SerializeArray(arr []any) string {
+	result := "{"
+	for _, member := range arr {
+		result += fmt.Sprintf("%v,", member)
+	}
+	return result[:len(result)-1] + "}"
+}
+
+func PrepareArgs(args []any) []any {
+	preparedArgs := args
+	for id := range args {
+		switch arg := args[id].(type) {
+		case []string:
+			preparedArgs[id] = SerializeStringArray(arg)
+		case []int64:
+			preparedArgs[id] = SerializeArray(args)
+		case []any:
+			preparedArgs[id] = SerializeArray(args)
+		}
+	}
+	return preparedArgs
 }

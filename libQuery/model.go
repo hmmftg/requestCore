@@ -48,7 +48,7 @@ type QueryRunnerInterface interface {
 	CallDbFunction(callString string, args ...any) (int, string, error)
 	GetModule() (string, string)
 	InsertRow(insert string, args ...any) (sql.Result, error)
-	Dml(ctx context.Context, methodName, command string, args ...any) (sql.Result, error)
+	Dml(ctx context.Context, moduleName, methodName, command string, args ...any) (sql.Result, error)
 	SetVariableCommand() string
 }
 

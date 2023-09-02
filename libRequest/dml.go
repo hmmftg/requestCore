@@ -30,6 +30,8 @@ func (m RequestModel) InsertRequest(request Request) error {
 	return m.InsertRequestWithContext(context.Background(), request)
 }
 
+const ModuleName = "RequestHandler"
+
 func (m RequestModel) InsertRequestWithContext(ctx context.Context, request Request) error {
 	rowByte, err := json.Marshal(request)
 	if err != nil {
@@ -39,7 +41,7 @@ func (m RequestModel) InsertRequestWithContext(ctx context.Context, request Requ
 	if strings.Contains(m.InsertInDb, "$2") {
 		args = append(args, request.Req)
 	}
-	ret, err := m.QueryInterface.Dml(ctx, "InsertRequest",
+	ret, err := m.QueryInterface.Dml(ctx, ModuleName, "InsertRequest",
 		m.InsertInDb,
 		args...,
 	)
@@ -61,7 +63,7 @@ func (m RequestModel) UpdateRequestWithContext(ctx context.Context, request Requ
 		args = append(args, request.Resp)
 	}
 
-	ret, err := m.QueryInterface.Dml(ctx, "UpdateRequest",
+	ret, err := m.QueryInterface.Dml(ctx, ModuleName, "UpdateRequest",
 		m.UpdateInDb,
 		args...,
 	)
