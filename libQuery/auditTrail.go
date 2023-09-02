@@ -11,13 +11,16 @@ import (
 type ContextKey string
 
 const (
-	APP                        = "request.APP"
-	USER                       = "request.USER"
-	MODULE                     = "request.MODULE"
-	METHOD                     = "request.METHOD"
-	SetCommandError            = "error in Dml->SetTrxVariable(%s,%s,%s)"
-	ERROR_EXECUTE_DML          = "ERROR_EXECUTE_DML"
-	OracleSetVariableCommand   = "BEGIN DBMS_SESSION.SET_CONTEXT('request', :1, :2); END"
+	APP                      = "request.APP"
+	USER                     = "request.USER"
+	MODULE                   = "request.MODULE"
+	METHOD                   = "request.METHOD"
+	SetCommandError          = "error in Dml->SetTrxVariable(%s,%s,%s)"
+	ErrorExecuteDML          = "ERROR_EXECUTE_DML"
+	OracleSetVariableCommand = `--sql
+		BEGIN 
+			CARD_ISSUE.AUDIT_TRAIL.SET_MODIF_ARGS(:1, :2);
+		END;`
 	PostgresSetVariableCommand = "SELECT set_config($1,$2,true);"
 )
 
