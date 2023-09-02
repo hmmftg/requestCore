@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"strings"
 
 	"github.com/hmmftg/requestCore/libError"
 	"github.com/hmmftg/requestCore/response"
@@ -33,7 +34,7 @@ const (
 )
 
 func SetVariable(ctx context.Context, tx *sql.Tx, command, key, value string) error {
-	_, err := tx.Exec(command, key, value)
+	_, err := tx.ExecContext(ctx, command, key, value)
 	if err != nil {
 		return libError.Join(err, SetCommandError, command, key, value)
 	}
@@ -69,6 +70,35 @@ func (m QueryRunnerModel) SetModifVariables(ctx context.Context, methodName stri
 	return nil
 }
 
+func SerializeStringArray(arr []string) string {
+	var result strings.Builder
+	result.WriteRune('{')
+	result.WriteString(strings.Join(arr, ","))
+	result.WriteRune('}')
+	return result.String()
+}
+
+func SerializeArray(arr []any) string {
+	result := "{"
+	for _, member := range arr {
+		result += fmt.Sprintf("%v,", member)
+	}
+	return result[:len(result)-1] + "}"
+}
+
+func PrepareArgs(args []any) []any {
+	preparedArgs := args
+	for id := range args {
+		switch arg := args[id].(type) {
+		case []string:
+			preparedArgs[id] = SerializeStringArray(arg)
+		default:
+			preparedArgs[id] = SerializeArray(args)
+		}
+	}
+	return preparedArgs
+}
+
 func (m QueryRunnerModel) Dml(ctx context.Context, methodName, command string, args ...any) (sql.Result, error) {
 	tx, err := m.DB.BeginTx(ctx, nil)
 	if err != nil {
@@ -81,7 +111,8 @@ func (m QueryRunnerModel) Dml(ctx context.Context, methodName, command string, a
 	}
 
 	//result, err := tx.ExecContext(ctx, command, args...)
-	result, err := tx.Exec(command, args...)
+	preparedArgs := PrepareArgs(args)
+	result, err := tx.ExecContext(ctx, command, preparedArgs...)
 	if err != nil {
 		return nil, libError.Join(err, "error in Dml->Exec(%s,%s)=>%v", command, args, result)
 	}

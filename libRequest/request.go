@@ -12,24 +12,24 @@ import (
 	"github.com/hmmftg/requestCore/webFramework"
 )
 
-func (m RequestModel) Initialize(c webFramework.WebFramework, method, url string, req *Request, args ...any) (int, map[string]string, error) {
+func (m RequestModel) Initialize(w webFramework.WebFramework, method, url string, req *Request, args ...any) (int, map[string]string, error) {
 	err := m.CheckDuplicateRequest(*req)
 	if err != nil {
 		return http.StatusBadRequest, map[string]string{"desc": "DUPLICATE_REQUEST", "message": "Duplicate Request"}, err
 	}
-	m.AddRequestEvent(c, req.BranchId, method, "start", req)
+	m.AddRequestEvent(w, req.BranchId, method, "start", req)
 	prg, mdl := m.QueryInterface.GetModule()
 	req.Header.SetProgram(prg)
 	req.Header.SetModule(mdl)
-	req.Header.SetUser(c.Parser.GetLocalString("userId"))
+	req.Header.SetUser(w.Parser.GetLocalString("userId"))
 	req.Header.SetMethod(method)
-	err = m.InsertRequest(*req)
+	err = m.InsertRequestWithContext(w.Ctx, *req)
 	if err != nil {
 		return http.StatusServiceUnavailable, map[string]string{"desc": "PWC_REGISTER", "message": "Unable To Register Request"}, err
 	}
 	var params []any
 	for _, arg := range args {
-		params = append(params, c.Parser.GetUrlParam(arg.(string)))
+		params = append(params, w.Parser.GetUrlParam(arg.(string)))
 	}
 	path := fmt.Sprintf(url, params...)
 	return http.StatusOK, map[string]string{"path": path}, nil
@@ -123,6 +123,10 @@ func (m RequestModel) AddRequestEvent(w webFramework.WebFramework, branch, metho
 }
 
 func (m RequestModel) InsertRequest(request Request) error {
+	return m.InsertRequestWithContext(context.Background(), request)
+}
+
+func (m RequestModel) InsertRequestWithContext(ctx context.Context, request Request) error {
 	rowByte, err := json.Marshal(request)
 	if err != nil {
 		return err
@@ -137,7 +141,7 @@ func (m RequestModel) InsertRequest(request Request) error {
 	if strings.Contains(m.InsertInDb, "$6") {
 		args = append(args, request.Req)
 	}
-	ret, err := m.QueryInterface.Dml(context.Background(), "InsertRequest",
+	ret, err := m.QueryInterface.Dml(ctx, "InsertRequest",
 		m.InsertInDb,
 		args...,
 	)
@@ -165,6 +169,10 @@ func (m RequestModel) CheckDuplicateRequest(request Request) error {
 }
 
 func (m RequestModel) UpdateRequest(request Request) error {
+	return m.UpdateRequestWithContext(context.Background(), request)
+}
+
+func (m RequestModel) UpdateRequestWithContext(ctx context.Context, request Request) error {
 	programName, moduleName := m.QueryInterface.GetModule()
 	requestBytes, _ := json.Marshal(request)
 	args := make([]any, 6)
@@ -178,7 +186,7 @@ func (m RequestModel) UpdateRequest(request Request) error {
 		args = append(args, request.Resp)
 	}
 
-	ret, err := m.QueryInterface.Dml(context.Background(), "UpdateRequest",
+	ret, err := m.QueryInterface.Dml(ctx, "UpdateRequest",
 		m.UpdateInDb,
 		args...,
 	)

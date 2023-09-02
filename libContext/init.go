@@ -7,18 +7,16 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/hmmftg/requestCore/libFiber"
 	"github.com/hmmftg/requestCore/libGin"
+	"github.com/hmmftg/requestCore/libQuery"
 	"github.com/hmmftg/requestCore/response"
 	"github.com/hmmftg/requestCore/webFramework"
 	"github.com/valyala/fasthttp"
 )
 
-type ContextKey string
-
 const (
-	WebFrameworkKey = ContextKey("webFramework")
+	WebFrameworkKey = libQuery.ContextKey("webFramework")
 	Gin             = "gin"
 	Fiber           = "fiber"
-	USER            = ContextKey("USER")
 )
 
 func InitContext(c context.Context) webFramework.WebFramework {
@@ -33,7 +31,7 @@ func InitContext(c context.Context) webFramework.WebFramework {
 	default:
 		log.Fatalf("error in InitContext: %s is unknown webFramework", c.Value(WebFrameworkKey).(string))
 	}
-	w.Ctx = context.WithValue(w.Ctx, USER, w.Parser.GetHeaderValue("User-Id"))
+	w.Ctx = context.WithValue(w.Ctx, libQuery.ContextKey(libQuery.USER), w.Parser.GetHeaderValue("User-Id"))
 	return w
 }
 

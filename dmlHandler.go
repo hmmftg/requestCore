@@ -114,7 +114,7 @@ func DmlHandler[Req libQuery.DmlModel](
 		preControl := request.PreControlCommands()
 		for _, command := range preControl[key] {
 			core.RequestTools().LogStart(w, fmt.Sprintf("PreControl: %s", command.Name), "Execute")
-			_, errPreControl := command.ExecuteWithContext(w.Ctx, fmt.Sprintf("%s.%s", title, "preControl"), core.GetDB())
+			_, errPreControl := command.ExecuteWithContext(w.Ctx, fmt.Sprintf("%s.%s.%s", title, "preControl", command.Name), core.GetDB())
 			if errPreControl != nil {
 				core.Responder().HandleErrorState(libError.Join(errPreControl, "PreControl"), http.StatusBadRequest, errPreControl.Description, errPreControl.Message, c)
 				return
@@ -124,7 +124,7 @@ func DmlHandler[Req libQuery.DmlModel](
 		resp := map[string]any{}
 		for _, command := range dml[key] {
 			core.RequestTools().LogStart(w, fmt.Sprintf("Insert: %s", command.Name), "Execute")
-			result, errInsert := command.ExecuteWithContext(w.Ctx, fmt.Sprintf("%s.%s", title, "dml"), core.GetDB())
+			result, errInsert := command.ExecuteWithContext(w.Ctx, fmt.Sprintf("%s.%s.%s", title, "dml", command.Name), core.GetDB())
 			if errInsert != nil {
 				core.Responder().HandleErrorState(libError.Join(errInsert, "Insert"), http.StatusBadRequest, errInsert.Description, errInsert.Message, c)
 				return
@@ -136,7 +136,7 @@ func DmlHandler[Req libQuery.DmlModel](
 
 		finalize := request.FinalizeCommands()
 		for _, command := range finalize[key] {
-			_, errFinalize := command.ExecuteWithContext(w.Ctx, fmt.Sprintf("%s.%s", title, "finalize"), core.GetDB())
+			_, errFinalize := command.ExecuteWithContext(w.Ctx, fmt.Sprintf("%s.%s.%s", title, "finalize", command.Name), core.GetDB())
 			if errFinalize != nil {
 				log.Printf("Error executing finalize command: %s=>%v", command.Name, errFinalize)
 			}
