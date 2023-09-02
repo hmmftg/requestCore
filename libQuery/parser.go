@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/hmmftg/requestCore/webFramework"
 	"github.com/valyala/fasttemplate"
 )
 
@@ -62,7 +63,7 @@ func (c *DmlResult) LoadFromMap(m any) error {
 	return err
 }
 
-func ParseCommand(command, user, app, action, title string, value map[string]string, parser FieldParser) string {
+func ParseCommand(command, user, app, action, title string, value map[string]string, parser webFramework.FieldParser) string {
 	//template := "http://{{host}}/?q={{query}}&foo={{bar}}{{bar}}"
 	return fasttemplate.New(command, "{{", "}}").ExecuteString(
 		map[string]any{

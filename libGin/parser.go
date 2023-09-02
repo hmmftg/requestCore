@@ -5,7 +5,7 @@ import (
 	"net/http"
 
 	"github.com/hmmftg/requestCore/libQuery"
-	"github.com/hmmftg/requestCore/response"
+	"github.com/hmmftg/requestCore/webFramework"
 
 	"github.com/gin-gonic/gin"
 )
@@ -81,7 +81,7 @@ func (c GinParser) GetArgs(args ...any) map[string]string {
 	return ginArgs
 }
 
-func (c GinParser) ParseCommand(command, title string, request libQuery.RecordData, parser libQuery.FieldParser) string {
+func (c GinParser) ParseCommand(command, title string, request webFramework.RecordData, parser webFramework.FieldParser) string {
 	return libQuery.ParseCommand(command,
 		c.Ctx.GetString("userId"),
 		c.Ctx.GetString("appName"),
@@ -93,7 +93,7 @@ func (c GinParser) GetHttpHeader() http.Header {
 	return c.Ctx.Request.Header
 }
 
-func (c GinParser) SendJSONRespBody(status int, resp response.WsResponse) error {
+func (c GinParser) SendJSONRespBody(status int, resp any) error {
 	c.Ctx.JSON(status, resp)
 	return nil
 }

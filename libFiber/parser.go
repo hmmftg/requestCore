@@ -5,7 +5,7 @@ import (
 	"net/http"
 
 	"github.com/hmmftg/requestCore/libQuery"
-	"github.com/hmmftg/requestCore/response"
+	"github.com/hmmftg/requestCore/webFramework"
 
 	"github.com/gofiber/fiber/v2"
 )
@@ -84,7 +84,7 @@ func (c FiberParser) GetArgs(args ...any) map[string]string {
 	return fiberArgs
 }
 
-func (c FiberParser) ParseCommand(command, title string, request libQuery.RecordData, parser libQuery.FieldParser) string {
+func (c FiberParser) ParseCommand(command, title string, request webFramework.RecordData, parser webFramework.FieldParser) string {
 
 	if request.GetValueMap() == nil {
 		return libQuery.ParseCommand(command, c.Ctx.Locals("userId").(string),
@@ -104,7 +104,7 @@ func (c FiberParser) GetHttpHeader() http.Header {
 	return ExtendMap(c.Ctx.GetReqHeaders())
 }
 
-func (c FiberParser) SendJSONRespBody(status int, resp response.WsResponse) error {
+func (c FiberParser) SendJSONRespBody(status int, resp any) error {
 	err := c.Ctx.JSON(resp)
 	c.Ctx.Status(status)
 	return err

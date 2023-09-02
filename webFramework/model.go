@@ -3,10 +3,22 @@ package webFramework
 import (
 	"context"
 	"net/http"
-
-	"github.com/hmmftg/requestCore/libQuery"
-	"github.com/hmmftg/requestCore/response"
 )
+
+type RecordData interface {
+	GetId() string
+	GetControlId(string) string
+	GetIdList() []any
+	SetId(string)
+	SetValue(string)
+	GetSubCategory() string
+	GetValue() any
+	GetValueMap() map[string]string
+}
+
+type FieldParser interface {
+	Parse(string) string
+}
 
 type RequestParser interface {
 	GetMethod() string
@@ -25,8 +37,8 @@ type RequestParser interface {
 	CheckUrlParam(name string) (string, bool)
 	SetLocal(name string, value any)
 	GetArgs(args ...any) map[string]string
-	ParseCommand(command, title string, request libQuery.RecordData, parser libQuery.FieldParser) string
-	SendJSONRespBody(status int, resp response.WsResponse) error
+	ParseCommand(command, title string, request RecordData, parser FieldParser) string
+	SendJSONRespBody(status int, resp any) error
 	Next() error
 	Abort() error
 }

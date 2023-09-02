@@ -30,17 +30,17 @@ func GetSingleRecordHandler[Req, Resp any](title, sql string,
 		id = strings.ReplaceAll(id, "*", "/")
 		code, desc, arrayErr, _, _, err := libRequest.GetRequest[Req](w, false)
 		if err != nil {
-			core.Responder().HandleErrorState(err, code, desc, arrayErr, c)
+			core.Responder().HandleErrorState(err, code, desc, arrayErr, w)
 			return
 		}
 		code, desc, data, respRaw, err := libQuery.CallSql[libQuery.QueryData](sql, core.GetDB(), id)
 		if err != nil {
-			core.Responder().HandleErrorState(err, code, desc, data, c)
+			core.Responder().HandleErrorState(err, code, desc, data, w)
 			return
 		}
 
 		if len(respRaw[0].DataRaw) == 0 {
-			core.Responder().HandleErrorState(fmt.Errorf(libQuery.NO_DATA_FOUND), http.StatusBadRequest, libQuery.NO_DATA_FOUND, arrayErr, c)
+			core.Responder().HandleErrorState(fmt.Errorf(libQuery.NO_DATA_FOUND), http.StatusBadRequest, libQuery.NO_DATA_FOUND, arrayErr, w)
 			return
 		}
 
@@ -49,14 +49,14 @@ func GetSingleRecordHandler[Req, Resp any](title, sql string,
 		if err != nil {
 			core.Responder().HandleErrorState(
 				libError.Join(err, "%s[json.Unmarsha](%s)", title, respRaw[0].DataRaw),
-				http.StatusInternalServerError, "DB_RESP_PARSE_ERROR", respRaw[0].DataRaw, c)
+				http.StatusInternalServerError, "DB_RESP_PARSE_ERROR", respRaw[0].DataRaw, w)
 			return
 		}
-		core.Responder().Respond(200, 0, "OK", result[0], false, c)
+		core.Responder().Respond(200, 0, "OK", result[0], false, w)
 	}
 }
 
-func GetMapHandler[Req any, Resp libQuery.RecordData](title, sql string,
+func GetMapHandler[Req any, Resp webFramework.RecordData](title, sql string,
 	core RequestCoreInterface,
 	hasParam bool) any {
 	log.Println("Registering: ", title)
@@ -69,7 +69,7 @@ func GetMapHandler[Req any, Resp libQuery.RecordData](title, sql string,
 		}
 		code, desc, arrayErr, _, _, err := libRequest.GetRequest[Req](w, false)
 		if err != nil {
-			core.Responder().HandleErrorState(err, code, desc, arrayErr, c)
+			core.Responder().HandleErrorState(err, code, desc, arrayErr, w)
 			return
 		}
 		var respRaw []libQuery.QueryData
@@ -77,19 +77,19 @@ func GetMapHandler[Req any, Resp libQuery.RecordData](title, sql string,
 		if len(id) == 0 {
 			code, desc, data, respRaw, err = libQuery.CallSql[libQuery.QueryData](sql, core.GetDB())
 			if err != nil {
-				core.Responder().HandleErrorState(err, code, desc, data, c)
+				core.Responder().HandleErrorState(err, code, desc, data, w)
 				return
 			}
 		} else {
 			code, desc, data, respRaw, err = libQuery.CallSql[libQuery.QueryData](sql, core.GetDB(), id)
 			if err != nil {
-				core.Responder().HandleErrorState(err, code, desc, data, c)
+				core.Responder().HandleErrorState(err, code, desc, data, w)
 				return
 			}
 		}
 
 		if len(respRaw[0].DataRaw) == 0 {
-			core.Responder().HandleErrorState(fmt.Errorf(libQuery.NO_DATA_FOUND), http.StatusBadRequest, libQuery.NO_DATA_FOUND, arrayErr, c)
+			core.Responder().HandleErrorState(fmt.Errorf(libQuery.NO_DATA_FOUND), http.StatusBadRequest, libQuery.NO_DATA_FOUND, arrayErr, w)
 			return
 		}
 
@@ -98,18 +98,18 @@ func GetMapHandler[Req any, Resp libQuery.RecordData](title, sql string,
 		if err != nil {
 			core.Responder().HandleErrorState(
 				libError.Join(err, "%s[json.Unmarsha](%s)", title, respRaw[0].DataRaw),
-				http.StatusInternalServerError, "DB_RESP_PARSE_ERROR", respRaw[0].DataRaw, c)
+				http.StatusInternalServerError, "DB_RESP_PARSE_ERROR", respRaw[0].DataRaw, w)
 			return
 		}
 		respMap := make(map[string]any, 0)
 		for _, row := range result {
 			respMap[row.GetId()] = row.GetValue()
 		}
-		core.Responder().Respond(200, 0, "OK", respMap, false, c)
+		core.Responder().Respond(200, 0, "OK", respMap, false, w)
 	}
 }
 
-func GetMapBySubHandler[Req any, Resp libQuery.RecordData](title, sql string,
+func GetMapBySubHandler[Req any, Resp webFramework.RecordData](title, sql string,
 	core RequestCoreInterface,
 	hasParam bool) any {
 	log.Println("Registering: ", title)
@@ -122,7 +122,7 @@ func GetMapBySubHandler[Req any, Resp libQuery.RecordData](title, sql string,
 		}
 		code, desc, arrayErr, _, _, err := libRequest.GetRequest[Req](w, false)
 		if err != nil {
-			core.Responder().HandleErrorState(err, code, desc, arrayErr, c)
+			core.Responder().HandleErrorState(err, code, desc, arrayErr, w)
 			return
 		}
 		var respRaw []libQuery.QueryData
@@ -130,19 +130,19 @@ func GetMapBySubHandler[Req any, Resp libQuery.RecordData](title, sql string,
 		if len(id) == 0 {
 			code, desc, data, respRaw, err = libQuery.CallSql[libQuery.QueryData](sql, core.GetDB())
 			if err != nil {
-				core.Responder().HandleErrorState(err, code, desc, data, c)
+				core.Responder().HandleErrorState(err, code, desc, data, w)
 				return
 			}
 		} else {
 			code, desc, data, respRaw, err = libQuery.CallSql[libQuery.QueryData](sql, core.GetDB(), id)
 			if err != nil {
-				core.Responder().HandleErrorState(err, code, desc, data, c)
+				core.Responder().HandleErrorState(err, code, desc, data, w)
 				return
 			}
 		}
 
 		if len(respRaw[0].DataRaw) == 0 {
-			core.Responder().HandleErrorState(fmt.Errorf(libQuery.NO_DATA_FOUND), http.StatusBadRequest, libQuery.NO_DATA_FOUND, arrayErr, c)
+			core.Responder().HandleErrorState(fmt.Errorf(libQuery.NO_DATA_FOUND), http.StatusBadRequest, libQuery.NO_DATA_FOUND, arrayErr, w)
 			return
 		}
 
@@ -151,7 +151,7 @@ func GetMapBySubHandler[Req any, Resp libQuery.RecordData](title, sql string,
 		if err != nil {
 			core.Responder().HandleErrorState(
 				libError.Join(err, "%s[json.Unmarsha](%s)", title, respRaw[0].DataRaw),
-				http.StatusInternalServerError, "DB_RESP_PARSE_ERROR", respRaw[0].DataRaw, c)
+				http.StatusInternalServerError, "DB_RESP_PARSE_ERROR", respRaw[0].DataRaw, w)
 			return
 		}
 		respMap := make(map[string]map[string]any, 0)
@@ -163,7 +163,7 @@ func GetMapBySubHandler[Req any, Resp libQuery.RecordData](title, sql string,
 				respMap[row.GetSubCategory()][row.GetId()] = row.GetValue()
 			}
 		}
-		core.Responder().Respond(200, 0, "OK", respMap, false, c)
+		core.Responder().Respond(200, 0, "OK", respMap, false, w)
 	}
 }
 
@@ -180,7 +180,7 @@ func GetQuery[Req any](title, sql string,
 		}
 		code, desc, arrayErr, _, _, err := libRequest.GetRequest[Req](w, false)
 		if err != nil {
-			core.Responder().HandleErrorState(err, code, desc, arrayErr, c)
+			core.Responder().HandleErrorState(err, code, desc, arrayErr, w)
 			return
 		}
 		var respRaw []libQuery.QueryData
@@ -188,19 +188,19 @@ func GetQuery[Req any](title, sql string,
 		if len(id) == 0 {
 			code, desc, data, respRaw, err = libQuery.CallSql[libQuery.QueryData](sql, core.GetDB())
 			if err != nil {
-				core.Responder().HandleErrorState(err, code, desc, data, c)
+				core.Responder().HandleErrorState(err, code, desc, data, w)
 				return
 			}
 		} else {
 			code, desc, data, respRaw, err = libQuery.CallSql[libQuery.QueryData](sql, core.GetDB(), id)
 			if err != nil {
-				core.Responder().HandleErrorState(err, code, desc, data, c)
+				core.Responder().HandleErrorState(err, code, desc, data, w)
 				return
 			}
 		}
 
 		if len(respRaw[0].DataRaw) == 0 {
-			core.Responder().HandleErrorState(fmt.Errorf(libQuery.NO_DATA_FOUND), http.StatusBadRequest, libQuery.NO_DATA_FOUND, arrayErr, c)
+			core.Responder().HandleErrorState(fmt.Errorf(libQuery.NO_DATA_FOUND), http.StatusBadRequest, libQuery.NO_DATA_FOUND, arrayErr, w)
 			return
 		}
 		var result []map[string]any
@@ -208,10 +208,10 @@ func GetQuery[Req any](title, sql string,
 		if err != nil {
 			core.Responder().HandleErrorState(
 				libError.Join(err, "%s[json.Unmarsha](%s)", title, respRaw[0].DataRaw),
-				http.StatusInternalServerError, "DB_RESP_PARSE_ERROR", respRaw[0].DataRaw, c)
+				http.StatusInternalServerError, "DB_RESP_PARSE_ERROR", respRaw[0].DataRaw, w)
 			return
 		}
-		core.Responder().Respond(200, 0, "OK", result, false, c)
+		core.Responder().Respond(200, 0, "OK", result, false, w)
 	}
 }
 
@@ -228,7 +228,7 @@ func GetQueryMap[Req any](title, sql string,
 		}
 		code, desc, arrayErr, _, _, err := libRequest.GetRequest[Req](w, false)
 		if err != nil {
-			core.Responder().HandleErrorState(err, code, desc, arrayErr, c)
+			core.Responder().HandleErrorState(err, code, desc, arrayErr, w)
 			return
 		}
 		var respRaw []libQuery.QueryData
@@ -236,19 +236,19 @@ func GetQueryMap[Req any](title, sql string,
 		if len(id) == 0 {
 			code, desc, data, respRaw, err = libQuery.CallSql[libQuery.QueryData](sql, core.GetDB())
 			if err != nil {
-				core.Responder().HandleErrorState(err, code, desc, data, c)
+				core.Responder().HandleErrorState(err, code, desc, data, w)
 				return
 			}
 		} else {
 			code, desc, data, respRaw, err = libQuery.CallSql[libQuery.QueryData](sql, core.GetDB(), id)
 			if err != nil {
-				core.Responder().HandleErrorState(err, code, desc, data, c)
+				core.Responder().HandleErrorState(err, code, desc, data, w)
 				return
 			}
 		}
 
 		if len(respRaw) == 0 {
-			core.Responder().HandleErrorState(fmt.Errorf(libQuery.NO_DATA_FOUND), http.StatusBadRequest, libQuery.NO_DATA_FOUND, arrayErr, c)
+			core.Responder().HandleErrorState(fmt.Errorf(libQuery.NO_DATA_FOUND), http.StatusBadRequest, libQuery.NO_DATA_FOUND, arrayErr, w)
 			return
 		}
 		result := make([]any, 0)
@@ -259,7 +259,7 @@ func GetQueryMap[Req any](title, sql string,
 				if err != nil {
 					core.Responder().HandleErrorState(
 						libError.Join(err, "%s[json.Unmarsha](%s)", title, row.MapList),
-						http.StatusInternalServerError, "DB_RESP_PARSE_ERROR", row.MapList, c)
+						http.StatusInternalServerError, "DB_RESP_PARSE_ERROR", row.MapList, w)
 					return
 				}
 				mapFlat := make([]any, 0)
@@ -276,7 +276,7 @@ func GetQueryMap[Req any](title, sql string,
 				//result[row.Key] = mapFlat
 			}
 		}
-		core.Responder().Respond(200, 0, "OK", result, false, c)
+		core.Responder().Respond(200, 0, "OK", result, false, w)
 	}
 }
 
@@ -288,17 +288,17 @@ func GetQueryHandler[Req, Resp any](title, sql string,
 		w := libContext.InitContext(c)
 		code, desc, arrayErr, _, _, err := libRequest.GetRequest[Req](w, false)
 		if err != nil {
-			core.Responder().Respond(code, 1, desc, arrayErr, true, c)
+			core.Responder().Respond(code, 1, desc, arrayErr, true, w)
 			return
 		}
 		code, desc, data, respRaw, err := libQuery.CallSql[libQuery.QueryData](sql, core.GetDB())
 		if err != nil {
-			core.Responder().Respond(code, 1, desc, data, true, c)
+			core.Responder().Respond(code, 1, desc, data, true, w)
 			return
 		}
 
 		if len(respRaw[0].DataRaw) == 0 {
-			core.Responder().HandleErrorState(fmt.Errorf(libQuery.NO_DATA_FOUND), http.StatusBadRequest, libQuery.NO_DATA_FOUND, arrayErr, c)
+			core.Responder().HandleErrorState(fmt.Errorf(libQuery.NO_DATA_FOUND), http.StatusBadRequest, libQuery.NO_DATA_FOUND, arrayErr, w)
 			return
 		}
 
@@ -307,10 +307,10 @@ func GetQueryHandler[Req, Resp any](title, sql string,
 		if err != nil {
 			core.Responder().HandleErrorState(
 				libError.Join(err, "%s[json.Unmarsha](%s)", title, respRaw[0].DataRaw),
-				http.StatusInternalServerError, "DB_RESP_PARSE_ERROR", respRaw[0].DataRaw, c)
+				http.StatusInternalServerError, "DB_RESP_PARSE_ERROR", respRaw[0].DataRaw, w)
 			return
 		}
-		core.Responder().Respond(200, 0, "OK", result, false, c)
+		core.Responder().Respond(200, 0, "OK", result, false, w)
 	}
 }
 
@@ -331,11 +331,11 @@ func GetQueryFillable[Resp libQuery.QueryWithDeps](
 		}
 		code, desc, data, result, err := libQuery.CallSql[Resp](query, core.GetDB(), params...)
 		if err != nil {
-			core.Responder().HandleErrorState(err, code, desc, data, c)
+			core.Responder().HandleErrorState(err, code, desc, data, w)
 			return
 		}
 		if len(result) == 0 {
-			core.Responder().Respond(http.StatusBadRequest, 1, libQuery.NO_DATA_FOUND, "No Data Found", true, c)
+			core.Responder().Respond(http.StatusBadRequest, 1, libQuery.NO_DATA_FOUND, "No Data Found", true, w)
 			return
 		}
 		var filledResp []Resp
@@ -344,12 +344,12 @@ func GetQueryFillable[Resp libQuery.QueryWithDeps](
 			if err != nil {
 				core.Responder().HandleErrorState(
 					libError.Join(err, "%s[GetFillable](%v)=>%v", title, row, fillResp),
-					code, fillResp["Desc"].(string), fillResp["Data"], c)
+					code, fillResp["Desc"].(string), fillResp["Data"], w)
 				return
 			}
 			filledResp = append(filledResp, fillResp["Filled"].(Resp))
 		}
-		core.Responder().Respond(http.StatusOK, 0, "OK", filledResp, false, c)
+		core.Responder().Respond(http.StatusOK, 0, "OK", filledResp, false, w)
 	}
 }
 
@@ -365,17 +365,18 @@ func GetAllMapHandler[Model MapHandler](title string,
 	args ...any) any {
 	log.Println("Registering: ", title)
 	return func(c context.Context) {
+		w := libContext.InitContext(c)
 		var model Model
 		result, desc, err := model.GetAllMap(core)
 		if err != nil {
-			respHandler.Respond(http.StatusBadRequest, 1, desc, err.Error(), true, c)
+			respHandler.Respond(http.StatusBadRequest, 1, desc, err.Error(), true, w)
 			return
 		}
 		if len(result) == 0 {
-			respHandler.Respond(http.StatusBadRequest, 1, libQuery.NO_DATA_FOUND, "No Data Found", true, c)
+			respHandler.Respond(http.StatusBadRequest, 1, libQuery.NO_DATA_FOUND, "No Data Found", true, w)
 			return
 		}
-		respHandler.Respond(http.StatusOK, 0, "OK", result, false, c)
+		respHandler.Respond(http.StatusOK, 0, "OK", result, false, w)
 	}
 }
 
@@ -411,15 +412,15 @@ func GetSingleRecord[Model GetHandler](title string,
 		params := GetParams(w, args...)
 		code, desc, arrayErr, model, _, err := libRequest.GetRequest[Model](w, false)
 		if err != nil {
-			respHandler.Respond(code, 1, desc, arrayErr, true, c)
+			respHandler.Respond(code, 1, desc, arrayErr, true, w)
 			return
 		}
 		result, desc, err := model.GetSingle(core, params)
 		if err != nil {
-			respHandler.Respond(http.StatusBadRequest, 1, desc, err.Error(), true, c)
+			respHandler.Respond(http.StatusBadRequest, 1, desc, err.Error(), true, w)
 			return
 		}
-		respHandler.Respond(http.StatusOK, 0, "OK", result, false, c)
+		respHandler.Respond(http.StatusOK, 0, "OK", result, false, w)
 	}
 }
 
@@ -433,15 +434,15 @@ func GetAll[Model GetHandler](title string,
 		params := GetParams(w, args...)
 		code, desc, arrayErr, model, _, err := libRequest.GetRequest[Model](w, false)
 		if err != nil {
-			respHandler.Respond(code, 1, desc, arrayErr, true, c)
+			respHandler.Respond(code, 1, desc, arrayErr, true, w)
 			return
 		}
 		result, desc, err := model.GetAll(core, params)
 		if err != nil {
-			respHandler.Respond(http.StatusBadRequest, 1, desc, err.Error(), true, c)
+			respHandler.Respond(http.StatusBadRequest, 1, desc, err.Error(), true, w)
 			return
 		}
-		respHandler.Respond(http.StatusOK, 0, "OK", result, false, c)
+		respHandler.Respond(http.StatusOK, 0, "OK", result, false, w)
 	}
 }
 
@@ -464,16 +465,16 @@ func GetPage[Model GetPageHandler](title string,
 		params := GetParams(w, args...)
 		code, desc, arrayErr, model, _, err := libRequest.GetRequest[Model](w, false)
 		if err != nil {
-			respHandler.Respond(code, 1, desc, arrayErr, true, c)
+			respHandler.Respond(code, 1, desc, arrayErr, true, w)
 			return
 		}
 		pageSize, pageId := model.GetPageParams()
 		result, desc, err := model.GetPage(core, pageSize, pageId, params)
 		if err != nil {
-			respHandler.HandleErrorState(err, http.StatusBadRequest, desc, err.Error(), c)
+			respHandler.HandleErrorState(err, http.StatusBadRequest, desc, err.Error(), w)
 			return
 		}
-		respHandler.Respond(http.StatusOK, 0, "OK", result, false, c)
+		respHandler.Respond(http.StatusOK, 0, "OK", result, false, w)
 	}
 }
 
@@ -486,15 +487,16 @@ func QueryHandler[Req libQuery.QueryRequest, Resp libQuery.QueryResult](
 	log.Println("Registering: ", title)
 	return func(c context.Context) {
 		defer func() {
+			w := libContext.InitContext(c)
 			if r := recover(); r != nil {
-				core.Responder().HandleErrorState(libError.Join(r.(error), "error in query"), http.StatusInternalServerError, response.SYSTEM_FAULT, response.SYSTEM_FAULT_DESC, c)
+				core.Responder().HandleErrorState(libError.Join(r.(error), "error in query"), http.StatusInternalServerError, response.SYSTEM_FAULT, response.SYSTEM_FAULT_DESC, w)
 				panic(r)
 			}
 		}()
 		w := libContext.InitContext(c)
 		code, desc, arrayErr, request, _, err := libRequest.Req[Req, libRequest.RequestHeader](w, mode, validateHeader)
 		if err != nil {
-			core.Responder().HandleErrorState(err, code, desc, arrayErr, c)
+			core.Responder().HandleErrorState(err, code, desc, arrayErr, w)
 			return
 		}
 
@@ -505,10 +507,10 @@ func QueryHandler[Req libQuery.QueryRequest, Resp libQuery.QueryResult](
 		}
 		resp, errQuery := libQuery.Query[Resp](core.GetDB(), queryMap[key], args...)
 		if errQuery != nil {
-			core.Responder().HandleErrorState(libError.Join(errQuery, "query"), http.StatusBadRequest, errQuery.Description, errQuery.Message, c)
+			core.Responder().HandleErrorState(libError.Join(errQuery, "query"), http.StatusBadRequest, errQuery.Description, errQuery.Message, w)
 			return
 		}
 
-		core.Responder().Respond(http.StatusOK, 0, "OK", resp, false, c)
+		core.Responder().Respond(http.StatusOK, 0, "OK", resp, false, w)
 	}
 }

@@ -104,10 +104,6 @@ type DmlResult struct {
 	RowsAffected int64             `json:"rowsAffected" form:"rowsAffected"`
 }
 
-type FieldParser interface {
-	Parse(string) string
-}
-
 type QueryData struct {
 	DataRaw    string   `json:"result,omitempty" db:"result"`
 	Key        string   `json:"key,omitempty" db:"key"`
@@ -122,17 +118,6 @@ type RecordDataGet interface {
 	GetIdList() []any
 	GetSubCategory() string
 	GetValue() any
-}
-
-type RecordData interface {
-	GetId() string
-	GetControlId(string) string
-	GetIdList() []any
-	SetId(string)
-	SetValue(string)
-	GetSubCategory() string
-	GetValue() any
-	GetValueMap() map[string]string
 }
 
 type RecordDataDml interface {

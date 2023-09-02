@@ -110,10 +110,10 @@ func ConsumeRemoteGetApi(
 		}
 		status, code, desc, message, broken, err := ConsumeRemoteGet(w, api, fullPath, core, args...)
 		if err != nil {
-			core.Responder().HandleErrorState(err, status, desc, message, w.Ctx)
+			core.Responder().HandleErrorState(err, status, desc, message, w)
 			return
 		}
-		core.Responder().Respond(status, code, desc, message, broken, c)
+		core.Responder().Respond(status, code, desc, message, broken, w)
 	}
 }
 
@@ -146,7 +146,7 @@ func CallRemote[Req any, Resp any](
 		}
 		code, desc, arrayErr, req, reqLog, err := libRequest.GetRequest[Req](w, isJson)
 		if err != nil {
-			core.Responder().HandleErrorState(err, code, desc, arrayErr, c)
+			core.Responder().HandleErrorState(err, code, desc, arrayErr, w)
 			return
 		}
 		w.Parser.SetLocal("reqLog", &reqLog)
@@ -156,17 +156,17 @@ func CallRemote[Req any, Resp any](
 			u, _ := url.Parse(w.Parser.GetPath())
 			code, result, err := core.RequestTools().Initialize(w, title, u.Path, &reqLog)
 			if err != nil {
-				core.Responder().HandleErrorState(err, code, result["desc"], result["message"], c)
+				core.Responder().HandleErrorState(err, code, result["desc"], result["message"], w)
 				return
 			}
 		}
 		requestByte, _ := json.Marshal(req)
 		status, descArray, resp, err := transmitter(finalPath, api, method, requestByte, headers, response.ParseRemoteRespJson, core.Consumer().ConsumeRestApi)
 		if err != nil {
-			core.Responder().HandleErrorState(err, status, descArray["desc"], descArray["message"], c)
+			core.Responder().HandleErrorState(err, status, descArray["desc"], descArray["message"], w)
 			return
 		}
-		core.Responder().Respond(http.StatusOK, 0, "OK", resp, false, c)
+		core.Responder().Respond(http.StatusOK, 0, "OK", resp, false, w)
 	}
 }
 
@@ -204,7 +204,7 @@ func CallRemoteWithRespParser[Req any, Resp any](
 		}
 		code, desc, arrayErr, req, reqLog, err := libRequest.GetRequest[Req](w, isJson)
 		if err != nil {
-			core.Responder().HandleErrorState(err, code, desc, arrayErr, c)
+			core.Responder().HandleErrorState(err, code, desc, arrayErr, w)
 			return
 		}
 
@@ -214,17 +214,17 @@ func CallRemoteWithRespParser[Req any, Resp any](
 			u, _ := url.Parse(w.Parser.GetPath())
 			code, result, err := core.RequestTools().Initialize(w, title, u.Path, &reqLog)
 			if err != nil {
-				core.Responder().HandleErrorState(err, code, result["desc"], result["message"], c)
+				core.Responder().HandleErrorState(err, code, result["desc"], result["message"], w)
 				return
 			}
 		}
 		requestByte, _ := json.Marshal(req)
 		status, descArray, resp, err := transmitter(finalPath, api, method, requestByte, headers, parseRemoteResp, core.Consumer().ConsumeRestApi)
 		if err != nil {
-			core.Responder().HandleErrorState(err, status, descArray["desc"], descArray["message"], c)
+			core.Responder().HandleErrorState(err, status, descArray["desc"], descArray["message"], w)
 			return
 		}
-		core.Responder().Respond(http.StatusOK, 0, "OK", resp, false, c)
+		core.Responder().Respond(http.StatusOK, 0, "OK", resp, false, w)
 	}
 }
 
@@ -323,7 +323,7 @@ func CallHandler[Req any, Resp any](
 		}
 		code, desc, arrayErr, req, reqLog, err := libRequest.GetRequest[Req](w, isJson)
 		if err != nil {
-			core.Responder().HandleErrorState(err, code, desc, arrayErr, c)
+			core.Responder().HandleErrorState(err, code, desc, arrayErr, w)
 			return
 		}
 		w.Parser.SetLocal("reqLog", &reqLog)
@@ -333,7 +333,7 @@ func CallHandler[Req any, Resp any](
 			u, _ := url.Parse(w.Parser.GetPath())
 			code, result, err := core.RequestTools().Initialize(w, title, u.Path, &reqLog)
 			if err != nil {
-				core.Responder().HandleErrorState(err, code, result["desc"], result["message"], c)
+				core.Responder().HandleErrorState(err, code, result["desc"], result["message"], w)
 				return
 			}
 		}
@@ -349,10 +349,10 @@ func CallHandler[Req any, Resp any](
 				Headers:     headers,
 			})
 		if errCall != nil {
-			core.Responder().HandleErrorState(errCall, errCall.Status, errCall.Description, errCall.Message, w.Ctx)
+			core.Responder().HandleErrorState(errCall, errCall.Status, errCall.Description, errCall.Message, w)
 			return
 		}
 
-		core.Responder().Respond(http.StatusOK, 0, "OK", resp, false, c)
+		core.Responder().Respond(http.StatusOK, 0, "OK", resp, false, w)
 	}
 }

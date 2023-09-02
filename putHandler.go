@@ -12,6 +12,7 @@ import (
 	"github.com/hmmftg/requestCore/libError"
 	"github.com/hmmftg/requestCore/libQuery"
 	"github.com/hmmftg/requestCore/libRequest"
+	"github.com/hmmftg/requestCore/webFramework"
 )
 
 func PutHandler[Req libQuery.RecordDataDml](title string,
@@ -27,7 +28,7 @@ func PutHandler[Req libQuery.RecordDataDml](title string,
 		id = strings.ReplaceAll(id, "*", "/")
 		code, desc, arrayErr, request, reqLog, err := libRequest.GetRequest[Req](w, true)
 		if err != nil {
-			core.Responder().HandleErrorState(err, code, desc, arrayErr, c)
+			core.Responder().HandleErrorState(err, code, desc, arrayErr, w)
 			return
 		}
 		request.SetId(id)
@@ -39,33 +40,33 @@ func PutHandler[Req libQuery.RecordDataDml](title string,
 			u, _ := url.Parse(w.Parser.GetPath())
 			code, result, err := core.RequestTools().Initialize(w, method, u.Path, &reqLog)
 			if err != nil {
-				core.Responder().HandleErrorState(err, code, result["desc"], result["message"], c)
+				core.Responder().HandleErrorState(err, code, result["desc"], result["message"], w)
 				return
 			}
 		}
 
 		code, desc, err = request.CheckExistence(core.GetDB())
 		if err != nil {
-			core.Responder().HandleErrorState(err, code, desc, "error in CheckExistence", c)
+			core.Responder().HandleErrorState(err, code, desc, "error in CheckExistence", w)
 			return
 		}
 
 		resp, code, desc, err := request.Put(core.GetDB(), w.Parser.GetArgs(args...))
 		if err != nil {
-			core.Responder().HandleErrorState(err, code, desc, "error in Put", c)
+			core.Responder().HandleErrorState(err, code, desc, "error in Put", w)
 			return
 		}
 
-		core.Responder().Respond(http.StatusOK, 0, "OK", resp, false, c)
+		core.Responder().Respond(http.StatusOK, 0, "OK", resp, false, w)
 		if finalizer != nil {
 			finalizer(request, c)
 		}
 	}
 }
 
-func DeleteHandler[Req libQuery.RecordData](title, delete, checkQuery string,
+func DeleteHandler[Req webFramework.RecordData](title, delete, checkQuery string,
 	core RequestCoreInterface,
-	hasInitializer bool, parser libQuery.FieldParser,
+	hasInitializer bool, parser webFramework.FieldParser,
 ) any {
 	log.Println("Registering: ", title)
 	return func(c context.Context) {
@@ -74,7 +75,7 @@ func DeleteHandler[Req libQuery.RecordData](title, delete, checkQuery string,
 		id = strings.ReplaceAll(id, "*", "/")
 		code, desc, arrayErr, reqLog, err := libRequest.GetEmptyRequest(w)
 		if err != nil {
-			core.Responder().HandleErrorState(err, code, desc, arrayErr, c)
+			core.Responder().HandleErrorState(err, code, desc, arrayErr, w)
 			return
 		}
 		w.Parser.SetLocal("reqLog", &reqLog)
@@ -85,25 +86,25 @@ func DeleteHandler[Req libQuery.RecordData](title, delete, checkQuery string,
 		if hasInitializer {
 			code, result, err := core.RequestTools().Initialize(w, method, u.Path, &reqLog)
 			if err != nil {
-				core.Responder().HandleErrorState(err, code, result["desc"], result["message"], c)
+				core.Responder().HandleErrorState(err, code, result["desc"], result["message"], w)
 				return
 			}
 		}
 
 		code, desc, data, _, err := libQuery.CallSql[libQuery.QueryData](checkQuery, core.GetDB(), id)
 		if code == 400 && desc == libQuery.NO_DATA_FOUND && data == "No Data Found" {
-			core.Responder().HandleErrorState(libError.Join(err, "DELETE_NOT_ALLOWED"), http.StatusBadRequest, "DELETE_NOT_ALLOWED", data, c)
+			core.Responder().HandleErrorState(libError.Join(err, "DELETE_NOT_ALLOWED"), http.StatusBadRequest, "DELETE_NOT_ALLOWED", data, w)
 			return
 		}
 		if err != nil {
-			core.Responder().Respond(code, 1, desc, data, true, c)
+			core.Responder().Respond(code, 1, desc, data, true, w)
 			return
 		}
 		var request Req
 		deleteParsed := w.Parser.ParseCommand(delete, title, request, parser)
 		resultDb, err := core.GetDB().InsertRow(deleteParsed, id)
 		if err != nil {
-			core.Responder().HandleErrorState(libError.Join(err, "Exec failed"), http.StatusInternalServerError, "ERROR_CALLING_DB_FUNCTION", resultDb, c)
+			core.Responder().HandleErrorState(libError.Join(err, "Exec failed"), http.StatusInternalServerError, "ERROR_CALLING_DB_FUNCTION", resultDb, w)
 			return
 		}
 
@@ -111,7 +112,7 @@ func DeleteHandler[Req libQuery.RecordData](title, delete, checkQuery string,
 		resp.LastInsertId, _ = resultDb.LastInsertId()
 		resp.RowsAffected, _ = resultDb.RowsAffected()
 
-		core.Responder().Respond(http.StatusOK, 0, "OK", resp, false, c)
+		core.Responder().Respond(http.StatusOK, 0, "OK", resp, false, w)
 	}
 }
 
@@ -133,7 +134,7 @@ func UpdateHandler[Req libQuery.Updatable](title string, hasReqLog bool,
 		}
 		code, desc, arrayErr, request, reqLog, err := libRequest.GetRequest[Req](w, true)
 		if err != nil {
-			core.Responder().HandleErrorState(err, code, desc, arrayErr, c)
+			core.Responder().HandleErrorState(err, code, desc, arrayErr, w)
 			return
 		}
 		if hasReqLog {
@@ -147,26 +148,26 @@ func UpdateHandler[Req libQuery.Updatable](title string, hasReqLog bool,
 			u, _ := url.Parse(w.Parser.GetPath())
 			code, result, err := core.RequestTools().Initialize(w, method, u.Path, &reqLog)
 			if err != nil {
-				core.Responder().HandleErrorState(err, code, result["desc"], result["message"], c)
+				core.Responder().HandleErrorState(err, code, result["desc"], result["message"], w)
 				return
 			}
 		}
 
 		code, desc, data, _, err := libQuery.CallSql[libQuery.QueryData](filledRequest.GetCountCommand(), core.GetDB(), filledRequest.GetUniqueId()...)
 		if err != nil {
-			core.Responder().HandleErrorState(err, code, desc, data, c)
+			core.Responder().HandleErrorState(err, code, desc, data, w)
 			return
 		}
 
 		if desc == libQuery.NO_DATA_FOUND {
-			core.Responder().HandleErrorState(fmt.Errorf(libQuery.NO_DATA_FOUND), http.StatusBadRequest, libQuery.NO_DATA_FOUND, arrayErr, c)
+			core.Responder().HandleErrorState(fmt.Errorf(libQuery.NO_DATA_FOUND), http.StatusBadRequest, libQuery.NO_DATA_FOUND, arrayErr, w)
 			return
 		}
 
 		update, updateArgs := filledRequest.GetUpdateCommand()
 		resultDb, err := core.GetDB().InsertRow(update, updateArgs...)
 		if err != nil {
-			core.Responder().HandleErrorState(err, http.StatusInternalServerError, "ERROR_CALLING_DB_FUNCTION", arrayErr, c)
+			core.Responder().HandleErrorState(err, http.StatusInternalServerError, "ERROR_CALLING_DB_FUNCTION", arrayErr, w)
 			return
 		}
 
@@ -175,17 +176,17 @@ func UpdateHandler[Req libQuery.Updatable](title string, hasReqLog bool,
 		resp.RowsAffected, _ = resultDb.RowsAffected()
 
 		if resp.RowsAffected == 0 {
-			core.Responder().HandleErrorState(fmt.Errorf(libQuery.NO_DATA_FOUND), http.StatusBadRequest, libQuery.NO_DATA_FOUND, arrayErr, c)
+			core.Responder().HandleErrorState(fmt.Errorf(libQuery.NO_DATA_FOUND), http.StatusBadRequest, libQuery.NO_DATA_FOUND, arrayErr, w)
 			return
 		}
 
 		desc, err = filledRequest.Finalize(core.GetDB())
 		if err != nil {
-			core.Responder().HandleErrorState(err, http.StatusInternalServerError, desc, arrayErr, c)
+			core.Responder().HandleErrorState(err, http.StatusInternalServerError, desc, arrayErr, w)
 			return
 		}
 
-		core.Responder().Respond(http.StatusOK, 0, "OK", resp, false, c)
+		core.Responder().Respond(http.StatusOK, 0, "OK", resp, false, w)
 		if finalizer != nil {
 			finalizer(request, c)
 		}
