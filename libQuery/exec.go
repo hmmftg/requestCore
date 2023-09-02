@@ -60,19 +60,19 @@ func (command DmlCommand) ExecuteWithContext(ctx context.Context, moduleName, me
 	case Insert:
 		resp, err := core.Dml(ctx, moduleName, methodName, command.Command, command.Args...)
 		if err != nil {
-			return nil, response.ToError(ERROR_EXECUTE_DML, nil, libError.Join(err, "%s: %s", command.Type, command.Name))
+			return nil, response.ToError(ErrorExecuteDML, nil, libError.Join(err, "%s: %s", command.Type, command.Name))
 		}
 		return resp, nil
 	case Update:
 		resp, err := core.Dml(ctx, moduleName, methodName, command.Command, command.Args...)
 		if err != nil {
-			return nil, response.ToError(ERROR_EXECUTE_DML, nil, libError.Join(err, "%s: %s", command.Type, command.Name))
+			return nil, response.ToError(ErrorExecuteDML, nil, libError.Join(err, "%s: %s", command.Type, command.Name))
 		}
 		return resp, nil
 	case Delete:
 		resp, err := core.Dml(ctx, moduleName, methodName, command.Command, command.Args...)
 		if err != nil {
-			return nil, response.ToError(ERROR_EXECUTE_DML, nil, libError.Join(err, "%s: %s", command.Type, command.Name))
+			return nil, response.ToError(ErrorExecuteDML, nil, libError.Join(err, "%s: %s", command.Type, command.Name))
 		}
 		return resp, nil
 	}
