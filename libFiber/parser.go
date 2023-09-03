@@ -10,9 +10,9 @@ import (
 	"github.com/gofiber/fiber/v2"
 )
 
-func InitContext(c any) FiberParser {
+func InitContext(c *fiber.Ctx) FiberParser {
 	return FiberParser{
-		Ctx: c.(*fiber.Ctx),
+		Ctx: c,
 	}
 }
 

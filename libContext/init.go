@@ -5,12 +5,12 @@ import (
 	"log"
 
 	"github.com/gin-gonic/gin"
+	"github.com/gofiber/fiber/v2"
 	"github.com/hmmftg/requestCore/libFiber"
 	"github.com/hmmftg/requestCore/libGin"
 	"github.com/hmmftg/requestCore/libQuery"
 	"github.com/hmmftg/requestCore/response"
 	"github.com/hmmftg/requestCore/webFramework"
-	"github.com/valyala/fasthttp"
 )
 
 const (
@@ -19,17 +19,17 @@ const (
 	Fiber           = "fiber"
 )
 
-func InitContext(c context.Context) webFramework.WebFramework {
+func InitContext(c any) webFramework.WebFramework {
 	w := webFramework.WebFramework{}
-	switch c.(type) {
+	switch ctx := c.(type) {
 	case *gin.Context:
-		w.Ctx = context.WithValue(c, WebFrameworkKey, Gin)
+		w.Ctx = context.WithValue(ctx, WebFrameworkKey, Gin)
 		w.Parser = libGin.InitContext(c)
-	case *fasthttp.RequestCtx:
-		w.Ctx = context.WithValue(c, WebFrameworkKey, Fiber)
-		w.Parser = libFiber.InitContext(c)
+	case *fiber.Ctx:
+		w.Ctx = context.WithValue(ctx.Context(), WebFrameworkKey, Fiber)
+		w.Parser = libFiber.InitContext(ctx)
 	default:
-		log.Fatalf("error in InitContext: %s is unknown webFramework", c.Value(WebFrameworkKey).(string))
+		log.Fatalf("error in InitContext: unknown webFramework %v", ctx)
 	}
 	w.Ctx = context.WithValue(w.Ctx, libQuery.ContextKey(libQuery.USER), w.Parser.GetHeaderValue("User-Id"))
 	return w
