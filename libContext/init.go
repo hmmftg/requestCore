@@ -29,7 +29,7 @@ func InitContext(c any) webFramework.WebFramework {
 		w.Ctx = context.WithValue(ctx.Context(), WebFrameworkKey, Fiber)
 		w.Parser = libFiber.InitContext(ctx)
 	default:
-		log.Fatalf("error in InitContext: unknown webFramework %v", ctx)
+		log.Fatalf("error in InitContext: unknown webFramework %T", ctx)
 	}
 	w.Ctx = context.WithValue(w.Ctx, libQuery.ContextKey(libQuery.USER), w.Parser.GetHeaderValue("User-Id"))
 	return w
