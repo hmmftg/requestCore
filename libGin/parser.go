@@ -66,6 +66,10 @@ func (c GinParser) SetLocal(name string, value any) {
 	c.Ctx.Set(name, value)
 }
 
+func (c GinParser) SetReqHeader(name string, value string) {
+	c.Ctx.Request.Header.Set(name, value)
+}
+
 func (c GinParser) GetArgs(args ...any) map[string]string {
 	ginArgs := map[string]string{
 		"userId":   c.Ctx.GetString("userId"),

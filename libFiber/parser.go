@@ -67,6 +67,10 @@ func (c FiberParser) SetLocal(name string, value any) {
 	c.Ctx.Locals(name, value)
 }
 
+func (c FiberParser) SetReqHeader(name string, value string) {
+	c.Ctx.Context().Request.Header.Set(name, value)
+}
+
 func (c FiberParser) GetArgs(args ...any) map[string]string {
 	fiberArgs := map[string]string{
 		"userId":   c.Ctx.Locals("userId").(string),
