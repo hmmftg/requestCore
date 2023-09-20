@@ -3,6 +3,7 @@ package libQuery
 import (
 	"context"
 	"fmt"
+	"log"
 
 	"github.com/hmmftg/requestCore/libError"
 	"github.com/hmmftg/requestCore/response"
@@ -17,6 +18,10 @@ const (
 )
 
 func (m QueryRunnerModel) CallDbFunction(callString string, args ...any) (int, string, error) {
+	errPing := m.DB.Ping()
+	if errPing != nil {
+		log.Println("error in ping", errPing)
+	}
 	_, err := m.DB.Exec(callString, args...)
 	if err != nil {
 		return -3, ERROR_CALLING_DB_FUNCTION, libError.Join(err, "CallDbFunction[Exec](%s,%v)", callString, args)

@@ -3,11 +3,16 @@ package libQuery
 import (
 	"context"
 	"database/sql"
+	"log"
 
 	"github.com/hmmftg/requestCore/libError"
 )
 
 func (m QueryRunnerModel) InsertRow(insert string, args ...any) (sql.Result, error) {
+	errPing := m.DB.Ping()
+	if errPing != nil {
+		log.Println("error in ping", errPing)
+	}
 	result, err := m.DB.Exec(
 		insert,
 		args...)
@@ -18,6 +23,10 @@ func (m QueryRunnerModel) InsertRow(insert string, args ...any) (sql.Result, err
 }
 
 func (m QueryRunnerModel) Dml(ctx context.Context, moduleName, methodName, command string, args ...any) (sql.Result, error) {
+	errPing := m.DB.Ping()
+	if errPing != nil {
+		log.Println("error in ping", errPing)
+	}
 	tx, err := m.DB.BeginTx(ctx, nil)
 	if err != nil {
 		return nil, libError.Join(err, "error in Dml->BeginTrx()")

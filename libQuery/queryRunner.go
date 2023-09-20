@@ -3,6 +3,7 @@ package libQuery
 import (
 	"database/sql"
 	"fmt"
+	"log"
 	"net/http"
 	"reflect"
 	"strings"
@@ -23,6 +24,10 @@ const (
 )
 
 func (m QueryRunnerModel) QueryRunner(querySql string, args ...any) (int, []any, error) {
+	errPing := m.DB.Ping()
+	if errPing != nil {
+		log.Println("error in ping", errPing)
+	}
 	stmt, err := m.DB.Prepare(querySql)
 	finalRows := []any{}
 	errorData := map[string]any{}
