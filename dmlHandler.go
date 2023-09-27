@@ -22,6 +22,20 @@ func Dml[Req libQuery.DmlModel](
 	return DmlHandler[Req](title, key, core, libRequest.JSON, true)
 }
 
+func ExecDML(request libQuery.DmlModel, key, title string, w webFramework.WebFramework, core RequestCoreInterface) (map[string]any, *response.ErrorState) {
+	errPreControl := PreControlDML(request, key, title, w, core)
+	if errPreControl != nil {
+		return nil, errPreControl
+	}
+	resp, errExec := ExecuteDML(request, key, title, w, core)
+	if errExec != nil {
+		return nil, errExec
+	}
+
+	FinalizeDML(request, key, title, w, core)
+	return resp, nil
+}
+
 func PreControlDML(request libQuery.DmlModel, key, title string, w webFramework.WebFramework, core RequestCoreInterface) *response.ErrorState {
 	preControl := request.PreControlCommands()
 	for _, command := range preControl[key] {
