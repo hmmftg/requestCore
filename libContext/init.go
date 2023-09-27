@@ -3,6 +3,7 @@ package libContext
 import (
 	"context"
 	"log"
+	"runtime/debug"
 
 	"github.com/gin-gonic/gin"
 	"github.com/gofiber/fiber/v2"
@@ -29,7 +30,8 @@ func InitContext(c any) webFramework.WebFramework {
 		w.Ctx = context.WithValue(ctx.Context(), WebFrameworkKey, Fiber)
 		w.Parser = libFiber.InitContext(ctx)
 	default:
-		log.Fatalf("error in InitContext: unknown webFramework %T", ctx)
+		stack := debug.Stack()
+		log.Fatalf("error in InitContext: unknown webFramework %T, Stack: %s", ctx, string(stack))
 	}
 	w.Ctx = context.WithValue(w.Ctx, libQuery.ContextKey(libQuery.USER), w.Parser.GetHeaderValue("User-Id"))
 	return w

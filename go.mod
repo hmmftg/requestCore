@@ -9,7 +9,6 @@ require (
 	github.com/go-playground/validator/v10 v10.14.0
 	github.com/gofiber/fiber/v2 v2.46.0
 	github.com/hmmftg/stacktrace v0.0.0-20221203072522-92b9b7adfc8d
-	github.com/valyala/fasthttp v1.47.0
 	github.com/valyala/fasttemplate v1.2.2
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1
 )
@@ -40,6 +39,7 @@ require (
 	github.com/twitchyliquid64/golang-asm v0.15.1 // indirect
 	github.com/ugorji/go/codec v1.2.11 // indirect
 	github.com/valyala/bytebufferpool v1.0.0 // indirect
+	github.com/valyala/fasthttp v1.47.0 // indirect
 	github.com/valyala/tcplisten v1.0.0 // indirect
 	golang.org/x/arch v0.3.0 // indirect
 	golang.org/x/crypto v0.9.0 // indirect
