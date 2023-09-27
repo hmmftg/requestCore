@@ -12,6 +12,7 @@ import (
 	"github.com/hmmftg/requestCore/libQuery"
 	"github.com/hmmftg/requestCore/response"
 	"github.com/hmmftg/requestCore/webFramework"
+	"github.com/valyala/fasthttp"
 )
 
 const (
@@ -29,6 +30,14 @@ func InitContext(c any) webFramework.WebFramework {
 	case *fiber.Ctx:
 		w.Ctx = context.WithValue(ctx.Context(), WebFrameworkKey, Fiber)
 		w.Parser = libFiber.InitContext(ctx)
+	case *fasthttp.RequestCtx:
+		fiberCtx, ok := ctx.UserValue(libFiber.FiberCtxKey).(*fiber.Ctx)
+		if !ok {
+			stack := debug.Stack()
+			log.Fatalf("error in InitContext: unable to parse fiber ctx %T, Stack: %s", ctx.UserValue(libFiber.FiberCtxKey), string(stack))
+		}
+		w.Ctx = context.WithValue(ctx, WebFrameworkKey, Fiber)
+		w.Parser = libFiber.InitContext(fiberCtx)
 	default:
 		stack := debug.Stack()
 		log.Fatalf("error in InitContext: unknown webFramework %T, Stack: %s", ctx, string(stack))

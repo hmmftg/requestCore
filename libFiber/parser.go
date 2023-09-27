@@ -120,8 +120,11 @@ func (c FiberParser) Abort() error {
 	return c.Ctx.SendStatus(c.Ctx.Response().StatusCode())
 }
 
+const FiberCtxKey = "fiber.Ctx"
+
 func Fiber(handler any) func(c *fiber.Ctx) error {
 	return func(c *fiber.Ctx) error {
+		c.Context().SetUserValue(FiberCtxKey, c)
 		handler.(func(c context.Context))(c.Context())
 		return nil
 	}
