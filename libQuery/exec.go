@@ -2,6 +2,7 @@ package libQuery
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"log"
 
@@ -42,6 +43,15 @@ func (command DmlCommand) Execute(core QueryRunnerInterface, moduleName, methodN
 	return command.ExecuteWithContext(context.Background(), moduleName, methodName, core)
 }
 
+func GetDmlResult(resultDb sql.Result, rows map[string]string) DmlResult {
+	resp := DmlResult{
+		Rows: rows,
+	}
+	resp.LastInsertId, _ = resultDb.LastInsertId()
+	resp.RowsAffected, _ = resultDb.RowsAffected()
+	return resp
+}
+
 func (command DmlCommand) ExecuteWithContext(ctx context.Context, moduleName, methodName string, core QueryRunnerInterface) (any, *response.ErrorState) {
 	switch command.Type {
 	case QueryCheckExists:
@@ -67,19 +77,19 @@ func (command DmlCommand) ExecuteWithContext(ctx context.Context, moduleName, me
 		if err != nil {
 			return nil, response.ToError(ErrorExecuteDML, nil, libError.Join(err, "%s: %s", command.Type, command.Name))
 		}
-		return resp, nil
+		return GetDmlResult(resp, nil), nil
 	case Update:
 		resp, err := core.Dml(ctx, moduleName, methodName, command.Command, command.Args...)
 		if err != nil {
 			return nil, response.ToError(ErrorExecuteDML, nil, libError.Join(err, "%s: %s", command.Type, command.Name))
 		}
-		return resp, nil
+		return GetDmlResult(resp, nil), nil
 	case Delete:
 		resp, err := core.Dml(ctx, moduleName, methodName, command.Command, command.Args...)
 		if err != nil {
 			return nil, response.ToError(ErrorExecuteDML, nil, libError.Join(err, "%s: %s", command.Type, command.Name))
 		}
-		return resp, nil
+		return GetDmlResult(resp, nil), nil
 	}
 	return nil, nil
 }
