@@ -1,6 +1,7 @@
 package libRequest
 
 import (
+	"context"
 	"time"
 
 	"github.com/hmmftg/requestCore/libQuery"
@@ -31,7 +32,7 @@ type RequestInterface interface {
 	LogStart(c webFramework.WebFramework, method, log string) *Request
 	InsertRequest(request Request) error
 	CheckDuplicateRequest(request Request) error
-	UpdateRequest(request Request) error
+	UpdateRequestWithContext(ctx context.Context, request Request) error
 }
 
 type LogData struct {

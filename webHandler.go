@@ -82,7 +82,7 @@ func (m WebHanlder) RespondWithReceipt(code, status int, message string, data an
 
 		reqLog.Outgoing = resp //string(respB)
 		if message != "DUPLICATE_REQUEST" {
-			err := m.RequestInterface.UpdateRequest(*reqLog)
+			err := m.RequestInterface.UpdateRequestWithContext(w.Ctx, *reqLog)
 			if err != nil {
 				log.Println("error in UpdateRequest", err)
 			}
