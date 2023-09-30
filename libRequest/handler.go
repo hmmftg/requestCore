@@ -31,7 +31,7 @@ const (
 )
 
 func Req[Req any, Header any, PT interface {
-	HeaderInterface
+	webFramework.HeaderInterface
 	*Header
 }](ctx webFramework.WebFramework, mode Type, validateHeader bool) (int, string, []response.ErrorResponse, Req, Request, error) {
 	var request Req
@@ -42,7 +42,7 @@ func Req[Req any, Header any, PT interface {
 
 	// bind the headers to data
 	header := PT(new(Header))
-	err = ctx.Parser.GetHeader(&header)
+	err = ctx.Parser.GetHeader(header)
 	if err != nil {
 		return http.StatusBadRequest, "HEADER_ABSENT", nil, request, req, libError.Join(err, "GetRequest[GetHeader](%v)", ctx.Parser.GetHttpHeader())
 	}

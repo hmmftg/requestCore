@@ -16,6 +16,24 @@ type RecordData interface {
 	GetValueMap() map[string]string
 }
 
+type HeaderInterface interface {
+	GetId() string
+	GetUser() string
+	GetBranch() string
+	GetBank() string
+	GetPerson() string
+	GetProgram() string
+	GetModule() string
+	GetMethod() string
+	SetUser(string)
+	SetBranch(string)
+	SetBank(string)
+	SetPerson(string)
+	SetProgram(string)
+	SetModule(string)
+	SetMethod(string)
+}
+
 type FieldParser interface {
 	Parse(string) string
 }
@@ -23,7 +41,7 @@ type FieldParser interface {
 type RequestParser interface {
 	GetMethod() string
 	GetPath() string
-	GetHeader(target any) error
+	GetHeader(target HeaderInterface) error
 	GetHeaderValue(name string) string
 	GetHttpHeader() http.Header
 	GetBody(target any) error

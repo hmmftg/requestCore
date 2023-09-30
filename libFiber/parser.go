@@ -23,8 +23,9 @@ func (c FiberParser) GetMethod() string {
 func (c FiberParser) GetPath() string {
 	return c.Ctx.OriginalURL()
 }
-func (c FiberParser) GetHeader(target any) error {
-	return c.Ctx.ReqHeaderParser(target)
+func (c FiberParser) GetHeader(target webFramework.HeaderInterface) error {
+	targetPtr := target
+	return c.Ctx.ReqHeaderParser(targetPtr)
 }
 func (c FiberParser) GetHeaderValue(name string) string {
 	return c.Ctx.GetReqHeaders()[name]

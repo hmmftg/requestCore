@@ -109,41 +109,23 @@ func (r *RequestHeader) SetPerson(person string) {
 	r.Person = person
 }
 
-type HeaderInterface interface {
-	GetId() string
-	GetUser() string
-	GetBranch() string
-	GetBank() string
-	GetPerson() string
-	GetProgram() string
-	GetModule() string
-	GetMethod() string
-	SetUser(string)
-	SetBranch(string)
-	SetBank(string)
-	SetPerson(string)
-	SetProgram(string)
-	SetModule(string)
-	SetMethod(string)
-}
-
 type Request struct {
-	Header     HeaderInterface `json:"header"`
-	Id         string          `json:"id"`
-	RequestId  string          `json:"request_id"`
-	Time       time.Time       `json:"dt"`
-	Incoming   any             `json:"incoming"`
-	NationalId string          `json:"national_id"`
-	UrlPath    string          `json:"url_path"`
-	ServiceId  string          `json:"service_id"`
-	ActionId   string          `json:"action_id"`
-	BankId     string          `json:"bank_id"`
-	BranchId   string          `json:"branch_id"`
-	PersonId   string          `json:"person_id"`
-	UserId     string          `json:"user_id"`
-	Req        string          `json:"req"`
-	Resp       string          `json:"resp"`
-	Outgoing   any             `json:"outgoing"`
-	Result     string          `json:"result"`
-	Events     []EventData     `json:"events"`
+	Header     webFramework.HeaderInterface `json:"header"`
+	Id         string                       `json:"id"`
+	RequestId  string                       `json:"request_id"`
+	Time       time.Time                    `json:"dt"`
+	Incoming   any                          `json:"incoming"`
+	NationalId string                       `json:"national_id"`
+	UrlPath    string                       `json:"url_path"`
+	ServiceId  string                       `json:"service_id"`
+	ActionId   string                       `json:"action_id"`
+	BankId     string                       `json:"bank_id"`
+	BranchId   string                       `json:"branch_id"`
+	PersonId   string                       `json:"person_id"`
+	UserId     string                       `json:"user_id"`
+	Req        string                       `json:"req"`
+	Resp       string                       `json:"resp"`
+	Outgoing   any                          `json:"outgoing"`
+	Result     string                       `json:"result"`
+	Events     []EventData                  `json:"events"`
 }

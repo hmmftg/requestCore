@@ -22,7 +22,7 @@ func (c GinParser) GetPath() string {
 	return c.Ctx.FullPath()
 }
 
-func (c GinParser) GetHeader(target any) error {
+func (c GinParser) GetHeader(target webFramework.HeaderInterface) error {
 	return c.Ctx.ShouldBindHeader(target)
 }
 func (c GinParser) GetHeaderValue(name string) string {
