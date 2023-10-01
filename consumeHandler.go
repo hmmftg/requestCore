@@ -139,6 +139,7 @@ func CallRemote[Req any, Resp any](
 		headers["Branch-Id"] = w.Parser.GetHeaderValue("Branch-Id")
 		headers["Person-Id"] = w.Parser.GetHeaderValue("Person-Id")
 		headers["Bank-Code"] = w.Parser.GetLocalString("bankCode")
+		headers["User-Id"] = w.Parser.GetLocalString("User-Id")
 		finalPath := path
 		for _, value := range w.Parser.GetUrlParams() {
 			//normalized := strings.ReplaceAll(param.Value, "*", "/")
@@ -197,6 +198,7 @@ func CallRemoteWithRespParser[Req any, Resp any](
 		headers["Request-Id"] = w.Parser.GetHeaderValue("Request-Id")
 		headers["Branch-Id"] = w.Parser.GetHeaderValue("Branch-Id")
 		headers["Person-Id"] = w.Parser.GetHeaderValue("Person-Id")
+		headers["User-Id"] = w.Parser.GetLocalString("User-Id")
 		finalPath := path
 		for _, param := range w.Parser.GetUrlParams() {
 			normalized := strings.ReplaceAll(param, "*", "/")

@@ -42,7 +42,14 @@ func InitContext(c any) webFramework.WebFramework {
 		stack := debug.Stack()
 		log.Fatalf("error in InitContext: unknown webFramework %T, Stack: %s", ctx, string(stack))
 	}
-	w.Ctx = context.WithValue(w.Ctx, libQuery.ContextKey(libQuery.USER), w.Parser.GetHeaderValue("User-Id"))
+	userId := w.Parser.GetHeaderValue("User-Id")
+	if len(userId) == 0 {
+		userId = w.Parser.GetLocalString("user")
+	}
+	if len(userId) == 0 {
+		log.Println("unable to find userId in header and locals => audit trail will fail")
+	}
+	w.Ctx = context.WithValue(w.Ctx, libQuery.ContextKey(libQuery.USER), userId)
 	return w
 }
 
