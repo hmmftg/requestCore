@@ -3,9 +3,11 @@ package libQuery
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"reflect"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/hmmftg/requestCore/webFramework"
 	"github.com/valyala/fasttemplate"
@@ -31,6 +33,21 @@ func ParseQueryResult(result map[string]any, t reflect.Type, v reflect.Value) {
 			} else {
 				if t.Field(i).Type.Kind() == reflect.Slice {
 					v.FieldByName(t.Field(i).Name).Set(reflect.MakeSlice(reflect.TypeOf([]string{}), 0, 0))
+				} else if t.Field(i).Type.Kind() == reflect.Ptr {
+					if t.Field(i).Type.String() == "*time.Time" {
+						format := t.Field(i).Tag.Get("timeFormat")
+						tm, errParseTime := time.Parse(t.Field(i).Tag.Get("timeFormat"), value)
+						if errParseTime != nil {
+							log.Println("unable to parse time field with tag: timeFormat=", format, errParseTime)
+						} else {
+							v.FieldByName(t.Field(i).Name).Set(reflect.ValueOf(&tm))
+						}
+					} else {
+						log.Println(
+							"no parser defined for name:", t.Field(i).Type.Name(),
+							"path:", t.Field(i).Type.PkgPath(),
+							"string:", t.Field(i).Type.String())
+					}
 				} else {
 					v.FieldByName(t.Field(i).Name).SetString(value)
 				}
