@@ -57,6 +57,9 @@ func (command DmlCommand) ExecuteWithContext(ctx context.Context, moduleName, me
 	case QueryCheckExists:
 		_, desc, data, resp, err := CallSql[QueryData](command.Command, core, command.Args...)
 		if err != nil {
+			if command.CustomError != nil {
+				return nil, command.CustomError
+			}
 			return nil, response.ToError(desc, data, libError.Join(err, "CheckExists: %s", command.Name))
 		}
 		if desc == NO_DATA_FOUND {
@@ -69,24 +72,36 @@ func (command DmlCommand) ExecuteWithContext(ctx context.Context, moduleName, me
 			return nil, nil // OK
 		}
 		if err != nil {
+			if command.CustomError != nil {
+				return nil, command.CustomError
+			}
 			return nil, response.ToError(desc, data, libError.Join(err, "CheckNotExists: %s", command.Name))
 		}
 		return nil, response.ToError(DUPLICATE_FOUND, DUPLICATE_FOUND_DESC, fmt.Errorf("CheckNotExists: %s=> %s", command.Name, DUPLICATE_FOUND))
 	case Insert:
 		resp, err := core.Dml(ctx, moduleName, methodName, command.Command, command.Args...)
 		if err != nil {
+			if command.CustomError != nil {
+				return nil, command.CustomError
+			}
 			return nil, response.ToError(ErrorExecuteDML, nil, libError.Join(err, "%s: %s", command.Type, command.Name))
 		}
 		return GetDmlResult(resp, nil), nil
 	case Update:
 		resp, err := core.Dml(ctx, moduleName, methodName, command.Command, command.Args...)
 		if err != nil {
+			if command.CustomError != nil {
+				return nil, command.CustomError
+			}
 			return nil, response.ToError(ErrorExecuteDML, nil, libError.Join(err, "%s: %s", command.Type, command.Name))
 		}
 		return GetDmlResult(resp, nil), nil
 	case Delete:
 		resp, err := core.Dml(ctx, moduleName, methodName, command.Command, command.Args...)
 		if err != nil {
+			if command.CustomError != nil {
+				return nil, command.CustomError
+			}
 			return nil, response.ToError(ErrorExecuteDML, nil, libError.Join(err, "%s: %s", command.Type, command.Name))
 		}
 		return GetDmlResult(resp, nil), nil

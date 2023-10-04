@@ -3,6 +3,8 @@ package libQuery
 import (
 	"context"
 	"database/sql"
+
+	"github.com/hmmftg/requestCore/response"
 )
 
 type QueryRunnerModel struct {
@@ -70,10 +72,11 @@ type Updatable interface {
 type DmlCommandType int
 
 type DmlCommand struct {
-	Name    string
-	Command string
-	Args    []any
-	Type    DmlCommandType
+	Name        string
+	Command     string
+	Args        []any
+	Type        DmlCommandType
+	CustomError *response.ErrorState
 }
 
 //go:generate enumer -type=QueryCommandType -json -output queryEnum.go
