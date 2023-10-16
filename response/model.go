@@ -7,6 +7,9 @@ type ResponseHandler interface {
 	HandleErrorState(err error, status int, message string, data any, w webFramework.WebFramework)
 	Respond(code, status int, message string, data any, abort bool, w webFramework.WebFramework)
 	RespondWithReceipt(code, status int, message string, data any, printData *Receipt, abort bool, w webFramework.WebFramework)
+	OK(w webFramework.WebFramework, resp any)
+	OKWithReceipt(w webFramework.WebFramework, resp any, receipt *Receipt)
+	Error(w webFramework.WebFramework, err *ErrorState)
 }
 
 type InternalError struct {

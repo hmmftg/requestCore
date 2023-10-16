@@ -79,9 +79,13 @@ func firstTime() (ut.Translator, *validator.Validate, error) {
 	return Translator, Validator, nil
 }
 
-func ValidateStruct(in any) error {
+func ValidateStruct(in any) validator.ValidationErrors {
 	Init()
-	return Validator.Struct(in)
+	err := Validator.Struct(in)
+	if err != nil {
+		return err.(validator.ValidationErrors)
+	}
+	return nil
 }
 
 func GetTranslator() ut.Translator {

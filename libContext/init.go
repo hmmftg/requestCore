@@ -47,7 +47,8 @@ func InitContext(c any) webFramework.WebFramework {
 		userId = w.Parser.GetLocalString("userId")
 	}
 	if len(userId) == 0 {
-		log.Println("unable to find userId in header and locals => audit trail will fail")
+		stack := debug.Stack()
+		log.Println("unable to find userId in header and locals => audit trail will fail: ", string(stack))
 	}
 	w.Ctx = context.WithValue(w.Ctx, libQuery.ContextKey(libQuery.USER), userId)
 	return w

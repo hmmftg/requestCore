@@ -93,6 +93,8 @@ type ErrorState struct {
 	Child       error
 }
 
+type Err *ErrorState
+
 func (e ErrorState) Error() string {
 	return e.ErrorDesc
 }

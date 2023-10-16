@@ -3,6 +3,7 @@ package requestCore
 import (
 	"fmt"
 	"log"
+	"net/http"
 
 	"github.com/hmmftg/requestCore/libRequest"
 	"github.com/hmmftg/requestCore/response"
@@ -17,7 +18,7 @@ type WebHanlder struct {
 }
 
 func (m WebHanlder) HandleErrorState(err error, status int, message string, data any, w webFramework.WebFramework) {
-	log.Println(err.Error(), stacktrace.PropagateWithDepth(err, 1, ""))
+	log.Printf("error state: %s, %+v", stacktrace.PropagateWithDepth(err, 1, ""), err)
 
 	if r := w.Parser.GetLocal("reqLog"); r != nil {
 		reqLog := r.(*libRequest.Request)
@@ -32,7 +33,7 @@ func (m WebHanlder) HandleErrorState(err error, status int, message string, data
 }
 
 func (m WebHanlder) ErrorState(w webFramework.WebFramework, err *response.ErrorState) {
-	log.Println(err.Error(), stacktrace.PropagateWithDepth(err, 1, ""))
+	log.Printf("error state: %s, %+v", stacktrace.PropagateWithDepth(err, 1, ""), err)
 
 	if r := w.Parser.GetLocal("reqLog"); r != nil {
 		reqLog := r.(*libRequest.Request)
@@ -44,6 +45,18 @@ func (m WebHanlder) ErrorState(w webFramework.WebFramework, err *response.ErrorS
 
 func (m WebHanlder) Respond(code, status int, message string, data any, abort bool, w webFramework.WebFramework) {
 	m.RespondWithReceipt(code, status, message, data, nil, abort, w)
+}
+
+func (m WebHanlder) OK(w webFramework.WebFramework, resp any) {
+	m.Respond(http.StatusOK, 0, "OK", resp, false, w)
+}
+
+func (m WebHanlder) OKWithReceipt(w webFramework.WebFramework, resp any, receipt *response.Receipt) {
+	m.RespondWithReceipt(http.StatusOK, 0, "OK", resp, receipt, false, w)
+}
+
+func (m WebHanlder) Error(w webFramework.WebFramework, err *response.ErrorState) {
+	m.HandleErrorState(err, err.Status, err.Description, err.Message, w)
 }
 
 func (m WebHanlder) GetErrorsArray(message string, data any) []response.ErrorResponse {

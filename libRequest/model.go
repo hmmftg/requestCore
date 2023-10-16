@@ -110,6 +110,8 @@ func (r *RequestHeader) SetPerson(person string) {
 	r.Person = person
 }
 
+type RequestPtr *Request
+
 type Request struct {
 	Header     webFramework.HeaderInterface `json:"header"`
 	Id         string                       `json:"id"`

@@ -30,7 +30,7 @@ func TestGinReq(t *testing.T) {
 			Name:          "valid",
 			Body:          `{"id":"222222"}`,
 			DesiredBody:   `{"id":"222222"}`,
-			Header:        &RequestHeader{RequestId: "1111111111"},
+			Header:        &RequestHeader{RequestId: "1111111111", User: "tester"},
 			DesiredHeader: `{"id":"1111111111"}`,
 		},
 	}
@@ -43,6 +43,7 @@ func TestGinReq(t *testing.T) {
 			},
 		}
 		c.Request.Header.Add("Request-Id", v.Header.GetId())
+		c.Request.Header.Add("User-Id", v.Header.GetUser())
 		w := libContext.InitContext(&c)
 
 		code, desc, arrErr, req, reqLog, err := Req[SampleBody, RequestHeader](w, JSON, true)
