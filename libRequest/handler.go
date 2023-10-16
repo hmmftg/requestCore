@@ -182,7 +182,7 @@ func GetEmptyRequest(ctx webFramework.WebFramework) (int, string, []response.Err
 	var header RequestHeader
 	err := ctx.Parser.GetHeader(&header)
 	if err != nil {
-		return 400, "HEADER_ABSENT", nil, req, err
+		return http.StatusBadRequest, "HEADER_ABSENT", nil, req, err
 	}
 
 	req = Request{
@@ -198,12 +198,12 @@ func GetEmptyRequest(ctx webFramework.WebFramework) (int, string, []response.Err
 
 	if ctx.Parser.GetMethod() != "GET" {
 		libValidate.Init()
-		err = libValidate.ValidateStruct(header)
-		if err != nil {
-			errorResponses := response.FormatErrorResp(err, libValidate.GetTranslator())
-			return 400, "Header Validation Failed", errorResponses, req, err
+		errValidate := libValidate.ValidateStruct(header)
+		if errValidate != nil {
+			errorResponses := response.FormatErrorResp(errValidate, libValidate.GetTranslator())
+			return http.StatusBadRequest, "Header Validation Failed", errorResponses, req, errValidate
 		}
 	}
 
-	return 200, "OK", nil, req, nil
+	return http.StatusOK, "OK", nil, req, nil
 }
