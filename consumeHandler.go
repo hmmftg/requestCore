@@ -155,7 +155,7 @@ func CallRemote[Req any, Resp any](
 
 		if hasInitializer {
 			u, _ := url.Parse(w.Parser.GetPath())
-			code, result, err := core.RequestTools().Initialize(w, title, u.Path, &reqLog)
+			code, result, err := core.RequestTools().Initialize(w, title, u.Path, reqLog)
 			if err != nil {
 				core.Responder().HandleErrorState(err, code, result["desc"], result["message"], w)
 				return
@@ -214,7 +214,7 @@ func CallRemoteWithRespParser[Req any, Resp any](
 			w.Parser.SetLocal("reqLog", &reqLog)
 			reqLog.Incoming = req
 			u, _ := url.Parse(w.Parser.GetPath())
-			code, result, err := core.RequestTools().Initialize(w, title, u.Path, &reqLog)
+			code, result, err := core.RequestTools().Initialize(w, title, u.Path, reqLog)
 			if err != nil {
 				core.Responder().HandleErrorState(err, code, result["desc"], result["message"], w)
 				return
@@ -333,7 +333,7 @@ func CallHandler[Req any, Resp any](
 
 		if hasInitializer {
 			u, _ := url.Parse(w.Parser.GetPath())
-			code, result, err := core.RequestTools().Initialize(w, title, u.Path, &reqLog)
+			code, result, err := core.RequestTools().Initialize(w, title, u.Path, reqLog)
 			if err != nil {
 				core.Responder().HandleErrorState(err, code, result["desc"], result["message"], w)
 				return

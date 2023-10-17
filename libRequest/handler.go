@@ -11,7 +11,7 @@ import (
 	"github.com/hmmftg/requestCore/webFramework"
 )
 
-func GetRequest[Q any](ctx webFramework.WebFramework, isJson bool) (int, string, []response.ErrorResponse, Q, Request, error) {
+func GetRequest[Q any](ctx webFramework.WebFramework, isJson bool) (int, string, []response.ErrorResponse, Q, RequestPtr, error) {
 	validateHeader := ctx.Parser.GetMethod() != "GET"
 	if isJson {
 		return Req[Q, RequestHeader](ctx, JSON, validateHeader)
@@ -160,7 +160,7 @@ func ParseRequest[Req any](
 func Req[Req any, Header any, PT interface {
 	webFramework.HeaderInterface
 	*Header
-}](w webFramework.WebFramework, mode Type, validateHeader bool) (int, string, []response.ErrorResponse, Req, Request, error) {
+}](w webFramework.WebFramework, mode Type, validateHeader bool) (int, string, []response.ErrorResponse, Req, RequestPtr, error) {
 	const function = "Req"
 
 	// bind the headers to data
@@ -168,15 +168,15 @@ func Req[Req any, Header any, PT interface {
 	headerPtr := PT(header)
 	errHeader := w.Parser.GetHeader(headerPtr)
 	if errHeader != nil {
-		return http.StatusBadRequest, "HEADER_ABSENT", nil, *new(Req), Request{}, libError.Join(errHeader, "%s[GetHeader](%v)", function, w.Parser.GetHttpHeader())
+		return http.StatusBadRequest, "HEADER_ABSENT", nil, *new(Req), nil, libError.Join(errHeader, "%s[GetHeader](%v)", function, w.Parser.GetHttpHeader())
 	}
 
 	request, req, errParse, errArray := parseRequest[Req](w, mode, validateHeader, headerPtr, function)
 	if errParse != nil {
-		return errParse.Status, errParse.Description, errArray, *request, *req, *errParse
+		return errParse.Status, errParse.Description, errArray, *request, req, *errParse
 	}
 
-	return http.StatusOK, "OK", nil, *request, *req, nil
+	return http.StatusOK, "OK", nil, *request, req, nil
 }
 
 func GetEmptyRequest(ctx webFramework.WebFramework) (int, string, []response.ErrorResponse, Request, error) {

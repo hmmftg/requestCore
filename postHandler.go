@@ -32,7 +32,7 @@ func PostHandler[Req libQuery.RecordDataDml](title string,
 			method := title
 			reqLog.Incoming = request
 			u, _ := url.Parse(w.Parser.GetPath())
-			code, result, err := core.RequestTools().Initialize(w, method, u.Path, &reqLog)
+			code, result, err := core.RequestTools().Initialize(w, method, u.Path, reqLog)
 			if err != nil {
 				core.Responder().HandleErrorState(err, code, result["desc"], result["message"], w)
 				return
