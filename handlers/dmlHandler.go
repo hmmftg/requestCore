@@ -20,7 +20,7 @@ func Dml[Req libQuery.DmlModel](
 	title, key string,
 	core requestCore.RequestCoreInterface,
 ) any {
-	return DmlHandler[Req](title, key, core, libRequest.JSON, true)
+	return DmlHandlerOld[Req](title, key, core, libRequest.JSON, true)
 }
 
 func ExecDML(request libQuery.DmlModel, key, title string, w webFramework.WebFramework, core requestCore.RequestCoreInterface) (map[string]any, *response.ErrorState) {
@@ -98,16 +98,22 @@ func (h DmlHandlerType[Req, Resp]) Finalizer(req HandlerRequest[Req, Resp]) {
 	FinalizeDML(*req.Request, h.Key, req.Title, req.W, req.Core)
 }
 
-func DmlHandlerNew[Req libQuery.DmlModel](
-	title, key string,
+func DmlHandler[Req libQuery.DmlModel](
+	title, key, path string,
 	core requestCore.RequestCoreInterface,
 	mode libRequest.Type,
 	validateHeader bool,
 ) any {
-	return BaseHandler[Req, map[string]any, DmlHandlerType[Req, map[string]any]](core, DmlHandlerType[Req, map[string]any]{Mode: mode, VerifyHeader: validateHeader})
+	return BaseHandler[Req, map[string]any, DmlHandlerType[Req, map[string]any]](core, DmlHandlerType[Req, map[string]any]{
+		Mode:         mode,
+		VerifyHeader: validateHeader,
+		Title:        title,
+		Key:          key,
+		Path:         path,
+	})
 }
 
-func DmlHandler[Req libQuery.DmlModel](
+func DmlHandlerOld[Req libQuery.DmlModel](
 	title, key string,
 	core requestCore.RequestCoreInterface,
 	mode libRequest.Type,

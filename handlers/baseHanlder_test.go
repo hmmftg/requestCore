@@ -59,7 +59,7 @@ func TestBaseHandler(t *testing.T) {
 	}
 
 	env := testingtools.GetEnvWithDB[testingtools.TestEnv](
-		testingtools.SampleRequestModelMock(t).DB,
+		testingtools.SampleRequestModelMock(t, nil).DB,
 		testingtools.DefaultAPIList,
 	)
 

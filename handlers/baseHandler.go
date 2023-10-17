@@ -59,39 +59,41 @@ func BaseHandler[Req any, Resp any, Handler HandlerInterface[Req, Resp]](
 				panic(r)
 			}
 		}()
-		req := HandlerRequest[Req, Resp]{
+		trx := HandlerRequest[Req, Resp]{
 			Title: title,
 			Args:  args,
+			Core:  core,
+			W:     w,
 		}
-		req.W = w
 		var errParse response.Err
-		req.Request, req.Header, errParse = libRequest.ParseRequest[Req](req.W, mode, validateHeader)
+		trx.Request, trx.Header, errParse = libRequest.ParseRequest[Req](trx.W, mode, validateHeader)
 		if errParse != nil {
-			core.Responder().Error(req.W, errParse)
+			core.Responder().Error(trx.W, errParse)
 			return
 		}
 
 		if saveInRequestTable {
-			errInitRequest := core.RequestTools().InitRequest(req.W, title, path)
+			errInitRequest := core.RequestTools().InitRequest(trx.W, title, path)
 			if errInitRequest != nil {
-				core.Responder().Error(req.W, errInitRequest)
+				core.Responder().Error(trx.W, errInitRequest)
 				return
 			}
 		}
 
-		errInit := handler.Initializer(req)
+		errInit := handler.Initializer(trx)
 		if errInit != nil {
-			core.Responder().Error(req.W, errInit)
+			core.Responder().Error(trx.W, errInit)
 			return
 		}
 
-		resp, err := handler.Handler(req)
+		var err *response.ErrorState
+		trx.Response, err = handler.Handler(trx)
 		if err != nil {
-			core.Responder().Error(req.W, err)
+			core.Responder().Error(trx.W, err)
 			return
 		}
 
-		core.Responder().OK(req.W, resp)
-		handler.Finalizer(req)
+		core.Responder().OK(trx.W, trx.Response)
+		handler.Finalizer(trx)
 	}
 }

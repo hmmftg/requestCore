@@ -96,7 +96,7 @@ func (a AnyString) Match(_ driver.Value) bool {
 	return true
 }
 
-func SampleRequestModelMock(t *testing.T) libQuery.QueryRunnerModel {
+func SampleRequestModelMock(t *testing.T, mockList func(sqlmock.Sqlmock)) libQuery.QueryRunnerModel {
 	db, mockDB, err := sqlmock.New() // sqlmock.QueryMatcherOption(sqlmock.QueryMatcherEqual))
 	if err != nil {
 		t.Fatal(err)
@@ -111,6 +111,9 @@ func SampleRequestModelMock(t *testing.T) libQuery.QueryRunnerModel {
 	mockDB.ExpectExec("").WithArgs(anyS, anyS).WillReturnResult(driver.RowsAffected(1))
 	mockDB.ExpectExec("insert").WillReturnResult(driver.RowsAffected(1))
 	mockDB.ExpectCommit()
+	if mockList != nil {
+		mockList(mockDB)
+	}
 	mockDB.ExpectBegin()
 	mockDB.ExpectExec("").WithArgs(anyS, anyS).WillReturnResult(driver.RowsAffected(1))
 	mockDB.ExpectExec("").WithArgs(anyS, anyS).WillReturnResult(driver.RowsAffected(1))
