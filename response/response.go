@@ -96,7 +96,7 @@ type ErrorState struct {
 type Err *ErrorState
 
 func (e ErrorState) Error() string {
-	return e.ErrorDesc
+	return e.Child.Error()
 }
 
 func (e ErrorState) AddSource(src string) *ErrorState {

@@ -9,7 +9,7 @@ import (
 	"github.com/hmmftg/requestCore/libError"
 )
 
-func (m RequestModel) CheckDuplicateRequest(request Request) error {
+func (m RequestModel) CheckDuplicateRequest(request RequestPtr) error {
 	ret, result, err := m.QueryInterface.QueryRunner(m.QueryInDb, request.Header.GetId())
 	if err != nil {
 		return err
@@ -26,13 +26,13 @@ func (m RequestModel) CheckDuplicateRequest(request Request) error {
 	return nil
 }
 
-func (m RequestModel) InsertRequest(request Request) error {
+func (m RequestModel) InsertRequest(request RequestPtr) error {
 	return m.InsertRequestWithContext(context.Background(), request)
 }
 
 const ModuleName = "RequestHandler"
 
-func (m RequestModel) InsertRequestWithContext(ctx context.Context, request Request) error {
+func (m RequestModel) InsertRequestWithContext(ctx context.Context, request RequestPtr) error {
 	rowByte, err := json.Marshal(request)
 	if err != nil {
 		return err
@@ -51,11 +51,11 @@ func (m RequestModel) InsertRequestWithContext(ctx context.Context, request Requ
 	return nil
 }
 
-func (m RequestModel) UpdateRequest(request Request) error {
+func (m RequestModel) UpdateRequest(request RequestPtr) error {
 	return m.UpdateRequestWithContext(context.Background(), request)
 }
 
-func (m RequestModel) UpdateRequestWithContext(ctx context.Context, request Request) error {
+func (m RequestModel) UpdateRequestWithContext(ctx context.Context, request RequestPtr) error {
 	requestBytes, _ := json.Marshal(request)
 	args := []any{string(requestBytes)}
 	args = append(args, request.Id)
@@ -70,6 +70,8 @@ func (m RequestModel) UpdateRequestWithContext(ctx context.Context, request Requ
 	if err != nil {
 		return libError.Join(err, "error in UpdateRequest[Dml]()=>%v", ret)
 	}
+
+	m.QueryInterface.Close()
 
 	return nil
 }

@@ -1,6 +1,6 @@
 module github.com/hmmftg/requestCore
 
-go 1.20
+go 1.21.3
 
 require (
 	github.com/DATA-DOG/go-sqlmock v1.5.0
@@ -9,6 +9,7 @@ require (
 	github.com/go-playground/universal-translator v0.18.1
 	github.com/go-playground/validator/v10 v10.14.0
 	github.com/gofiber/fiber/v2 v2.46.0
+	github.com/hmmftg/image v0.12.1
 	github.com/hmmftg/stacktrace v0.0.0-20221203072522-92b9b7adfc8d
 	github.com/valyala/fasthttp v1.47.0
 	github.com/valyala/fasttemplate v1.2.2
@@ -48,7 +49,7 @@ require (
 	golang.org/x/crypto v0.9.0 // indirect
 	golang.org/x/net v0.10.0 // indirect
 	golang.org/x/sys v0.8.0 // indirect
-	golang.org/x/text v0.9.0 // indirect
+	golang.org/x/text v0.13.0 // indirect
 	google.golang.org/protobuf v1.30.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )

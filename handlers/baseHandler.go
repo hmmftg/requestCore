@@ -1,18 +1,25 @@
-package requestCore
+package handlers
 
 import (
 	"context"
 	"log"
+	"net/http"
 
+	"github.com/hmmftg/requestCore"
 	"github.com/hmmftg/requestCore/libContext"
+	"github.com/hmmftg/requestCore/libError"
 	"github.com/hmmftg/requestCore/libRequest"
 	"github.com/hmmftg/requestCore/response"
 	"github.com/hmmftg/requestCore/webFramework"
 )
 
 type HandlerInterface[Req any, Resp any] interface {
-	// returns Request Bodymode and validate header option
-	Parameters() (libRequest.Type, bool)
+	// returns handler title
+	//   Request Bodymode
+	//   and validate header option
+	//   and save to request table option
+	//   and url path of handler
+	Parameters() (string, libRequest.Type, bool, bool, string)
 	// runs after validating request
 	Initializer(req HandlerRequest[Req, Resp]) *response.ErrorState
 	// main handler runs after initialize
@@ -23,6 +30,7 @@ type HandlerInterface[Req any, Resp any] interface {
 
 type HandlerRequest[Req any, Resp any] struct {
 	Title    string
+	Core     requestCore.RequestCoreInterface
 	Header   *libRequest.RequestHeader
 	Request  *Req
 	Response Resp
@@ -30,24 +38,45 @@ type HandlerRequest[Req any, Resp any] struct {
 	Args     []any
 }
 
-func BaseHandler[Req any, Resp any, Handler HandlerInterface[Req, Resp]](title string,
-	core RequestCoreInterface,
+func BaseHandler[Req any, Resp any, Handler HandlerInterface[Req, Resp]](
+	core requestCore.RequestCoreInterface,
 	handler Handler,
 	args ...any,
 ) any {
+	title, mode, validateHeader, saveInRequestTable, path := handler.Parameters()
 	log.Println("Registering: ", title)
 	return func(c context.Context) {
+		w := libContext.InitContext(c)
+		defer func() {
+			if r := recover(); r != nil {
+				core.Responder().Error(w,
+					response.Error(
+						http.StatusInternalServerError,
+						response.SYSTEM_FAULT,
+						response.SYSTEM_FAULT_DESC,
+						libError.Join(r.(error), "error in %s", title),
+					))
+				panic(r)
+			}
+		}()
 		req := HandlerRequest[Req, Resp]{
 			Title: title,
 			Args:  args,
 		}
-		req.W = libContext.InitContext(c)
-		mode, validateHeader := handler.Parameters()
+		req.W = w
 		var errParse response.Err
 		req.Request, req.Header, errParse = libRequest.ParseRequest[Req](req.W, mode, validateHeader)
 		if errParse != nil {
 			core.Responder().Error(req.W, errParse)
 			return
+		}
+
+		if saveInRequestTable {
+			errInitRequest := core.RequestTools().InitRequest(req.W, title, path)
+			if errInitRequest != nil {
+				core.Responder().Error(req.W, errInitRequest)
+				return
+			}
 		}
 
 		errInit := handler.Initializer(req)

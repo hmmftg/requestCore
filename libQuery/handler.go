@@ -24,3 +24,7 @@ func HandleCheckExistence(code int, desc, notExistDesc string, record []QueryDat
 	}
 	return http.StatusOK, "", nil
 }
+
+func (m QueryRunnerModel) Close() {
+	m.DB.Close()
+}

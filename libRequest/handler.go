@@ -1,6 +1,7 @@
 package libRequest
 
 import (
+	"fmt"
 	"net/http"
 	"time"
 
@@ -123,7 +124,7 @@ func parseRequest[Req any](w webFramework.WebFramework, mode Type, validateHeade
 		}
 	}
 	if len(errorResponses) > 0 {
-		return nil, nil, response.Error(http.StatusBadRequest, "VALIDATION_FAILED", errorResponses, libError.Join(err, "%s[ValidateRequest](fails)", name)), errorResponses
+		return nil, nil, response.Error(http.StatusBadRequest, "VALIDATION_FAILED", errorResponses, fmt.Errorf("%s[ValidateRequest](fails)", name)), errorResponses
 	}
 
 	return &request, &req, nil, nil
@@ -148,6 +149,8 @@ func ParseRequest[Req any](
 	if errParse != nil {
 		return nil, nil, errParse
 	}
+
+	req.Incoming = request
 
 	w.Parser.SetLocal("reqLog", req)
 

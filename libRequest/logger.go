@@ -6,10 +6,10 @@ import (
 	"github.com/hmmftg/requestCore/webFramework"
 )
 
-func (m RequestModel) LogStart(w webFramework.WebFramework, method, log string) *Request {
+func (m RequestModel) LogStart(w webFramework.WebFramework, method, log string) RequestPtr {
 	r := w.Parser.GetLocal("reqLog")
 	if r != nil {
-		reqLog := r.(*Request)
+		reqLog := r.(RequestPtr)
 		branch := w.Parser.GetLocal("branchId")
 		if branch == nil {
 			branch = ""
@@ -20,13 +20,13 @@ func (m RequestModel) LogStart(w webFramework.WebFramework, method, log string) 
 	return &Request{ActionId: "NONE"}
 }
 
-func (m RequestModel) LogEnd(method, log string, r *Request) {
+func (m RequestModel) LogEnd(method, log string, r RequestPtr) {
 	if r.ActionId != "NONE" {
 		m.AddRequestLog(method, log, r)
 	}
 }
 
-func (m RequestModel) AddRequestLog(method, log string, req *Request) {
+func (m RequestModel) AddRequestLog(method, log string, req RequestPtr) {
 	programName, moduleName := m.QueryInterface.GetModule()
 	logData := LogData{
 		Time:    time.Now(),
@@ -46,7 +46,7 @@ func (m RequestModel) AddRequestLog(method, log string, req *Request) {
 	req.Events[lastEventId].Logs = append(req.Events[lastEventId].Logs, logData)
 }
 
-func (m RequestModel) AddLogEvent(method, log string, req *Request) {
+func (m RequestModel) AddLogEvent(method, log string, req RequestPtr) {
 	programName, moduleName := m.QueryInterface.GetModule()
 	event := EventData{
 		Time: time.Now(),
@@ -63,7 +63,7 @@ func (m RequestModel) AddLogEvent(method, log string, req *Request) {
 	req.Events = append(req.Events, event)
 }
 
-func (m RequestModel) AddRequestEvent(w webFramework.WebFramework, branch, method, log string, req *Request) {
+func (m RequestModel) AddRequestEvent(w webFramework.WebFramework, branch, method, log string, req RequestPtr) {
 	programName, moduleName := m.QueryInterface.GetModule()
 	event := EventData{
 		Time:     time.Now(),

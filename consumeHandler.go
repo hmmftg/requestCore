@@ -230,13 +230,13 @@ func CallRemoteWithRespParser[Req any, Resp any](
 	}
 }
 
-// initializer func(c webFramework.WebFramework, method, url string, reqLog *libRequest.Request, args ...any) (int, map[string]string, error),
+// initializer func(c webFramework.WebFramework, method, url string, reqLog libRequest.RequestPtr, args ...any) (int, map[string]string, error),
 func InitPostRequest(
 	ctx webFramework.WebFramework,
-	reqLog *libRequest.Request,
+	reqLog libRequest.RequestPtr,
 	method, url string,
 	checkDuplicate func(libRequest.Request) error,
-	addEvent func(webFramework.WebFramework, string, string, string, *libRequest.Request),
+	addEvent func(webFramework.WebFramework, string, string, string, libRequest.RequestPtr),
 	insertRequest func(libRequest.Request) error,
 	args ...any,
 ) (int, map[string]string, error) {
@@ -257,7 +257,7 @@ func InitPostRequest(
 	return http.StatusOK, map[string]string{"path": path}, nil
 }
 
-func ConsumeRemotePost(c any, reqLog *libRequest.Request, request any, method, methodName, api, url string,
+func ConsumeRemotePost(c any, reqLog libRequest.RequestPtr, request any, method, methodName, api, url string,
 	parseRemoteResp func([]byte, string, int) (int, map[string]string, any, error),
 	consumeHandler func([]byte, string, string, string, string, map[string]string) ([]byte, string, int, error),
 	args ...any) (int, string, any, error) {
@@ -285,7 +285,7 @@ func CallApi[Resp any](
 	core RequestCoreInterface,
 	method string,
 	param libCallApi.CallParam) (*Resp, *response.ErrorState) {
-	var reqLog *libRequest.Request
+	var reqLog libRequest.RequestPtr
 	dump, err := json.MarshalIndent(param, "", "  ")
 	if err == nil {
 		reqLog = core.RequestTools().LogStart(w, method, string(dump))

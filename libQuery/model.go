@@ -20,6 +20,7 @@ type DBMode int
 const (
 	Oracle DBMode = iota
 	Postgres
+	MockDB
 )
 
 func Init(
@@ -52,6 +53,8 @@ type QueryRunnerInterface interface {
 	InsertRow(insert string, args ...any) (sql.Result, error)
 	Dml(ctx context.Context, moduleName, methodName, command string, args ...any) (sql.Result, error)
 	SetVariableCommand() string
+	//Used in mock db for test
+	Close()
 }
 
 type DmlModel interface {

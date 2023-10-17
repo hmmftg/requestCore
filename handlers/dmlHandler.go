@@ -1,4 +1,4 @@
-package requestCore
+package handlers
 
 import (
 	"context"
@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/url"
 
+	"github.com/hmmftg/requestCore"
 	"github.com/hmmftg/requestCore/libContext"
 	"github.com/hmmftg/requestCore/libError"
 	"github.com/hmmftg/requestCore/libQuery"
@@ -17,12 +18,12 @@ import (
 
 func Dml[Req libQuery.DmlModel](
 	title, key string,
-	core RequestCoreInterface,
+	core requestCore.RequestCoreInterface,
 ) any {
 	return DmlHandler[Req](title, key, core, libRequest.JSON, true)
 }
 
-func ExecDML(request libQuery.DmlModel, key, title string, w webFramework.WebFramework, core RequestCoreInterface) (map[string]any, *response.ErrorState) {
+func ExecDML(request libQuery.DmlModel, key, title string, w webFramework.WebFramework, core requestCore.RequestCoreInterface) (map[string]any, *response.ErrorState) {
 	errPreControl := PreControlDML(request, key, title, w, core)
 	if errPreControl != nil {
 		return nil, errPreControl
@@ -36,7 +37,7 @@ func ExecDML(request libQuery.DmlModel, key, title string, w webFramework.WebFra
 	return resp, nil
 }
 
-func PreControlDML(request libQuery.DmlModel, key, title string, w webFramework.WebFramework, core RequestCoreInterface) *response.ErrorState {
+func PreControlDML(request libQuery.DmlModel, key, title string, w webFramework.WebFramework, core requestCore.RequestCoreInterface) *response.ErrorState {
 	preControl := request.PreControlCommands()
 	for _, command := range preControl[key] {
 		core.RequestTools().LogStart(w, fmt.Sprintf("PreControl: %s", command.Name), "Execute")
@@ -49,7 +50,7 @@ func PreControlDML(request libQuery.DmlModel, key, title string, w webFramework.
 	return nil
 }
 
-func ExecuteDML(request libQuery.DmlModel, key, title string, w webFramework.WebFramework, core RequestCoreInterface) (map[string]any, *response.ErrorState) {
+func ExecuteDML(request libQuery.DmlModel, key, title string, w webFramework.WebFramework, core requestCore.RequestCoreInterface) (map[string]any, *response.ErrorState) {
 	dml := request.DmlCommands()
 	resp := map[string]any{}
 	for _, command := range dml[key] {
@@ -64,7 +65,7 @@ func ExecuteDML(request libQuery.DmlModel, key, title string, w webFramework.Web
 	return resp, nil
 }
 
-func FinalizeDML(request libQuery.DmlModel, key, title string, w webFramework.WebFramework, core RequestCoreInterface) {
+func FinalizeDML(request libQuery.DmlModel, key, title string, w webFramework.WebFramework, core requestCore.RequestCoreInterface) {
 	finalize := request.FinalizeCommands()
 	for _, command := range finalize[key] {
 		_, errFinalize := command.ExecuteWithContext(
@@ -75,9 +76,40 @@ func FinalizeDML(request libQuery.DmlModel, key, title string, w webFramework.We
 	}
 }
 
+type DmlHandlerType[Req libQuery.DmlModel, Resp map[string]any] struct {
+	Title        string
+	Path         string
+	Mode         libRequest.Type
+	VerifyHeader bool
+	Key          string
+}
+
+func (h DmlHandlerType[Req, Resp]) Parameters() (string, libRequest.Type, bool, bool, string) {
+	return h.Title, h.Mode, h.VerifyHeader, true, h.Path
+}
+func (h DmlHandlerType[Req, Resp]) Initializer(req HandlerRequest[Req, Resp]) *response.ErrorState {
+	return PreControlDML(*req.Request, h.Key, req.Title, req.W, req.Core)
+}
+func (h DmlHandlerType[Req, Resp]) Handler(req HandlerRequest[Req, Resp]) (Resp, *response.ErrorState) {
+	resp, err := ExecuteDML(*req.Request, h.Key, req.Title, req.W, req.Core)
+	return resp, err
+}
+func (h DmlHandlerType[Req, Resp]) Finalizer(req HandlerRequest[Req, Resp]) {
+	FinalizeDML(*req.Request, h.Key, req.Title, req.W, req.Core)
+}
+
+func DmlHandlerNew[Req libQuery.DmlModel](
+	title, key string,
+	core requestCore.RequestCoreInterface,
+	mode libRequest.Type,
+	validateHeader bool,
+) any {
+	return BaseHandler[Req, map[string]any, DmlHandlerType[Req, map[string]any]](core, DmlHandlerType[Req, map[string]any]{Mode: mode, VerifyHeader: validateHeader})
+}
+
 func DmlHandler[Req libQuery.DmlModel](
 	title, key string,
-	core RequestCoreInterface,
+	core requestCore.RequestCoreInterface,
 	mode libRequest.Type,
 	validateHeader bool,
 ) any {

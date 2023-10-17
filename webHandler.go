@@ -18,10 +18,10 @@ type WebHanlder struct {
 }
 
 func (m WebHanlder) HandleErrorState(err error, status int, message string, data any, w webFramework.WebFramework) {
-	log.Printf("error state: %s, %+v", stacktrace.PropagateWithDepth(err, 1, ""), err)
+	log.Printf("error state: %+v", err)
 
 	if r := w.Parser.GetLocal("reqLog"); r != nil {
-		reqLog := r.(*libRequest.Request)
+		reqLog := r.(libRequest.RequestPtr)
 		m.RequestInterface.LogEnd("HandleError", fmt.Sprintf("desc: %s, err: %v, data: %v", message, err, data), reqLog)
 	}
 	switch internalError := err.(type) {
@@ -36,7 +36,7 @@ func (m WebHanlder) ErrorState(w webFramework.WebFramework, err *response.ErrorS
 	log.Printf("error state: %s, %+v", stacktrace.PropagateWithDepth(err, 1, ""), err)
 
 	if r := w.Parser.GetLocal("reqLog"); r != nil {
-		reqLog := r.(*libRequest.Request)
+		reqLog := r.(libRequest.RequestPtr)
 		m.RequestInterface.LogEnd("HandleError", fmt.Sprintf("desc: %s, err: %v, data: %v", err.Description, err, err.Message), reqLog)
 	}
 
@@ -74,19 +74,15 @@ func (m WebHanlder) RespondWithReceipt(code, status int, message string, data an
 		resp.ErrorData = m.GetErrorsArray(message, data)
 	}
 
-	if r := w.Parser.GetLocal("reqLog"); r != nil {
-		reqLog := r.(*libRequest.Request)
-		reqLog.Id = w.Parser.GetHeaderValue("Request-Id")
-		reqLog.BranchId = w.Parser.GetHeaderValue("Branch-Id")
-	}
-
 	err := w.Parser.SendJSONRespBody(code, resp)
 	if err != nil {
 		log.Println("error in SendJSONRespBody", err)
 	}
 
 	if r := w.Parser.GetLocal("reqLog"); r != nil {
-		reqLog := r.(*libRequest.Request)
+		reqLog := r.(libRequest.RequestPtr)
+		reqLog.Id = w.Parser.GetHeaderValue("Request-Id")
+		reqLog.BranchId = w.Parser.GetHeaderValue("Branch-Id")
 		if len(message) > 63 {
 			reqLog.Result = message[:63]
 		} else {
@@ -95,7 +91,7 @@ func (m WebHanlder) RespondWithReceipt(code, status int, message string, data an
 
 		reqLog.Outgoing = resp //string(respB)
 		if message != "DUPLICATE_REQUEST" {
-			err := m.RequestInterface.UpdateRequestWithContext(w.Ctx, *reqLog)
+			err := m.RequestInterface.UpdateRequestWithContext(w.Ctx, reqLog)
 			if err != nil {
 				log.Println("error in UpdateRequest", err)
 			}

@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/hmmftg/requestCore/libQuery"
+	"github.com/hmmftg/requestCore/response"
 	"github.com/hmmftg/requestCore/webFramework"
 )
 
@@ -24,15 +25,16 @@ type LoggerInterface interface {
 }
 
 type RequestInterface interface {
-	Initialize(c webFramework.WebFramework, method, url string, req *Request, args ...any) (int, map[string]string, error)
-	InitializeNoLog(c webFramework.WebFramework, method, url string, req *Request, args ...any) (int, map[string]string, error)
-	AddRequestLog(method, log string, req *Request)
-	LogEnd(method, log string, req *Request)
-	AddRequestEvent(c webFramework.WebFramework, branch, method, log string, req *Request)
-	LogStart(c webFramework.WebFramework, method, log string) *Request
-	InsertRequest(request Request) error
-	CheckDuplicateRequest(request Request) error
-	UpdateRequestWithContext(ctx context.Context, request Request) error
+	Initialize(c webFramework.WebFramework, method, url string, req RequestPtr, args ...any) (int, map[string]string, error)
+	InitRequest(c webFramework.WebFramework, method, url string) *response.ErrorState
+	InitializeNoLog(c webFramework.WebFramework, method, url string, req RequestPtr, args ...any) (int, map[string]string, error)
+	AddRequestLog(method, log string, req RequestPtr)
+	LogEnd(method, log string, req RequestPtr)
+	AddRequestEvent(c webFramework.WebFramework, branch, method, log string, req RequestPtr)
+	LogStart(c webFramework.WebFramework, method, log string) RequestPtr
+	InsertRequest(request RequestPtr) error
+	CheckDuplicateRequest(request RequestPtr) error
+	UpdateRequestWithContext(ctx context.Context, request RequestPtr) error
 }
 
 type LogData struct {
