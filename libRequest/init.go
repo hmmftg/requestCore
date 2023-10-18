@@ -12,6 +12,10 @@ import (
 func (m RequestModel) Initialize(w webFramework.WebFramework, method, url string, req RequestPtr, args ...any) (int, map[string]string, response.ErrorState) {
 	err := m.CheckDuplicateRequest(req)
 	if err != nil {
+		src := err.GetInput().(string)
+		if src == "DB" {
+			return http.StatusBadRequest, map[string]string{"desc": "PWC_REGISTER", "message": "unable to CheckDuplicateRequest"}, err
+		}
 		return http.StatusBadRequest, map[string]string{"desc": "DUPLICATE_REQUEST", "message": "Duplicate Request"}, err
 	}
 	m.AddRequestEvent(w, req.BranchId, method, "start", req)
@@ -47,6 +51,10 @@ func (m RequestModel) InitRequest(w webFramework.WebFramework, method, url strin
 	req := reqL.(RequestPtr)
 	err := m.CheckDuplicateRequest(req)
 	if err != nil {
+		src := err.GetInput().(string)
+		if src == "DB" {
+			return err
+		}
 		return response.Error(
 			http.StatusBadRequest,
 			"DUPLICATE_REQUEST",

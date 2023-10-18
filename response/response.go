@@ -86,6 +86,7 @@ type ErrorData struct {
 type ErrorState interface {
 	Error() string
 	Input(in any) ErrorState
+	GetInput() any
 	WsResponse() string
 	SetStatus(int) ErrorState
 	SetDescription(string) ErrorState
@@ -98,6 +99,7 @@ type ErrorState interface {
 }
 
 func (e ErrorData) GetStatus() int         { return e.Status }
+func (e ErrorData) GetInput() any          { return e.input }
 func (e ErrorData) GetDescription() string { return e.Description }
 func (e ErrorData) GetMessage() any        { return e.Message }
 

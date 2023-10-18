@@ -26,5 +26,7 @@ func HandleCheckExistence(code int, desc, notExistDesc string, record []QueryDat
 }
 
 func (m QueryRunnerModel) Close() {
-	m.DB.Close()
+	if m.Mode == MockDB {
+		m.DB.Close()
+	}
 }

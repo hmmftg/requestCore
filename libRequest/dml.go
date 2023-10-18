@@ -17,12 +17,12 @@ func (m RequestModel) CheckDuplicateRequest(request RequestPtr) response.ErrorSt
 	}
 	if ret != 0 {
 		if len(result) > 0 {
-			return response.ToErrorState(fmt.Errorf("query(%s)=>%d", request.Header.GetId(), ret))
+			return response.ToErrorState(fmt.Errorf("query(%s)=>%d", request.Header.GetId(), ret)).Input("COUNT1")
 		}
-		return response.ToErrorState(fmt.Errorf("query(%s)=>%d,%s", request.Header.GetId(), ret, result[0]))
+		return response.ToErrorState(fmt.Errorf("query(%s)=>%d,%s", request.Header.GetId(), ret, result[0])).Input("RETURN")
 	}
 	if len(result) > 0 {
-		return response.ToErrorState(fmt.Errorf("duplicate Request: id: %s", request.Header.GetId()))
+		return response.ToErrorState(fmt.Errorf("duplicate Request: id: %s", request.Header.GetId())).Input("COUNT2")
 	}
 	return nil
 }

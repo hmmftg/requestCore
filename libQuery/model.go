@@ -12,6 +12,7 @@ type QueryRunnerModel struct {
 	ProgramName string
 	ModuleName  string
 	SetVariable string
+	Mode        DBMode
 }
 
 //go:generate enumer -type=DBMode -json -output dbModeEnum.go
