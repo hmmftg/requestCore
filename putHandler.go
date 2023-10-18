@@ -34,7 +34,7 @@ func PutHandler[Req libQuery.RecordDataDml](title string,
 		request.SetId(id)
 
 		if hasInitializer {
-			w.Parser.SetLocal("reqLog", &reqLog)
+			w.Parser.SetLocal("reqLog", reqLog)
 			method := title
 			reqLog.Incoming = request
 			u, _ := url.Parse(w.Parser.GetPath())
@@ -78,13 +78,13 @@ func DeleteHandler[Req webFramework.RecordData](title, delete, checkQuery string
 			core.Responder().HandleErrorState(err, code, desc, arrayErr, w)
 			return
 		}
-		w.Parser.SetLocal("reqLog", &reqLog)
+		w.Parser.SetLocal("reqLog", reqLog)
 		method := title
 
 		u, _ := url.Parse(w.Parser.GetPath())
 
 		if hasInitializer {
-			code, result, err := core.RequestTools().Initialize(w, method, u.Path, &reqLog)
+			code, result, err := core.RequestTools().Initialize(w, method, u.Path, reqLog)
 			if err != nil {
 				core.Responder().HandleErrorState(err, code, result["desc"], result["message"], w)
 				return
@@ -138,7 +138,7 @@ func UpdateHandler[Req libQuery.Updatable](title string, hasReqLog bool,
 			return
 		}
 		if hasReqLog {
-			w.Parser.SetLocal("reqLog", &reqLog)
+			w.Parser.SetLocal("reqLog", reqLog)
 		}
 		filledRequest := request.SetParams(params).(Req)
 		method := title

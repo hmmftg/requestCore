@@ -179,13 +179,13 @@ func Req[Req any, Header any, PT interface {
 	return http.StatusOK, "OK", nil, *request, req, nil
 }
 
-func GetEmptyRequest(ctx webFramework.WebFramework) (int, string, []response.ErrorResponse, Request, error) {
+func GetEmptyRequest(ctx webFramework.WebFramework) (int, string, []response.ErrorResponse, RequestPtr, error) {
 	var req Request
 	// bind the headers to data
 	var header RequestHeader
 	err := ctx.Parser.GetHeader(&header)
 	if err != nil {
-		return http.StatusBadRequest, "HEADER_ABSENT", nil, req, err
+		return http.StatusBadRequest, "HEADER_ABSENT", nil, &req, err
 	}
 
 	req = Request{
@@ -204,9 +204,9 @@ func GetEmptyRequest(ctx webFramework.WebFramework) (int, string, []response.Err
 		errValidate := libValidate.ValidateStruct(header)
 		if errValidate != nil {
 			errorResponses := response.FormatErrorResp(errValidate, libValidate.GetTranslator())
-			return http.StatusBadRequest, "Header Validation Failed", errorResponses, req, errValidate
+			return http.StatusBadRequest, "Header Validation Failed", errorResponses, &req, errValidate
 		}
 	}
 
-	return http.StatusOK, "OK", nil, req, nil
+	return http.StatusOK, "OK", nil, &req, nil
 }

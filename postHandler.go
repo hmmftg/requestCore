@@ -28,7 +28,7 @@ func PostHandler[Req libQuery.RecordDataDml](title string,
 		}
 
 		if hasInitializer {
-			w.Parser.SetLocal("reqLog", &reqLog)
+			w.Parser.SetLocal("reqLog", reqLog)
 			method := title
 			reqLog.Incoming = request
 			u, _ := url.Parse(w.Parser.GetPath())

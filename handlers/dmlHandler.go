@@ -142,7 +142,7 @@ func DmlHandlerOld[Req libQuery.DmlModel](
 			return
 		}
 
-		w.Parser.SetLocal("reqLog", &reqLog)
+		w.Parser.SetLocal("reqLog", reqLog)
 		method := title
 		reqLog.Incoming = request
 		u, _ := url.Parse(w.Parser.GetPath())
