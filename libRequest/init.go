@@ -9,7 +9,7 @@ import (
 	"github.com/hmmftg/requestCore/webFramework"
 )
 
-func (m RequestModel) Initialize(w webFramework.WebFramework, method, url string, req RequestPtr, args ...any) (int, map[string]string, error) {
+func (m RequestModel) Initialize(w webFramework.WebFramework, method, url string, req RequestPtr, args ...any) (int, map[string]string, response.ErrorState) {
 	err := m.CheckDuplicateRequest(req)
 	if err != nil {
 		return http.StatusBadRequest, map[string]string{"desc": "DUPLICATE_REQUEST", "message": "Duplicate Request"}, err
@@ -32,7 +32,7 @@ func (m RequestModel) Initialize(w webFramework.WebFramework, method, url string
 	return http.StatusOK, map[string]string{"path": path}, nil
 }
 
-func (m RequestModel) InitializeNoLog(c webFramework.WebFramework, method, url string, req RequestPtr, args ...any) (int, map[string]string, error) {
+func (m RequestModel) InitializeNoLog(c webFramework.WebFramework, method, url string, req RequestPtr, args ...any) (int, map[string]string, response.ErrorState) {
 	m.AddRequestEvent(c, req.BranchId, method, "start", req)
 	var params []any
 	for _, arg := range args {
@@ -42,7 +42,7 @@ func (m RequestModel) InitializeNoLog(c webFramework.WebFramework, method, url s
 	return http.StatusOK, map[string]string{"path": path}, nil
 }
 
-func (m RequestModel) InitRequest(w webFramework.WebFramework, method, url string) *response.ErrorState {
+func (m RequestModel) InitRequest(w webFramework.WebFramework, method, url string) response.ErrorState {
 	reqL := w.Parser.GetLocal("reqLog")
 	req := reqL.(RequestPtr)
 	err := m.CheckDuplicateRequest(req)

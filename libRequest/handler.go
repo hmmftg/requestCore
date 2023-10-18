@@ -31,7 +31,7 @@ const (
 	URI
 )
 
-func parseRequest[Req any](w webFramework.WebFramework, mode Type, validateHeader bool, header webFramework.HeaderInterface, name string) (*Req, RequestPtr, response.Err, []response.ErrorResponse) {
+func parseRequest[Req any](w webFramework.WebFramework, mode Type, validateHeader bool, header webFramework.HeaderInterface, name string) (*Req, RequestPtr, response.ErrorState, []response.ErrorResponse) {
 	libValidate.Init()
 	var err error
 	var request Req
@@ -134,7 +134,7 @@ func ParseRequest[Req any](
 	w webFramework.WebFramework,
 	mode Type,
 	validateHeader bool,
-) (*Req, *RequestHeader, response.Err) {
+) (*Req, *RequestHeader, response.ErrorState) {
 	var header RequestHeader
 
 	const function = "ParseRequest"
@@ -142,7 +142,7 @@ func ParseRequest[Req any](
 	// bind the headers to data
 	err := w.Parser.GetHeader(&header)
 	if err != nil {
-		return nil, nil, response.Error(http.StatusBadRequest, "HEADER_ABSENT", nil, libError.Join(err, "GetRequest[GetHeader](%v)", w.Parser.GetHttpHeader())).AddSource(function)
+		return nil, nil, response.Error(http.StatusBadRequest, "HEADER_ABSENT", nil, libError.Join(err, "GetRequest[GetHeader](%v)", w.Parser.GetHttpHeader())).Input(function)
 	}
 
 	request, req, errParse, _ := parseRequest[Req](w, mode, validateHeader, &header, function)
@@ -160,7 +160,7 @@ func ParseRequest[Req any](
 func Req[Req any, Header any, PT interface {
 	webFramework.HeaderInterface
 	*Header
-}](w webFramework.WebFramework, mode Type, validateHeader bool) (int, string, []response.ErrorResponse, Req, RequestPtr, error) {
+}](w webFramework.WebFramework, mode Type, validateHeader bool) (int, string, []response.ErrorResponse, Req, RequestPtr, response.ErrorState) {
 	const function = "Req"
 
 	// bind the headers to data
@@ -168,12 +168,12 @@ func Req[Req any, Header any, PT interface {
 	headerPtr := PT(header)
 	errHeader := w.Parser.GetHeader(headerPtr)
 	if errHeader != nil {
-		return http.StatusBadRequest, "HEADER_ABSENT", nil, *new(Req), nil, libError.Join(errHeader, "%s[GetHeader](%v)", function, w.Parser.GetHttpHeader())
+		return http.StatusBadRequest, "HEADER_ABSENT", nil, *new(Req), nil, response.ToErrorState(libError.Join(errHeader, "%s[GetHeader](%v)", function, w.Parser.GetHttpHeader()))
 	}
 
 	request, req, errParse, errArray := parseRequest[Req](w, mode, validateHeader, headerPtr, function)
 	if errParse != nil {
-		return errParse.Status, errParse.Description, errArray, *request, req, *errParse
+		return errParse.GetStatus(), errParse.GetDescription(), errArray, *request, req, errParse
 	}
 
 	return http.StatusOK, "OK", nil, *request, req, nil

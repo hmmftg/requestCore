@@ -284,7 +284,7 @@ func CallApi[Resp any](
 	w webFramework.WebFramework,
 	core RequestCoreInterface,
 	method string,
-	param libCallApi.CallParam) (*Resp, *response.ErrorState) {
+	param libCallApi.CallParam) (*Resp, response.ErrorState) {
 	var reqLog libRequest.RequestPtr
 	dump, err := json.MarshalIndent(param, "", "  ")
 	if err == nil {
@@ -351,7 +351,7 @@ func CallHandler[Req any, Resp any](
 				Headers:     headers,
 			})
 		if errCall != nil {
-			core.Responder().HandleErrorState(errCall, errCall.Status, errCall.Description, errCall.Message, w)
+			core.Responder().Error(w, errCall)
 			return
 		}
 

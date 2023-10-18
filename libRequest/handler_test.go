@@ -51,9 +51,9 @@ func TestGinReq(t *testing.T) {
 			t.Fatal(code, desc, arrErr, req, reqLog, err)
 		}
 
-		b, err := json.Marshal(req)
-		if err != nil {
-			t.Fatal(err)
+		b, errJSON := json.Marshal(req)
+		if errJSON != nil {
+			t.Fatal(errJSON)
 		}
 		if string(b) != v.DesiredBody {
 			t.Fatal("want:", v.DesiredBody, "got:", string(b))
@@ -98,9 +98,9 @@ func TestFiberReq(t *testing.T) {
 			t.Fatal(code, desc, arrErr, req, reqLog, err)
 		}
 
-		b, err := json.Marshal(req)
-		if err != nil {
-			t.Fatal(err)
+		b, errJSON := json.Marshal(req)
+		if errJSON != nil {
+			t.Fatal(errJSON)
 		}
 		if string(b) != v.DesiredBody {
 			t.Fatal("want:", v.DesiredBody, "got:", string(b))

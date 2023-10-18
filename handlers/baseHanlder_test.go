@@ -29,11 +29,11 @@ type testHandlerType[Req testReq, Resp testResp] struct {
 func (h testHandlerType[Req, Resp]) Parameters() (string, libRequest.Type, bool, bool, string) {
 	return h.Title, h.Mode, h.VerifyHeader, h.SaveRequest, h.Path
 }
-func (h testHandlerType[Req, Resp]) Initializer(req HandlerRequest[Req, Resp]) *response.ErrorState {
+func (h testHandlerType[Req, Resp]) Initializer(req HandlerRequest[Req, Resp]) response.ErrorState {
 	log.Println("Initializer")
 	return nil
 }
-func (h testHandlerType[Req, Resp]) Handler(req HandlerRequest[Req, Resp]) (Resp, *response.ErrorState) {
+func (h testHandlerType[Req, Resp]) Handler(req HandlerRequest[Req, Resp]) (Resp, response.ErrorState) {
 	log.Println("Handler")
 	result := testResp{Result: "a"}
 	return Resp(result), nil

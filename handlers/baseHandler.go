@@ -21,9 +21,9 @@ type HandlerInterface[Req any, Resp any] interface {
 	//   and url path of handler
 	Parameters() (string, libRequest.Type, bool, bool, string)
 	// runs after validating request
-	Initializer(req HandlerRequest[Req, Resp]) *response.ErrorState
+	Initializer(req HandlerRequest[Req, Resp]) response.ErrorState
 	// main handler runs after initialize
-	Handler(req HandlerRequest[Req, Resp]) (Resp, *response.ErrorState)
+	Handler(req HandlerRequest[Req, Resp]) (Resp, response.ErrorState)
 	// runs after sending back response
 	Finalizer(req HandlerRequest[Req, Resp])
 }
@@ -65,7 +65,7 @@ func BaseHandler[Req any, Resp any, Handler HandlerInterface[Req, Resp]](
 			Core:  core,
 			W:     w,
 		}
-		var errParse response.Err
+		var errParse response.ErrorState
 		trx.Request, trx.Header, errParse = libRequest.ParseRequest[Req](trx.W, mode, validateHeader)
 		if errParse != nil {
 			core.Responder().Error(trx.W, errParse)
@@ -86,7 +86,7 @@ func BaseHandler[Req any, Resp any, Handler HandlerInterface[Req, Resp]](
 			return
 		}
 
-		var err *response.ErrorState
+		var err response.ErrorState
 		trx.Response, err = handler.Handler(trx)
 		if err != nil {
 			core.Responder().Error(trx.W, err)

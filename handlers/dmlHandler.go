@@ -23,7 +23,7 @@ func Dml[Req libQuery.DmlModel](
 	return DmlHandlerOld[Req](title, key, core, libRequest.JSON, true)
 }
 
-func ExecDML(request libQuery.DmlModel, key, title string, w webFramework.WebFramework, core requestCore.RequestCoreInterface) (map[string]any, *response.ErrorState) {
+func ExecDML(request libQuery.DmlModel, key, title string, w webFramework.WebFramework, core requestCore.RequestCoreInterface) (map[string]any, response.ErrorState) {
 	errPreControl := PreControlDML(request, key, title, w, core)
 	if errPreControl != nil {
 		return nil, errPreControl
@@ -37,7 +37,7 @@ func ExecDML(request libQuery.DmlModel, key, title string, w webFramework.WebFra
 	return resp, nil
 }
 
-func PreControlDML(request libQuery.DmlModel, key, title string, w webFramework.WebFramework, core requestCore.RequestCoreInterface) *response.ErrorState {
+func PreControlDML(request libQuery.DmlModel, key, title string, w webFramework.WebFramework, core requestCore.RequestCoreInterface) response.ErrorState {
 	preControl := request.PreControlCommands()
 	for _, command := range preControl[key] {
 		core.RequestTools().LogStart(w, fmt.Sprintf("PreControl: %s", command.Name), "Execute")
@@ -50,7 +50,7 @@ func PreControlDML(request libQuery.DmlModel, key, title string, w webFramework.
 	return nil
 }
 
-func ExecuteDML(request libQuery.DmlModel, key, title string, w webFramework.WebFramework, core requestCore.RequestCoreInterface) (map[string]any, *response.ErrorState) {
+func ExecuteDML(request libQuery.DmlModel, key, title string, w webFramework.WebFramework, core requestCore.RequestCoreInterface) (map[string]any, response.ErrorState) {
 	dml := request.DmlCommands()
 	resp := map[string]any{}
 	for _, command := range dml[key] {
@@ -87,10 +87,10 @@ type DmlHandlerType[Req libQuery.DmlModel, Resp map[string]any] struct {
 func (h DmlHandlerType[Req, Resp]) Parameters() (string, libRequest.Type, bool, bool, string) {
 	return h.Title, h.Mode, h.VerifyHeader, true, h.Path
 }
-func (h DmlHandlerType[Req, Resp]) Initializer(req HandlerRequest[Req, Resp]) *response.ErrorState {
+func (h DmlHandlerType[Req, Resp]) Initializer(req HandlerRequest[Req, Resp]) response.ErrorState {
 	return PreControlDML(*req.Request, h.Key, req.Title, req.W, req.Core)
 }
-func (h DmlHandlerType[Req, Resp]) Handler(req HandlerRequest[Req, Resp]) (Resp, *response.ErrorState) {
+func (h DmlHandlerType[Req, Resp]) Handler(req HandlerRequest[Req, Resp]) (Resp, response.ErrorState) {
 	resp, err := ExecuteDML(*req.Request, h.Key, req.Title, req.W, req.Core)
 	return resp, err
 }
@@ -157,8 +157,8 @@ func DmlHandlerOld[Req libQuery.DmlModel](
 			core.Responder().HandleErrorState(
 				libError.Join(errPreControl, "PreControl"),
 				http.StatusBadRequest,
-				errPreControl.Description,
-				errPreControl.Message,
+				errPreControl.GetDescription(),
+				errPreControl.GetMessage(),
 				w)
 			return
 		}
@@ -168,8 +168,8 @@ func DmlHandlerOld[Req libQuery.DmlModel](
 			core.Responder().HandleErrorState(
 				libError.Join(errExec, "Execute"),
 				http.StatusInternalServerError,
-				errExec.Description,
-				errExec.Message,
+				errExec.GetDescription(),
+				errExec.GetMessage(),
 				w)
 			return
 		}

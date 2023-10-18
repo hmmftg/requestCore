@@ -87,7 +87,7 @@ func TestExecuteWithContext(t *testing.T) {
 		Command DmlCommand
 		Model   QueryRunnerInterface
 		Result  any
-		Error   *response.ErrorState
+		Error   response.ErrorState
 	}
 	testCases := []TestCase{{
 		Name: "Valid Query Exists",
@@ -104,10 +104,10 @@ func TestExecuteWithContext(t *testing.T) {
 			Name:        "q2",
 			Command:     "queryE",
 			Type:        QueryCheckExists,
-			CustomError: &response.ErrorState{Description: "eeeerrr", Status: 1, Message: "mmm"},
+			CustomError: &response.ErrorData{Description: "eeeerrr", Status: 1, Message: "mmm"},
 		},
 		Model: getMock(QueryCheckExists, errors.New("error happened")),
-		Error: &response.ErrorState{Description: "eeeerrr", Status: 1, Message: "mmm"},
+		Error: &response.ErrorData{Description: "eeeerrr", Status: 1, Message: "mmm"},
 	}, {
 		Name: "Valid Query Not Exists",
 		Command: DmlCommand{
@@ -122,10 +122,10 @@ func TestExecuteWithContext(t *testing.T) {
 			Name:        "q2",
 			Command:     "queryN",
 			Type:        QueryCheckNotExists,
-			CustomError: &response.ErrorState{Description: "eeeerrr", Status: 1, Message: "mmm"},
+			CustomError: &response.ErrorData{Description: "eeeerrr", Status: 1, Message: "mmm"},
 		},
 		Model: getMock(QueryCheckNotExists, errors.New("error happened")),
-		Error: &response.ErrorState{Description: "eeeerrr", Status: 1, Message: "mmm"},
+		Error: &response.ErrorData{Description: "eeeerrr", Status: 1, Message: "mmm"},
 	}}
 	for _, testCase := range testCases {
 		result, err := testCase.Command.ExecuteWithContext(testCase.Context, "", "", testCase.Model)

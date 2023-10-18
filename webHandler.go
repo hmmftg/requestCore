@@ -32,15 +32,15 @@ func (m WebHanlder) HandleErrorState(err error, status int, message string, data
 	m.Respond(status, 1, message, data, true, w)
 }
 
-func (m WebHanlder) ErrorState(w webFramework.WebFramework, err *response.ErrorState) {
+func (m WebHanlder) ErrorState(w webFramework.WebFramework, err response.ErrorState) {
 	log.Printf("error state: %s, %+v", stacktrace.PropagateWithDepth(err, 1, ""), err)
 
 	if r := w.Parser.GetLocal("reqLog"); r != nil {
 		reqLog := r.(libRequest.RequestPtr)
-		m.RequestInterface.LogEnd("HandleError", fmt.Sprintf("desc: %s, err: %v, data: %v", err.Description, err, err.Message), reqLog)
+		m.RequestInterface.LogEnd("HandleError", fmt.Sprintf("desc: %s, err: %v, data: %v", err.GetDescription(), err, err.GetMessage()), reqLog)
 	}
 
-	m.Respond(err.Status, 1, err.Description, err.Message, true, w)
+	m.Respond(err.GetStatus(), 1, err.GetDescription(), err.GetMessage(), true, w)
 }
 
 func (m WebHanlder) Respond(code, status int, message string, data any, abort bool, w webFramework.WebFramework) {
@@ -55,8 +55,8 @@ func (m WebHanlder) OKWithReceipt(w webFramework.WebFramework, resp any, receipt
 	m.RespondWithReceipt(http.StatusOK, 0, "OK", resp, receipt, false, w)
 }
 
-func (m WebHanlder) Error(w webFramework.WebFramework, err *response.ErrorState) {
-	m.HandleErrorState(err, err.Status, err.Description, err.Message, w)
+func (m WebHanlder) Error(w webFramework.WebFramework, err response.ErrorState) {
+	m.HandleErrorState(err, err.GetStatus(), err.GetDescription(), err.GetMessage(), w)
 }
 
 func (m WebHanlder) GetErrorsArray(message string, data any) []response.ErrorResponse {

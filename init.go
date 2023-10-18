@@ -79,7 +79,7 @@ func Init() (ut.Translator, *validator.Validate, error) {
 	return trans, Validate, nil
 }
 
-func InitReqLog(w webFramework.WebFramework, reqLog libRequest.RequestPtr, core RequestCoreInterface, method, path string) *response.ErrorState {
+func InitReqLog(w webFramework.WebFramework, reqLog libRequest.RequestPtr, core RequestCoreInterface, method, path string) response.ErrorState {
 	w.Parser.SetLocal("reqLog", reqLog)
 	status, result, err := core.RequestTools().Initialize(w, method, path, reqLog)
 	if err != nil {

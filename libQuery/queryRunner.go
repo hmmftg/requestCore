@@ -212,7 +212,7 @@ const (
 	QueryMap
 )
 
-func Query[Result QueryResult](core QueryRunnerInterface, command QueryCommand, args ...any) (any, *response.ErrorState) {
+func Query[Result QueryResult](core QueryRunnerInterface, command QueryCommand, args ...any) (any, response.ErrorState) {
 	switch command.Type {
 	case QuerySingle:
 		_, desc, data, resp, err := CallSql[Result](command.Command, core, args...)

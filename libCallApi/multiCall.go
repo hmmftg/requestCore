@@ -24,7 +24,7 @@ type CallResult[RespType any] struct {
 	Resp   *RespType
 	WsResp *response.WsRemoteResponse
 	Status *CallResp
-	Error  *response.ErrorState
+	Error  response.ErrorState
 }
 
 func Call[RespType any](param CallParam) CallResult[RespType] {

@@ -9,7 +9,7 @@ type ResponseHandler interface {
 	RespondWithReceipt(code, status int, message string, data any, printData *Receipt, abort bool, w webFramework.WebFramework)
 	OK(w webFramework.WebFramework, resp any)
 	OKWithReceipt(w webFramework.WebFramework, resp any, receipt *Receipt)
-	Error(w webFramework.WebFramework, err *ErrorState)
+	Error(w webFramework.WebFramework, err ErrorState)
 }
 
 type InternalError struct {

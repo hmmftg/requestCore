@@ -39,7 +39,7 @@ const (
 	Delete
 )
 
-func (command DmlCommand) Execute(core QueryRunnerInterface, moduleName, methodName string) (any, *response.ErrorState) {
+func (command DmlCommand) Execute(core QueryRunnerInterface, moduleName, methodName string) (any, response.ErrorState) {
 	return command.ExecuteWithContext(context.Background(), moduleName, methodName, core)
 }
 
@@ -52,7 +52,7 @@ func GetDmlResult(resultDb sql.Result, rows map[string]string) DmlResult {
 	return resp
 }
 
-func (command DmlCommand) ExecuteWithContext(ctx context.Context, moduleName, methodName string, core QueryRunnerInterface) (any, *response.ErrorState) {
+func (command DmlCommand) ExecuteWithContext(ctx context.Context, moduleName, methodName string, core QueryRunnerInterface) (any, response.ErrorState) {
 	switch command.Type {
 	case QueryCheckExists:
 		_, desc, data, resp, err := CallSql[QueryData](command.Command, core, command.Args...)

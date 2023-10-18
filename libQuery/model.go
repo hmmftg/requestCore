@@ -79,7 +79,7 @@ type DmlCommand struct {
 	Command     string
 	Args        []any
 	Type        DmlCommandType
-	CustomError *response.ErrorState
+	CustomError response.ErrorState
 }
 
 //go:generate enumer -type=QueryCommandType -json -output queryEnum.go

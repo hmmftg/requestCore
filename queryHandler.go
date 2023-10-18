@@ -507,7 +507,7 @@ func QueryHandler[Req libQuery.QueryRequest, Resp libQuery.QueryResult](
 		}
 		resp, errQuery := libQuery.Query[Resp](core.GetDB(), queryMap[key], args...)
 		if errQuery != nil {
-			core.Responder().HandleErrorState(libError.Join(errQuery, "query"), http.StatusBadRequest, errQuery.Description, errQuery.Message, w)
+			core.Responder().HandleErrorState(libError.Join(errQuery, "query"), http.StatusBadRequest, errQuery.GetDescription(), errQuery.GetMessage(), w)
 			return
 		}
 
