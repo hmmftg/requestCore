@@ -130,6 +130,16 @@ func TestExecuteWithContext(t *testing.T) {
 	for _, testCase := range testCases {
 		result, err := testCase.Command.ExecuteWithContext(testCase.Context, "", "", testCase.Model)
 		assert.DeepEqual(t, result, testCase.Result)
-		assert.DeepEqual(t, err, testCase.Error)
+		if err == nil && testCase.Error != nil {
+			t.Fatal("error wanted", testCase.Error, "got", err)
+		}
+		if err != nil && testCase.Error == nil {
+			t.Fatal("error wanted", testCase.Error, "got", err)
+		}
+		if err != nil {
+			assert.Equal(t, err.GetDescription(), testCase.Error.GetDescription())
+			assert.Equal(t, err.GetStatus(), testCase.Error.GetStatus())
+			assert.Equal(t, err.GetMessage(), testCase.Error.GetMessage())
+		}
 	}
 }
