@@ -115,7 +115,7 @@ func TestDMLHandler(t *testing.T) {
 			&testCases[id],
 			&testingtools.TestOptions{
 				Path:    "/",
-				Name:    "check base handler",
+				Name:    "check dml handler",
 				Method:  "POST",
 				Handler: env.handler(),
 				Silent:  false,

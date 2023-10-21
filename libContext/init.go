@@ -4,6 +4,7 @@ import (
 	"context"
 	"log"
 	"runtime/debug"
+	"testing"
 
 	"github.com/gin-gonic/gin"
 	"github.com/gofiber/fiber/v2"
@@ -19,6 +20,9 @@ const (
 	WebFrameworkKey = libQuery.ContextKey("webFramework")
 	Gin             = "gin"
 	Fiber           = "fiber"
+	Testing         = "testing"
+	UserIdHeader    = "User-Id"
+	UserIdLocal     = "userId"
 )
 
 func InitContext(c any) webFramework.WebFramework {
@@ -38,11 +42,14 @@ func InitContext(c any) webFramework.WebFramework {
 		}
 		w.Ctx = context.WithValue(ctx, WebFrameworkKey, Fiber)
 		w.Parser = libFiber.InitContext(fiberCtx)
+	case *testing.T:
+		w.Ctx = context.WithValue(context.Background(), WebFrameworkKey, Testing)
+		w.Parser = initTestContext(ctx)
 	default:
 		stack := debug.Stack()
 		log.Fatalf("error in InitContext: unknown webFramework %T, Stack: %s", ctx, string(stack))
 	}
-	userId := w.Parser.GetHeaderValue("User-Id")
+	userId := w.Parser.GetHeaderValue(UserIdHeader)
 	if len(userId) == 0 {
 		userId = w.Parser.GetLocalString("userId")
 	}

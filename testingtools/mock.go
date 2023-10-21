@@ -89,6 +89,15 @@ func DefaultAPIList() map[string]libCallApi.RemoteApi {
 	}
 }
 
+func TestAPIList() map[string]libCallApi.RemoteApi {
+	return map[string]libCallApi.RemoteApi{
+		"api": {
+			Domain: "https://api.github.com",
+			Name:   "test api",
+		},
+	}
+}
+
 type AnyString string
 
 // Match satisfies sqlmock.Argument interface

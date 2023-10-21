@@ -90,7 +90,6 @@ func (c FiberParser) GetArgs(args ...any) map[string]string {
 }
 
 func (c FiberParser) ParseCommand(command, title string, request webFramework.RecordData, parser webFramework.FieldParser) string {
-
 	if request.GetValueMap() == nil {
 		return libQuery.ParseCommand(command, c.Ctx.Locals("userId").(string),
 			c.Ctx.Locals("appName").(string),

@@ -1,4 +1,4 @@
-package requestCore
+package handlers
 
 import (
 	"context"
@@ -11,8 +11,10 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/hmmftg/requestCore"
 	"github.com/hmmftg/requestCore/libCallApi"
 	"github.com/hmmftg/requestCore/libContext"
+	"github.com/hmmftg/requestCore/libError"
 	"github.com/hmmftg/requestCore/libQuery"
 	"github.com/hmmftg/requestCore/libRequest"
 	"github.com/hmmftg/requestCore/response"
@@ -22,7 +24,7 @@ import (
 func ConsumeRemoteGet(
 	w webFramework.WebFramework,
 	api, url string,
-	core RequestCoreInterface,
+	core requestCore.RequestCoreInterface,
 	args ...any) (int, int, string, any, bool, error) {
 	var params []any
 	for _, arg := range args {
@@ -63,8 +65,10 @@ func ConsumeRemoteGet(
 	path := fmt.Sprintf(url, params...)
 
 	reqLog := core.RequestTools().LogStart(w, "ConsumeRemoteGet", path)
+	h := DefaultHeaders()
+	headersMap := extractHeaders(w, h, nil)
 
-	respBytes, desc, err := core.Consumer().ConsumeRestBasicAuthApi(nil, api, path, "application/x-www-form-urlencoded", "GET", nil)
+	respBytes, desc, err := core.Consumer().ConsumeRestBasicAuthApi(nil, api, path, "application/x-www-form-urlencoded", "GET", headersMap)
 	if err != nil {
 		return http.StatusInternalServerError, 1, desc, string(respBytes), true, err
 	}
@@ -97,9 +101,29 @@ func ConsumeRemoteGet(
 	return http.StatusOK, 0, "OK", resp.Result, false, nil
 }
 
+func extractValue(name string, source func(string) string, dest map[string]string) {
+	if strings.Contains(name, "#") {
+		headerSplit := strings.Split(name, "#")
+		dest[headerSplit[1]] = source(headerSplit[0])
+	} else {
+		dest[name] = source(name)
+	}
+}
+
+func extractHeaders(w webFramework.WebFramework, headers, locals []string) map[string]string {
+	headersMap := make(map[string]string, 0)
+	for _, header := range headers {
+		extractValue(header, w.Parser.GetHeaderValue, headersMap)
+	}
+	for _, local := range locals {
+		extractValue(local, w.Parser.GetLocalString, headersMap)
+	}
+	return headersMap
+}
+
 func ConsumeRemoteGetApi(
 	api, url string,
-	core RequestCoreInterface,
+	core requestCore.RequestCoreInterface,
 	args ...any) any {
 	log.Println("ConsumeRemoteGetApi...")
 	return func(c context.Context) {
@@ -108,6 +132,7 @@ func ConsumeRemoteGetApi(
 		if len(args) > 0 && args[0] == "QUERY" {
 			fullPath = fmt.Sprintf("%s?%s", fullPath, w.Parser.GetRawUrlQuery())
 		}
+
 		status, code, desc, message, broken, err := ConsumeRemoteGet(w, api, fullPath, core, args...)
 		if err != nil {
 			core.Responder().HandleErrorState(err, status, desc, message, w)
@@ -116,6 +141,108 @@ func ConsumeRemoteGetApi(
 		core.Responder().Respond(status, code, desc, message, broken, w)
 	}
 }
+
+type CallArgs[Req any, Resp any] struct {
+	Title, Path, Api, Method string
+	HasQuery, IsJson         bool
+	HasInitializer           bool
+	ForwardAuth              bool
+	Transmitter              func(
+		path, api, method string,
+		requestByte []byte,
+		headers map[string]string,
+		parseRemoteResp func([]byte, string, int) (int, map[string]string, any, error),
+		consumer func([]byte, string, string, string, string, map[string]string) ([]byte, string, int, error),
+	) (int, map[string]string, any, error)
+	Args, Locals, Headers []string
+	Parser                func(respBytes []byte, desc string, status int) (int, map[string]string, any, error)
+}
+
+func DefaultHeaders() []string {
+	return []string{
+		"Authorization",
+		"Request-Id",
+		"Branch-Id",
+		"Person-Id",
+	}
+}
+
+func DefaultLocals() []string {
+	return []string{
+		"bankCode#Bank-Code",
+		"User-Id",
+	}
+}
+
+func (c CallArgs[Req, Resp]) Parameters() (string, libRequest.Type, bool, bool, string) {
+	var mode libRequest.Type
+	if c.IsJson {
+		mode = libRequest.JSON
+	} else {
+		mode = libRequest.Query
+	}
+	save := false
+	if c.HasInitializer {
+		save = true
+	}
+	return c.Title, mode, false, save, c.Path
+}
+
+const (
+	HeadersMap = "headersMap"
+	FinalPath  = "finalPath"
+)
+
+func (c CallArgs[Req, Resp]) Initializer(req HandlerRequest[Req, Resp]) response.ErrorState {
+	headers := make([]string, 0)
+	locals := make([]string, 0)
+	if c.ForwardAuth {
+		headers = append(headers, "Authorization")
+	}
+	headers = append(headers, "Request-Id")
+	headers = append(headers, "Branch-Id")
+	headers = append(headers, "Person-Id")
+	locals = append(locals, "User-Id")
+	headersMap := extractHeaders(req.W, headers, locals)
+	if !c.ForwardAuth {
+		remoteApi := req.Core.Consumer().GetApi(c.Api)
+		headersMap["Authorization"] = "Basic " + libCallApi.BasicAuth(remoteApi.User, remoteApi.Password)
+	}
+	req.W.Parser.SetLocal(HeadersMap, headersMap)
+
+	finalPath := c.Path
+	for _, value := range req.W.Parser.GetUrlParams() {
+		//normalized := strings.ReplaceAll(param.Value, "*", "/")
+		finalPath += "/" + value //normalized
+	}
+	req.W.Parser.SetLocal(FinalPath, finalPath)
+	return nil
+}
+func (c CallArgs[Req, Resp]) Handler(req HandlerRequest[Req, Resp]) (Resp, response.ErrorState) {
+	finalPath := req.W.Parser.GetLocalString(FinalPath)
+	headers, ok := req.W.Parser.GetLocal(HeadersMap).(map[string]string)
+	if !ok {
+		return req.Response, response.Error(
+			http.StatusInternalServerError,
+			"BAD_LOCAL_HEADERS",
+			req.W.Parser.GetLocal(HeadersMap),
+			fmt.Errorf("wront data type: %T", req.W.Parser.GetLocal(HeadersMap)))
+	}
+	requestByte, _ := json.Marshal(req.Request)
+	status, descArray, resp, err := c.Transmitter(
+		finalPath, c.Api, c.Method,
+		requestByte, headers, c.Parser,
+		req.Core.Consumer().ConsumeRestApi)
+	if err != nil {
+		return req.Response, response.Error(
+			status,
+			descArray["desc"],
+			descArray["message"],
+			libError.Join(err, "error calling api"))
+	}
+	return resp.(Resp), nil
+}
+func (c CallArgs[Req, Resp]) Finalizer(req HandlerRequest[Req, Resp]) {}
 
 func CallRemote[Req any, Resp any](
 	title, path, api, method string, hasQuery, isJson bool,
@@ -127,48 +254,25 @@ func CallRemote[Req any, Resp any](
 		parseRemoteResp func([]byte, string, int) (int, map[string]string, any, error),
 		consumer func([]byte, string, string, string, string, map[string]string) ([]byte, string, int, error),
 	) (int, map[string]string, any, error),
-	core RequestCoreInterface,
+	core requestCore.RequestCoreInterface,
 	args ...string,
 ) any {
-	log.Println("Registering: ", title)
-	return func(c context.Context) {
-		w := libContext.InitContext(c)
-		headers := make(map[string]string, 0)
-		headers["Authorization"] = w.Parser.GetHeaderValue("Authorization")
-		headers["Request-Id"] = w.Parser.GetHeaderValue("Request-Id")
-		headers["Branch-Id"] = w.Parser.GetHeaderValue("Branch-Id")
-		headers["Person-Id"] = w.Parser.GetHeaderValue("Person-Id")
-		headers["Bank-Code"] = w.Parser.GetLocalString("bankCode")
-		headers["User-Id"] = w.Parser.GetLocalString("User-Id")
-		finalPath := path
-		for _, value := range w.Parser.GetUrlParams() {
-			//normalized := strings.ReplaceAll(param.Value, "*", "/")
-			finalPath += "/" + value //normalized
-		}
-		code, desc, arrayErr, req, reqLog, err := libRequest.GetRequest[Req](w, isJson)
-		if err != nil {
-			core.Responder().HandleErrorState(err, code, desc, arrayErr, w)
-			return
-		}
-		w.Parser.SetLocal("reqLog", reqLog)
-		reqLog.Incoming = req
-
-		if hasInitializer {
-			u, _ := url.Parse(w.Parser.GetPath())
-			code, result, err := core.RequestTools().Initialize(w, title, u.Path, reqLog)
-			if err != nil {
-				core.Responder().HandleErrorState(err, code, result["desc"], result["message"], w)
-				return
-			}
-		}
-		requestByte, _ := json.Marshal(req)
-		status, descArray, resp, err := transmitter(finalPath, api, method, requestByte, headers, response.ParseRemoteRespJson, core.Consumer().ConsumeRestApi)
-		if err != nil {
-			core.Responder().HandleErrorState(err, status, descArray["desc"], descArray["message"], w)
-			return
-		}
-		core.Responder().Respond(http.StatusOK, 0, "OK", resp, false, w)
+	callArg := CallArgs[Req, Resp]{
+		Title:          title,
+		Path:           path,
+		Api:            api,
+		Method:         method,
+		HasQuery:       hasQuery,
+		IsJson:         isJson,
+		HasInitializer: hasInitializer,
+		ForwardAuth:    false,
+		Transmitter:    transmitter,
+		Args:           args,
+		Locals:         DefaultLocals(),
+		Headers:        DefaultHeaders(),
+		Parser:         response.ParseRemoteRespJson,
 	}
+	return BaseHandler[Req, Resp, CallArgs[Req, Resp]](core, callArg, args)
 }
 
 func CallRemoteWithRespParser[Req any, Resp any](
@@ -181,58 +285,31 @@ func CallRemoteWithRespParser[Req any, Resp any](
 		parseRemoteResp func([]byte, string, int) (int, map[string]string, any, error),
 		consumer func([]byte, string, string, string, string, map[string]string) ([]byte, string, int, error),
 	) (int, map[string]string, any, error),
-	core RequestCoreInterface,
+	core requestCore.RequestCoreInterface,
 	parseRemoteResp func([]byte, string, int) (int, map[string]string, any, error),
 	args ...string,
 ) any {
-	log.Println("Registering: ", title)
-	return func(c context.Context) {
-		w := libContext.InitContext(c)
-		headers := make(map[string]string, 0)
-		if forwardAuth {
-			headers["Authorization"] = w.Parser.GetHeaderValue("Authorization")
-		} else {
-			remoteApi := core.Consumer().GetApi(api)
-			headers["Authorization"] = "Basic " + libCallApi.BasicAuth(remoteApi.User, remoteApi.Password)
-		}
-		headers["Request-Id"] = w.Parser.GetHeaderValue("Request-Id")
-		headers["Branch-Id"] = w.Parser.GetHeaderValue("Branch-Id")
-		headers["Person-Id"] = w.Parser.GetHeaderValue("Person-Id")
-		headers["User-Id"] = w.Parser.GetLocalString("User-Id")
-		finalPath := path
-		for _, param := range w.Parser.GetUrlParams() {
-			normalized := strings.ReplaceAll(param, "*", "/")
-			finalPath += "/" + normalized
-		}
-		code, desc, arrayErr, req, reqLog, err := libRequest.GetRequest[Req](w, isJson)
-		if err != nil {
-			core.Responder().HandleErrorState(err, code, desc, arrayErr, w)
-			return
-		}
-
-		if hasInitializer {
-			w.Parser.SetLocal("reqLog", reqLog)
-			reqLog.Incoming = req
-			u, _ := url.Parse(w.Parser.GetPath())
-			code, result, err := core.RequestTools().Initialize(w, title, u.Path, reqLog)
-			if err != nil {
-				core.Responder().HandleErrorState(err, code, result["desc"], result["message"], w)
-				return
-			}
-		}
-		requestByte, _ := json.Marshal(req)
-		status, descArray, resp, err := transmitter(finalPath, api, method, requestByte, headers, parseRemoteResp, core.Consumer().ConsumeRestApi)
-		if err != nil {
-			core.Responder().HandleErrorState(err, status, descArray["desc"], descArray["message"], w)
-			return
-		}
-		core.Responder().Respond(http.StatusOK, 0, "OK", resp, false, w)
+	callArg := CallArgs[Req, Resp]{
+		Title:          title,
+		Path:           path,
+		Api:            api,
+		Method:         method,
+		HasQuery:       hasQuery,
+		IsJson:         isJson,
+		HasInitializer: hasInitializer,
+		ForwardAuth:    forwardAuth,
+		Transmitter:    transmitter,
+		Args:           args,
+		Locals:         DefaultLocals(),
+		Headers:        DefaultHeaders(),
+		Parser:         parseRemoteResp,
 	}
+	return BaseHandler[Req, Resp, CallArgs[Req, Resp]](core, callArg, args)
 }
 
 // initializer func(c webFramework.WebFramework, method, url string, reqLog libRequest.RequestPtr, args ...any) (int, map[string]string, error),
 func InitPostRequest(
-	ctx webFramework.WebFramework,
+	w webFramework.WebFramework,
 	reqLog libRequest.RequestPtr,
 	method, url string,
 	checkDuplicate func(libRequest.Request) error,
@@ -244,23 +321,27 @@ func InitPostRequest(
 	if err != nil {
 		return http.StatusBadRequest, map[string]string{"desc": "DUPLICATE_REQUEST", "message": "Duplicate Request"}, err
 	}
-	addEvent(ctx, reqLog.BranchId, method, "start", reqLog)
+	addEvent(w, reqLog.BranchId, method, "start", reqLog)
 	err = insertRequest(*reqLog)
 	if err != nil {
 		return http.StatusServiceUnavailable, map[string]string{"desc": "PWC_REGISTER", "message": "Unable To Register Request"}, err
 	}
 	var params []any
 	for _, arg := range args {
-		params = append(params, ctx.Parser.GetUrlParam(arg.(string)))
+		params = append(params, w.Parser.GetUrlParam(arg.(string)))
 	}
 	path := fmt.Sprintf(url, params...)
 	return http.StatusOK, map[string]string{"path": path}, nil
 }
 
-func ConsumeRemotePost(c any, reqLog libRequest.RequestPtr, request any, method, methodName, api, url string,
+func ConsumeRemotePost(
+	w webFramework.WebFramework,
+	reqLog libRequest.RequestPtr,
+	request any,
+	method, methodName, api, url string,
 	parseRemoteResp func([]byte, string, int) (int, map[string]string, any, error),
 	consumeHandler func([]byte, string, string, string, string, map[string]string) ([]byte, string, int, error),
-	args ...any) (int, string, any, error) {
+) (int, string, any, error) {
 	reqBytes, _ := json.Marshal(request)
 	headers := map[string]string{
 		"Request-Id": reqLog.Id,
@@ -282,7 +363,7 @@ type WsResponse[Result any] struct {
 
 func CallApi[Resp any](
 	w webFramework.WebFramework,
-	core RequestCoreInterface,
+	core requestCore.RequestCoreInterface,
 	method string,
 	param libCallApi.CallParam) (*Resp, response.ErrorState) {
 	var reqLog libRequest.RequestPtr
@@ -312,8 +393,8 @@ func CallApi[Resp any](
 func CallHandler[Req any, Resp any](
 	title, path, api, method, query string, isJson bool,
 	hasInitializer bool,
-	headers map[string]string,
-	core RequestCoreInterface,
+	headers []string,
+	core requestCore.RequestCoreInterface,
 ) any {
 	log.Println("Registering: ", title)
 	return func(c context.Context) {
@@ -339,6 +420,7 @@ func CallHandler[Req any, Resp any](
 				return
 			}
 		}
+		headersMap := extractHeaders(w, headers, nil)
 		resp, errCall := CallApi[Resp](w, core, title,
 			libCallApi.CallParam{
 				Api:         core.Consumer().GetApi(api),
@@ -348,7 +430,7 @@ func CallHandler[Req any, Resp any](
 				JsonBody:    req,
 				ValidateTls: false,
 				EnableLog:   false,
-				Headers:     headers,
+				Headers:     headersMap,
 			})
 		if errCall != nil {
 			core.Responder().Error(w, errCall)
