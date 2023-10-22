@@ -116,38 +116,39 @@ func (e ErrorData) SetMessage(msg any) ErrorState {
 	return &e
 }
 func (e ErrorData) ChildErr(err error) ErrorState {
-	if e.childs == nil {
-		e.childs = []ErrorState{ToErrorState(err)}
-	}
-	e.childs = append(e.childs, ToErrorState(err))
-	return &e
+	return e.Child(ToErrorState(err))
 }
 func (e ErrorData) Child(err ErrorState) ErrorState {
 	if e.childs == nil {
 		e.childs = []ErrorState{err}
+	} else {
+		e.childs = append(e.childs, err)
 	}
-	e.childs = append(e.childs, err)
 	return &e
+}
+func (e ErrorData) Format(header string, stack *strings.Builder) {
+	var jsonMsg, jsonInput string
+	if e.input != nil {
+		js, _ := json.Marshal(e.input)
+		jsonInput = string(js)
+	}
+	if e.Message != nil {
+		js, _ := json.Marshal(e.Message)
+		jsonMsg = string(js)
+	}
+	stack.WriteString(fmt.Sprintf("%s%d,%s,%s,%s,%s\n", header, e.Status, e.Description, e.source, jsonInput, jsonMsg))
+	childHeader := fmt.Sprintf("%s\t", header)
+	for _, errorData := range e.childs {
+		switch err := errorData.(type) {
+		case *ErrorData:
+			err.Format(childHeader, stack)
+		}
+	}
 }
 
 func (e ErrorData) Error() string {
 	var stack strings.Builder
-	for _, errorData := range e.childs {
-		switch err := errorData.(type) {
-		case *ErrorData:
-			var jsonMsg, jsonInput string
-			if err.input != nil {
-				js, _ := json.Marshal(err.input)
-				jsonInput = string(js)
-			}
-			if err.Message != nil {
-				js, _ := json.Marshal(err.Message)
-				jsonMsg = string(js)
-			}
-			stack.WriteString(fmt.Sprintf("%d,%s,%s,%s,%s", err.Status, err.source, err.Description, jsonInput, jsonMsg))
-		}
-		stack.WriteString("\n")
-	}
+	e.Format("", &stack)
 	return stack.String()
 }
 
@@ -170,25 +171,21 @@ func ToErrorState(err error) ErrorState {
 }
 
 func ToError(desc string, message any, err error) ErrorState {
-	return ErrorData{
-		Description: desc,
-		Message:     message,
-	}.ChildErr(err)
+	return Error(http.StatusInternalServerError, desc, message, err)
 }
 
 func Error(status int, desc string, message any, err error) ErrorState {
-	return ErrorData{
-		Description: desc,
-		Message:     message,
-		Status:      status,
-	}.ChildErr(err)
+	return Errors(status, desc, message, ToErrorState(err))
 }
 
 func Errors(status int, desc string, message any, err ErrorState) ErrorState {
+	_, filename, line, _ := runtime.Caller(1)
+	src := fmt.Sprintf("%s:%d", filename, line)
 	return ErrorData{
 		Description: desc,
 		Message:     message,
 		Status:      status,
+		source:      src,
 	}.Child(err)
 }
 

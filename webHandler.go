@@ -33,7 +33,7 @@ func (m WebHanlder) HandleErrorState(err error, status int, message string, data
 }
 
 func (m WebHanlder) ErrorState(w webFramework.WebFramework, err response.ErrorState) {
-	log.Printf("error state: %s, %+v", stacktrace.PropagateWithDepth(err, 1, ""), err)
+	log.Printf("error state: %s, \n%+v", stacktrace.PropagateWithDepth(err, 1, ""), err)
 
 	if r := w.Parser.GetLocal("reqLog"); r != nil {
 		reqLog := r.(libRequest.RequestPtr)
