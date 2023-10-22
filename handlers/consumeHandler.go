@@ -381,10 +381,10 @@ func CallApi[Resp any](
 	}
 
 	if resp1.Error != nil {
-		return nil, resp1.Error
+		return nil, response.Errors(http.StatusInternalServerError, "REMOTE_CALL_ERROR", param, resp1.Error)
 	}
 	if resp1.Status.Status != http.StatusOK {
-		return nil, resp1.WsResp.ToErrorState()
+		return nil, resp1.WsResp.ToErrorState().Input(param)
 	}
 	return &resp1.Resp.Result, nil
 }

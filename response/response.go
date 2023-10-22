@@ -116,7 +116,7 @@ func (e ErrorData) SetMessage(msg any) ErrorState {
 	return &e
 }
 func (e ErrorData) ChildErr(err error) ErrorState {
-	return e.Child(ToErrorState(err))
+	return e.Child(toErrorState(err, 4))
 }
 func (e ErrorData) Child(err ErrorState) ErrorState {
 	if e.childs == nil {
@@ -161,8 +161,8 @@ func (e ErrorData) WsResponse() string {
 	return fmt.Sprintf("%s#%s#%v#%v#%d", e.Description, e.source, e.input, e.Message, e.Status)
 }
 
-func ToErrorState(err error) ErrorState {
-	_, filename, line, _ := runtime.Caller(1)
+func toErrorState(err error, skip int) ErrorState {
+	_, filename, line, _ := runtime.Caller(skip)
 	src := fmt.Sprintf("%s:%d", filename, line)
 	return &ErrorData{
 		Description: err.Error(),
@@ -170,12 +170,16 @@ func ToErrorState(err error) ErrorState {
 	}
 }
 
+func ToErrorState(err error) ErrorState {
+	return toErrorState(err, 2)
+}
+
 func ToError(desc string, message any, err error) ErrorState {
 	return Error(http.StatusInternalServerError, desc, message, err)
 }
 
 func Error(status int, desc string, message any, err error) ErrorState {
-	return Errors(status, desc, message, ToErrorState(err))
+	return Errors(status, desc, message, toErrorState(err, 3))
 }
 
 func Errors(status int, desc string, message any, err ErrorState) ErrorState {

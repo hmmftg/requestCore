@@ -221,7 +221,7 @@ func ConsumeRest[Resp any](c CallData) (*Resp, *response.WsRemoteResponse, *Call
 
 	req, errPrepare := PrepareCall(c)
 	if errPrepare != nil {
-		return nil, nil, nil, errPrepare
+		return nil, nil, nil, errPrepare.Input(c)
 	}
 
 	client := &http.Client{
@@ -245,7 +245,7 @@ func ConsumeRest[Resp any](c CallData) (*Resp, *response.WsRemoteResponse, *Call
 
 	respJson, errResp, callResp, errParse := GetResp[Resp, response.WsRemoteResponse](c.Api, resp)
 	if errParse != nil {
-		return nil, nil, callResp, errParse
+		return nil, nil, callResp, errParse.Input(resp)
 	}
 
 	return respJson, errResp, callResp, nil
