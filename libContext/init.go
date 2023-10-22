@@ -45,7 +45,7 @@ func initContext(c any, unknownUser bool) webFramework.WebFramework {
 		w.Parser = libGin.InitContext(c)
 	case *fiber.Ctx:
 		if unknownUser {
-			ctx.Set(UserIdLocal, UnknownUser)
+			ctx.Locals(UserIdLocal, UnknownUser)
 		}
 		w.Ctx = context.WithValue(ctx.Context(), WebFrameworkKey, Fiber)
 		w.Parser = libFiber.InitContext(ctx)
@@ -56,7 +56,7 @@ func initContext(c any, unknownUser bool) webFramework.WebFramework {
 			log.Fatalf("error in InitContext: unable to parse fiber ctx %T, Stack: %s", ctx.UserValue(libFiber.FiberCtxKey), string(stack))
 		}
 		if unknownUser {
-			fiberCtx.Set(UserIdLocal, UnknownUser)
+			fiberCtx.Locals(UserIdLocal, UnknownUser)
 		}
 		w.Ctx = context.WithValue(ctx, WebFrameworkKey, Fiber)
 		w.Parser = libFiber.InitContext(fiberCtx)
