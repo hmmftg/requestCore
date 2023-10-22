@@ -10,5 +10,6 @@
         "ROWID",
         "valyala",
         "VARCHAR"
-    ]
+    ],
+    "GitHooks.hooksDirectory": "/home/hamid/Projects/PCBO/Refah/backend/requestCore/requestCore/.git/hooks"
 }

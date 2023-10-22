@@ -184,6 +184,14 @@ func Error(status int, desc string, message any, err error) ErrorState {
 	}.ChildErr(err)
 }
 
+func Errors(status int, desc string, message any, err ErrorState) ErrorState {
+	return ErrorData{
+		Description: desc,
+		Message:     message,
+		Status:      status,
+	}.Child(err)
+}
+
 func FormatErrorResp(errs error, trans ut.Translator) []ErrorResponse {
 	log.Println(errs)
 	err := errs.(validator.ValidationErrors)
