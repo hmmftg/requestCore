@@ -173,7 +173,7 @@ func Req[Req any, Header any, PT interface {
 
 	request, req, errParse, errArray := parseRequest[Req](w, mode, validateHeader, headerPtr, function)
 	if errParse != nil {
-		return errParse.GetStatus(), errParse.GetDescription(), errArray, *request, req, errParse
+		return errParse.GetStatus(), errParse.GetDescription(), errArray, *new(Req), req, errParse
 	}
 
 	return http.StatusOK, "OK", nil, *request, req, nil
