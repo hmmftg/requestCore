@@ -126,7 +126,7 @@ func ConsumeRemoteGetApi(
 	args ...any) any {
 	log.Println("ConsumeRemoteGetApi...")
 	return func(c context.Context) {
-		w := libContext.InitContext(c)
+		w := libContext.InitContextNoAuditTrail(c)
 		fullPath := url
 		if len(args) > 0 && args[0] == "QUERY" {
 			fullPath = fmt.Sprintf("%s?%s", fullPath, w.Parser.GetRawUrlQuery())
@@ -397,7 +397,12 @@ func CallHandler[Req any, Resp any](
 ) any {
 	log.Println("Registering: ", title)
 	return func(c context.Context) {
-		w := libContext.InitContext(c)
+		var w webFramework.WebFramework
+		if hasInitializer {
+			w = libContext.InitContext(c)
+		} else {
+			w = libContext.InitContextNoAuditTrail(c)
+		}
 		finalPath := path
 		for _, value := range w.Parser.GetUrlParams() {
 			//normalized := strings.ReplaceAll(param.Value, "*", "/")

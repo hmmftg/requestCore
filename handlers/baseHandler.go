@@ -46,7 +46,12 @@ func BaseHandler[Req any, Resp any, Handler HandlerInterface[Req, Resp]](
 	title, mode, validateHeader, saveInRequestTable, path := handler.Parameters()
 	log.Println("Registering: ", title)
 	return func(c context.Context) {
-		w := libContext.InitContext(c)
+		var w webFramework.WebFramework
+		if saveInRequestTable {
+			w = libContext.InitContext(c)
+		} else {
+			w = libContext.InitContextNoAuditTrail(c)
+		}
 		defer func() {
 			if r := recover(); r != nil {
 				core.Responder().Error(w,

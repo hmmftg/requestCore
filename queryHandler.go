@@ -25,7 +25,7 @@ func GetSingleRecordHandler[Req, Resp any](title, sql string,
 ) any {
 	log.Println("Registering: ", title)
 	return func(c context.Context) {
-		w := libContext.InitContext(c)
+		w := libContext.InitContextNoAuditTrail(c)
 		id := w.Parser.GetUrlParam("id")
 		id = strings.ReplaceAll(id, "*", "/")
 		code, desc, arrayErr, _, _, err := libRequest.GetRequest[Req](w, false)
@@ -61,7 +61,7 @@ func GetMapHandler[Req any, Resp webFramework.RecordData](title, sql string,
 	hasParam bool) any {
 	log.Println("Registering: ", title)
 	return func(c context.Context) {
-		w := libContext.InitContext(c)
+		w := libContext.InitContextNoAuditTrail(c)
 		id := ""
 		if hasParam {
 			id = w.Parser.GetUrlParam("id")
@@ -114,7 +114,7 @@ func GetMapBySubHandler[Req any, Resp webFramework.RecordData](title, sql string
 	hasParam bool) any {
 	log.Println("Registering: ", title)
 	return func(c context.Context) {
-		w := libContext.InitContext(c)
+		w := libContext.InitContextNoAuditTrail(c)
 		id := ""
 		if hasParam {
 			id = w.Parser.GetUrlParam("id")
@@ -172,7 +172,7 @@ func GetQuery[Req any](title, sql string,
 	hasParam bool) any {
 	log.Println("Registering: ", title)
 	return func(c context.Context) {
-		w := libContext.InitContext(c)
+		w := libContext.InitContextNoAuditTrail(c)
 		id := ""
 		if hasParam {
 			id = w.Parser.GetUrlParam("id")
@@ -220,7 +220,7 @@ func GetQueryMap[Req any](title, sql string,
 	hasParam bool) any {
 	log.Println("Registering: ", title)
 	return func(c context.Context) {
-		w := libContext.InitContext(c)
+		w := libContext.InitContextNoAuditTrail(c)
 		id := ""
 		if hasParam {
 			id = w.Parser.GetUrlParam("id")
@@ -285,7 +285,7 @@ func GetQueryHandler[Req, Resp any](title, sql string,
 	args ...any) any {
 	log.Println("Registering: ", title)
 	return func(c context.Context) {
-		w := libContext.InitContext(c)
+		w := libContext.InitContextNoAuditTrail(c)
 		code, desc, arrayErr, _, _, err := libRequest.GetRequest[Req](w, false)
 		if err != nil {
 			core.Responder().Respond(code, 1, desc, arrayErr, true, w)
@@ -321,7 +321,7 @@ func GetQueryFillable[Resp libQuery.QueryWithDeps](
 ) any {
 	log.Println("Registering: ", title)
 	return func(c context.Context) {
-		w := libContext.InitContext(c)
+		w := libContext.InitContextNoAuditTrail(c)
 		params := []any{}
 		for _, arg := range args {
 			val, exists := w.Parser.CheckUrlParam(arg)
@@ -365,7 +365,7 @@ func GetAllMapHandler[Model MapHandler](title string,
 	args ...any) any {
 	log.Println("Registering: ", title)
 	return func(c context.Context) {
-		w := libContext.InitContext(c)
+		w := libContext.InitContextNoAuditTrail(c)
 		var model Model
 		result, desc, err := model.GetAllMap(core)
 		if err != nil {
@@ -408,7 +408,7 @@ func GetSingleRecord[Model GetHandler](title string,
 	args ...any) any {
 	log.Println("Registering: ", title)
 	return func(c context.Context) {
-		w := libContext.InitContext(c)
+		w := libContext.InitContextNoAuditTrail(c)
 		params := GetParams(w, args...)
 		code, desc, arrayErr, model, _, err := libRequest.GetRequest[Model](w, false)
 		if err != nil {
@@ -430,7 +430,7 @@ func GetAll[Model GetHandler](title string,
 	args ...any) any {
 	log.Println("Registering: ", title)
 	return func(c context.Context) {
-		w := libContext.InitContext(c)
+		w := libContext.InitContextNoAuditTrail(c)
 		params := GetParams(w, args...)
 		code, desc, arrayErr, model, _, err := libRequest.GetRequest[Model](w, false)
 		if err != nil {
@@ -461,7 +461,7 @@ func GetPage[Model GetPageHandler](title string,
 	args ...any) any {
 	log.Println("Registering: ", title)
 	return func(c context.Context) {
-		w := libContext.InitContext(c)
+		w := libContext.InitContextNoAuditTrail(c)
 		params := GetParams(w, args...)
 		code, desc, arrayErr, model, _, err := libRequest.GetRequest[Model](w, false)
 		if err != nil {
@@ -487,13 +487,13 @@ func QueryHandler[Req libQuery.QueryRequest, Resp libQuery.QueryResult](
 	log.Println("Registering: ", title)
 	return func(c context.Context) {
 		defer func() {
-			w := libContext.InitContext(c)
+			w := libContext.InitContextNoAuditTrail(c)
 			if r := recover(); r != nil {
 				core.Responder().HandleErrorState(libError.Join(r.(error), "error in query"), http.StatusInternalServerError, response.SYSTEM_FAULT, response.SYSTEM_FAULT_DESC, w)
 				panic(r)
 			}
 		}()
-		w := libContext.InitContext(c)
+		w := libContext.InitContextNoAuditTrail(c)
 		code, desc, arrayErr, request, _, err := libRequest.Req[Req, libRequest.RequestHeader](w, mode, validateHeader)
 		if err != nil {
 			core.Responder().HandleErrorState(err, code, desc, arrayErr, w)

@@ -23,15 +23,30 @@ const (
 	Testing         = "testing"
 	UserIdHeader    = "User-Id"
 	UserIdLocal     = "userId"
+	UnknownUser     = "unknown"
 )
 
 func InitContext(c any) webFramework.WebFramework {
+	return initContext(c, false)
+}
+
+// useful in Get handlers which mostly don't have audit trail
+func InitContextNoAuditTrail(c any) webFramework.WebFramework {
+	return initContext(c, true)
+}
+func initContext(c any, unknownUser bool) webFramework.WebFramework {
 	w := webFramework.WebFramework{}
 	switch ctx := c.(type) {
 	case *gin.Context:
+		if unknownUser {
+			ctx.Set(UserIdLocal, UnknownUser)
+		}
 		w.Ctx = context.WithValue(ctx, WebFrameworkKey, Gin)
 		w.Parser = libGin.InitContext(c)
 	case *fiber.Ctx:
+		if unknownUser {
+			ctx.Set(UserIdLocal, UnknownUser)
+		}
 		w.Ctx = context.WithValue(ctx.Context(), WebFrameworkKey, Fiber)
 		w.Parser = libFiber.InitContext(ctx)
 	case *fasthttp.RequestCtx:
@@ -39,6 +54,9 @@ func InitContext(c any) webFramework.WebFramework {
 		if !ok {
 			stack := debug.Stack()
 			log.Fatalf("error in InitContext: unable to parse fiber ctx %T, Stack: %s", ctx.UserValue(libFiber.FiberCtxKey), string(stack))
+		}
+		if unknownUser {
+			fiberCtx.Set(UserIdLocal, UnknownUser)
 		}
 		w.Ctx = context.WithValue(ctx, WebFrameworkKey, Fiber)
 		w.Parser = libFiber.InitContext(fiberCtx)
@@ -51,7 +69,7 @@ func InitContext(c any) webFramework.WebFramework {
 	}
 	userId := w.Parser.GetHeaderValue(UserIdHeader)
 	if len(userId) == 0 {
-		userId = w.Parser.GetLocalString("userId")
+		userId = w.Parser.GetLocalString(UserIdLocal)
 	}
 	if len(userId) == 0 {
 		stack := debug.Stack()
