@@ -15,6 +15,7 @@ type CallParam struct {
 	Method      string
 	Path        string
 	Query       string
+	QueryStack  []string
 	ValidateTls bool
 	EnableLog   bool
 	JsonBody    any
@@ -27,7 +28,15 @@ type CallResult[RespType any] struct {
 	Error  response.ErrorState
 }
 
-func Call[RespType any](param CallParam) CallResult[RespType] {
+func Call[RespType any](param *CallParam) CallResult[RespType] {
+	if len(param.QueryStack) > 0 {
+		param.Query = param.QueryStack[0]
+		if len(param.QueryStack) > 1 {
+			param.QueryStack = param.QueryStack[1:]
+		} else {
+			param.QueryStack = nil
+		}
+	}
 	callData := CallData{
 		Api:       param.Api,
 		Path:      param.Path + param.Query,
@@ -49,7 +58,7 @@ type TypeList interface {
 func MultiCall(paramList []CallParam, core CallApiInterface) []CallResult[response.WsRemoteResponse] {
 	resultList := make([]CallResult[response.WsRemoteResponse], 0)
 	for i := 0; i < len(paramList); i++ {
-		resp := Call[response.WsRemoteResponse](paramList[i])
+		resp := Call[response.WsRemoteResponse](&paramList[i])
 		resultList = append(resultList, resp)
 		if resp.Status.Status != http.StatusOK {
 			return resultList

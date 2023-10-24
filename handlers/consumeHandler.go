@@ -372,7 +372,7 @@ func CallApi[Resp any](
 	} else {
 		reqLog = core.RequestTools().LogStart(w, method, fmt.Sprintf("params: %+v", param))
 	}
-	resp1 := libCallApi.Call[WsResponse[Resp]](param)
+	resp1 := libCallApi.Call[WsResponse[Resp]](&param)
 	dump, err = json.MarshalIndent(resp1, "", "  ")
 	if err == nil {
 		core.RequestTools().LogEnd(method, string(dump), reqLog)
