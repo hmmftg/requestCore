@@ -29,7 +29,7 @@ type CallResult[RespType any] struct {
 }
 
 func Call[RespType any](param CallParam) CallResult[RespType] {
-	if len(*param.QueryStack) > 0 {
+	if param.QueryStack != nil && len(*param.QueryStack) > 0 {
 		param.Query = (*param.QueryStack)[0]
 		if len(*param.QueryStack) > 1 {
 			*param.QueryStack = (*param.QueryStack)[1:]
