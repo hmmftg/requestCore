@@ -54,5 +54,8 @@ func CallApi[Resp any](
 	method string,
 	param libCallApi.CallParam) (*Resp, response.ErrorState) {
 	result, err := callApi[WsResponse[Resp]](w, core, method, param)
+	if result == nil {
+		return nil, err
+	}
 	return &result.Result, err
 }
