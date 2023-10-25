@@ -97,7 +97,7 @@ func TestDMLHandler(t *testing.T) {
 			Name:      "Precontrol failed",
 			Url:       "/",
 			Request:   testDMLReq{ID: "1"},
-			Status:    200,
+			Status:    500,
 			CheckBody: []string{"errors", "error pre1"},
 			Model: testingtools.SampleRequestModelMock(t, func(mockDB sqlmock.Sqlmock) {
 				mockDB.ExpectPrepare(Pre1).ExpectQuery().WillReturnError(errors.New("error pre1"))
@@ -118,7 +118,7 @@ func TestDMLHandler(t *testing.T) {
 				Name:    "check dml handler",
 				Method:  "POST",
 				Handler: env.handler(),
-				Silent:  false,
+				Silent:  true,
 			})
 	}
 }

@@ -26,9 +26,9 @@ func TestCall(t *testing.T) {
 		Result  *AnimeEpisodes
 		Error   response.ErrorState
 	}
-	callParam := CallParam{
+	callParam := CallParamData{
 		Api:        RemoteApi{Domain: "https://api.jikan.moe/v4/anime"},
-		QueryStack: []string{"1/episodes", "200/episodes", "300/episodes", "400/episodes"},
+		QueryStack: &[]string{"1/episodes", "200/episodes", "300/episodes", "400/episodes"},
 	}
 	testCases := []TestCase{
 		{
