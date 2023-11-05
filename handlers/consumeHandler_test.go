@@ -127,6 +127,7 @@ func (env *testCallRemoteEnv) handler(url, method string, isJSON, hasQuery bool)
 		libCallApi.TransmitRequestWithAuth,
 		env.Interface,
 		ParseGithubRespJson,
+		false,
 	)
 }
 

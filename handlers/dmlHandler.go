@@ -94,6 +94,9 @@ func (h DmlHandlerType[Req, Resp]) Handler(req HandlerRequest[Req, Resp]) (Resp,
 	resp, err := ExecuteDML(*req.Request, h.Key, req.Title, req.W, req.Core)
 	return resp, err
 }
+func (h DmlHandlerType[Req, Resp]) Simulation(req HandlerRequest[Req, Resp]) (Resp, response.ErrorState) {
+	return req.Response, nil
+}
 func (h DmlHandlerType[Req, Resp]) Finalizer(req HandlerRequest[Req, Resp]) {
 	FinalizeDML(*req.Request, h.Key, req.Title, req.W, req.Core)
 }
@@ -104,13 +107,15 @@ func DmlHandler[Req libQuery.DmlModel](
 	mode libRequest.Type,
 	validateHeader bool,
 ) any {
-	return BaseHandler[Req, map[string]any, DmlHandlerType[Req, map[string]any]](core, DmlHandlerType[Req, map[string]any]{
-		Mode:         mode,
-		VerifyHeader: validateHeader,
-		Title:        title,
-		Key:          key,
-		Path:         path,
-	})
+	return BaseHandler[Req, map[string]any, DmlHandlerType[Req, map[string]any]](core,
+		DmlHandlerType[Req, map[string]any]{
+			Mode:         mode,
+			VerifyHeader: validateHeader,
+			Title:        title,
+			Key:          key,
+			Path:         path,
+		},
+		false)
 }
 
 func DmlHandlerOld[Req libQuery.DmlModel](

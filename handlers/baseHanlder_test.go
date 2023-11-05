@@ -38,6 +38,11 @@ func (h testHandlerType[Req, Resp]) Handler(req HandlerRequest[Req, Resp]) (Resp
 	result := testResp{Result: "a"}
 	return Resp(result), nil
 }
+func (h testHandlerType[Req, Resp]) Simulation(req HandlerRequest[Req, Resp]) (Resp, response.ErrorState) {
+	log.Println("Simulation")
+	result := testResp{Result: "a"}
+	return Resp(result), nil
+}
 func (h testHandlerType[Req, Resp]) Finalizer(req HandlerRequest[Req, Resp]) {
 	log.Println("Finalizer")
 }
@@ -72,6 +77,7 @@ func TestBaseHandler(t *testing.T) {
 			Mode:         libRequest.JSON,
 			VerifyHeader: true,
 		},
+		false,
 	)
 	gin.SetMode(gin.ReleaseMode)
 	testingtools.TestAPI(t, testCases, &testingtools.TestOptions{

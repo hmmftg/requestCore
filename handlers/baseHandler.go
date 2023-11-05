@@ -26,6 +26,8 @@ type HandlerInterface[Req any, Resp any] interface {
 	Handler(req HandlerRequest[Req, Resp]) (Resp, response.ErrorState)
 	// runs after sending back response
 	Finalizer(req HandlerRequest[Req, Resp])
+	// handles simulation mode
+	Simulation(req HandlerRequest[Req, Resp]) (Resp, response.ErrorState)
 }
 
 type HandlerRequest[Req any, Resp any] struct {
@@ -41,6 +43,7 @@ type HandlerRequest[Req any, Resp any] struct {
 func BaseHandler[Req any, Resp any, Handler HandlerInterface[Req, Resp]](
 	core requestCore.RequestCoreInterface,
 	handler Handler,
+	simulation bool,
 	args ...any,
 ) any {
 	title, mode, validateHeader, saveInRequestTable, path := handler.Parameters()
@@ -70,6 +73,27 @@ func BaseHandler[Req any, Resp any, Handler HandlerInterface[Req, Resp]](
 			Core:  core,
 			W:     w,
 		}
+
+		if simulation {
+			resp, header, errParse := libRequest.ParseRequest[Resp](trx.W, mode, validateHeader)
+			if errParse != nil {
+				core.Responder().Error(trx.W, errParse)
+				return
+			}
+
+			trx.Response = *resp
+			trx.Header = header
+
+			var err response.ErrorState
+			trx.Response, err = handler.Simulation(trx)
+			if err != nil {
+				core.Responder().Error(trx.W, err)
+				return
+			}
+
+			core.Responder().OK(trx.W, trx.Response)
+		}
+
 		var errParse response.ErrorState
 		trx.Request, trx.Header, errParse = libRequest.ParseRequest[Req](trx.W, mode, validateHeader)
 		if errParse != nil {

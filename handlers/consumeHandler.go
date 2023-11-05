@@ -241,6 +241,9 @@ func (c CallArgs[Req, Resp]) Handler(req HandlerRequest[Req, Resp]) (Resp, respo
 	}
 	return resp.(Resp), nil
 }
+func (c CallArgs[Req, Resp]) Simulation(req HandlerRequest[Req, Resp]) (Resp, response.ErrorState) {
+	return req.Response, nil
+}
 func (c CallArgs[Req, Resp]) Finalizer(req HandlerRequest[Req, Resp]) {}
 
 func CallRemote[Req any, Resp any](
@@ -254,6 +257,7 @@ func CallRemote[Req any, Resp any](
 		consumer func([]byte, string, string, string, string, map[string]string) ([]byte, string, int, error),
 	) (int, map[string]string, any, error),
 	core requestCore.RequestCoreInterface,
+	simulation bool,
 	args ...string,
 ) any {
 	callArg := CallArgs[Req, Resp]{
@@ -271,7 +275,7 @@ func CallRemote[Req any, Resp any](
 		Headers:        DefaultHeaders(),
 		Parser:         response.ParseRemoteRespJson,
 	}
-	return BaseHandler[Req, Resp, CallArgs[Req, Resp]](core, callArg, args)
+	return BaseHandler[Req, Resp, CallArgs[Req, Resp]](core, callArg, simulation, args)
 }
 
 func CallRemoteWithRespParser[Req any, Resp any](
@@ -286,6 +290,7 @@ func CallRemoteWithRespParser[Req any, Resp any](
 	) (int, map[string]string, any, error),
 	core requestCore.RequestCoreInterface,
 	parseRemoteResp func([]byte, string, int) (int, map[string]string, any, error),
+	simulation bool,
 	args ...string,
 ) any {
 	callArg := CallArgs[Req, Resp]{
@@ -303,7 +308,7 @@ func CallRemoteWithRespParser[Req any, Resp any](
 		Headers:        DefaultHeaders(),
 		Parser:         parseRemoteResp,
 	}
-	return BaseHandler[Req, Resp, CallArgs[Req, Resp]](core, callArg, args)
+	return BaseHandler[Req, Resp, CallArgs[Req, Resp]](core, callArg, simulation, args)
 }
 
 // initializer func(c webFramework.WebFramework, method, url string, reqLog libRequest.RequestPtr, args ...any) (int, map[string]string, error),
