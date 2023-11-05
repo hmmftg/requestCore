@@ -107,6 +107,8 @@ func BaseHandler[Req any, Resp any, Handler HandlerInterface[Req, Resp]](
 				core.Responder().Error(trx.W, errInitRequest)
 				return
 			}
+		} else {
+			w.Parser.SetLocal("reqLog", nil)
 		}
 
 		errInit := handler.Initializer(trx)

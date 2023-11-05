@@ -135,3 +135,18 @@ func SampleRequestModelMock(t *testing.T, mockList func(sqlmock.Sqlmock)) libQue
 		DB: db,
 	}
 }
+
+func SampleQueryMock(t *testing.T, mockList func(sqlmock.Sqlmock)) libQuery.QueryRunnerModel {
+	db, mockDB, err := sqlmock.New() // sqlmock.QueryMatcherOption(sqlmock.QueryMatcherEqual))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if mockList != nil {
+		mockList(mockDB)
+	}
+
+	return libQuery.QueryRunnerModel{
+		DB: db,
+	}
+}

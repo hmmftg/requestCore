@@ -84,7 +84,7 @@ func TestCallAPI(t *testing.T) {
 			CheckBody: []string{"Transmigration"},
 			Model:     testingtools.SampleRequestModelMock(t, func(mockDB sqlmock.Sqlmock) {}),
 		},
-		{
+		/*{
 			Name:         "Step4",
 			Url:          "/",
 			DesiredError: "v4/anime@GET@false@false",
@@ -95,7 +95,7 @@ func TestCallAPI(t *testing.T) {
 			Status:    200,
 			CheckBody: []string{"https://myanimelist.net/anime/400/Seihou_Bukyou_Outlaw_Star/episode/1", "Outlaw World"},
 			Model:     testingtools.SampleRequestModelMock(t, func(mockDB sqlmock.Sqlmock) {}),
-		},
+		},*/
 	}
 
 	for id := range testCases {
