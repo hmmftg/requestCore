@@ -61,7 +61,6 @@ func CallApi[Resp any](
 }
 
 func callApiNoLog[Resp any](
-	core requestCore.RequestCoreInterface,
 	method string,
 	param libCallApi.CallParam) (*Resp, error) {
 	resp1 := libCallApi.Call[Resp](param)
@@ -76,10 +75,9 @@ func callApiNoLog[Resp any](
 }
 
 func CallApiNoLog[Resp any](
-	core requestCore.RequestCoreInterface,
 	method string,
 	param libCallApi.CallParam) (*Resp, error) {
-	result, err := callApiNoLog[WsResponse[Resp]](core, method, param)
+	result, err := callApiNoLog[WsResponse[Resp]](method, param)
 	if result == nil {
 		return nil, err
 	}
