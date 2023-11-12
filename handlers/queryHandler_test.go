@@ -60,7 +60,7 @@ var (
 			Name:    "q3",
 			Command: Command3,
 			Type:    libQuery.QuerySingle,
-			Args:    []string{"p1", "p2"},
+			Args:    []string{"id", "p2"},
 		},
 	}
 )
@@ -177,13 +177,13 @@ func TestQueryHandlerWithArgs(t *testing.T) {
 	testCases := []testingtools.TestCase{
 		{
 			Name:      "Valid",
-			Url:       "/?id=" + QueryMap[Query3].Args[0] + "&p2=" + QueryMap[Query3].Args[1],
+			Url:       "/?id=1&p2=3",
 			Status:    200,
 			CheckBody: []string{`"result":[`, `{"id":"1","data":"2"}`},
 			Model: testingtools.SampleQueryMock(t, func(mockDB sqlmock.Sqlmock) {
 				mockDB.ExpectPrepare(Command3).
 					ExpectQuery().
-					WithArgs(QueryMap[Query3].GetDriverArgs()...).
+					WithArgs(QueryMap[Query3].GetDriverArgs(testQueryReq{ID: "1", P2: "3"})...).
 					WillReturnRows(
 						sqlmock.NewRows([]string{"ID", "DATA"}).
 							AddRow("1", "2"))

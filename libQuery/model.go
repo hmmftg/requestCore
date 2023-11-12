@@ -94,10 +94,14 @@ type QueryCommand struct {
 	Args    []string
 }
 
-func (q QueryCommand) GetDriverArgs() []driver.Value {
+func (q QueryCommand) GetDriverArgs(req any) []driver.Value {
 	args := []driver.Value{}
 	for id := range q.Args {
-		args = append(args, q.Args[id])
+		_, val, err := GetFormTagValue(q.Args[id], req)
+		if err != nil {
+			return nil
+		}
+		args = append(args, val)
 	}
 	return args
 }

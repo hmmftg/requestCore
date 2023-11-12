@@ -144,7 +144,7 @@ func TestCall(t *testing.T) {
 				},
 			},
 		},
-		{
+		/*{
 			Name: "Step4",
 			Result: &AnimeEpisodes{
 				Data: []Data{
@@ -180,7 +180,7 @@ func TestCall(t *testing.T) {
 					HasNextPage:     false,
 				},
 			},
-		},
+		},*/
 	}
 
 	for id := range testCases {

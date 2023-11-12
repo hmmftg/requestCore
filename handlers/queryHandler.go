@@ -28,7 +28,15 @@ func (q QueryHandlerType[Row, Resp]) Initializer(req HandlerRequest[Row, Resp]) 
 func (q QueryHandlerType[Row, Resp]) Handler(req HandlerRequest[Row, Resp]) (Resp, response.ErrorState) {
 	anyArgs := []any{}
 	for id := range q.Command.Args {
-		anyArgs = append(anyArgs, q.Command.Args[id])
+		_, val, err := libQuery.GetFormTagValue(q.Command.Args[id], req.Request)
+		if err != nil {
+			return nil, response.Error(
+				http.StatusInternalServerError,
+				"COMMAND_ARGUMENT_ERROR",
+				q.Command,
+				err)
+		}
+		anyArgs = append(anyArgs, val)
 	}
 	resp, err := libQuery.GetQuery[Row](
 		q.Command.Command,

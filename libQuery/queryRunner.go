@@ -120,6 +120,43 @@ func (m QueryRunnerModel) QueryRunner(querySql string, args ...any) (int, []any,
 	return 0, finalRows, nil
 }
 
+func GetTagValue(name, tag string, s any) (*string, *string, error) {
+	//var elemType reflect.Type
+	elemType := reflect.TypeOf(s)
+	elemValue := reflect.ValueOf(s)
+	if elemType.Kind() == reflect.Pointer {
+		// TODO handle interface type
+		elemType = elemType.Elem()
+		elemValue = elemValue.Elem()
+	}
+	if elemType.Kind() != reflect.Struct {
+		if elemType.Kind() == reflect.Interface {
+			// TODO handle interface type
+			// pt := reflect.ValueOf(s).Elem()
+			return nil, nil, fmt.Errorf("bad type, %T is interface not struct", s)
+
+		}
+		return nil, nil, fmt.Errorf("bad type, %T is not struct", s)
+	}
+	for i := 0; i < elemType.NumField(); i++ {
+		f := elemType.Field(i)
+		tagID := strings.Split(f.Tag.Get(tag), ",")[0] // use split to ignore tag "options" like omitempty, etc.
+		if tagID == name {
+			v := elemValue.Field(i).String()
+			return &f.Name, &v, nil
+		}
+	}
+	return nil, nil, fmt.Errorf("field %s with tag %s is not present in %T ", name, tag, s)
+}
+
+func GetDBTagValue(name string, s any) (*string, *string, error) {
+	return GetTagValue(name, "db", s)
+}
+
+func GetFormTagValue(name string, s any) (*string, *string, error) {
+	return GetTagValue(name, "form", s)
+}
+
 func (m QueryRunnerModel) QueryToStruct(querySql string, target any, args ...any) (int, any, error) {
 	ret, results, err := m.QueryRunner(querySql, args...)
 	if err != nil {
