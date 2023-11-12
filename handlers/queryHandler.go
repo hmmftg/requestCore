@@ -36,7 +36,7 @@ func (q QueryHandlerType[Row, Resp]) Handler(req HandlerRequest[Row, Resp]) (Res
 				q.Command,
 				err)
 		}
-		anyArgs = append(anyArgs, val)
+		anyArgs = append(anyArgs, *val)
 	}
 	resp, err := libQuery.GetQuery[Row](
 		q.Command.Command,
