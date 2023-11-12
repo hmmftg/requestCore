@@ -3,6 +3,7 @@ package libQuery
 import (
 	"context"
 	"database/sql"
+	"database/sql/driver"
 
 	"github.com/hmmftg/requestCore/response"
 )
@@ -90,6 +91,15 @@ type QueryCommand struct {
 	Name    string
 	Command string
 	Type    QueryCommandType
+	Args    []string
+}
+
+func (q QueryCommand) GetDriverArgs() []driver.Value {
+	args := []driver.Value{}
+	for id := range q.Args {
+		args = append(args, q.Args[id])
+	}
+	return args
 }
 
 type QueryRequest interface {

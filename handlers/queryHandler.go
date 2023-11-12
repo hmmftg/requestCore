@@ -17,7 +17,6 @@ type QueryHandlerType[Row any, Resp []Row] struct {
 	VerifyHeader bool
 	Key          string
 	Command      libQuery.QueryCommand
-	Args         []any
 }
 
 func (q QueryHandlerType[Row, Resp]) Parameters() (string, libRequest.Type, bool, bool, string) {
@@ -27,7 +26,14 @@ func (q QueryHandlerType[Row, Resp]) Initializer(req HandlerRequest[Row, Resp]) 
 	return nil
 }
 func (q QueryHandlerType[Row, Resp]) Handler(req HandlerRequest[Row, Resp]) (Resp, response.ErrorState) {
-	resp, err := libQuery.GetQuery[Row](q.Command.Command, req.Core.GetDB(), q.Args...)
+	anyArgs := []any{}
+	for id := range q.Command.Args {
+		anyArgs = append(anyArgs, q.Command.Args[id])
+	}
+	resp, err := libQuery.GetQuery[Row](
+		q.Command.Command,
+		req.Core.GetDB(),
+		anyArgs...)
 	if err != nil {
 		return req.Response, err
 	}

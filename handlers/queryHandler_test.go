@@ -31,14 +31,17 @@ func (env *testQueryEnv) SetParams(params libParams.ParamInterface) {
 
 type testQueryReq struct {
 	ID   string `form:"id" json:"id" validate:"required" db:"ID"`
+	P2   string `form:"p2" json:"-" db:"P2"`
 	Data string `json:"data" db:"DATA"`
 }
 
 const (
 	Query1   = "query1"
 	Query2   = "query2"
+	Query3   = "query3"
 	Command1 = "command1"
 	Command2 = "command2"
+	Command3 = "command3"
 )
 
 var (
@@ -52,6 +55,12 @@ var (
 			Name:    "q2",
 			Command: Command2,
 			Type:    libQuery.QueryAll,
+		},
+		Query3: {
+			Name:    "q3",
+			Command: Command3,
+			Type:    libQuery.QuerySingle,
+			Args:    []string{"p1", "p2"},
 		},
 	}
 )
@@ -105,7 +114,7 @@ func TestQueryHandler(t *testing.T) {
 
 func (env *testQueryEnv) handlerAll() any {
 	return QueryHandler[testQueryReq](
-		"queryAll_handler",
+		"queryAll_handler_all",
 		Query2,
 		"/",
 		QueryMap,
@@ -146,6 +155,55 @@ func TestQueryAllHandler(t *testing.T) {
 				Name:    "check query all handler",
 				Method:  "GET",
 				Handler: env.handlerAll(),
+				Silent:  true,
+			})
+	}
+}
+
+func (env *testQueryEnv) handlerWithArgs() any {
+	return QueryHandler[testQueryReq](
+		"query_handler_with_args",
+		Query3,
+		"/",
+		QueryMap,
+		env.Interface,
+		libRequest.Query,
+		true,
+		false,
+	)
+}
+
+func TestQueryHandlerWithArgs(t *testing.T) {
+	testCases := []testingtools.TestCase{
+		{
+			Name:      "Valid",
+			Url:       "/?id=" + QueryMap[Query3].Args[0] + "&p2=" + QueryMap[Query3].Args[1],
+			Status:    200,
+			CheckBody: []string{`"result":[`, `{"id":"1","data":"2"}`},
+			Model: testingtools.SampleQueryMock(t, func(mockDB sqlmock.Sqlmock) {
+				mockDB.ExpectPrepare(Command3).
+					ExpectQuery().
+					WithArgs(QueryMap[Query3].GetDriverArgs()...).
+					WillReturnRows(
+						sqlmock.NewRows([]string{"ID", "DATA"}).
+							AddRow("1", "2"))
+			}),
+		},
+	}
+
+	for id := range testCases {
+		env := testingtools.GetEnvWithDB[testQueryEnv](
+			testCases[id].Model.DB,
+			testingtools.DefaultAPIList)
+
+		testingtools.TestDB(
+			t,
+			&testCases[id],
+			&testingtools.TestOptions{
+				Path:    "/",
+				Name:    "check query with args handler",
+				Method:  "GET",
+				Handler: env.handlerWithArgs(),
 				Silent:  true,
 			})
 	}
