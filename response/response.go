@@ -214,7 +214,7 @@ func FormatErrorResp(errs error, trans ut.Translator) []ErrorResponse {
 		parent = parent[:len(parent)-1]
 
 		switch validationError.Tag() {
-		case "required":
+		case "required", "required_unless", "required_if":
 			errorResp.Code = "REQUIRED-FIELD"
 		case "padded_ip":
 			fallthrough
