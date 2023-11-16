@@ -330,15 +330,19 @@ func GetDescFromCode(code string, data any, errDescList map[string]string) (stri
 func GetErrorsArrayWithMap(incomingDesc string, data any, errDescList map[string]string) []ErrorResponse {
 	var errorResponses []ErrorResponse
 	errorResponses, ok := data.([]ErrorResponse)
+	desc := incomingDesc
 	if !ok || len(errorResponses) == 0 {
 		errorResponses = make([]ErrorResponse, 0)
 		var errorResp ErrorResponse
-		if strings.Contains(incomingDesc, "-") { //error already translated
-			errorResp.Code = incomingDesc
-			errorResp.Description = data
-			return append(errorResponses, errorResp)
+		if strings.Contains(desc, "-") {
+			if data != nil { //error already translated
+				errorResp.Code = desc
+				errorResp.Description = data
+				return append(errorResponses, errorResp)
+			}
+			desc = strings.ReplaceAll(desc, "-", "_")
 		}
-		errorResp.Code, errorResp.Description = GetDescFromCode(incomingDesc, data, errDescList)
+		errorResp.Code, errorResp.Description = GetDescFromCode(desc, data, errDescList)
 		errorResponses = append(errorResponses, errorResp)
 	}
 	for i := 0; i < len(errorResponses); i++ {

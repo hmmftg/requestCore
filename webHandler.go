@@ -56,7 +56,7 @@ func (m WebHanlder) OKWithReceipt(w webFramework.WebFramework, resp any, receipt
 }
 
 func (m WebHanlder) Error(w webFramework.WebFramework, err response.ErrorState) {
-	m.HandleErrorState(err, err.GetStatus(), err.GetDescription(), err.GetMessage(), w)
+	m.ErrorState(w, err)
 }
 
 func (m WebHanlder) GetErrorsArray(message string, data any) []response.ErrorResponse {
