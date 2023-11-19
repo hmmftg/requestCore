@@ -109,7 +109,10 @@ func parseRequest[Req any](w webFramework.WebFramework, mode Type, validateHeade
 
 	errorResponses := []response.ErrorResponse{}
 	if validateHeader {
-		errValidate := libValidate.ValidateStruct(header)
+		err, errValidate := libValidate.ValidateStruct(header)
+		if err != nil {
+			return nil, nil, response.Error(http.StatusInternalServerError, "INVALID_VALIDATION", nil, err), nil
+		}
 		if errValidate != nil {
 			errorResponsesHeader := response.FormatErrorResp(errValidate, libValidate.GetTranslator())
 			errorResponses = append(errorResponses, errorResponsesHeader...)
@@ -117,7 +120,10 @@ func parseRequest[Req any](w webFramework.WebFramework, mode Type, validateHeade
 	}
 
 	if mode != NoBinding {
-		errValidate := libValidate.ValidateStruct(request)
+		err, errValidate := libValidate.ValidateStruct(request)
+		if err != nil {
+			return nil, nil, response.Error(http.StatusInternalServerError, "INVALID_VALIDATION", nil, err), nil
+		}
 		if errValidate != nil {
 			errorResponsesRequest := response.FormatErrorResp(errValidate, libValidate.GetTranslator())
 			errorResponses = append(errorResponses, errorResponsesRequest...)
@@ -201,7 +207,10 @@ func GetEmptyRequest(ctx webFramework.WebFramework) (int, string, []response.Err
 
 	if ctx.Parser.GetMethod() != "GET" {
 		libValidate.Init()
-		errValidate := libValidate.ValidateStruct(header)
+		err, errValidate := libValidate.ValidateStruct(header)
+		if err != nil {
+			return http.StatusInternalServerError, "INVALID_VALIDATION", nil, nil, err
+		}
 		if errValidate != nil {
 			errorResponses := response.FormatErrorResp(errValidate, libValidate.GetTranslator())
 			return http.StatusBadRequest, "Header Validation Failed", errorResponses, &req, errValidate
