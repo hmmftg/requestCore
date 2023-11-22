@@ -20,7 +20,10 @@ func ConfigFiberLogger(params libRequest.LoggerInterface) logger.Config {
 	}
 	go func() {
 		for {
-			<-time.After(time.Hour * 24)
+			t := time.Now()
+			t = t.Truncate(time.Hour * 24)
+
+			<-time.After(time.Duration(t.Hour()) * 24)
 			logWriter.Rotate()
 		}
 	}()
