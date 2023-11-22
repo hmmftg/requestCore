@@ -20,6 +20,12 @@ func ConfigGinLogger(params libRequest.LoggerInterface) gin.LoggerConfig {
 		//MaxAge:     28,   //days, keep all
 		Compress: params.GetLogCompress(), // disabled by default
 	}
+	go func() {
+		for {
+			<-time.After(time.Hour * 24)
+			logger.Rotate()
+		}
+	}()
 	log.SetOutput(&logger)
 	return gin.LoggerConfig{
 		Output:    &logger,

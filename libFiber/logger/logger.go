@@ -2,6 +2,7 @@ package logger
 
 import (
 	"log"
+	"time"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/logger"
@@ -17,6 +18,12 @@ func ConfigFiberLogger(params libRequest.LoggerInterface) logger.Config {
 		//MaxAge:     28,   //days, keep all
 		Compress: params.GetLogCompress(), // disabled by default
 	}
+	go func() {
+		for {
+			<-time.After(time.Hour * 24)
+			logWriter.Rotate()
+		}
+	}()
 	log.SetOutput(&logWriter)
 	return logger.Config{
 		Output:     &logWriter,
