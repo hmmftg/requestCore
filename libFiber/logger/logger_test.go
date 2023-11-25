@@ -3,6 +3,7 @@ package logger
 import (
 	"log"
 	"testing"
+	"time"
 )
 
 type testLogger struct {
@@ -24,6 +25,9 @@ func TestFiberLogger(t *testing.T) {
 		{LogPath: "test1.log", LogSize: 1, LogCompress: true},
 		{LogPath: "test2.log", LogSize: 2, LogCompress: false},
 		{LogPath: "test3.log", LogSize: 3, LogCompress: true},
+		{LogPath: "test4.log", LogSize: 1, LogCompress: true},
+		{LogPath: "test5.log", LogSize: 1, LogCompress: true},
+		{LogPath: "test6.log", LogSize: 1, LogCompress: true},
 	}
 	tables := []struct {
 		logData   string
@@ -38,6 +42,7 @@ func TestFiberLogger(t *testing.T) {
 			for i := 0; i < table.logRepeat; i++ {
 				log.Println(table.logData)
 			}
+			time.Sleep(time.Millisecond * 100)
 		}
 	}
 }
