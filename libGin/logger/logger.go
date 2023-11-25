@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/hmmftg/requestCore/libParams"
 	"github.com/hmmftg/requestCore/libRequest"
 
 	//cSpell: ignore natefinch
@@ -20,6 +21,9 @@ func ConfigGinLogger(params libRequest.LoggerInterface) gin.LoggerConfig {
 		//MaxAge:     28,   //days, keep all
 		Compress: params.GetLogCompress(), // disabled by default
 	}
+
+	libParams.LogRotate(&logger)
+
 	log.SetOutput(&logger)
 	return gin.LoggerConfig{
 		Output:    &logger,

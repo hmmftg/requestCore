@@ -5,6 +5,7 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/logger"
+	"github.com/hmmftg/requestCore/libParams"
 	"github.com/hmmftg/requestCore/libRequest"
 	"gopkg.in/natefinch/lumberjack.v2"
 )
@@ -17,6 +18,9 @@ func ConfigFiberLogger(params libRequest.LoggerInterface) logger.Config {
 		//MaxAge:     28,   //days, keep all
 		Compress: params.GetLogCompress(), // disabled by default
 	}
+
+	libParams.LogRotate(&logWriter)
+
 	log.SetOutput(&logWriter)
 	return logger.Config{
 		Output:     &logWriter,
