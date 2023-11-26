@@ -16,7 +16,8 @@ func ConfigFiberLogger(params libRequest.LoggerInterface) logger.Config {
 		MaxSize:  params.GetLogSize(), // megabytes
 		//MaxBackups: 3, keep all
 		//MaxAge:     28,   //days, keep all
-		Compress: params.GetLogCompress(), // disabled by default
+		Compress:  params.GetLogCompress(), // disabled by default
+		LocalTime: true,
 	}
 
 	libParams.LogRotate(&logWriter)
