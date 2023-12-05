@@ -63,6 +63,8 @@ func GetOutArgs(args ...any) map[string]string {
 					switch outValue := namedParameter.Dest.(type) {
 					case string:
 						rows[dbParameter.Name] = outValue
+					case *string:
+						rows[dbParameter.Name] = *outValue
 					default:
 						log.Printf("wrong db-out parameter type %T\n", namedParameter.Dest)
 					}
@@ -75,6 +77,8 @@ func GetOutArgs(args ...any) map[string]string {
 				switch outValue := dbParameter.Dest.(type) {
 				case string:
 					rows[fmt.Sprintf("not named arg %d", id)] = outValue
+				case *string:
+					rows[fmt.Sprintf("not named arg %d", id)] = *outValue
 				default:
 					log.Printf("wrong db-out parameter type %T\n", dbParameter.Dest)
 				}
@@ -118,7 +122,8 @@ func (command DmlCommand) ExecuteWithContext(ctx context.Context, moduleName, me
 			}
 			return nil, response.ToError(ErrorExecuteDML, nil, libError.Join(err, "%s: %s", command.Type, command.Name))
 		}
-		return GetDmlResult(resp, nil), nil
+		outValues := GetOutArgs(command.Args...)
+		return GetDmlResult(resp, outValues), nil
 	case Update:
 		resp, err := core.Dml(ctx, moduleName, methodName, command.Command, command.Args...)
 		if err != nil {
@@ -127,7 +132,8 @@ func (command DmlCommand) ExecuteWithContext(ctx context.Context, moduleName, me
 			}
 			return nil, response.ToError(ErrorExecuteDML, nil, libError.Join(err, "%s: %s", command.Type, command.Name))
 		}
-		return GetDmlResult(resp, nil), nil
+		outValues := GetOutArgs(command.Args...)
+		return GetDmlResult(resp, outValues), nil
 	case Delete:
 		resp, err := core.Dml(ctx, moduleName, methodName, command.Command, command.Args...)
 		if err != nil {
