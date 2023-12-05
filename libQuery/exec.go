@@ -52,6 +52,38 @@ func GetDmlResult(resultDb sql.Result, rows map[string]string) DmlResult {
 	return resp
 }
 
+func GetOutArgs(args ...any) map[string]string {
+	rows := map[string]string{}
+	for id, arg := range args {
+		switch dbParameter := arg.(type) {
+		case sql.NamedArg:
+			switch namedParameter := dbParameter.Value.(type) {
+			case sql.Out:
+				if namedParameter.Dest != nil {
+					switch outValue := namedParameter.Dest.(type) {
+					case string:
+						rows[dbParameter.Name] = outValue
+					default:
+						log.Printf("wrong db-out parameter type %T\n", namedParameter.Dest)
+					}
+				}
+			default:
+				log.Printf("wrong db-out named parameter value type %T\n", dbParameter.Value)
+			}
+		case sql.Out:
+			if dbParameter.Dest != nil {
+				switch outValue := dbParameter.Dest.(type) {
+				case string:
+					rows[fmt.Sprintf("not named arg %d", id)] = outValue
+				default:
+					log.Printf("wrong db-out parameter type %T\n", dbParameter.Dest)
+				}
+			}
+		}
+	}
+	return rows
+}
+
 func (command DmlCommand) ExecuteWithContext(ctx context.Context, moduleName, methodName string, core QueryRunnerInterface) (any, response.ErrorState) {
 	switch command.Type {
 	case QueryCheckExists:

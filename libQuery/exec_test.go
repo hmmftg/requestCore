@@ -18,7 +18,7 @@ func (a AnyString) Match(v driver.Value) bool {
 	return true
 }
 
-func getMock(sqlType DmlCommandType, err error) QueryRunnerInterface {
+func getMock(sqlType DmlCommandType, err error, args ...driver.Value) QueryRunnerInterface {
 	db, mockDb, _ := sqlmock.New() //sqlmock.QueryMatcherOption(sqlmock.QueryMatcherEqual))
 
 	var anyS AnyString
@@ -39,36 +39,40 @@ func getMock(sqlType DmlCommandType, err error) QueryRunnerInterface {
 		}
 	case Insert:
 		mockDb.ExpectBegin()
-		mockDb.ExpectExec("").WithArgs(anyS, anyS).WillReturnResult(driver.RowsAffected(1))
-		mockDb.ExpectExec("").WithArgs(anyS, anyS).WillReturnResult(driver.RowsAffected(1))
-		mockDb.ExpectExec("").WithArgs(anyS, anyS).WillReturnResult(driver.RowsAffected(1))
-		mockDb.ExpectExec("").WithArgs(anyS, anyS).WillReturnResult(driver.RowsAffected(1))
+		mockDb.ExpectExec("").WithArgs(anyS, anyS).WillReturnResult(sqlmock.NewResult(0, 1))
+		mockDb.ExpectExec("").WithArgs(anyS, anyS).WillReturnResult(sqlmock.NewResult(0, 1))
+		mockDb.ExpectExec("").WithArgs(anyS, anyS).WillReturnResult(sqlmock.NewResult(0, 1))
+		mockDb.ExpectExec("").WithArgs(anyS, anyS).WillReturnResult(sqlmock.NewResult(0, 1))
 		if err == nil {
-			mockDb.ExpectExec("insert").WillReturnResult(driver.RowsAffected(1))
+			if len(args) == 0 {
+				mockDb.ExpectExec("insert").WillReturnResult(sqlmock.NewResult(0, 1))
+			} else {
+				mockDb.ExpectExec("insert").WithArgs(args...).WillReturnResult(sqlmock.NewResult(0, 1))
+			}
 		} else {
 			mockDb.ExpectExec("queryE").WillReturnError(err)
 		}
 		mockDb.ExpectCommit()
 	case Update:
 		mockDb.ExpectBegin()
-		mockDb.ExpectExec("").WithArgs(anyS, anyS).WillReturnResult(driver.RowsAffected(1))
-		mockDb.ExpectExec("").WithArgs(anyS, anyS).WillReturnResult(driver.RowsAffected(1))
-		mockDb.ExpectExec("").WithArgs(anyS, anyS).WillReturnResult(driver.RowsAffected(1))
-		mockDb.ExpectExec("").WithArgs(anyS, anyS).WillReturnResult(driver.RowsAffected(1))
+		mockDb.ExpectExec("").WithArgs(anyS, anyS).WillReturnResult(sqlmock.NewResult(0, 1))
+		mockDb.ExpectExec("").WithArgs(anyS, anyS).WillReturnResult(sqlmock.NewResult(0, 1))
+		mockDb.ExpectExec("").WithArgs(anyS, anyS).WillReturnResult(sqlmock.NewResult(0, 1))
+		mockDb.ExpectExec("").WithArgs(anyS, anyS).WillReturnResult(sqlmock.NewResult(0, 1))
 		if err == nil {
-			mockDb.ExpectExec("update").WillReturnResult(driver.RowsAffected(1))
+			mockDb.ExpectExec("update").WillReturnResult(sqlmock.NewResult(0, 1))
 		} else {
 			mockDb.ExpectExec("queryE").WillReturnError(err)
 		}
 		mockDb.ExpectCommit()
 	case Delete:
 		mockDb.ExpectBegin()
-		mockDb.ExpectExec("").WithArgs(anyS, anyS).WillReturnResult(driver.RowsAffected(1))
-		mockDb.ExpectExec("").WithArgs(anyS, anyS).WillReturnResult(driver.RowsAffected(1))
-		mockDb.ExpectExec("").WithArgs(anyS, anyS).WillReturnResult(driver.RowsAffected(1))
-		mockDb.ExpectExec("").WithArgs(anyS, anyS).WillReturnResult(driver.RowsAffected(1))
+		mockDb.ExpectExec("").WithArgs(anyS, anyS).WillReturnResult(sqlmock.NewResult(0, 1))
+		mockDb.ExpectExec("").WithArgs(anyS, anyS).WillReturnResult(sqlmock.NewResult(0, 1))
+		mockDb.ExpectExec("").WithArgs(anyS, anyS).WillReturnResult(sqlmock.NewResult(0, 1))
+		mockDb.ExpectExec("").WithArgs(anyS, anyS).WillReturnResult(sqlmock.NewResult(0, 1))
 		if err == nil {
-			mockDb.ExpectExec("delete").WillReturnResult(driver.RowsAffected(1))
+			mockDb.ExpectExec("delete").WillReturnResult(sqlmock.NewResult(0, 1))
 		} else {
 			mockDb.ExpectExec("queryE").WillReturnError(err)
 		}
