@@ -40,11 +40,12 @@ func ExecDML(request libQuery.DmlModel, key, title string, w webFramework.WebFra
 func PreControlDML(request libQuery.DmlModel, key, title string, w webFramework.WebFramework, core requestCore.RequestCoreInterface) response.ErrorState {
 	preControl := request.PreControlCommands()
 	for _, command := range preControl[key] {
-		core.RequestTools().LogStart(w, fmt.Sprintf("PreControl: %s", command.Name), "Execute")
+		title := fmt.Sprintf("PreControl: %s", command.Name)
+		core.RequestTools().LogStart(w, title, "Execute")
 		_, errPreControl := command.ExecuteWithContext(
 			w.Ctx, title, fmt.Sprintf("%s.%s", "preControl", command.Name), core.GetDB())
 		if errPreControl != nil {
-			return errPreControl
+			return response.Errors(http.StatusInternalServerError, errPreControl.GetDescription(), title, errPreControl)
 		}
 	}
 	return nil
@@ -54,11 +55,12 @@ func ExecuteDML(request libQuery.DmlModel, key, title string, w webFramework.Web
 	dml := request.DmlCommands()
 	resp := map[string]any{}
 	for _, command := range dml[key] {
-		core.RequestTools().LogStart(w, fmt.Sprintf("Insert: %s", command.Name), "Execute")
+		title := fmt.Sprintf("Insert: %s", command.Name)
+		core.RequestTools().LogStart(w, title, "Execute")
 		result, errInsert := command.ExecuteWithContext(
 			w.Ctx, title, fmt.Sprintf("%s.%s", "dml", command.Name), core.GetDB())
 		if errInsert != nil {
-			return nil, errInsert
+			return nil, response.Errors(http.StatusInternalServerError, errInsert.GetDescription(), title, errInsert)
 		}
 		resp[command.Name] = result
 	}
@@ -68,10 +70,11 @@ func ExecuteDML(request libQuery.DmlModel, key, title string, w webFramework.Web
 func FinalizeDML(request libQuery.DmlModel, key, title string, w webFramework.WebFramework, core requestCore.RequestCoreInterface) {
 	finalize := request.FinalizeCommands()
 	for _, command := range finalize[key] {
+		title := fmt.Sprintf("Finalize: %s", command.Name)
 		_, errFinalize := command.ExecuteWithContext(
-			w.Ctx, title, fmt.Sprintf("%s.%s", "finalize", command.Name), core.GetDB())
+			w.Ctx, title, title, core.GetDB())
 		if errFinalize != nil {
-			log.Printf("Error executing finalize command: %s=>%v", command.Name, errFinalize)
+			log.Printf("Error executing finalize command: %s=>%v", title, errFinalize)
 		}
 	}
 }
