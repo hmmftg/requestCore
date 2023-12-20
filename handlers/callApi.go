@@ -43,7 +43,7 @@ func callApi[Resp any](
 		return nil, response.Errors(http.StatusInternalServerError, "REMOTE_CALL_ERROR", param, resp1.Error)
 	}
 	if resp1.Status.Status != http.StatusOK {
-		return nil, resp1.WsResp.ToErrorState().Input(param)
+		return nil, resp1.WsResp.ToErrorState().Input(param).SetStatus(resp1.Status.Status)
 	}
 	return resp1.Resp, nil
 }
@@ -69,7 +69,7 @@ func callApiNoLog[Resp any](
 		return nil, response.Errors(http.StatusInternalServerError, "REMOTE_CALL_ERROR", param, resp1.Error)
 	}
 	if resp1.Status.Status != http.StatusOK {
-		return nil, resp1.WsResp.ToErrorState().Input(param)
+		return nil, resp1.WsResp.ToErrorState().Input(param).SetStatus(resp1.Status.Status)
 	}
 	return resp1.Resp, nil
 }
