@@ -69,8 +69,6 @@ func GetOutArgs(args ...any) map[string]string {
 						log.Printf("wrong db-out parameter type %T\n", namedParameter.Dest)
 					}
 				}
-			default:
-				log.Printf("wrong db-out named parameter value type %T\n", dbParameter.Value)
 			}
 		case sql.Out:
 			if dbParameter.Dest != nil {
