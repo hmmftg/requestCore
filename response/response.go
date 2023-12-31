@@ -213,7 +213,9 @@ func FormatErrorResp(errs error, trans ut.Translator) []ErrorResponse {
 		}
 		parent = parent[:len(parent)-1]
 
-		switch validationError.Tag() {
+		validationtag := strings.Split(validationError.Tag(), "=")
+
+		switch validationtag[0] {
 		case "required", "required_unless", "required_if":
 			errorResp.Code = "REQUIRED-FIELD"
 		case "padded_ip":
@@ -234,7 +236,12 @@ func FormatErrorResp(errs error, trans ut.Translator) []ErrorResponse {
 			parent += validationError.Tag()
 			errorResp.Code = "INVALID-INPUT-DATA"
 		}
-		errorResp.Description = parent + " " + validationError.Translate(trans)
+		// complicated tag
+		if len(validationtag) > 1 {
+			errorResp.Description = fmt.Sprintf("%s فیلد %s اجباری میباشد", parent, validationError.Field())
+		} else {
+			errorResp.Description = parent + " " + validationError.Translate(trans)
+		}
 		errorResponses = append(errorResponses, errorResp)
 	}
 	return errorResponses
