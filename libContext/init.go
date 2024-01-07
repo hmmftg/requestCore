@@ -3,7 +3,6 @@ package libContext
 import (
 	"context"
 	"log"
-	"runtime/debug"
 	"testing"
 
 	"github.com/gin-gonic/gin"
@@ -52,8 +51,8 @@ func initContext(c any, unknownUser bool) webFramework.WebFramework {
 	case *fasthttp.RequestCtx:
 		fiberCtx, ok := ctx.UserValue(libFiber.FiberCtxKey).(*fiber.Ctx)
 		if !ok {
-			stack := debug.Stack()
-			log.Fatalf("error in InitContext: unable to parse fiber ctx %T, Stack: %s", ctx.UserValue(libFiber.FiberCtxKey), string(stack))
+			stack := response.GetStack(1, "libContext/init.go")
+			log.Fatalf("error in InitContext: unable to parse fiber ctx %T, Stack: %s", ctx.UserValue(libFiber.FiberCtxKey), stack)
 		}
 		if unknownUser {
 			fiberCtx.Locals(UserIdLocal, UnknownUser)
@@ -64,16 +63,16 @@ func initContext(c any, unknownUser bool) webFramework.WebFramework {
 		w.Ctx = context.WithValue(context.Background(), WebFrameworkKey, Testing)
 		w.Parser = initTestContext(ctx)
 	default:
-		stack := debug.Stack()
-		log.Fatalf("error in InitContext: unknown webFramework %T, Stack: %s", ctx, string(stack))
+		stack := response.GetStack(1, "libContext/init.go")
+		log.Fatalf("error in InitContext: unknown webFramework %T, Stack: %s", ctx, stack)
 	}
 	userId := w.Parser.GetHeaderValue(UserIdHeader)
 	if len(userId) == 0 {
 		userId = w.Parser.GetLocalString(UserIdLocal)
 	}
 	if len(userId) == 0 {
-		stack := debug.Stack()
-		log.Println("unable to find userId in header and locals => audit trail will fail: ", string(stack))
+		stack := response.GetStack(1, "libContext/init.go")
+		log.Println("unable to find userId in header and locals => audit trail will fail: ", stack)
 	}
 	w.Ctx = context.WithValue(w.Ctx, libQuery.ContextKey(libQuery.USER), userId)
 	return w

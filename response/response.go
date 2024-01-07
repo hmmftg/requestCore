@@ -161,9 +161,19 @@ func (e ErrorData) WsResponse() string {
 	return fmt.Sprintf("%s#%s#%v#%v#%d", e.Description, e.source, e.input, e.Message, e.Status)
 }
 
+func GetStack(skip int, exclude string) string {
+	_, filename, line, _ := runtime.Caller(skip + 1)
+	localSkip := skip
+	for strings.Contains(filename, "requestCore/response/response.go") ||
+		strings.Contains(filename, exclude) {
+		localSkip++
+		_, filename, line, _ = runtime.Caller(localSkip)
+	}
+	return fmt.Sprintf("%s:%d", filename, line)
+}
+
 func toErrorState(err error, skip int) ErrorState {
-	_, filename, line, _ := runtime.Caller(skip)
-	src := fmt.Sprintf("%s:%d", filename, line)
+	src := GetStack(skip, "requestCore/response/response.go")
 	return &ErrorData{
 		Description: err.Error(),
 		source:      src,

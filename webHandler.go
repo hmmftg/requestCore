@@ -8,7 +8,6 @@ import (
 	"github.com/hmmftg/requestCore/libRequest"
 	"github.com/hmmftg/requestCore/response"
 	"github.com/hmmftg/requestCore/webFramework"
-	"github.com/hmmftg/stacktrace"
 )
 
 type WebHanlder struct {
@@ -32,15 +31,28 @@ func (m WebHanlder) HandleErrorState(err error, status int, message string, data
 	m.Respond(status, 1, message, data, true, w)
 }
 
-func (m WebHanlder) ErrorState(w webFramework.WebFramework, err response.ErrorState) {
-	log.Printf("error state: %s, \n%+v", stacktrace.PropagateWithDepth(err, 1, ""), err)
+func (m WebHanlder) errorState(w webFramework.WebFramework, err response.ErrorState, depth int) {
+	src := response.GetStack(depth+1, "requestCore/webHandler.go")
+	log.Printf("error state: %s, \n%+v", src, err)
 
 	if r := w.Parser.GetLocal("reqLog"); r != nil {
 		reqLog := r.(libRequest.RequestPtr)
-		m.RequestInterface.LogEnd("HandleError", fmt.Sprintf("desc: %s, err: %v, data: %v", err.GetDescription(), err, err.GetMessage()), reqLog)
+		m.RequestInterface.LogEnd(
+			"HandleError",
+			fmt.Sprintf("desc: %s, err: %v, data: %v", err.GetDescription(), err, err.GetMessage()),
+			reqLog,
+		)
 	}
 
 	m.Respond(err.GetStatus(), 1, err.GetDescription(), err.GetMessage(), true, w)
+}
+
+func (m WebHanlder) ErrorState(w webFramework.WebFramework, err response.ErrorState) {
+	m.errorState(w, err, 1)
+}
+
+func (m WebHanlder) Error(w webFramework.WebFramework, err response.ErrorState) {
+	m.errorState(w, err, 1)
 }
 
 func (m WebHanlder) Respond(code, status int, message string, data any, abort bool, w webFramework.WebFramework) {
@@ -53,10 +65,6 @@ func (m WebHanlder) OK(w webFramework.WebFramework, resp any) {
 
 func (m WebHanlder) OKWithReceipt(w webFramework.WebFramework, resp any, receipt *response.Receipt) {
 	m.RespondWithReceipt(http.StatusOK, 0, "OK", resp, receipt, false, w)
-}
-
-func (m WebHanlder) Error(w webFramework.WebFramework, err response.ErrorState) {
-	m.ErrorState(w, err)
 }
 
 func (m WebHanlder) GetErrorsArray(message string, data any) []response.ErrorResponse {

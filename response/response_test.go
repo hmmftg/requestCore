@@ -2,6 +2,8 @@ package response
 
 import (
 	"encoding/json"
+	"fmt"
+	"strings"
 	"testing"
 )
 
@@ -30,6 +32,53 @@ func TestWsResponse(t *testing.T) {
 		}
 		if string(result) != tst.Desired {
 			t.Fatal(string(result), "!=", tst.Desired)
+		}
+	}
+}
+
+func fakeErrorCaller(depth int) ErrorState {
+	if depth == 0 {
+		err := fmt.Errorf("err: %d", depth)
+		return toErrorState(err, depth)
+	}
+	return Errors(-1, "faker", depth, fakeErrorCaller(depth-1))
+}
+
+func TestErrorState(t *testing.T) {
+	type TestCase struct {
+		Name          string
+		CallDepth     int
+		DesiredSrc    string
+		NotDesiredSrc string
+	}
+	testCases := []TestCase{
+		{
+			Name:          "depth1",
+			CallDepth:     1,
+			DesiredSrc:    "response/response_test.go",
+			NotDesiredSrc: "response/response.go",
+		},
+		{
+			Name:          "depth2",
+			CallDepth:     2,
+			DesiredSrc:    "response/response_test.go",
+			NotDesiredSrc: "response/response.go",
+		},
+		{
+			Name:          "depth3",
+			CallDepth:     3,
+			DesiredSrc:    "response/response_test.go",
+			NotDesiredSrc: "response/response.go",
+		},
+	}
+	for _, tst := range testCases {
+		err := fakeErrorCaller(tst.CallDepth)
+		result := err.Error()
+		if !strings.Contains(result, tst.DesiredSrc) {
+			t.Fatal(result, " does not contain ", tst.DesiredSrc)
+		}
+		if strings.Contains(result, tst.NotDesiredSrc) {
+			t.Fatal(result, " contains ", tst.NotDesiredSrc)
 		}
 	}
 }
