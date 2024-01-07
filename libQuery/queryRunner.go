@@ -223,7 +223,7 @@ func GetQuery[R any](query string, core QueryRunnerInterface, args ...any) ([]R,
 	var target R
 	nRet, result, err := core.QueryToStruct(query, target, args...)
 	if nRet == QUERY_ERROR && strings.HasPrefix(err.Error(), "no data found") {
-		return nil, response.ToError(NO_DATA_FOUND, "No Data Found", err)
+		return nil, response.Error(http.StatusBadRequest, NO_DATA_FOUND, "No Data Found", err)
 	}
 	if nRet != 0 || err != nil {
 		return nil, response.ToError(DB_READ_ERROR, err.Error(), err)
@@ -236,7 +236,12 @@ func GetQuery[R any](query string, core QueryRunnerInterface, args ...any) ([]R,
 		return nil, response.ToError(PARSE_DB_RESP_ERROR, "Unable to parse response struct", err)
 	}
 	if len(rows) == 0 {
-		return nil, response.ToError(NO_DATA_FOUND, "No Data Found", fmt.Errorf("no data found: %s,%v", query, args))
+		return nil, response.Error(
+			http.StatusBadRequest,
+			NO_DATA_FOUND,
+			"No Data Found",
+			fmt.Errorf("no data found: %s,%v", query, args),
+		)
 	}
 	return rows, nil
 }
@@ -280,7 +285,11 @@ func Query[Result QueryResult](core QueryRunnerInterface, command QueryCommand, 
 			return nil, response.ToError(desc, data, libError.Join(err, "QuerySingle: %s", command.Name))
 		}
 		if desc == NO_DATA_FOUND {
-			return nil, response.ToError(NO_DATA_FOUND, NO_DATA_FOUND_DESC, fmt.Errorf("QuerySingle: %s=> %s", command.Name, NO_DATA_FOUND))
+			return nil, response.Error(
+				http.StatusBadRequest,
+				NO_DATA_FOUND,
+				NO_DATA_FOUND_DESC,
+				fmt.Errorf("QuerySingle: %s=> %s", command.Name, NO_DATA_FOUND))
 		}
 		return resp[0], nil
 	case QueryAll:
@@ -289,7 +298,11 @@ func Query[Result QueryResult](core QueryRunnerInterface, command QueryCommand, 
 			return nil, response.ToError(desc, data, libError.Join(err, "QueryAll: %s", command.Name))
 		}
 		if desc == NO_DATA_FOUND {
-			return nil, response.ToError(NO_DATA_FOUND, NO_DATA_FOUND_DESC, fmt.Errorf("QueryAll: %s=> %s", command.Name, NO_DATA_FOUND))
+			return nil, response.Error(
+				http.StatusBadRequest,
+				NO_DATA_FOUND,
+				NO_DATA_FOUND_DESC,
+				fmt.Errorf("QueryAll: %s=> %s", command.Name, NO_DATA_FOUND))
 		}
 		return resp, nil
 	case QueryMap:
@@ -298,7 +311,11 @@ func Query[Result QueryResult](core QueryRunnerInterface, command QueryCommand, 
 			return nil, response.ToError(desc, data, libError.Join(err, "QueryMap: %s", command.Name))
 		}
 		if desc == NO_DATA_FOUND {
-			return nil, response.ToError(NO_DATA_FOUND, NO_DATA_FOUND_DESC, fmt.Errorf("QueryMap: %s=> %s", command.Name, NO_DATA_FOUND))
+			return nil, response.Error(
+				http.StatusBadRequest,
+				NO_DATA_FOUND,
+				NO_DATA_FOUND_DESC,
+				fmt.Errorf("QueryMap: %s=> %s", command.Name, NO_DATA_FOUND))
 		}
 		respMap := make(map[string]any)
 		for _, record := range resp {
