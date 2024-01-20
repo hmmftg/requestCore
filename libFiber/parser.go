@@ -28,7 +28,7 @@ func (c FiberParser) GetHeader(target webFramework.HeaderInterface) error {
 	return c.Ctx.ReqHeaderParser(targetPtr)
 }
 func (c FiberParser) GetHeaderValue(name string) string {
-	return c.Ctx.GetReqHeaders()[name]
+	return c.Ctx.GetReqHeaders()[name][0]
 }
 func (c FiberParser) GetBody(target any) error {
 	return c.Ctx.BodyParser(target)
@@ -105,7 +105,7 @@ func (c FiberParser) ParseCommand(command, title string, request webFramework.Re
 }
 
 func (c FiberParser) GetHttpHeader() http.Header {
-	return ExtendMap(c.Ctx.GetReqHeaders())
+	return c.Ctx.GetReqHeaders()
 }
 
 func (c FiberParser) SendJSONRespBody(status int, resp any) error {
