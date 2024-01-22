@@ -13,10 +13,11 @@ import (
 )
 
 type WsResponse[Result any] struct {
-	Status      int                      `json:"status"`
-	Description string                   `json:"description"`
-	Result      Result                   `json:"result,omitempty"`
-	ErrorData   []response.ErrorResponse `json:"errors,omitempty"`
+	Status       int                      `json:"status"`
+	Description  string                   `json:"description"`
+	Result       Result                   `json:"result,omitempty"`
+	ErrorData    []response.ErrorResponse `json:"errors,omitempty"`
+	PrintReceipt *response.Receipt        `json:"printReceipt,omitempty"`
 }
 
 func callApi[Resp any](
@@ -58,6 +59,18 @@ func CallApi[Resp any](
 		return nil, err
 	}
 	return &result.Result, err
+}
+
+func CallApiWithReceipt[Resp any](
+	w webFramework.WebFramework,
+	core requestCore.RequestCoreInterface,
+	method string,
+	param libCallApi.CallParam) (*Resp, *response.Receipt, response.ErrorState) {
+	result, err := callApi[WsResponse[Resp]](w, core, method, param)
+	if result == nil {
+		return nil, nil, err
+	}
+	return &result.Result, result.PrintReceipt, err
 }
 
 func callApiNoLog[Resp any](
