@@ -26,8 +26,8 @@ type testHandlerType[Req testReq, Resp testResp] struct {
 	SaveRequest  bool
 }
 
-func (h testHandlerType[Req, Resp]) Parameters() (string, libRequest.Type, bool, bool, string) {
-	return h.Title, h.Mode, h.VerifyHeader, h.SaveRequest, h.Path
+func (h testHandlerType[Req, Resp]) Parameters() HandlerParameters {
+	return HandlerParameters{h.Title, h.Mode, h.VerifyHeader, h.SaveRequest, h.Path, false}
 }
 func (h testHandlerType[Req, Resp]) Initializer(req HandlerRequest[Req, Resp]) response.ErrorState {
 	log.Println("Initializer")

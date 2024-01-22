@@ -13,13 +13,22 @@ import (
 	"github.com/hmmftg/requestCore/webFramework"
 )
 
+type HandlerParameters struct {
+	Title          string
+	Body           libRequest.Type
+	ValidateHeader bool
+	SaveToRequest  bool
+	Path           string
+	HasReceipt     bool
+}
+
 type HandlerInterface[Req any, Resp any] interface {
 	// returns handler title
 	//   Request Bodymode
 	//   and validate header option
 	//   and save to request table option
 	//   and url path of handler
-	Parameters() (string, libRequest.Type, bool, bool, string)
+	Parameters() HandlerParameters
 	// runs after validating request
 	Initializer(req HandlerRequest[Req, Resp]) response.ErrorState
 	// main handler runs after initialize
@@ -46,11 +55,11 @@ func BaseHandler[Req any, Resp any, Handler HandlerInterface[Req, Resp]](
 	simulation bool,
 	args ...any,
 ) any {
-	title, mode, validateHeader, saveInRequestTable, path := handler.Parameters()
-	log.Println("Registering: ", title)
+	params := handler.Parameters()
+	log.Println("Registering: ", params.Title)
 	return func(c context.Context) {
 		var w webFramework.WebFramework
-		if saveInRequestTable {
+		if params.SaveToRequest {
 			w = libContext.InitContext(c)
 		} else {
 			w = libContext.InitContextNoAuditTrail(c)
@@ -62,20 +71,24 @@ func BaseHandler[Req any, Resp any, Handler HandlerInterface[Req, Resp]](
 						http.StatusInternalServerError,
 						response.SYSTEM_FAULT,
 						response.SYSTEM_FAULT_DESC,
-						libError.Join(r.(error), "error in %s", title),
+						libError.Join(r.(error), "error in %s", params.Title),
 					))
 				panic(r)
 			}
 		}()
 		trx := HandlerRequest[Req, Resp]{
-			Title: title,
+			Title: params.Title,
 			Args:  args,
 			Core:  core,
 			W:     w,
 		}
 
 		if simulation {
-			resp, header, errParse := libRequest.ParseRequest[Resp](trx.W, mode, validateHeader)
+			resp, header, errParse := libRequest.ParseRequest[Resp](
+				trx.W,
+				params.Body,
+				params.ValidateHeader,
+			)
 			if errParse != nil {
 				core.Responder().Error(trx.W, errParse)
 				return
@@ -95,14 +108,17 @@ func BaseHandler[Req any, Resp any, Handler HandlerInterface[Req, Resp]](
 		}
 
 		var errParse response.ErrorState
-		trx.Request, trx.Header, errParse = libRequest.ParseRequest[Req](trx.W, mode, validateHeader)
+		trx.Request, trx.Header, errParse = libRequest.ParseRequest[Req](
+			trx.W,
+			params.Body,
+			params.ValidateHeader)
 		if errParse != nil {
 			core.Responder().Error(trx.W, errParse)
 			return
 		}
 
-		if saveInRequestTable {
-			errInitRequest := core.RequestTools().InitRequest(trx.W, title, path)
+		if params.SaveToRequest {
+			errInitRequest := core.RequestTools().InitRequest(trx.W, params.Title, params.Path)
 			if errInitRequest != nil {
 				core.Responder().Error(trx.W, errInitRequest)
 				return
@@ -124,7 +140,25 @@ func BaseHandler[Req any, Resp any, Handler HandlerInterface[Req, Resp]](
 			return
 		}
 
-		core.Responder().OK(trx.W, trx.Response)
+		respSent := false
+		if params.HasReceipt {
+			receipt := trx.W.Parser.GetLocal("receipt")
+			if receipt != nil {
+				rc, ok := receipt.(*response.Receipt)
+				if ok {
+					core.Responder().OKWithReceipt(trx.W, trx.Response, rc)
+					respSent = true
+				} else {
+					log.Printf("registered as handler with receipt, but receipt local was: %t\n", receipt)
+				}
+			} else {
+				log.Println("registered as handler with receipt, but receipt local was abset")
+			}
+		}
+		if !respSent {
+			core.Responder().OK(trx.W, trx.Response)
+		}
+
 		handler.Finalizer(trx)
 	}
 }

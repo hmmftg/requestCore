@@ -19,8 +19,8 @@ type QueryHandlerType[Row any, Resp []Row] struct {
 	Command      libQuery.QueryCommand
 }
 
-func (q QueryHandlerType[Row, Resp]) Parameters() (string, libRequest.Type, bool, bool, string) {
-	return q.Title, q.Mode, q.VerifyHeader, false, q.Path
+func (q QueryHandlerType[Row, Resp]) Parameters() HandlerParameters {
+	return HandlerParameters{q.Title, q.Mode, q.VerifyHeader, false, q.Path, false}
 }
 func (q QueryHandlerType[Row, Resp]) Initializer(req HandlerRequest[Row, Resp]) response.ErrorState {
 	return nil

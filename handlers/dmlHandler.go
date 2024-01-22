@@ -87,8 +87,8 @@ type DmlHandlerType[Req libQuery.DmlModel, Resp map[string]any] struct {
 	Key          string
 }
 
-func (h DmlHandlerType[Req, Resp]) Parameters() (string, libRequest.Type, bool, bool, string) {
-	return h.Title, h.Mode, h.VerifyHeader, true, h.Path
+func (h DmlHandlerType[Req, Resp]) Parameters() HandlerParameters {
+	return HandlerParameters{h.Title, h.Mode, h.VerifyHeader, true, h.Path, false}
 }
 func (h DmlHandlerType[Req, Resp]) Initializer(req HandlerRequest[Req, Resp]) response.ErrorState {
 	return PreControlDML(*req.Request, h.Key, req.Title, req.W, req.Core)

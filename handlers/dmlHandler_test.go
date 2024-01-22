@@ -98,7 +98,7 @@ func TestDMLHandler(t *testing.T) {
 			Url:       "/",
 			Request:   testDMLReq{ID: "1"},
 			Status:    500,
-			CheckBody: []string{"errors", "error pre1"},
+			CheckBody: []string{"errors", "PreControl: pre1"},
 			Model: testingtools.SampleRequestModelMock(t, func(mockDB sqlmock.Sqlmock) {
 				mockDB.ExpectPrepare(Pre1).ExpectQuery().WillReturnError(errors.New("error pre1"))
 			}),

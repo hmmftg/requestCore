@@ -173,7 +173,7 @@ func DefaultLocals() []string {
 	}
 }
 
-func (c CallArgs[Req, Resp]) Parameters() (string, libRequest.Type, bool, bool, string) {
+func (c CallArgs[Req, Resp]) Parameters() HandlerParameters {
 	var mode libRequest.Type
 	if c.IsJson {
 		mode = libRequest.JSON
@@ -184,7 +184,7 @@ func (c CallArgs[Req, Resp]) Parameters() (string, libRequest.Type, bool, bool, 
 	if c.HasInitializer {
 		save = true
 	}
-	return c.Title, mode, false, save, c.Path
+	return HandlerParameters{c.Title, mode, false, save, c.Path, false}
 }
 
 const (
