@@ -2,20 +2,42 @@ package testingtools
 
 import (
 	"database/sql"
+	"image"
 	"os"
 	"path/filepath"
 	"testing"
 
-	"github.com/hmmftg/requestCore/libParams"
-
-	// cSpell:ignore gotest sqlmock sqlstruct cardNumber
 	"github.com/DATA-DOG/go-sqlmock"
+	"github.com/hmmftg/image/font/opentype"
 	"github.com/hmmftg/requestCore"
 	"github.com/hmmftg/requestCore/libCallApi"
 	"github.com/hmmftg/requestCore/libDictionary"
+	"github.com/hmmftg/requestCore/libParams"
 	"github.com/hmmftg/requestCore/libQuery"
 	"github.com/hmmftg/requestCore/libRequest"
 )
+
+type Params struct {
+	Roles       map[string]string
+	Params      map[string]string
+	ErrorDesc   map[string]string
+	MessageDesc map[string]string
+	AccessRoles map[string]string
+	RemoteApis  map[string]libCallApi.RemoteApi
+}
+
+func (p Params) GetFonts() map[string]opentype.Font {
+	return nil
+}
+func (p Params) GetImages() map[string]image.Image {
+	return nil
+}
+func (p Params) GetRoles() map[string]string {
+	return p.Roles
+}
+func (p Params) GetParams() map[string]string {
+	return p.Params
+}
 
 // columns are prefixed with "o" since we used sqlstruct to generate them
 func InitTesting(t *testing.T,
@@ -26,7 +48,7 @@ func InitTesting(t *testing.T,
 	csv string,
 	module string,
 ) (requestCore.RequestCoreModel, libParams.ParamInterface) {
-	wsParams := TestingWsParams{
+	wsParams := Params{
 		ErrorDesc:  errDesc,
 		RemoteApis: remoteApis,
 	}
@@ -71,7 +93,7 @@ func InitTesting(t *testing.T,
 		Dict: libDictionary.DictionaryModel{
 			MessageDesc: wsParams.MessageDesc,
 		},
-	}, &wsParams
+	}, wsParams
 }
 
 func DefaultAccessRoles() map[string]string {
@@ -89,6 +111,16 @@ func DefaultErrorDesc() map[string]string {
 	}
 }
 
+func DefaultAPIList() map[string]libCallApi.RemoteApi {
+	return map[string]libCallApi.RemoteApi{
+		"simulation": {
+			Domain: "http://local.simulation.dev/simulation/api",
+			// Domain: "http://localhost:9055/simulation/api",
+			Name: "simulation",
+		},
+	}
+}
+
 func DefaultDB(t *testing.T) *sql.DB {
 	db, _, err := sqlmock.New()
 	if err != nil {
@@ -101,7 +133,7 @@ func DefaultDB(t *testing.T) *sql.DB {
 func InitTestingNoDB(t *testing.T,
 	errDesc map[string]string,
 	remoteApis map[string]libCallApi.RemoteApi,
-) (requestCore.RequestCoreModel, TestingWsParams) {
+) (requestCore.RequestCoreModel, libParams.ParamInterface) {
 	return InitTestingWithDB(errDesc, remoteApis, DefaultDB(t))
 }
 
@@ -109,8 +141,8 @@ func InitTestingWithDB(
 	errDesc map[string]string,
 	remoteApis map[string]libCallApi.RemoteApi,
 	db *sql.DB,
-) (requestCore.RequestCoreModel, TestingWsParams) {
-	wsParams := TestingWsParams{
+) (requestCore.RequestCoreModel, Params) {
+	wsParams := Params{
 		ErrorDesc:  errDesc,
 		RemoteApis: remoteApis,
 	}

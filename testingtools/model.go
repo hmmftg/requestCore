@@ -16,25 +16,7 @@ import (
 	"github.com/hmmftg/requestCore/libQuery"
 )
 
-const (
-	oracleSign string = ":"
-	pgSign     string = "$"
-)
-
 type customMockConverter struct{}
-
-func (customMockConverter) ConvertValue(v interface{}) (driver.Value, error) {
-	switch value := v.(type) {
-	case string:
-		return value, nil
-	case int64:
-		return value, nil
-	case sql.Out:
-		return value, nil
-	default:
-		return nil, fmt.Errorf("cannot convert %T with value %v", v, v)
-	}
-}
 
 type Model struct {
 	Query   string
@@ -76,6 +58,25 @@ type KeyValuePair struct {
 }
 
 type Header []KeyValuePair
+type AnyString string
+
+const (
+	oracleSign string = ":"
+	pgSign     string = "$"
+)
+
+func (customMockConverter) ConvertValue(v interface{}) (driver.Value, error) {
+	switch value := v.(type) {
+	case string:
+		return value, nil
+	case int64:
+		return value, nil
+	case sql.Out:
+		return value, nil
+	default:
+		return nil, fmt.Errorf("cannot convert %T with value %v", v, v)
+	}
+}
 
 // Map converts a Header to a map.
 func (h Header) Map() map[string][]string {

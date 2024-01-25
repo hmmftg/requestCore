@@ -2,6 +2,7 @@ package testingtools
 
 import (
 	"bytes"
+	"database/sql/driver"
 	"encoding/json"
 	"io"
 	"log"
@@ -9,10 +10,12 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/gin-gonic/gin"
 	"github.com/gofiber/fiber/v2"
 	"github.com/hmmftg/requestCore/libFiber"
 	"github.com/hmmftg/requestCore/libGin"
+	"github.com/hmmftg/requestCore/libQuery"
 	"gotest.tools/v3/assert"
 	"gotest.tools/v3/assert/cmp"
 )
@@ -168,4 +171,37 @@ func TestDBFiber(t *testing.T, tc *TestCase, options *TestOptions) {
 	f := initializeTestServerFiber(options)
 
 	doTestFiber(t, f, tc, options)
+}
+
+// Match satisfies sqlmock.Argument interface
+func (a AnyString) Match(_ driver.Value) bool {
+	return true
+}
+
+func GetRequestModel(t *testing.T) libQuery.QueryRunnerModel {
+	db, mockDB, err := sqlmock.New() // sqlmock.QueryMatcherOption(sqlmock.QueryMatcherEqual))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	mockDB.ExpectPrepare("query").ExpectQuery().WillReturnRows(sqlmock.NewRows([]string{"poet"}))
+	mockDB.ExpectBegin()
+	var anyS AnyString
+	mockDB.ExpectExec("").WithArgs(anyS, anyS).WillReturnResult(driver.RowsAffected(1))
+	mockDB.ExpectExec("").WithArgs(anyS, anyS).WillReturnResult(driver.RowsAffected(1))
+	mockDB.ExpectExec("").WithArgs(anyS, anyS).WillReturnResult(driver.RowsAffected(1))
+	mockDB.ExpectExec("").WithArgs(anyS, anyS).WillReturnResult(driver.RowsAffected(1))
+	mockDB.ExpectExec("insert").WillReturnResult(driver.RowsAffected(1))
+	mockDB.ExpectCommit()
+	mockDB.ExpectBegin()
+	mockDB.ExpectExec("").WithArgs(anyS, anyS).WillReturnResult(driver.RowsAffected(1))
+	mockDB.ExpectExec("").WithArgs(anyS, anyS).WillReturnResult(driver.RowsAffected(1))
+	mockDB.ExpectExec("").WithArgs(anyS, anyS).WillReturnResult(driver.RowsAffected(1))
+	mockDB.ExpectExec("").WithArgs(anyS, anyS).WillReturnResult(driver.RowsAffected(1))
+	mockDB.ExpectExec("update").WillReturnResult(driver.RowsAffected(1))
+	mockDB.ExpectCommit()
+
+	return libQuery.QueryRunnerModel{
+		DB: db,
+	}
 }

@@ -10,6 +10,24 @@ import (
 	"github.com/hmmftg/requestCore"
 )
 
+type TestingEnv interface {
+	GetInterface() requestCore.RequestCoreInterface
+	GetParams() libParams.ParamInterface
+	SetInterface(requestCore.RequestCoreInterface)
+	SetParams(libParams.ParamInterface)
+}
+
+func PrepareEnvWithDB(env TestingEnv, db *sql.DB) {
+	model, wsParams := InitTestingWithDB(
+		DefaultErrorDesc(),
+		DefaultAPIList(),
+		db,
+	)
+	wsParams.AccessRoles = DefaultAccessRoles()
+	env.SetInterface(model)
+	env.SetParams(&wsParams)
+}
+
 func GetEnv[Env any, PT interface {
 	GetInterface() requestCore.RequestCoreInterface
 	GetParams() libParams.ParamInterface

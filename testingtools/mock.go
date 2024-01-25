@@ -80,15 +80,6 @@ func GetDMLModel(t *testing.T, m Model) libQuery.QueryRunnerModel {
 	}
 }
 
-func DefaultAPIList() map[string]libCallApi.RemoteApi {
-	return map[string]libCallApi.RemoteApi{
-		"api": {
-			Domain: "",
-			Name:   "test api",
-		},
-	}
-}
-
 func TestAPIList() map[string]libCallApi.RemoteApi {
 	return map[string]libCallApi.RemoteApi{
 		"api": {
@@ -96,13 +87,6 @@ func TestAPIList() map[string]libCallApi.RemoteApi {
 			Name:   "test api",
 		},
 	}
-}
-
-type AnyString string
-
-// Match satisfies sqlmock.Argument interface
-func (a AnyString) Match(_ driver.Value) bool {
-	return true
 }
 
 func SampleRequestModelMock(t *testing.T, mockList func(sqlmock.Sqlmock)) libQuery.QueryRunnerModel {
