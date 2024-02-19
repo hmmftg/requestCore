@@ -43,7 +43,7 @@ func PreControlDML(request libQuery.DmlModel, key, title string, w webFramework.
 		title := fmt.Sprintf("PreControl: %s", command.Name)
 		core.RequestTools().LogStart(w, title, "Execute")
 		_, errPreControl := command.ExecuteWithContext(
-			w.Ctx, title, fmt.Sprintf("%s.%s", "preControl", command.Name), core.GetDB())
+			w.Parser, w.Ctx, title, fmt.Sprintf("%s.%s", "preControl", command.Name), core.GetDB())
 		if errPreControl != nil {
 			return response.Errors(http.StatusInternalServerError, errPreControl.GetDescription(), title, errPreControl)
 		}
@@ -58,7 +58,7 @@ func ExecuteDML(request libQuery.DmlModel, key, title string, w webFramework.Web
 		title := fmt.Sprintf("Insert: %s", command.Name)
 		core.RequestTools().LogStart(w, title, "Execute")
 		result, errInsert := command.ExecuteWithContext(
-			w.Ctx, title, fmt.Sprintf("%s.%s", "dml", command.Name), core.GetDB())
+			w.Parser, w.Ctx, title, fmt.Sprintf("%s.%s", "dml", command.Name), core.GetDB())
 		if errInsert != nil {
 			return nil, response.Errors(http.StatusInternalServerError, errInsert.GetDescription(), title, errInsert)
 		}
@@ -72,7 +72,7 @@ func FinalizeDML(request libQuery.DmlModel, key, title string, w webFramework.We
 	for _, command := range finalize[key] {
 		title := fmt.Sprintf("Finalize: %s", command.Name)
 		_, errFinalize := command.ExecuteWithContext(
-			w.Ctx, title, title, core.GetDB())
+			w.Parser, w.Ctx, title, title, core.GetDB())
 		if errFinalize != nil {
 			log.Printf("Error executing finalize command: %s=>%v", title, errFinalize)
 		}

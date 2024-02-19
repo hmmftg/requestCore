@@ -8,6 +8,7 @@ import (
 
 	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/hmmftg/requestCore/response"
+	"github.com/hmmftg/requestCore/webFramework"
 	"gotest.tools/v3/assert"
 )
 
@@ -132,7 +133,7 @@ func TestExecuteWithContext(t *testing.T) {
 		Error: &response.ErrorData{Description: "eeeerrr", Status: 1, Message: "mmm"},
 	}}
 	for _, testCase := range testCases {
-		result, err := testCase.Command.ExecuteWithContext(testCase.Context, "", "", testCase.Model)
+		result, err := testCase.Command.ExecuteWithContext(webFramework.FakeParser{}, testCase.Context, "", "", testCase.Model)
 		assert.DeepEqual(t, result, testCase.Result)
 		if err == nil && testCase.Error != nil {
 			t.Fatal("error wanted", testCase.Error, "got", err)

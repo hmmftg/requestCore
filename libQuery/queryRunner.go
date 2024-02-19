@@ -142,8 +142,15 @@ func GetTagValue(name, tag string, s any) (*string, *string, error) {
 		f := elemType.Field(i)
 		tagID := strings.Split(f.Tag.Get(tag), ",")[0] // use split to ignore tag "options" like omitempty, etc.
 		if tagID == name {
-			v := elemValue.Field(i).String()
-			return &f.Name, &v, nil
+			switch elemValue.Field(i).Kind() {
+			case reflect.String:
+				v := elemValue.Field(i).String()
+				return &f.Name, &v, nil
+			case reflect.Int64:
+				i := elemValue.Field(i).Int()
+				v := fmt.Sprintf("%d", i)
+				return &f.Name, &v, nil
+			}
 		}
 	}
 	return nil, nil, fmt.Errorf("field %s with tag %s is not present in %T ", name, tag, s)
