@@ -62,10 +62,9 @@ func GetLocalArgs(parser webFramework.RequestParser, args []any) []any {
 			stringArg, ok := namedArg.Value.(string)
 			if ok && strings.HasPrefix(stringArg, "w.local:") {
 				parts := strings.Split(stringArg, ":")
-				result[id] = parser.GetLocal(parts[1])
-			} else {
-				result[id] = arg
+				namedArg.Value = parser.GetLocal(parts[1])
 			}
+			result[id] = namedArg
 		} else {
 			result[id] = arg
 		}
