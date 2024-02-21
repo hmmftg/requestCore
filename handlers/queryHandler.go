@@ -11,16 +11,17 @@ import (
 )
 
 type QueryHandlerType[Row any, Resp []Row] struct {
-	Title        string
-	Path         string
-	Mode         libRequest.Type
-	VerifyHeader bool
-	Key          string
-	Command      libQuery.QueryCommand
+	Title           string
+	Path            string
+	Mode            libRequest.Type
+	VerifyHeader    bool
+	Key             string
+	Command         libQuery.QueryCommand
+	RecoveryHandler func(any)
 }
 
 func (q QueryHandlerType[Row, Resp]) Parameters() HandlerParameters {
-	return HandlerParameters{q.Title, q.Mode, q.VerifyHeader, false, q.Path, false}
+	return HandlerParameters{q.Title, q.Mode, q.VerifyHeader, false, q.Path, false, q.RecoveryHandler}
 }
 func (q QueryHandlerType[Row, Resp]) Initializer(req HandlerRequest[Row, Resp]) response.ErrorState {
 	return nil
@@ -68,15 +69,17 @@ func QueryHandler[Row any, Resp []Row](
 	core requestCore.RequestCoreInterface,
 	mode libRequest.Type,
 	validateHeader, simulation bool,
+	recoveryHandler func(any),
 ) any {
 	return BaseHandler[Row, Resp, QueryHandlerType[Row, Resp]](core,
 		QueryHandlerType[Row, Resp]{
-			Mode:         mode,
-			VerifyHeader: validateHeader,
-			Title:        title,
-			Key:          key,
-			Command:      queryMap[key],
-			Path:         path,
+			Mode:            mode,
+			VerifyHeader:    validateHeader,
+			Title:           title,
+			Key:             key,
+			Command:         queryMap[key],
+			Path:            path,
+			RecoveryHandler: recoveryHandler,
 		},
 		simulation)
 }

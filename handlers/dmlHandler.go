@@ -80,15 +80,16 @@ func FinalizeDML(request libQuery.DmlModel, key, title string, w webFramework.We
 }
 
 type DmlHandlerType[Req libQuery.DmlModel, Resp map[string]any] struct {
-	Title        string
-	Path         string
-	Mode         libRequest.Type
-	VerifyHeader bool
-	Key          string
+	Title           string
+	Path            string
+	Mode            libRequest.Type
+	VerifyHeader    bool
+	Key             string
+	RecoveryHandler func(any)
 }
 
 func (h DmlHandlerType[Req, Resp]) Parameters() HandlerParameters {
-	return HandlerParameters{h.Title, h.Mode, h.VerifyHeader, true, h.Path, false}
+	return HandlerParameters{h.Title, h.Mode, h.VerifyHeader, true, h.Path, false, h.RecoveryHandler}
 }
 func (h DmlHandlerType[Req, Resp]) Initializer(req HandlerRequest[Req, Resp]) response.ErrorState {
 	return PreControlDML(*req.Request, h.Key, req.Title, req.W, req.Core)
@@ -109,14 +110,16 @@ func DmlHandler[Req libQuery.DmlModel](
 	core requestCore.RequestCoreInterface,
 	mode libRequest.Type,
 	validateHeader bool,
+	recoveryHandler func(any),
 ) any {
 	return BaseHandler[Req, map[string]any, DmlHandlerType[Req, map[string]any]](core,
 		DmlHandlerType[Req, map[string]any]{
-			Mode:         mode,
-			VerifyHeader: validateHeader,
-			Title:        title,
-			Key:          key,
-			Path:         path,
+			Mode:            mode,
+			VerifyHeader:    validateHeader,
+			Title:           title,
+			Key:             key,
+			Path:            path,
+			RecoveryHandler: recoveryHandler,
 		},
 		false)
 }

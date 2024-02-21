@@ -75,6 +75,7 @@ func (env *testQueryEnv) handler() any {
 		libRequest.Query,
 		true,
 		false,
+		nil,
 	)
 }
 
@@ -122,6 +123,7 @@ func (env *testQueryEnv) handlerAll() any {
 		libRequest.Query,
 		true,
 		false,
+		nil,
 	)
 }
 
@@ -170,6 +172,7 @@ func (env *testQueryEnv) handlerWithArgs() any {
 		libRequest.Query,
 		true,
 		false,
+		nil,
 	)
 }
 

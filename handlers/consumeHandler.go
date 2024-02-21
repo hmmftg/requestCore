@@ -155,6 +155,7 @@ type CallArgs[Req any, Resp any] struct {
 	) (int, map[string]string, any, error)
 	Args, Locals, Headers []string
 	Parser                func(respBytes []byte, desc string, status int) (int, map[string]string, any, error)
+	RecoveryHandler       func(any)
 }
 
 func DefaultHeaders() []string {
@@ -184,7 +185,7 @@ func (c CallArgs[Req, Resp]) Parameters() HandlerParameters {
 	if c.HasInitializer {
 		save = true
 	}
-	return HandlerParameters{c.Title, mode, false, save, c.Path, false}
+	return HandlerParameters{c.Title, mode, false, save, c.Path, false, c.RecoveryHandler}
 }
 
 const (

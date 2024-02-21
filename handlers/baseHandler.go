@@ -14,12 +14,13 @@ import (
 )
 
 type HandlerParameters struct {
-	Title          string
-	Body           libRequest.Type
-	ValidateHeader bool
-	SaveToRequest  bool
-	Path           string
-	HasReceipt     bool
+	Title           string
+	Body            libRequest.Type
+	ValidateHeader  bool
+	SaveToRequest   bool
+	Path            string
+	HasReceipt      bool
+	RecoveryHandler func(any)
 }
 
 type HandlerInterface[Req any, Resp any] interface {
@@ -47,6 +48,7 @@ type HandlerRequest[Req any, Resp any] struct {
 	Response Resp
 	W        webFramework.WebFramework
 	Args     []any
+	RespSent bool
 }
 
 func BaseHandler[Req any, Resp any, Handler HandlerInterface[Req, Resp]](
@@ -64,24 +66,31 @@ func BaseHandler[Req any, Resp any, Handler HandlerInterface[Req, Resp]](
 		} else {
 			w = libContext.InitContextNoAuditTrail(c)
 		}
-		defer func() {
-			if r := recover(); r != nil {
-				core.Responder().Error(w,
-					response.Error(
-						http.StatusInternalServerError,
-						response.SYSTEM_FAULT,
-						response.SYSTEM_FAULT_DESC,
-						libError.Join(r.(error), "error in %s", params.Title),
-					))
-				panic(r)
-			}
-		}()
 		trx := HandlerRequest[Req, Resp]{
 			Title: params.Title,
 			Args:  args,
 			Core:  core,
 			W:     w,
 		}
+
+		defer func() {
+			if r := recover(); r != nil {
+				if params.RecoveryHandler != nil {
+					params.RecoveryHandler(r)
+				} else {
+					core.Responder().Error(w,
+						response.Error(
+							http.StatusInternalServerError,
+							response.SYSTEM_FAULT,
+							response.SYSTEM_FAULT_DESC,
+							libError.Join(r.(error), "error in %s", params.Title),
+						))
+				}
+				panic(r)
+			}
+
+			handler.Finalizer(trx)
+		}()
 
 		if simulation {
 			resp, header, errParse := libRequest.ParseRequest[Resp](
@@ -139,15 +148,13 @@ func BaseHandler[Req any, Resp any, Handler HandlerInterface[Req, Resp]](
 			core.Responder().Error(trx.W, err)
 			return
 		}
-
-		respSent := false
 		if params.HasReceipt {
 			receipt := trx.W.Parser.GetLocal("receipt")
 			if receipt != nil {
 				rc, ok := receipt.(*response.Receipt)
 				if ok {
 					core.Responder().OKWithReceipt(trx.W, trx.Response, rc)
-					respSent = true
+					trx.RespSent = true
 				} else {
 					log.Printf("registered as handler with receipt, but receipt local was: %t\n", receipt)
 				}
@@ -155,10 +162,9 @@ func BaseHandler[Req any, Resp any, Handler HandlerInterface[Req, Resp]](
 				log.Println("registered as handler with receipt, but receipt local was abset")
 			}
 		}
-		if !respSent {
+		if !trx.RespSent {
 			core.Responder().OK(trx.W, trx.Response)
+			trx.RespSent = true
 		}
-
-		handler.Finalizer(trx)
 	}
 }
