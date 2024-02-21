@@ -118,6 +118,11 @@ func DefaultAPIList() map[string]libCallApi.RemoteApi {
 			// Domain: "http://localhost:9055/simulation/api",
 			Name: "simulation",
 		},
+		"gorest": {
+			Domain: "https://gorest.co.in/public/v2",
+			// Domain: "http://localhost:9055/simulation/api",
+			Name: "gorest",
+		},
 	}
 }
 

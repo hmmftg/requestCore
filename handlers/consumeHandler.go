@@ -414,3 +414,71 @@ func CallHandler[Req any, Resp any](
 		core.Responder().Respond(http.StatusOK, 0, "OK", resp, false, w)
 	}
 }
+
+type ConsumeHandlerType[Req any, Resp any] struct {
+	Title           string
+	Params          libCallApi.RemoteCallParamData[Req]
+	Path            string
+	Mode            libRequest.Type
+	VerifyHeader    bool
+	SaveToRequest   bool
+	HasReceipt      bool
+	Headers         []string
+	Api             string
+	Method          string
+	Query           string
+	RecoveryHandler func(any)
+}
+
+func (h *ConsumeHandlerType[Req, Resp]) Parameters() HandlerParameters {
+	return HandlerParameters{
+		Title:           h.Title,
+		Body:            h.Mode,
+		ValidateHeader:  h.VerifyHeader,
+		SaveToRequest:   h.SaveToRequest,
+		Path:            h.Path,
+		HasReceipt:      h.HasReceipt,
+		RecoveryHandler: h.RecoveryHandler,
+	}
+}
+
+func (h *ConsumeHandlerType[Req, Resp]) Initializer(req HandlerRequest[Req, Resp]) response.ErrorState {
+	for _, value := range req.W.Parser.GetUrlParams() {
+		//normalized := strings.ReplaceAll(param.Value, "*", "/")
+		h.Path += "/" + value //normalized
+	}
+	return nil
+}
+
+func (h *ConsumeHandlerType[Req, Resp]) Handler(req HandlerRequest[Req, Resp]) (Resp, response.ErrorState) {
+	headersMap := extractHeaders(req.W, h.Headers, nil)
+	resp, errCall := CallApiJSON[Req, Resp](req.W, req.Core, h.Title,
+		&libCallApi.RemoteCallParamData[Req]{
+			Api:         req.Core.Consumer().GetApi(h.Api),
+			Method:      h.Method,
+			Path:        h.Path,
+			Query:       h.Query,
+			JsonBody:    *req.Request,
+			ValidateTls: false,
+			EnableLog:   false,
+			Headers:     headersMap,
+		})
+	if errCall != nil {
+		return req.Response, errCall
+	}
+	return *resp, nil
+}
+
+func (h *ConsumeHandlerType[Req, Resp]) Simulation(req HandlerRequest[Req, Resp]) (Resp, response.ErrorState) {
+	return req.Response, nil
+}
+
+func (h *ConsumeHandlerType[Req, Resp]) Finalizer(req HandlerRequest[Req, Resp]) {}
+
+func ConsumeHandler[Req, Resp any](
+	core requestCore.RequestCoreInterface,
+	params *ConsumeHandlerType[Req, Resp],
+	simulation bool,
+) any {
+	return BaseHandler[Req, Resp, *ConsumeHandlerType[Req, Resp]](core, params, simulation)
+}

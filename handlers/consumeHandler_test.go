@@ -8,10 +8,12 @@ import (
 	"testing"
 
 	"github.com/DATA-DOG/go-sqlmock"
+	"github.com/gin-gonic/gin"
 	"github.com/hmmftg/requestCore"
 	"github.com/hmmftg/requestCore/libCallApi"
 	"github.com/hmmftg/requestCore/libContext"
 	"github.com/hmmftg/requestCore/libParams"
+	"github.com/hmmftg/requestCore/libRequest"
 	"github.com/hmmftg/requestCore/testingtools"
 	"gotest.tools/v3/assert"
 )
@@ -166,4 +168,59 @@ func TestCallRemoteHandler(t *testing.T) {
 				Silent:  true,
 			})
 	}
+}
+
+type testRemoteCallReq struct {
+	ID string `json:"id"`
+}
+
+type testRemoteCallResp struct {
+}
+
+func TestConsumeHandler(t *testing.T) {
+	testCases := []testingtools.TestCase{
+		{
+			Name:      "Valid",
+			Url:       "/",
+			Request:   testReq{ID: "1"},
+			Status:    200,
+			CheckBody: []string{"result", `"a"`},
+		},
+		{
+			Name:    "Invalid Request",
+			Url:     "/",
+			Request: map[string]any{"ss": "a"},
+			Status:  400,
+		},
+	}
+
+	env := testingtools.GetEnvWithDB[testingtools.TestEnv](
+		testingtools.SampleRequestModelMock(t, nil).DB,
+		testingtools.DefaultAPIList,
+	)
+
+	handler := ConsumeHandler[testRemoteCallReq, testRemoteCallResp](
+		env.Interface,
+		&ConsumeHandlerType[testRemoteCallReq, testRemoteCallResp]{
+			Title: "consume_handler",
+			Params: libCallApi.RemoteCallParamData[testRemoteCallReq]{
+				Headers: map[string]string{"H1": "a"},
+				Method:  "POST",
+			},
+			Api:           "simulation",
+			Path:          "users",
+			Mode:          libRequest.JSON,
+			VerifyHeader:  false,
+			SaveToRequest: false,
+		},
+		false,
+	)
+	gin.SetMode(gin.ReleaseMode)
+	testingtools.TestAPI(t, testCases, &testingtools.TestOptions{
+		Path:    "/",
+		Name:    "check consume handler",
+		Method:  "POST",
+		Handler: handler,
+		Silent:  false,
+	})
 }

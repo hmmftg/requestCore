@@ -164,6 +164,26 @@ func GetResp[Resp any, Error any](api RemoteApi, resp *http.Response) (*Resp, *E
 	return &respJson, &errJson, &CallResp{Status: resp.StatusCode, Headers: headerMap}, nil
 }
 
+func GetJSONResp[Resp any](api RemoteApi, resp *http.Response) (*Resp, response.ErrorState) {
+	responseData, err := io.ReadAll(resp.Body)
+	if err != nil {
+		if os.IsTimeout(err) {
+			return nil, response.Error(http.StatusRequestTimeout, "API_READ_TIMED_OUT", api.Name, err).Input("GetResp.ReadAll")
+		}
+		return nil, response.Error(http.StatusRequestTimeout, "API_UNABLE_TO_READ", api.Name, err).Input("GetResp.ReadAll")
+	}
+	var respJson Resp
+	err = json.Unmarshal(responseData, &respJson)
+	if err != nil {
+		return nil, response.Error(resp.StatusCode, "API_OK_RESP_JSON", api.Name, err).Input(fmt.Sprintf("GetResp.Unmarshal:%s", string(responseData)))
+	}
+	headerMap := make(map[string]string, 0)
+	for key, header := range resp.Header {
+		headerMap[key] = header[0]
+	}
+	return &respJson, nil
+}
+
 func PrepareCall(c CallData) (*http.Request, response.ErrorState) {
 	if timeOutString, ok := c.Headers["Time-Out"]; ok {
 		timeoutSeconds, _ := strconv.Atoi(timeOutString)
@@ -249,6 +269,42 @@ func ConsumeRest[Resp any](c CallData) (*Resp, *response.WsRemoteResponse, *Call
 	}
 
 	return respJson, errResp, callResp, nil
+}
+
+func ConsumeRestJSON[Resp any](c *CallData) (*Resp, response.ErrorState) {
+	if c.Timeout == 0 {
+		c.Timeout = time.Duration(30 * time.Second)
+	}
+
+	req, errPrepare := PrepareCall(*c)
+	if errPrepare != nil {
+		return nil, errPrepare.Input(c)
+	}
+
+	client := &http.Client{
+		Timeout: c.Timeout,
+		Transport: &http.Transport{
+			TLSClientConfig: &tls.Config{InsecureSkipVerify: c.SslVerify},
+		}}
+
+	if c.EnableLog {
+		req = c.SetLogs(req)
+	}
+	resp, err := client.Do(req)
+	if err != nil {
+		if os.IsTimeout(err) {
+			return nil, response.Error(http.StatusRequestTimeout, "API_CONNECT_TIMED_OUT", c, err).Input(fmt.Sprintf("ConsumeRest.ClientDo:%v", req))
+		}
+		return nil, response.Error(http.StatusRequestTimeout, "API_UNABLE_TO_CALL", c, err).Input(fmt.Sprintf("ConsumeRest.ClientDo:%v", req))
+	}
+	var respJson *Resp
+
+	respJson, errParse := GetJSONResp[Resp](c.Api, resp)
+	if errParse != nil {
+		return nil, errParse.Input(resp)
+	}
+
+	return respJson, nil
 }
 
 func TransmitRequestWithAuth(

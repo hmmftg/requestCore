@@ -3,6 +3,7 @@ package handlers
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 
 	"github.com/hmmftg/requestCore"
@@ -71,6 +72,30 @@ func CallApiWithReceipt[Resp any](
 		return nil, nil, err
 	}
 	return &result.Result, result.PrintReceipt, err
+}
+
+func CallApiJSON[Req, Resp any](
+	w webFramework.WebFramework,
+	core requestCore.RequestCoreInterface,
+	method string,
+	param *libCallApi.RemoteCallParamData[Req],
+) (*Resp, response.ErrorState) {
+	var reqLog libRequest.RequestPtr
+	dump, err := json.MarshalIndent(param, "", "  ")
+	if err == nil {
+		reqLog = core.RequestTools().LogStart(w, method, string(dump))
+	} else {
+		reqLog = core.RequestTools().LogStart(w, method, fmt.Sprintf("params: %+v", param))
+	}
+	resp, err := libCallApi.RemoteCall[Req, Resp](param)
+	dump, errJSON := json.MarshalIndent(resp, "", "  ")
+	if err == nil {
+		core.RequestTools().LogEnd(method, string(dump), reqLog)
+	} else {
+		log.Println(errJSON)
+		core.RequestTools().LogEnd(method, fmt.Sprintf("resp: %+v", resp), reqLog)
+	}
+	return resp, nil
 }
 
 func callApiNoLog[Resp any](

@@ -102,7 +102,9 @@ func (h DmlHandlerType[Req, Resp]) Simulation(req HandlerRequest[Req, Resp]) (Re
 	return req.Response, nil
 }
 func (h DmlHandlerType[Req, Resp]) Finalizer(req HandlerRequest[Req, Resp]) {
-	FinalizeDML(*req.Request, h.Key, req.Title, req.W, req.Core)
+	if req.RespSent {
+		FinalizeDML(*req.Request, h.Key, req.Title, req.W, req.Core)
+	}
 }
 
 func DmlHandler[Req libQuery.DmlModel](

@@ -74,6 +74,7 @@ func BaseHandler[Req any, Resp any, Handler HandlerInterface[Req, Resp]](
 		}
 
 		defer func() {
+			handler.Finalizer(trx)
 			if r := recover(); r != nil {
 				if params.RecoveryHandler != nil {
 					params.RecoveryHandler(r)
@@ -89,7 +90,6 @@ func BaseHandler[Req any, Resp any, Handler HandlerInterface[Req, Resp]](
 				panic(r)
 			}
 
-			handler.Finalizer(trx)
 		}()
 
 		if simulation {
