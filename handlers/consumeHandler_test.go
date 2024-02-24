@@ -205,32 +205,35 @@ func (h testConsumeHandlerType[Req, Resp]) Parameters() HandlerParameters {
 		nil,
 	}
 }
-func (h testConsumeHandlerType[Req, Resp]) Initializer(req HandlerRequest[Req, testRemoteCallResp]) response.ErrorState {
+func (h testConsumeHandlerType[Req, Resp]) Initializer(req HandlerRequest[Req, WsResponse[testRemoteCallResp]]) response.ErrorState {
 	return nil
 }
-func (h testConsumeHandlerType[Req, Resp]) Handler(req HandlerRequest[Req, testRemoteCallResp]) (testRemoteCallResp, response.ErrorState) {
-	resp := testRemoteCallResp{
-		Result: "a",
+func (h testConsumeHandlerType[Req, Resp]) Handler(req HandlerRequest[Req, WsResponse[testRemoteCallResp]]) (WsResponse[testRemoteCallResp], response.ErrorState) {
+	ws := WsResponse[testRemoteCallResp]{
+		Result: testRemoteCallResp{
+			Result: "a",
+		},
+	}
+	return ws, nil
+}
+func (h testConsumeHandlerType[Req, Resp]) Simulation(req HandlerRequest[Req, WsResponse[testRemoteCallResp]]) (WsResponse[testRemoteCallResp], response.ErrorState) {
+	ws := WsResponse[testRemoteCallResp]{
+		Result: testRemoteCallResp{
+			Result: "a",
+		},
 	}
 
-	return resp, nil
+	return ws, nil
 }
-func (h testConsumeHandlerType[Req, Resp]) Simulation(req HandlerRequest[Req, testRemoteCallResp]) (testRemoteCallResp, response.ErrorState) {
-	resp := testRemoteCallResp{
-		Result: "a",
-	}
-
-	return resp, nil
-}
-func (h testConsumeHandlerType[Req, Resp]) Finalizer(req HandlerRequest[Req, testRemoteCallResp]) {
+func (h testConsumeHandlerType[Req, Resp]) Finalizer(req HandlerRequest[Req, WsResponse[testRemoteCallResp]]) {
 }
 
 func testConsumeHandler[Req, Resp any](
 	core requestCore.RequestCoreInterface,
-	params *testConsumeHandlerType[Req, testRemoteCallResp],
+	params *testConsumeHandlerType[Req, WsResponse[testRemoteCallResp]],
 	simulation bool,
 ) any {
-	return BaseHandler[Req, testRemoteCallResp, *testConsumeHandlerType[Req, testRemoteCallResp]](core, params, simulation)
+	return BaseHandler[Req, WsResponse[testRemoteCallResp], *testConsumeHandlerType[Req, WsResponse[testRemoteCallResp]]](core, params, simulation)
 }
 
 func TestConsumeHandler(t *testing.T) {
@@ -255,9 +258,9 @@ func TestConsumeHandler(t *testing.T) {
 		testingtools.DefaultAPIList,
 	)
 
-	handler := testConsumeHandler[testRemoteCallReq, testRemoteCallResp](
+	handler := testConsumeHandler[testRemoteCallReq, WsResponse[testRemoteCallResp]](
 		env.Interface,
-		&testConsumeHandlerType[testRemoteCallReq, testRemoteCallResp]{
+		&testConsumeHandlerType[testRemoteCallReq, WsResponse[testRemoteCallResp]]{
 			Title: "consume_handler",
 			Params: libCallApi.RemoteCallParamData[testRemoteCallReq]{
 				Headers: map[string]string{"H1": "a"},
