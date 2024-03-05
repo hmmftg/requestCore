@@ -1,0 +1,5 @@
+package libQuery
+
+func TestQueryRunner() {
+
+}

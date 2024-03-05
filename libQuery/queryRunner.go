@@ -67,7 +67,11 @@ func (m QueryRunnerModel) QueryRunner(querySql string, args ...any) (int, []any,
 			case "BOOL":
 				scanArgs[i] = new(sql.NullBool)
 			case "INT4", "INT64", "NUMBER":
-				scanArgs[i] = new(sql.NullInt64)
+				if p, _, ok := v.DecimalSize(); ok && p > 0 {
+					scanArgs[i] = new(sql.NullFloat64)
+				} else {
+					scanArgs[i] = new(sql.NullInt64)
+				}
 			default:
 				//log.Println("Undefined Type Name: ", v.DatabaseTypeName())
 				scanArgs[i] = new(sql.NullString)
