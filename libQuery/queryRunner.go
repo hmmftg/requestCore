@@ -209,9 +209,6 @@ func GetQueryResp[R any](query string, core QueryRunnerInterface, args ...any) (
 	if nRet != 0 || err != nil {
 		return http.StatusInternalServerError, DB_READ_ERROR, err.Error(), true, nil, err
 	}
-	if err != nil {
-		return http.StatusBadRequest, PARSE_DB_RESP_ERROR, "Unable to parse response", true, nil, err
-	}
 	return http.StatusOK, "", "", false, result, nil
 }
 
@@ -238,9 +235,6 @@ func GetQuery[R any](query string, core QueryRunnerInterface, args ...any) ([]R,
 	}
 	if nRet != 0 || err != nil {
 		return nil, response.ToError(DB_READ_ERROR, err.Error(), err)
-	}
-	if err != nil {
-		return nil, response.ToError(PARSE_DB_RESP_ERROR, "Unable to parse response", err)
 	}
 	rows, ok := result.([]R)
 	if !ok {
