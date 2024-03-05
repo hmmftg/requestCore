@@ -59,7 +59,12 @@ func ParseQueryResult(result map[string]any, t reflect.Type, v reflect.Value) {
 		case int64:
 			v.FieldByName(t.Field(i).Name).SetInt(result[tag].(int64))
 		case float64:
-			v.FieldByName(t.Field(i).Name).SetFloat(result[tag].(float64))
+			switch v.FieldByName(t.Field(i).Name).Type().Kind() {
+			case reflect.Int64:
+				v.FieldByName(t.Field(i).Name).SetInt(int64(result[tag].(float64)))
+			case reflect.Float64:
+				v.FieldByName(t.Field(i).Name).SetFloat(result[tag].(float64))
+			}
 		}
 	}
 }

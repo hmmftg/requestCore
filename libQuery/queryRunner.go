@@ -6,6 +6,7 @@ import (
 	"log"
 	"net/http"
 	"reflect"
+	"slices"
 	"strings"
 
 	"github.com/hmmftg/requestCore/libError"
@@ -23,13 +24,13 @@ const (
 	SCAN_ERROR    = -4
 )
 
-func (m QueryRunnerModel) QueryRunner(querySql string, args ...any) (int, []any, error) {
+func (m QueryRunnerModel) QueryRunner(querySql string, args ...any) (int, []map[string]any, error) {
 	errPing := m.DB.Ping()
 	if errPing != nil {
 		log.Println("error in ping", errPing)
 	}
 	stmt, err := m.DB.Prepare(querySql)
-	finalRows := []any{}
+	finalRows := []map[string]any{}
 	errorData := map[string]any{}
 	if err != nil {
 		errorData["step"] = "prepare"
@@ -55,29 +56,31 @@ func (m QueryRunnerModel) QueryRunner(querySql string, args ...any) (int, []any,
 
 	count := len(columnTypes)
 
-	for rows.Next() {
+	baseArgs := make([]any, count)
 
-		scanArgs := make([]any, count)
-
-		for i, v := range columnTypes {
-
-			switch v.DatabaseTypeName() {
-			case "NCHAR", "VARCHAR", "_VARCHAR", "TEXT", "UUID", "TIMESTAMP", "TIMESTAMP WITHOUT TIME ZONE", "JSON", "CHAR", "DATE", "ROWID":
-				scanArgs[i] = new(sql.NullString)
-			case "BOOL":
-				scanArgs[i] = new(sql.NullBool)
-			case "INT4", "INT64", "NUMBER":
-				if p, _, ok := v.DecimalSize(); ok && p > 0 {
-					scanArgs[i] = new(sql.NullFloat64)
-				} else {
-					scanArgs[i] = new(sql.NullInt64)
-				}
-			default:
-				//log.Println("Undefined Type Name: ", v.DatabaseTypeName())
-				scanArgs[i] = new(sql.NullString)
+	for i, v := range columnTypes {
+		switch v.DatabaseTypeName() {
+		case "NCHAR", "VARCHAR", "_VARCHAR", "TEXT", "CHAR",
+			"UUID", "ROWID",
+			"TIMESTAMP", "TIMESTAMP WITHOUT TIME ZONE", "DATE",
+			"JSON":
+			baseArgs[i] = new(sql.Null[string])
+		case "BOOL":
+			baseArgs[i] = new(sql.Null[bool])
+		case "INT4", "INT64", "NUMBER":
+			if p, _, ok := v.DecimalSize(); ok && p > 0 {
+				baseArgs[i] = new(sql.Null[float64])
+			} else {
+				baseArgs[i] = new(sql.Null[int64])
 			}
+		default:
+			//log.Println("Undefined Type Name: ", v.DatabaseTypeName())
+			baseArgs[i] = new(sql.Null[string])
 		}
+	}
 
+	for rows.Next() {
+		scanArgs := slices.Clone(baseArgs)
 		err := rows.Scan(scanArgs...)
 
 		if err != nil {
@@ -89,33 +92,25 @@ func (m QueryRunnerModel) QueryRunner(querySql string, args ...any) (int, []any,
 		masterData := map[string]any{}
 
 		for i, v := range columnTypes {
-
-			if z, ok := (scanArgs[i]).(*sql.NullBool); ok {
-				masterData[v.Name()] = z.Bool
-				continue
+			switch z := (scanArgs[i]).(type) {
+			case *sql.Null[string]:
+				masterData[v.Name()] = z.V
+			case *sql.Null[bool]:
+				masterData[v.Name()] = z.V
+			case *sql.Null[int64]:
+				masterData[v.Name()] = z.V
+			case *sql.Null[float64]:
+				switch masterData[v.Name()].(type) {
+				case int64:
+					masterData[v.Name()] = int64(z.V)
+				case float64:
+					masterData[v.Name()] = z.V
+				}
+			case *sql.Null[int32]:
+				masterData[v.Name()] = z.V
+			default:
+				masterData[v.Name()] = scanArgs[i]
 			}
-
-			if z, ok := (scanArgs[i]).(*sql.NullString); ok {
-				masterData[v.Name()] = z.String
-				continue
-			}
-
-			if z, ok := (scanArgs[i]).(*sql.NullInt64); ok {
-				masterData[v.Name()] = z.Int64
-				continue
-			}
-
-			if z, ok := (scanArgs[i]).(*sql.NullFloat64); ok {
-				masterData[v.Name()] = z.Float64
-				continue
-			}
-
-			if z, ok := (scanArgs[i]).(*sql.NullInt32); ok {
-				masterData[v.Name()] = z.Int32
-				continue
-			}
-
-			masterData[v.Name()] = scanArgs[i]
 		}
 
 		finalRows = append(finalRows, masterData)
@@ -183,7 +178,7 @@ func (m QueryRunnerModel) QueryToStruct(querySql string, target any, args ...any
 	elemSlice := reflect.MakeSlice(reflect.SliceOf(elemType), 0, len(results))
 	for _, row := range results {
 		newRow := reflect.New(elemType).Elem()
-		ParseQueryResult(row.(map[string]any), elemType, newRow)
+		ParseQueryResult(row, elemType, newRow)
 		elemSlice = reflect.Append(elemSlice, newRow)
 	}
 

@@ -48,7 +48,7 @@ func Init(
 }
 
 type QueryRunnerInterface interface {
-	QueryRunner(querySql string, args ...any) (int, []any, error)
+	QueryRunner(querySql string, args ...any) (int, []map[string]any, error)
 	QueryToStruct(querySql string, target any, args ...any) (int, any, error)
 	CallDbFunction(callString string, args ...any) (int, string, error)
 	GetModule() (string, string)
