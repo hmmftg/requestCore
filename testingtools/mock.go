@@ -12,7 +12,7 @@ import (
 
 // GetSelectModel handles selecting a single or all items in mock DB model.
 func GetSelectModel(t *testing.T, m Model) libQuery.QueryRunnerModel {
-	db, mock, mockErr := sqlmock.New(sqlmock.ValueConverterOption(customMockConverter{}))
+	db, mock, mockErr := sqlmock.New(sqlmock.ValueConverterOption(CustomMockConverter{}))
 	if mockErr != nil {
 		t.Fatalf("failed to start mock DB: %v", mockErr)
 	}
@@ -54,7 +54,7 @@ func GetSelectModel(t *testing.T, m Model) libQuery.QueryRunnerModel {
 
 // GetDMLModel handles INSERT, UPDATE, and DELETE in mock DB models.
 func GetDMLModel(t *testing.T, m Model) libQuery.QueryRunnerModel {
-	db, mock, mockErr := sqlmock.New(sqlmock.ValueConverterOption(customMockConverter{}))
+	db, mock, mockErr := sqlmock.New(sqlmock.ValueConverterOption(CustomMockConverter{}))
 	if mockErr != nil {
 		t.Fatalf("failed to start mock DB: %v", mockErr)
 	}

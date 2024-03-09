@@ -58,25 +58,8 @@ func (m QueryRunnerModel) QueryRunner(querySql string, args ...any) (int, []map[
 
 	baseArgs := make([]any, count)
 
-	for i, v := range columnTypes {
-		switch v.DatabaseTypeName() {
-		case "NCHAR", "VARCHAR", "_VARCHAR", "TEXT", "CHAR",
-			"UUID", "ROWID",
-			"TIMESTAMP", "TIMESTAMP WITHOUT TIME ZONE", "DATE",
-			"JSON":
-			baseArgs[i] = new(sql.Null[string])
-		case "BOOL":
-			baseArgs[i] = new(sql.Null[bool])
-		case "INT4", "INT64", "NUMBER":
-			if p, _, ok := v.DecimalSize(); ok && p > 0 {
-				baseArgs[i] = new(sql.Null[float64])
-			} else {
-				baseArgs[i] = new(sql.Null[int64])
-			}
-		default:
-			//log.Println("Undefined Type Name: ", v.DatabaseTypeName())
-			baseArgs[i] = new(sql.Null[string])
-		}
+	for i := range columnTypes {
+		baseArgs[i] = new(sql.Null[any])
 	}
 
 	for rows.Next() {
@@ -92,25 +75,7 @@ func (m QueryRunnerModel) QueryRunner(querySql string, args ...any) (int, []map[
 		masterData := map[string]any{}
 
 		for i, v := range columnTypes {
-			switch z := (scanArgs[i]).(type) {
-			case *sql.Null[string]:
-				masterData[v.Name()] = z.V
-			case *sql.Null[bool]:
-				masterData[v.Name()] = z.V
-			case *sql.Null[int64]:
-				masterData[v.Name()] = z.V
-			case *sql.Null[float64]:
-				switch masterData[v.Name()].(type) {
-				case int64:
-					masterData[v.Name()] = int64(z.V)
-				case float64:
-					masterData[v.Name()] = z.V
-				}
-			case *sql.Null[int32]:
-				masterData[v.Name()] = z.V
-			default:
-				masterData[v.Name()] = scanArgs[i]
-			}
+			masterData[v.Name()] = scanArgs[i].(*sql.Null[any]).V
 		}
 
 		finalRows = append(finalRows, masterData)

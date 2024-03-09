@@ -57,15 +57,34 @@ func ParseQueryResult(result map[string]any, t reflect.Type, v reflect.Value) {
 		case bool:
 			v.FieldByName(t.Field(i).Name).SetBool(result[tag].(bool))
 		case int64:
-			v.FieldByName(t.Field(i).Name).SetInt(result[tag].(int64))
+			switch t.Field(i).Type.Kind() {
+			case reflect.Int64:
+				v.FieldByName(t.Field(i).Name).SetInt(result[tag].(int64))
+			case reflect.Float64:
+				v.FieldByName(t.Field(i).Name).SetFloat(float64(result[tag].(int64)))
+			default:
+				log.Printf("ParseQueryResult, unknown int64 sub-type: %s->%T\n",
+					v.FieldByName(t.Field(i).Name).Type().String(),
+					result[tag])
+			}
 		case float64:
-			switch v.FieldByName(t.Field(i).Name).Type().Kind() {
+			switch t.Field(i).Type.Kind() {
 			case reflect.Int64:
 				v.FieldByName(t.Field(i).Name).SetInt(int64(result[tag].(float64)))
 			case reflect.Float64:
 				v.FieldByName(t.Field(i).Name).SetFloat(result[tag].(float64))
+			default:
+				log.Printf("ParseQueryResult, unknown float sub-type: %s->%T\n",
+					v.FieldByName(t.Field(i).Name).Type().String(),
+					result[tag])
 			}
+		case time.Time:
+			v.FieldByName(t.Field(i).Name).Set(reflect.ValueOf(result[tag]))
+		case nil:
+		default:
+			log.Printf("ParseQueryResult, unknown type: %T\n", result[tag])
 		}
+
 	}
 }
 

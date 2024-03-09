@@ -16,7 +16,7 @@ import (
 	"github.com/hmmftg/requestCore/libQuery"
 )
 
-type customMockConverter struct{}
+type CustomMockConverter struct{}
 
 type Model struct {
 	Query   string
@@ -65,11 +65,13 @@ const (
 	pgSign     string = "$"
 )
 
-func (customMockConverter) ConvertValue(v interface{}) (driver.Value, error) {
+func (CustomMockConverter) ConvertValue(v interface{}) (driver.Value, error) {
 	switch value := v.(type) {
 	case string:
 		return value, nil
 	case int64:
+		return value, nil
+	case float64:
 		return value, nil
 	case sql.Out:
 		return value, nil
