@@ -2,7 +2,6 @@ package handlers
 
 import (
 	"context"
-	"strconv"
 	"strings"
 	"testing"
 
@@ -13,7 +12,7 @@ import (
 	"github.com/hmmftg/requestCore/testingtools"
 )
 
-func (env *testCallRemoteEnv) handlerCallAPI(url, method string, isJSON, hasQuery bool, queryStack *[]string) any {
+func (env *testCallRemoteEnv) handlerCallAPI(method string, queryStack *[]string) any {
 	return func(c context.Context) {
 		w := libContext.InitContextNoAuditTrail(c)
 		req, _, err := libRequest.ParseRequest[libCallApi.CallParamData](
@@ -107,8 +106,6 @@ func TestCallAPI(t *testing.T) {
 		if len(args) != 4 {
 			t.Fatalf("invalid test declaration for url: %s\n", args)
 		}
-		isJ, _ := strconv.ParseBool(args[2])
-		isQ, _ := strconv.ParseBool(args[3])
 
 		testingtools.TestDB(
 			t,
@@ -117,7 +114,7 @@ func TestCallAPI(t *testing.T) {
 				Path:    "/",
 				Name:    "check call api",
 				Method:  "GET",
-				Handler: env.handlerCallAPI(args[0], args[1], isJ, isQ, &queryStack),
+				Handler: env.handlerCallAPI(args[1], &queryStack),
 				Silent:  true,
 			})
 	}

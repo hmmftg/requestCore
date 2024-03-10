@@ -164,7 +164,7 @@ func GetResp[Resp any, Error any](api RemoteApi, resp *http.Response) (*Resp, *E
 	return &respJson, &errJson, &CallResp{Status: resp.StatusCode, Headers: headerMap}, nil
 }
 
-func GetJSONResp[Resp any](api RemoteApi, resp *http.Response) (*Resp, response.ErrorState) {
+func GetJSONResp[Resp ApiResp](api RemoteApi, resp *http.Response) (*Resp, response.ErrorState) {
 	responseData, err := io.ReadAll(resp.Body)
 	if err != nil {
 		if os.IsTimeout(err) {
@@ -173,6 +173,7 @@ func GetJSONResp[Resp any](api RemoteApi, resp *http.Response) (*Resp, response.
 		return nil, response.Error(http.StatusRequestTimeout, "API_UNABLE_TO_READ", api.Name, err).Input("GetResp.ReadAll")
 	}
 	var respJson Resp
+	respJson.SetStatus(resp.StatusCode)
 	err = json.Unmarshal(responseData, &respJson)
 	if err != nil {
 		return nil, response.Error(resp.StatusCode, "API_OK_RESP_JSON", api.Name, err).Input(fmt.Sprintf("GetResp.Unmarshal:%s", string(responseData)))
@@ -181,6 +182,7 @@ func GetJSONResp[Resp any](api RemoteApi, resp *http.Response) (*Resp, response.
 	for key, header := range resp.Header {
 		headerMap[key] = header[0]
 	}
+	respJson.SetHeaders(headerMap)
 	return &respJson, nil
 }
 
@@ -271,7 +273,7 @@ func ConsumeRest[Resp any](c CallData) (*Resp, *response.WsRemoteResponse, *Call
 	return respJson, errResp, callResp, nil
 }
 
-func ConsumeRestJSON[Resp any](c *CallData) (*Resp, response.ErrorState) {
+func ConsumeRestJSON[Resp ApiResp](c *CallData) (*Resp, response.ErrorState) {
 	if c.Timeout == 0 {
 		c.Timeout = time.Duration(30 * time.Second)
 	}

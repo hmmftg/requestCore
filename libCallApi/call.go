@@ -64,7 +64,12 @@ func Call[RespType any](param CallParam) CallResult[RespType] {
 	return CallResult[RespType]{resp, wsResp, callResp, err}
 }
 
-func RemoteCall[Req, Resp any](param *RemoteCallParamData[Req]) (*Resp, response.ErrorState) {
+type ApiResp interface {
+	SetStatus(int)
+	SetHeaders(map[string]string)
+}
+
+func RemoteCall[Req any, Resp ApiResp](param *RemoteCallParamData[Req]) (*Resp, response.ErrorState) {
 	if param.QueryStack != nil && len(*param.QueryStack) > 0 {
 		param.Query = (*param.QueryStack)[0]
 		if len(*param.QueryStack) > 1 {

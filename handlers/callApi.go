@@ -74,7 +74,7 @@ func CallApiWithReceipt[Resp any](
 	return &result.Result, result.PrintReceipt, err
 }
 
-func CallApiJSON[Req, Resp any](
+func CallApiJSON[Req any, Resp libCallApi.ApiResp](
 	w webFramework.WebFramework,
 	core requestCore.RequestCoreInterface,
 	method string,
@@ -99,7 +99,7 @@ func CallApiJSON[Req, Resp any](
 }
 
 func callApiNoLog[Resp any](
-	method string,
+	_ string,
 	param libCallApi.CallParam) (*Resp, error) {
 	resp1 := libCallApi.Call[Resp](param)
 

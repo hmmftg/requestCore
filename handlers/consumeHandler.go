@@ -415,7 +415,7 @@ func CallHandler[Req any, Resp any](
 	}
 }
 
-type ConsumeHandlerType[Req any, Resp any] struct {
+type ConsumeHandlerType[Req any, Resp libCallApi.ApiResp] struct {
 	Title           string
 	Params          libCallApi.RemoteCallParamData[Req]
 	Path            string
@@ -475,7 +475,7 @@ func (h *ConsumeHandlerType[Req, Resp]) Simulation(req HandlerRequest[Req, Resp]
 
 func (h *ConsumeHandlerType[Req, Resp]) Finalizer(req HandlerRequest[Req, Resp]) {}
 
-func ConsumeHandler[Req, Resp any](
+func ConsumeHandler[Req any, Resp libCallApi.ApiResp](
 	core requestCore.RequestCoreInterface,
 	params *ConsumeHandlerType[Req, Resp],
 	simulation bool,
