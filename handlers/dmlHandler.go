@@ -112,6 +112,7 @@ func DmlHandler[Req libQuery.DmlModel](
 	core requestCore.RequestCoreInterface,
 	mode libRequest.Type,
 	validateHeader bool,
+	simulation bool,
 	recoveryHandler func(any),
 ) any {
 	return BaseHandler[Req, map[string]any, DmlHandlerType[Req, map[string]any]](core,
@@ -123,7 +124,7 @@ func DmlHandler[Req libQuery.DmlModel](
 			Path:            path,
 			RecoveryHandler: recoveryHandler,
 		},
-		false)
+		simulation)
 }
 
 func DmlHandlerOld[Req libQuery.DmlModel](
