@@ -14,11 +14,20 @@ import (
 )
 
 type WsResponse[Result any] struct {
+	HttpStatus   int                      `json:"-"`
+	HttpHeaders  map[string]string        `json:"-"`
 	Status       int                      `json:"status"`
 	Description  string                   `json:"description"`
 	Result       Result                   `json:"result,omitempty"`
 	ErrorData    []response.ErrorResponse `json:"errors,omitempty"`
 	PrintReceipt *response.Receipt        `json:"printReceipt,omitempty"`
+}
+
+func (w *WsResponse[any]) SetStatus(status int) {
+	w.HttpStatus = status
+}
+func (w *WsResponse[any]) SetHeaders(headers map[string]string) {
+	w.HttpHeaders = headers
 }
 
 func callApi[Resp any](
