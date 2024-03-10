@@ -66,6 +66,7 @@ func (env *testDMLEnv) handler() any {
 		env.Interface,
 		libRequest.JSON,
 		true,
+		false,
 		nil,
 	)
 }
