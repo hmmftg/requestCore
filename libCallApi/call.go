@@ -69,7 +69,7 @@ type ApiResp interface {
 	SetHeaders(map[string]string)
 }
 
-func RemoteCall[Req any, Resp ApiResp](param *RemoteCallParamData[Req]) (*Resp, response.ErrorState) {
+func RemoteCall[Req any, Resp ApiResp](param *RemoteCallParamData[Req]) (ApiResp, response.ErrorState) {
 	if param.QueryStack != nil && len(*param.QueryStack) > 0 {
 		param.Query = (*param.QueryStack)[0]
 		if len(*param.QueryStack) > 1 {

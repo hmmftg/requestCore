@@ -88,7 +88,7 @@ func CallApiJSON[Req any, Resp libCallApi.ApiResp](
 	core requestCore.RequestCoreInterface,
 	method string,
 	param *libCallApi.RemoteCallParamData[Req],
-) (*Resp, response.ErrorState) {
+) (Resp, response.ErrorState) {
 	var reqLog libRequest.RequestPtr
 	dump, err := json.MarshalIndent(param, "", "  ")
 	if err == nil {
@@ -104,7 +104,7 @@ func CallApiJSON[Req any, Resp libCallApi.ApiResp](
 		log.Println(errJSON)
 		core.RequestTools().LogEnd(method, fmt.Sprintf("resp: %+v", resp), reqLog)
 	}
-	return resp, nil
+	return resp.(Resp), nil
 }
 
 func callApiNoLog[Resp any](

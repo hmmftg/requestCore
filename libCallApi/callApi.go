@@ -164,7 +164,7 @@ func GetResp[Resp any, Error any](api RemoteApi, resp *http.Response) (*Resp, *E
 	return &respJson, &errJson, &CallResp{Status: resp.StatusCode, Headers: headerMap}, nil
 }
 
-func GetJSONResp[Resp ApiResp](api RemoteApi, resp *http.Response) (*Resp, response.ErrorState) {
+func GetJSONResp[Resp ApiResp](api RemoteApi, resp *http.Response) (ApiResp, response.ErrorState) {
 	responseData, err := io.ReadAll(resp.Body)
 	if err != nil {
 		if os.IsTimeout(err) {
@@ -183,7 +183,7 @@ func GetJSONResp[Resp ApiResp](api RemoteApi, resp *http.Response) (*Resp, respo
 		headerMap[key] = header[0]
 	}
 	respJson.SetHeaders(headerMap)
-	return &respJson, nil
+	return respJson, nil
 }
 
 func PrepareCall(c CallData) (*http.Request, response.ErrorState) {
@@ -273,7 +273,7 @@ func ConsumeRest[Resp any](c CallData) (*Resp, *response.WsRemoteResponse, *Call
 	return respJson, errResp, callResp, nil
 }
 
-func ConsumeRestJSON[Resp ApiResp](c *CallData) (*Resp, response.ErrorState) {
+func ConsumeRestJSON[Resp ApiResp](c *CallData) (ApiResp, response.ErrorState) {
 	if c.Timeout == 0 {
 		c.Timeout = time.Duration(30 * time.Second)
 	}
@@ -299,7 +299,6 @@ func ConsumeRestJSON[Resp ApiResp](c *CallData) (*Resp, response.ErrorState) {
 		}
 		return nil, response.Error(http.StatusRequestTimeout, "API_UNABLE_TO_CALL", c, err).Input(fmt.Sprintf("ConsumeRest.ClientDo:%v", req))
 	}
-	var respJson *Resp
 
 	respJson, errParse := GetJSONResp[Resp](c.Api, resp)
 	if errParse != nil {
