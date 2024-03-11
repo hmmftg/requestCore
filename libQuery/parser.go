@@ -16,9 +16,8 @@ import (
 func ParseQueryResult(result map[string]any, t reflect.Type, v reflect.Value) {
 	for i := 0; i < t.NumField(); i++ {
 		tag := t.Field(i).Tag.Get("db")
-		switch result[tag].(type) {
+		switch value := result[tag].(type) {
 		case string:
-			value := result[tag].(string)
 			if value == "true" || value == "false" {
 				bl, _ := strconv.ParseBool(value)
 				v.FieldByName(t.Field(i).Name).SetBool(bl)
@@ -55,13 +54,13 @@ func ParseQueryResult(result map[string]any, t reflect.Type, v reflect.Value) {
 				}
 			}
 		case bool:
-			v.FieldByName(t.Field(i).Name).SetBool(result[tag].(bool))
+			v.FieldByName(t.Field(i).Name).SetBool(value)
 		case int64:
 			switch t.Field(i).Type.Kind() {
 			case reflect.Int64:
-				v.FieldByName(t.Field(i).Name).SetInt(result[tag].(int64))
+				v.FieldByName(t.Field(i).Name).SetInt(value)
 			case reflect.Float64:
-				v.FieldByName(t.Field(i).Name).SetFloat(float64(result[tag].(int64)))
+				v.FieldByName(t.Field(i).Name).SetFloat(float64(value))
 			default:
 				log.Printf("ParseQueryResult, unknown int64 sub-type: %s->%T\n",
 					v.FieldByName(t.Field(i).Name).Type().String(),
@@ -70,9 +69,9 @@ func ParseQueryResult(result map[string]any, t reflect.Type, v reflect.Value) {
 		case float64:
 			switch t.Field(i).Type.Kind() {
 			case reflect.Int64:
-				v.FieldByName(t.Field(i).Name).SetInt(int64(result[tag].(float64)))
+				v.FieldByName(t.Field(i).Name).SetInt(int64(value))
 			case reflect.Float64:
-				v.FieldByName(t.Field(i).Name).SetFloat(result[tag].(float64))
+				v.FieldByName(t.Field(i).Name).SetFloat(value)
 			default:
 				log.Printf("ParseQueryResult, unknown float sub-type: %s->%T\n",
 					v.FieldByName(t.Field(i).Name).Type().String(),
@@ -81,6 +80,26 @@ func ParseQueryResult(result map[string]any, t reflect.Type, v reflect.Value) {
 		case time.Time:
 			v.FieldByName(t.Field(i).Name).Set(reflect.ValueOf(result[tag]))
 		case nil:
+		case []uint8:
+			switch t.Field(i).Type.Kind() {
+			case reflect.String:
+				v.FieldByName(t.Field(i).Name).SetString(string(value))
+			case reflect.Slice:
+				sValue := string(value)
+				if strings.HasPrefix(sValue, "{") && strings.HasSuffix(sValue, "}") {
+					values := strings.Split(sValue[1:len(sValue)-1], ",")
+					slice := reflect.MakeSlice(reflect.TypeOf([]string{}), 0, 0)
+					for _, member := range values {
+						newSlice := reflect.Append(slice, reflect.ValueOf(member))
+						v.FieldByName(t.Field(i).Name).Set(newSlice)
+						slice = v.FieldByName(t.Field(i).Name)
+					}
+				}
+			default:
+				log.Printf("ParseQueryResult, unknown []uint8 sub-type: %s->%T\n",
+					v.FieldByName(t.Field(i).Name).Type().String(),
+					value)
+			}
 		default:
 			log.Printf("ParseQueryResult, unknown type: %T\n", result[tag])
 		}
