@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"net/http"
 
@@ -79,13 +80,24 @@ func BaseHandler[Req any, Resp any, Handler HandlerInterface[Req, Resp]](
 				if params.RecoveryHandler != nil {
 					params.RecoveryHandler(r)
 				} else {
-					core.Responder().Error(w,
-						response.Error(
-							http.StatusInternalServerError,
-							response.SYSTEM_FAULT,
-							response.SYSTEM_FAULT_DESC,
-							libError.Join(r.(error), "error in %s", params.Title),
-						))
+					switch data := r.(type) {
+					case error:
+						core.Responder().Error(w,
+							response.Error(
+								http.StatusInternalServerError,
+								response.SYSTEM_FAULT,
+								response.SYSTEM_FAULT_DESC,
+								libError.Join(data, "error in %s", params.Title),
+							))
+					default:
+						core.Responder().Error(w,
+							response.Error(
+								http.StatusInternalServerError,
+								response.SYSTEM_FAULT,
+								response.SYSTEM_FAULT_DESC,
+								fmt.Errorf("error in %s=> %+v", params.Title, data),
+							))
+					}
 				}
 				panic(r)
 			}
