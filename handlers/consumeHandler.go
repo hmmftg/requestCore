@@ -3,102 +3,20 @@ package handlers
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"log"
 	"net/http"
 	"net/url"
-	"strconv"
 	"strings"
 
 	"github.com/hmmftg/requestCore"
 	"github.com/hmmftg/requestCore/libCallApi"
 	"github.com/hmmftg/requestCore/libContext"
 	"github.com/hmmftg/requestCore/libError"
-	"github.com/hmmftg/requestCore/libQuery"
 	"github.com/hmmftg/requestCore/libRequest"
 	"github.com/hmmftg/requestCore/response"
 	"github.com/hmmftg/requestCore/webFramework"
 )
-
-func ConsumeRemoteGet(
-	w webFramework.WebFramework,
-	api, url string,
-	core requestCore.RequestCoreInterface,
-	args ...any) (int, int, string, any, bool, error) {
-	var params []any
-	for _, arg := range args {
-		switch arg.(type) {
-		case string:
-			if arg == "QUERY" {
-				continue
-			}
-			argString := arg.(string)
-			if len(w.Parser.GetUrlParam(argString)) > 0 {
-				params = append(params, w.Parser.GetUrlParam(argString))
-			} else {
-				if strings.Contains(argString, ":") {
-					argSplit := strings.Split(argString, ":")
-					switch argSplit[0] {
-					case "db":
-						_, _, _, argDb, err := libQuery.CallSql[libQuery.QueryData](argSplit[1], core.GetDB())
-						if err != nil {
-							return http.StatusBadRequest, 1, "UNABLE_TO_PARSE_DB_ARG", "unable to parse db argument", true, err
-						}
-						params = append(params, argDb[0].Value)
-					case "consume":
-						consumeArgs := strings.Split(argSplit[1], ",")
-						// 200, 0, "OK", resp.Result, false, nil
-						_, _, _, remoteData, _, err := ConsumeRemoteGet(w, consumeArgs[0], consumeArgs[1], core, consumeArgs[2])
-						if err != nil {
-							return http.StatusBadRequest, 1, "UNABLE_TO_PARSE_DB_ARG", "unable to parse db argument", true, err
-						}
-						remoteMap := remoteData.(map[string]any)
-						params = append(params, remoteMap[consumeArgs[3]])
-					}
-				} else {
-					params = append(params, w.Parser.GetLocalString(argString))
-				}
-			}
-		}
-	}
-	path := fmt.Sprintf(url, params...)
-
-	reqLog := core.RequestTools().LogStart(w, "ConsumeRemoteGet", path)
-	headersMap := extractHeaders(w, DefaultHeaders(), DefaultLocals())
-
-	respBytes, desc, err := core.Consumer().ConsumeRestBasicAuthApi(nil, api, path, "application/x-www-form-urlencoded", "GET", headersMap)
-	if err != nil {
-		return http.StatusInternalServerError, 1, desc, string(respBytes), true, err
-	}
-	core.RequestTools().LogEnd("ConsumeRemoteGet", desc, reqLog)
-
-	var resp response.WsRemoteResponse
-	err = json.Unmarshal(respBytes, &resp)
-	if err != nil {
-		return http.StatusInternalServerError, 1, "invalid resp from " + api, err.Error(), true, err
-	}
-	stat, err := strconv.Atoi(strings.Split(desc, " ")[0])
-	if stat != http.StatusOK {
-		if len(resp.ErrorData) > 0 {
-			errorDesc := resp.ErrorData // .(requestCore.ErrorResponse)
-			err = errors.New(errorDesc[0].Code)
-			if errorDesc[0].Description != nil {
-				switch v := errorDesc[0].Description.(type) {
-				case string:
-					err = errors.New(v)
-				}
-			}
-			return stat, 1, errorDesc[0].Code, errorDesc[0].Description, true, err
-		}
-		if len(resp.Description) > 0 {
-			return stat, 1, api + " Resp", resp.Description, true, err
-		}
-		return http.StatusInternalServerError, 1, "invalid resp from " + api, err.Error(), true, err
-	}
-
-	return http.StatusOK, 0, "OK", resp.Result, false, nil
-}
 
 func extractValue(name string, source func(string) string, dest map[string]string) {
 	if strings.Contains(name, "#") {
@@ -118,27 +36,6 @@ func extractHeaders(w webFramework.WebFramework, headers, locals []string) map[s
 		extractValue(local, w.Parser.GetLocalString, headersMap)
 	}
 	return headersMap
-}
-
-func ConsumeRemoteGetApi(
-	api, url string,
-	core requestCore.RequestCoreInterface,
-	args ...any) any {
-	log.Println("ConsumeRemoteGetApi...")
-	return func(c context.Context) {
-		w := libContext.InitContextNoAuditTrail(c)
-		fullPath := url
-		if len(args) > 0 && args[0] == "QUERY" {
-			fullPath = fmt.Sprintf("%s?%s", fullPath, w.Parser.GetRawUrlQuery())
-		}
-
-		status, code, desc, message, broken, err := ConsumeRemoteGet(w, api, fullPath, core, args...)
-		if err != nil {
-			core.Responder().HandleErrorState(err, status, desc, message, w)
-			return
-		}
-		core.Responder().Respond(status, code, desc, message, broken, w)
-	}
 }
 
 type CallArgs[Req any, Resp any] struct {
