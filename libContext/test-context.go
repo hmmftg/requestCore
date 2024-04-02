@@ -141,3 +141,7 @@ func (t TestingParser) Next() error {
 func (t TestingParser) Abort() error {
 	return t.AbortError
 }
+
+func (t TestingParser) ShouldBind(target any) error {
+	return t.BodyError
+}

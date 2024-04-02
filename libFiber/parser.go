@@ -123,6 +123,12 @@ func (c FiberParser) Abort() error {
 	return c.Ctx.SendStatus(c.Ctx.Response().StatusCode())
 }
 
+func (c FiberParser) ShouldBind(target any) error {
+	_, err := c.Ctx.FormFile(target.(string))
+
+	return err
+}
+
 const FiberCtxKey = "fiber.Ctx"
 
 func Fiber(handler any) func(c *fiber.Ctx) error {

@@ -110,6 +110,10 @@ func (c GinParser) Abort() error {
 	return nil
 }
 
+func (c GinParser) ShouldBind(target any) error {
+	return c.ShouldBind(target)
+}
+
 func Gin(handler any) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		handler.(func(c context.Context))(c)

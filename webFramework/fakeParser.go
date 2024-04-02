@@ -90,3 +90,7 @@ func (f FakeParser) Next() error {
 func (f FakeParser) Abort() error {
 	return nil
 }
+
+func (f FakeParser) ShouldBind(target any) error {
+	return f.ShouldBind(target)
+}

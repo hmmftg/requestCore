@@ -60,6 +60,7 @@ type RequestParser interface {
 	SendJSONRespBody(status int, resp any) error
 	Next() error
 	Abort() error
+	ShouldBind(target any) error
 }
 
 type RequestHandler interface {
