@@ -2,6 +2,7 @@ package webFramework
 
 import (
 	"context"
+	"mime/multipart"
 	"net/http"
 )
 
@@ -60,6 +61,8 @@ type RequestParser interface {
 	SendJSONRespBody(status int, resp any) error
 	Next() error
 	Abort() error
+	FormFile(name string) (multipart.File, *multipart.FileHeader, error)
+	FormValue(name string) string
 }
 
 type RequestHandler interface {

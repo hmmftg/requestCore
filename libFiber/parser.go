@@ -2,6 +2,7 @@ package libFiber
 
 import (
 	"context"
+	"mime/multipart"
 	"net/http"
 
 	"github.com/hmmftg/requestCore/libQuery"
@@ -121,6 +122,18 @@ func (c FiberParser) Next() error {
 }
 func (c FiberParser) Abort() error {
 	return c.Ctx.SendStatus(c.Ctx.Response().StatusCode())
+}
+
+func (c FiberParser) FormFile(name string) (multipart.File, *multipart.FileHeader, error) {
+	headers, err := c.Ctx.FormFile(name)
+
+	return nil, headers, err
+}
+
+func (c FiberParser) FormValue(name string) string {
+	value := c.Ctx.FormValue(name, "")
+
+	return value
 }
 
 const FiberCtxKey = "fiber.Ctx"

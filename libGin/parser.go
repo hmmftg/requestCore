@@ -2,6 +2,7 @@ package libGin
 
 import (
 	"context"
+	"mime/multipart"
 	"net/http"
 
 	"github.com/hmmftg/requestCore/libQuery"
@@ -108,6 +109,18 @@ func (c GinParser) Next() error {
 func (c GinParser) Abort() error {
 	c.Ctx.Abort()
 	return nil
+}
+
+func (c GinParser) FormFile(name string) (multipart.File, *multipart.FileHeader, error) {
+	f, headers, err := c.Ctx.Request.FormFile(name)
+
+	return f, headers, err
+}
+
+func (c GinParser) FormValue(name string) string {
+	value := c.Ctx.Request.FormValue(name)
+
+	return value
 }
 
 func Gin(handler any) gin.HandlerFunc {

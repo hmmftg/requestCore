@@ -3,6 +3,7 @@ package webFramework
 
 import (
 	"fmt"
+	"mime/multipart"
 	"net/http"
 )
 
@@ -89,4 +90,16 @@ func (f FakeParser) Next() error {
 }
 func (f FakeParser) Abort() error {
 	return nil
+}
+
+func (c FakeParser) FormFile(name string) (multipart.File, *multipart.FileHeader, error) {
+	f, headers, err := c.FormFile(name)
+
+	return f, headers, err
+}
+
+func (c FakeParser) FormValue(name string) string {
+	value := c.FormValue(name)
+
+	return value
 }

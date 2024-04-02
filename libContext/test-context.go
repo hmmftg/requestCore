@@ -1,6 +1,7 @@
 package libContext
 
 import (
+	"mime/multipart"
 	"net/http"
 	"os"
 	"reflect"
@@ -140,4 +141,16 @@ func (t TestingParser) Next() error {
 }
 func (t TestingParser) Abort() error {
 	return t.AbortError
+}
+
+func (c TestingParser) FormFile(name string) (multipart.File, *multipart.FileHeader, error) {
+	f, headers, err := c.FormFile(name)
+
+	return f, headers, err
+}
+
+func (c TestingParser) FormValue(name string) string {
+	value := c.FormValue(name)
+
+	return value
 }
