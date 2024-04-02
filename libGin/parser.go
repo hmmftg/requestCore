@@ -111,7 +111,7 @@ func (c GinParser) Abort() error {
 }
 
 func (c GinParser) ShouldBind(target any) error {
-	return c.ShouldBind(target)
+	return c.Ctx.ShouldBind(target)
 }
 
 func Gin(handler any) gin.HandlerFunc {

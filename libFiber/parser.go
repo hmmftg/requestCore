@@ -124,7 +124,7 @@ func (c FiberParser) Abort() error {
 }
 
 func (c FiberParser) ShouldBind(target any) error {
-	_, err := c.Ctx.FormFile(target.(string))
+	_, err := c.Ctx.FormFile("")
 
 	return err
 }
