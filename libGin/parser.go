@@ -2,10 +2,7 @@ package libGin
 
 import (
 	"context"
-	"io"
-	"mime/multipart"
 	"net/http"
-	"os"
 
 	"github.com/hmmftg/requestCore/libQuery"
 	"github.com/hmmftg/requestCore/webFramework"
@@ -113,34 +110,27 @@ func (c GinParser) Abort() error {
 	return nil
 }
 
-func (c GinParser) FormFile(name string) (multipart.File, *multipart.FileHeader, error) {
-	f, headers, err := c.Ctx.Request.FormFile(name)
-
-	return f, headers, err
-}
-
 func (c GinParser) FormValue(name string) string {
 	value := c.Ctx.Request.FormValue(name)
 
 	return value
 }
 
-func (c GinParser) MultiPartFile(
-	formTagName string,
-	handler func(multipart.File, *multipart.FileHeader) (*os.File, error),
-) (io.ReadCloser, error) {
-	file, fileHeaders, fileErr := c.FormFile(formTagName)
+func (c GinParser) FormFile(
+	formTagName, path string,
+) error {
+	file, fileHeaders, fileErr := c.Ctx.Request.FormFile(formTagName)
 	if fileErr != nil {
-		return nil, fileErr
+		return fileErr
 	}
 	defer file.Close()
 
-	tempFile, tempFileErr := handler(file, fileHeaders)
-	if tempFileErr != nil {
-		return nil, tempFileErr
+	saveErr := c.Ctx.SaveUploadedFile(fileHeaders, path)
+	if saveErr != nil {
+		return saveErr
 	}
 
-	return tempFile, nil
+	return nil
 }
 
 func Gin(handler any) gin.HandlerFunc {

@@ -1,8 +1,6 @@
 package libContext
 
 import (
-	"io"
-	"mime/multipart"
 	"net/http"
 	"os"
 	"reflect"
@@ -144,32 +142,19 @@ func (t TestingParser) Abort() error {
 	return t.AbortError
 }
 
-func (c TestingParser) FormFile(name string) (multipart.File, *multipart.FileHeader, error) {
-	f, headers, err := c.FormFile(name)
-
-	return f, headers, err
-}
-
 func (c TestingParser) FormValue(name string) string {
 	value := c.FormValue(name)
 
 	return value
 }
 
-func (c TestingParser) MultiPartFile(
-	formTagName string,
-	handler func(multipart.File, *multipart.FileHeader) (*os.File, error),
-) (io.ReadCloser, error) {
-	file, fileHeaders, fileErr := c.FormFile(formTagName)
+func (c TestingParser) FormFile(
+	formTagName, path string,
+) error {
+	fileErr := c.FormFile(formTagName, path)
 	if fileErr != nil {
-		return nil, fileErr
-	}
-	defer file.Close()
-
-	tempFile, tempFileErr := handler(file, fileHeaders)
-	if tempFileErr != nil {
-		return nil, tempFileErr
+		return fileErr
 	}
 
-	return tempFile, nil
+	return nil
 }

@@ -2,10 +2,7 @@ package webFramework
 
 import (
 	"context"
-	"io"
-	"mime/multipart"
 	"net/http"
-	"os"
 )
 
 type RecordData interface {
@@ -63,9 +60,8 @@ type RequestParser interface {
 	SendJSONRespBody(status int, resp any) error
 	Next() error
 	Abort() error
-	FormFile(name string) (multipart.File, *multipart.FileHeader, error)
 	FormValue(name string) string
-	MultiPartFile(formTagName string, handler func(multipart.File, *multipart.FileHeader) (*os.File, error)) (io.ReadCloser, error)
+	FormFile(formTagName, path string) error
 }
 
 type RequestHandler interface {

@@ -2,10 +2,7 @@ package libFiber
 
 import (
 	"context"
-	"io"
-	"mime/multipart"
 	"net/http"
-	"os"
 
 	"github.com/hmmftg/requestCore/libQuery"
 	"github.com/hmmftg/requestCore/webFramework"
@@ -126,34 +123,26 @@ func (c FiberParser) Abort() error {
 	return c.Ctx.SendStatus(c.Ctx.Response().StatusCode())
 }
 
-func (c FiberParser) FormFile(name string) (multipart.File, *multipart.FileHeader, error) {
-	headers, err := c.Ctx.FormFile(name)
-
-	return nil, headers, err
-}
-
 func (c FiberParser) FormValue(name string) string {
 	value := c.Ctx.FormValue(name, "")
 
 	return value
 }
 
-func (c FiberParser) MultiPartFile(
-	formTagName string,
-	handler func(multipart.File, *multipart.FileHeader) (*os.File, error),
-) (io.ReadCloser, error) {
-	file, fileHeaders, fileErr := c.FormFile(formTagName)
+func (c FiberParser) FormFile(
+	formTagName, path string,
+) error {
+	fileHeader, fileErr := c.Ctx.FormFile(formTagName)
 	if fileErr != nil {
-		return nil, fileErr
-	}
-	defer file.Close()
-
-	tempFile, tempFileErr := handler(file, fileHeaders)
-	if tempFileErr != nil {
-		return nil, tempFileErr
+		return fileErr
 	}
 
-	return tempFile, nil
+	saveErr := c.Ctx.SaveFile(fileHeader, path)
+	if saveErr != nil {
+		return saveErr
+	}
+
+	return nil
 }
 
 const FiberCtxKey = "fiber.Ctx"

@@ -3,10 +3,7 @@ package webFramework
 
 import (
 	"fmt"
-	"io"
-	"mime/multipart"
 	"net/http"
-	"os"
 )
 
 type FakeParser struct {
@@ -94,32 +91,19 @@ func (f FakeParser) Abort() error {
 	return nil
 }
 
-func (c FakeParser) FormFile(name string) (multipart.File, *multipart.FileHeader, error) {
-	f, headers, err := c.FormFile(name)
-
-	return f, headers, err
-}
-
 func (c FakeParser) FormValue(name string) string {
 	value := c.FormValue(name)
 
 	return value
 }
 
-func (c FakeParser) MultiPartFile(
-	formTagName string,
-	handler func(multipart.File, *multipart.FileHeader) (*os.File, error),
-) (io.ReadCloser, error) {
-	file, fileHeaders, fileErr := c.FormFile(formTagName)
+func (c FakeParser) FormFile(
+	formTagName, path string,
+) error {
+	fileErr := c.FormFile(formTagName, path)
 	if fileErr != nil {
-		return nil, fileErr
-	}
-	defer file.Close()
-
-	tempFile, tempFileErr := handler(file, fileHeaders)
-	if tempFileErr != nil {
-		return nil, tempFileErr
+		return fileErr
 	}
 
-	return tempFile, nil
+	return nil
 }
