@@ -123,6 +123,28 @@ func (c FiberParser) Abort() error {
 	return c.Ctx.SendStatus(c.Ctx.Response().StatusCode())
 }
 
+func (c FiberParser) FormValue(name string) string {
+	value := c.Ctx.FormValue(name, "")
+
+	return value
+}
+
+func (c FiberParser) SaveFile(
+	formTagName, path string,
+) error {
+	fileHeader, fileErr := c.Ctx.FormFile(formTagName)
+	if fileErr != nil {
+		return fileErr
+	}
+
+	saveErr := c.Ctx.SaveFile(fileHeader, path)
+	if saveErr != nil {
+		return saveErr
+	}
+
+	return nil
+}
+
 const FiberCtxKey = "fiber.Ctx"
 
 func Fiber(handler any) func(c *fiber.Ctx) error {

@@ -90,3 +90,20 @@ func (f FakeParser) Next() error {
 func (f FakeParser) Abort() error {
 	return nil
 }
+
+func (c FakeParser) FormValue(name string) string {
+	value := c.FormValue(name)
+
+	return value
+}
+
+func (c FakeParser) SaveFile(
+	formTagName, path string,
+) error {
+	fileErr := c.SaveFile(formTagName, path)
+	if fileErr != nil {
+		return fileErr
+	}
+
+	return nil
+}
