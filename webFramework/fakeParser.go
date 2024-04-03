@@ -97,10 +97,10 @@ func (c FakeParser) FormValue(name string) string {
 	return value
 }
 
-func (c FakeParser) FormFile(
+func (c FakeParser) SaveFile(
 	formTagName, path string,
 ) error {
-	fileErr := c.FormFile(formTagName, path)
+	fileErr := c.SaveFile(formTagName, path)
 	if fileErr != nil {
 		return fileErr
 	}

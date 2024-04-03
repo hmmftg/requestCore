@@ -148,10 +148,10 @@ func (c TestingParser) FormValue(name string) string {
 	return value
 }
 
-func (c TestingParser) FormFile(
+func (c TestingParser) SaveFile(
 	formTagName, path string,
 ) error {
-	fileErr := c.FormFile(formTagName, path)
+	fileErr := c.SaveFile(formTagName, path)
 	if fileErr != nil {
 		return fileErr
 	}

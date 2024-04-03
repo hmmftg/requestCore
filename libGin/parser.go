@@ -116,7 +116,7 @@ func (c GinParser) FormValue(name string) string {
 	return value
 }
 
-func (c GinParser) FormFile(
+func (c GinParser) SaveFile(
 	formTagName, path string,
 ) error {
 	file, fileHeaders, fileErr := c.Ctx.Request.FormFile(formTagName)

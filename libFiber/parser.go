@@ -129,7 +129,7 @@ func (c FiberParser) FormValue(name string) string {
 	return value
 }
 
-func (c FiberParser) FormFile(
+func (c FiberParser) SaveFile(
 	formTagName, path string,
 ) error {
 	fileHeader, fileErr := c.Ctx.FormFile(formTagName)

@@ -61,7 +61,7 @@ type RequestParser interface {
 	Next() error
 	Abort() error
 	FormValue(name string) string
-	FormFile(formTagName, path string) error
+	SaveFile(formTagName, path string) error
 }
 
 type RequestHandler interface {
