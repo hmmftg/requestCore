@@ -4,6 +4,7 @@ go 1.21.3
 
 require (
 	github.com/DATA-DOG/go-sqlmock v1.5.0
+	github.com/blockloop/scan/v2 v2.5.0
 	github.com/gin-gonic/gin v1.9.1
 	github.com/go-playground/locales v0.14.1
 	github.com/go-playground/universal-translator v0.18.1
@@ -29,6 +30,7 @@ require (
 	github.com/json-iterator/go v1.1.12 // indirect
 	github.com/klauspost/compress v1.17.0 // indirect
 	github.com/klauspost/cpuid/v2 v2.2.4 // indirect
+	github.com/kr/text v0.2.0 // indirect
 	github.com/leodido/go-urn v1.2.4 // indirect
 	github.com/mattn/go-colorable v0.1.13 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
