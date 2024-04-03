@@ -1,6 +1,7 @@
 package testingtools
 
 import (
+	"database/sql"
 	"database/sql/driver"
 	"errors"
 	"testing"
@@ -120,7 +121,7 @@ func SampleRequestModelMock(t *testing.T, mockList func(sqlmock.Sqlmock)) libQue
 	}
 }
 
-func SampleQueryMock(t *testing.T, mockList func(sqlmock.Sqlmock)) libQuery.QueryRunnerModel {
+func SampleMockDB(t *testing.T, mockList func(sqlmock.Sqlmock)) *sql.DB {
 	db, mockDB, err := sqlmock.New() // sqlmock.QueryMatcherOption(sqlmock.QueryMatcherEqual))
 	if err != nil {
 		t.Fatal(err)
@@ -130,7 +131,11 @@ func SampleQueryMock(t *testing.T, mockList func(sqlmock.Sqlmock)) libQuery.Quer
 		mockList(mockDB)
 	}
 
+	return db
+}
+
+func SampleQueryMock(t *testing.T, mockList func(sqlmock.Sqlmock)) libQuery.QueryRunnerModel {
 	return libQuery.QueryRunnerModel{
-		DB: db,
+		DB: SampleMockDB(t, mockList),
 	}
 }
