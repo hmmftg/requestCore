@@ -165,6 +165,8 @@ func GetResp[Resp any, Error any](api RemoteApi, resp *http.Response) (*Resp, *E
 }
 
 func GetJSONResp[Resp ApiResp](api RemoteApi, resp *http.Response) (*Resp, response.ErrorState) {
+	respJsonP := new(Resp)
+	respJson := *respJsonP
 	responseData, err := io.ReadAll(resp.Body)
 	if err != nil {
 		if os.IsTimeout(err) {
@@ -172,8 +174,6 @@ func GetJSONResp[Resp ApiResp](api RemoteApi, resp *http.Response) (*Resp, respo
 		}
 		return nil, response.Error(http.StatusRequestTimeout, "API_UNABLE_TO_READ", api.Name, err).Input("GetResp.ReadAll")
 	}
-	respJsonP := new(Resp)
-	respJson := *respJsonP
 	respJson.SetStatus(resp.StatusCode)
 	err = json.Unmarshal(responseData, respJsonP)
 	if err != nil {

@@ -18,7 +18,7 @@ import (
 	"github.com/hmmftg/requestCore/webFramework"
 )
 
-func extractValue(name string, source func(string) string, dest map[string]string) {
+func ExtractValue(name string, source func(string) string, dest map[string]string) {
 	if strings.Contains(name, "#") {
 		headerSplit := strings.Split(name, "#")
 		dest[headerSplit[1]] = source(headerSplit[0])
@@ -27,13 +27,13 @@ func extractValue(name string, source func(string) string, dest map[string]strin
 	}
 }
 
-func extractHeaders(w webFramework.WebFramework, headers, locals []string) map[string]string {
+func ExtractHeaders(w webFramework.WebFramework, headers, locals []string) map[string]string {
 	headersMap := make(map[string]string, 0)
 	for _, header := range headers {
-		extractValue(header, w.Parser.GetHeaderValue, headersMap)
+		ExtractValue(header, w.Parser.GetHeaderValue, headersMap)
 	}
 	for _, local := range locals {
-		extractValue(local, w.Parser.GetLocalString, headersMap)
+		ExtractValue(local, w.Parser.GetLocalString, headersMap)
 	}
 	return headersMap
 }
@@ -100,7 +100,7 @@ func (c CallArgs[Req, Resp]) Initializer(req HandlerRequest[Req, Resp]) response
 	headers = append(headers, "Branch-Id")
 	headers = append(headers, "Person-Id")
 	locals = append(locals, "User-Id")
-	headersMap := extractHeaders(req.W, headers, locals)
+	headersMap := ExtractHeaders(req.W, headers, locals)
 	if !c.ForwardAuth {
 		remoteApi := req.Core.Consumer().GetApi(c.Api)
 		headersMap["Authorization"] = "Basic " + libCallApi.BasicAuth(remoteApi.User, remoteApi.Password)
@@ -291,7 +291,7 @@ func CallHandler[Req any, Resp any](
 				return
 			}
 		}
-		headersMap := extractHeaders(w, headers, nil)
+		headersMap := ExtractHeaders(w, headers, nil)
 		resp, errCall := CallApi[Resp](w, core, title,
 			&libCallApi.CallParamData{
 				Api:         core.Consumer().GetApi(api),
@@ -348,7 +348,7 @@ func (h *ConsumeHandlerType[Req, Resp]) Initializer(req HandlerRequest[Req, Resp
 }
 
 func (h *ConsumeHandlerType[Req, Resp]) Handler(req HandlerRequest[Req, Resp]) (Resp, response.ErrorState) {
-	headersMap := extractHeaders(req.W, h.Headers, nil)
+	headersMap := ExtractHeaders(req.W, h.Headers, nil)
 	resp, errCall := CallApiJSON[Req, Resp](req.W, req.Core, h.Title,
 		&libCallApi.RemoteCallParamData[Req]{
 			Api:         req.Core.Consumer().GetApi(h.Api),

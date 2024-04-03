@@ -70,7 +70,7 @@ func ConsumeRemoteGet[Result any](
 	path := fmt.Sprintf(url, params...)
 
 	reqLog := core.RequestTools().LogStart(w, "ConsumeRemoteGet", path)
-	headersMap := extractHeaders(w, DefaultHeaders(), DefaultLocals())
+	headersMap := ExtractHeaders(w, DefaultHeaders(), DefaultLocals())
 
 	respBytes, desc, err := core.Consumer().ConsumeRestBasicAuthApi(nil, api, path, "application/x-www-form-urlencoded", "GET", headersMap)
 	if err != nil {

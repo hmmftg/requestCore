@@ -30,7 +30,7 @@ func (w *WsResponse[any]) SetHeaders(headers map[string]string) {
 	w.HttpHeaders = headers
 }
 
-func callApi[Resp any](
+func CallApiInternal[Resp any](
 	w webFramework.WebFramework,
 	core requestCore.RequestCoreInterface,
 	method string,
@@ -64,7 +64,7 @@ func CallApi[Resp any](
 	core requestCore.RequestCoreInterface,
 	method string,
 	param libCallApi.CallParam) (*Resp, response.ErrorState) {
-	result, err := callApi[WsResponse[Resp]](w, core, method, param)
+	result, err := CallApiInternal[WsResponse[Resp]](w, core, method, param)
 	if result == nil {
 		return nil, err
 	}
@@ -76,7 +76,7 @@ func CallApiWithReceipt[Resp any](
 	core requestCore.RequestCoreInterface,
 	method string,
 	param libCallApi.CallParam) (*Resp, *response.Receipt, response.ErrorState) {
-	result, err := callApi[WsResponse[Resp]](w, core, method, param)
+	result, err := CallApiInternal[WsResponse[Resp]](w, core, method, param)
 	if result == nil {
 		return nil, nil, err
 	}
