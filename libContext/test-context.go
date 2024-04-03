@@ -141,3 +141,20 @@ func (t TestingParser) Next() error {
 func (t TestingParser) Abort() error {
 	return t.AbortError
 }
+
+func (c TestingParser) FormValue(name string) string {
+	value := c.FormValue(name)
+
+	return value
+}
+
+func (c TestingParser) SaveFile(
+	formTagName, path string,
+) error {
+	fileErr := c.SaveFile(formTagName, path)
+	if fileErr != nil {
+		return fileErr
+	}
+
+	return nil
+}

@@ -60,6 +60,8 @@ type RequestParser interface {
 	SendJSONRespBody(status int, resp any) error
 	Next() error
 	Abort() error
+	FormValue(name string) string
+	SaveFile(formTagName, path string) error
 }
 
 type RequestHandler interface {

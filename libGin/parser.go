@@ -110,6 +110,29 @@ func (c GinParser) Abort() error {
 	return nil
 }
 
+func (c GinParser) FormValue(name string) string {
+	value := c.Ctx.Request.FormValue(name)
+
+	return value
+}
+
+func (c GinParser) SaveFile(
+	formTagName, path string,
+) error {
+	file, fileHeaders, fileErr := c.Ctx.Request.FormFile(formTagName)
+	if fileErr != nil {
+		return fileErr
+	}
+	defer file.Close()
+
+	saveErr := c.Ctx.SaveUploadedFile(fileHeaders, path)
+	if saveErr != nil {
+		return saveErr
+	}
+
+	return nil
+}
+
 func Gin(handler any) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		handler.(func(c context.Context))(c)
