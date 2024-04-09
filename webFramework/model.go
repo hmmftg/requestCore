@@ -62,6 +62,7 @@ type RequestParser interface {
 	Abort() error
 	FormValue(name string) string
 	SaveFile(formTagName, path string) error
+	FileAttachment(path, fileName string)
 }
 
 type RequestHandler interface {

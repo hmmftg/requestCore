@@ -158,3 +158,7 @@ func (c TestingParser) SaveFile(
 
 	return nil
 }
+
+func (c TestingParser) FileAttachment(path, fileName string) {
+	c.FileAttachment(path, fileName)
+}
