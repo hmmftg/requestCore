@@ -53,6 +53,7 @@ type CallArgs[Req any, Resp any] struct {
 	Args, Locals, Headers []string
 	Parser                func(respBytes []byte, desc string, status int) (int, map[string]string, any, error)
 	RecoveryHandler       func(any)
+	FileResponse          bool
 }
 
 func DefaultHeaders() []string {
@@ -82,7 +83,7 @@ func (c CallArgs[Req, Resp]) Parameters() HandlerParameters {
 	if c.HasInitializer {
 		save = true
 	}
-	return HandlerParameters{c.Title, mode, false, save, c.Path, false, c.RecoveryHandler}
+	return HandlerParameters{c.Title, mode, false, save, c.Path, false, c.RecoveryHandler, c.FileResponse}
 }
 
 const (

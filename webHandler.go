@@ -67,6 +67,10 @@ func (m WebHanlder) OKWithReceipt(w webFramework.WebFramework, resp any, receipt
 	m.RespondWithReceipt(http.StatusOK, 0, "OK", resp, receipt, false, w)
 }
 
+func (m WebHanlder) OKWithAttachment(w webFramework.WebFramework, attachment *response.FileResponse) {
+	m.RespondWitAttachment(http.StatusOK, 0, "OK", attachment, false, w)
+}
+
 func (m WebHanlder) GetErrorsArray(message string, data any) []response.ErrorResponse {
 	return response.GetErrorsArrayWithMap(message, data, m.ErrorDesc)
 }
@@ -112,6 +116,48 @@ func (m WebHanlder) RespondWithReceipt(code, status int, message string, data an
 		}
 	} else {
 		err = w.Parser.Next()
+		if err != nil {
+			log.Println("error in Next", err)
+		}
+	}
+}
+
+func (m WebHanlder) RespondWitAttachment(code, status int, message string, file *response.FileResponse, abort bool, w webFramework.WebFramework) {
+	var resp response.WsResponse
+	resp.Status = status
+	if code == 200 {
+		resp.Description = m.MessageDesc[message]
+	} else {
+		resp.ErrorData = m.GetErrorsArray(message, nil)
+	}
+
+	w.Parser.FileAttachment(file.Path, file.FileName)
+
+	if r := w.Parser.GetLocal("reqLog"); r != nil {
+		reqLog := r.(libRequest.RequestPtr)
+		reqLog.Id = w.Parser.GetHeaderValue("Request-Id")
+		reqLog.BranchId = w.Parser.GetHeaderValue("Branch-Id")
+		if len(message) > 63 {
+			reqLog.Result = message[:63]
+		} else {
+			reqLog.Result = message
+		}
+
+		reqLog.Outgoing = resp //string(respB)
+		if message != "DUPLICATE_REQUEST" {
+			err := m.RequestInterface.UpdateRequestWithContext(w.Ctx, reqLog)
+			if err != nil {
+				log.Println("error in UpdateRequest", err)
+			}
+		}
+	}
+	if abort {
+		err := w.Parser.Abort()
+		if err != nil {
+			log.Println("error in Abort", err)
+		}
+	} else {
+		err := w.Parser.Next()
 		if err != nil {
 			log.Println("error in Next", err)
 		}

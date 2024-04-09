@@ -22,6 +22,7 @@ type HandlerParameters struct {
 	Path            string
 	HasReceipt      bool
 	RecoveryHandler func(any)
+	FileResponse    bool
 }
 
 type HandlerInterface[Req any, Resp any] interface {
@@ -174,6 +175,22 @@ func BaseHandler[Req any, Resp any, Handler HandlerInterface[Req, Resp]](
 				log.Println("registered as handler with receipt, but receipt local was abset")
 			}
 		}
+
+		if params.FileResponse {
+			attachment := trx.W.Parser.GetLocal("attachment")
+			if attachment != nil {
+				rc, ok := attachment.(*response.FileResponse)
+				if ok {
+					core.Responder().OKWithAttachment(trx.W, rc)
+					trx.RespSent = true
+				} else {
+					log.Printf("registered as handler with attachment, but attachment local was: %t\n", attachment)
+				}
+			} else {
+				log.Println("registered as handler with attachment, but attachment local was abset")
+			}
+		}
+
 		if !trx.RespSent {
 			core.Responder().OK(trx.W, trx.Response)
 			trx.RespSent = true

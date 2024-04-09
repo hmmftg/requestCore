@@ -18,10 +18,11 @@ type QueryHandlerType[Row any, Resp []Row] struct {
 	Key             string
 	Command         libQuery.QueryCommand
 	RecoveryHandler func(any)
+	FileResponse    bool
 }
 
 func (q QueryHandlerType[Row, Resp]) Parameters() HandlerParameters {
-	return HandlerParameters{q.Title, q.Mode, q.VerifyHeader, false, q.Path, false, q.RecoveryHandler}
+	return HandlerParameters{q.Title, q.Mode, q.VerifyHeader, false, q.Path, false, q.RecoveryHandler, q.FileResponse}
 }
 func (q QueryHandlerType[Row, Resp]) Initializer(req HandlerRequest[Row, Resp]) response.ErrorState {
 	return nil
