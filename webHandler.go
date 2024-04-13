@@ -127,17 +127,19 @@ func (m WebHanlder) RespondWithAttachment(code, status int, message string, file
 	resp.Status = status
 	if code == 200 {
 		resp.Description = m.MessageDesc[message]
+
+		w.Parser.FileAttachment(file.Path, file.FileName)
 	} else {
 		resp.ErrorData = m.GetErrorsArray(message, nil)
 	}
 
 	if status == 200 {
 		resp.Description = m.MessageDesc[message]
+
+		w.Parser.FileAttachment(file.Path, file.FileName)
 	} else {
 		resp.ErrorData = m.GetErrorsArray(message, nil)
 	}
-
-	w.Parser.FileAttachment(file.Path, file.FileName)
 
 	if r := w.Parser.GetLocal("reqLog"); r != nil {
 		reqLog := r.(libRequest.RequestPtr)
