@@ -18,6 +18,24 @@ type InternalError struct {
 	Message any
 }
 
+type RespType int
+
+type RespData struct {
+	Code       int
+	Status     int
+	Message    string
+	Type       RespType
+	JSON       any
+	PrintData  *Receipt
+	Attachment *FileResponse
+}
+
+const (
+	Json RespType = iota
+	JsonWithReceipt
+	FileAttachment
+)
+
 func (e InternalError) Error() string {
 	return e.Desc
 }
