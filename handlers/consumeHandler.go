@@ -364,7 +364,7 @@ func (h *ConsumeHandlerType[Req, Resp]) Handler(req HandlerRequest[Req, Resp]) (
 	if errCall != nil {
 		return req.Response, errCall
 	}
-	return *resp, nil
+	return resp, nil
 }
 
 func (h *ConsumeHandlerType[Req, Resp]) Simulation(req HandlerRequest[Req, Resp]) (Resp, response.ErrorState) {
