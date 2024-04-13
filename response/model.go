@@ -21,13 +21,13 @@ type InternalError struct {
 type RespType int
 
 type RespData struct {
-	Code       int
-	Status     int
-	Message    string
-	Type       RespType
-	JSON       any
-	PrintData  *Receipt
-	Attachment *FileResponse
+	Code       int           `json:"code"`
+	Status     int           `json:"status"`
+	Message    string        `json:"message"`
+	Type       RespType      `json:"type"`
+	JSON       any           `json:"description"`
+	PrintData  *Receipt      `json:"receipt"`
+	Attachment *FileResponse `json:"attachment"`
 }
 
 const (

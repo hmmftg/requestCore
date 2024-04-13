@@ -113,9 +113,19 @@ func (m WebHanlder) respond(data response.RespData, abort bool, w webFramework.W
 			fallthrough
 		case response.Json:
 			resp.Result = data.JSON
+
+			err := w.Parser.SendJSONRespBody(data.Code, resp)
+			if err != nil {
+				log.Println("error in SendJSONRespBody", err)
+			}
 		}
 	} else {
 		resp.ErrorData = m.GetErrorsArray(data.Message, data)
+
+		err := w.Parser.SendJSONRespBody(data.Code, resp)
+		if err != nil {
+			log.Println("error in SendJSONRespBody", err)
+		}
 	}
 
 	if r := w.Parser.GetLocal("reqLog"); r != nil {
