@@ -86,11 +86,10 @@ type DmlHandlerType[Req libQuery.DmlModel, Resp map[string]any] struct {
 	VerifyHeader    bool
 	Key             string
 	RecoveryHandler func(any)
-	FileResponse    bool
 }
 
 func (h DmlHandlerType[Req, Resp]) Parameters() HandlerParameters {
-	return HandlerParameters{h.Title, h.Mode, h.VerifyHeader, true, h.Path, false, h.RecoveryHandler, h.FileResponse}
+	return HandlerParameters{h.Title, h.Mode, h.VerifyHeader, true, h.Path, false, h.RecoveryHandler, false}
 }
 func (h DmlHandlerType[Req, Resp]) Initializer(req HandlerRequest[Req, Resp]) response.ErrorState {
 	return PreControlDML(*req.Request, h.Key, req.Title, req.W, req.Core)
