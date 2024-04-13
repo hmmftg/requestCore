@@ -2,6 +2,7 @@ package libFiber
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 
 	"github.com/hmmftg/requestCore/libQuery"
@@ -143,6 +144,11 @@ func (c FiberParser) SaveFile(
 	}
 
 	return nil
+}
+
+func (c FiberParser) FileAttachment(path, fileName string) {
+	file := fmt.Sprintf("%s%s", path, fileName)
+	c.Ctx.SendFile(file, true)
 }
 
 const FiberCtxKey = "fiber.Ctx"

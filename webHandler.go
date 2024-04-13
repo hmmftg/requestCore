@@ -67,51 +67,83 @@ func (m WebHanlder) OKWithReceipt(w webFramework.WebFramework, resp any, receipt
 	m.RespondWithReceipt(http.StatusOK, 0, "OK", resp, receipt, false, w)
 }
 
+func (m WebHanlder) OKWithAttachment(w webFramework.WebFramework, attachment *response.FileResponse) {
+	m.RespondWithAttachment(http.StatusOK, 0, "OK", attachment, false, w)
+}
+
 func (m WebHanlder) GetErrorsArray(message string, data any) []response.ErrorResponse {
 	return response.GetErrorsArrayWithMap(message, data, m.ErrorDesc)
 }
 
 func (m WebHanlder) RespondWithReceipt(code, status int, message string, data any, printData *response.Receipt, abort bool, w webFramework.WebFramework) {
-	var resp response.WsResponse
-	resp.Status = status
-	if code == 200 {
-		resp.Description = m.MessageDesc[message]
-		resp.Result = data
-		resp.PrintReceipt = printData
-	} else {
-		resp.ErrorData = m.GetErrorsArray(message, data)
+	respData := response.RespData{
+		Code:      code,
+		Status:    status,
+		Message:   message,
+		Type:      response.JsonWithReceipt,
+		JSON:      data,
+		PrintData: printData,
 	}
 
-	err := w.Parser.SendJSONRespBody(code, resp)
-	if err != nil {
-		log.Println("error in SendJSONRespBody", err)
+	m.respond(respData, abort, w)
+}
+
+func (m WebHanlder) RespondWithAttachment(code, status int, message string, file *response.FileResponse, abort bool, w webFramework.WebFramework) {
+	respData := response.RespData{
+		Code:       code,
+		Status:     status,
+		Message:    message,
+		Type:       response.FileAttachment,
+		Attachment: file,
+	}
+
+	m.respond(respData, abort, w)
+}
+
+func (m WebHanlder) respond(data response.RespData, abort bool, w webFramework.WebFramework) {
+	var resp response.WsResponse
+	resp.Status = data.Status
+	if data.Code == http.StatusOK {
+		resp.Description = m.MessageDesc[data.Message]
+		switch data.Type {
+		case response.FileAttachment:
+			w.Parser.FileAttachment(data.Attachment.Path, data.Attachment.FileName)
+		case response.JsonWithReceipt:
+			resp.PrintReceipt = data.PrintData
+			fallthrough
+		case response.Json:
+			resp.Result = data.JSON
+		}
+	} else {
+		resp.ErrorData = m.GetErrorsArray(data.Message, data)
 	}
 
 	if r := w.Parser.GetLocal("reqLog"); r != nil {
 		reqLog := r.(libRequest.RequestPtr)
 		reqLog.Id = w.Parser.GetHeaderValue("Request-Id")
 		reqLog.BranchId = w.Parser.GetHeaderValue("Branch-Id")
-		if len(message) > 63 {
-			reqLog.Result = message[:63]
+		if len(data.Message) > 63 {
+			reqLog.Result = data.Message[:63]
 		} else {
-			reqLog.Result = message
+			reqLog.Result = data.Message
 		}
 
 		reqLog.Outgoing = resp //string(respB)
-		if message != "DUPLICATE_REQUEST" {
+		if data.Message != "DUPLICATE_REQUEST" {
 			err := m.RequestInterface.UpdateRequestWithContext(w.Ctx, reqLog)
 			if err != nil {
 				log.Println("error in UpdateRequest", err)
 			}
 		}
 	}
+
 	if abort {
-		err = w.Parser.Abort()
+		err := w.Parser.Abort()
 		if err != nil {
 			log.Println("error in Abort", err)
 		}
 	} else {
-		err = w.Parser.Next()
+		err := w.Parser.Next()
 		if err != nil {
 			log.Println("error in Next", err)
 		}

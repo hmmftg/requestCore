@@ -133,6 +133,10 @@ func (c GinParser) SaveFile(
 	return nil
 }
 
+func (c GinParser) FileAttachment(path, fileName string) {
+	c.Ctx.FileAttachment(path, fileName)
+}
+
 func Gin(handler any) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		handler.(func(c context.Context))(c)

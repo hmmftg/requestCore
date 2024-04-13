@@ -107,3 +107,7 @@ func (c FakeParser) SaveFile(
 
 	return nil
 }
+
+func (c FakeParser) FileAttachment(path, fileName string) {
+	c.FileAttachment(path, fileName)
+}

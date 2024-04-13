@@ -67,6 +67,11 @@ type Receipt struct {
 	Rows  []any  `json:"rows"`
 }
 
+type FileResponse struct {
+	FileName string `json:"fileName"`
+	Path     string `json:"path"`
+}
+
 type DbResponse struct {
 	Status      int    `json:"status"`
 	Description string `json:"description"`

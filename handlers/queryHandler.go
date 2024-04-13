@@ -21,7 +21,7 @@ type QueryHandlerType[Row any, Resp []Row] struct {
 }
 
 func (q QueryHandlerType[Row, Resp]) Parameters() HandlerParameters {
-	return HandlerParameters{q.Title, q.Mode, q.VerifyHeader, false, q.Path, false, q.RecoveryHandler}
+	return HandlerParameters{q.Title, q.Mode, q.VerifyHeader, false, q.Path, false, q.RecoveryHandler, false}
 }
 func (q QueryHandlerType[Row, Resp]) Initializer(req HandlerRequest[Row, Resp]) response.ErrorState {
 	return nil

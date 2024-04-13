@@ -82,7 +82,7 @@ func (c CallArgs[Req, Resp]) Parameters() HandlerParameters {
 	if c.HasInitializer {
 		save = true
 	}
-	return HandlerParameters{c.Title, mode, false, save, c.Path, false, c.RecoveryHandler}
+	return HandlerParameters{c.Title, mode, false, save, c.Path, false, c.RecoveryHandler, false}
 }
 
 const (
@@ -363,7 +363,7 @@ func (h *ConsumeHandlerType[Req, Resp]) Handler(req HandlerRequest[Req, Resp]) (
 	if errCall != nil {
 		return req.Response, errCall
 	}
-	return *resp, nil
+	return resp, nil
 }
 
 func (h *ConsumeHandlerType[Req, Resp]) Simulation(req HandlerRequest[Req, Resp]) (Resp, response.ErrorState) {
