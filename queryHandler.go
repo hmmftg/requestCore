@@ -52,16 +52,7 @@ func GetSingleRecordHandler[Req, Resp any](title, sql string,
 				http.StatusInternalServerError, "DB_RESP_PARSE_ERROR", respRaw[0].DataRaw, w)
 			return
 		}
-
-		respData := response.RespData{
-			Code:    http.StatusOK,
-			Status:  0,
-			Message: "OK",
-			Type:    response.Json,
-			JSON:    result[0],
-		}
-
-		core.Responder().Respond(respData, false, w)
+		core.Responder().Respond(200, 0, "OK", result[0], false, w)
 	}
 }
 
@@ -114,16 +105,7 @@ func GetMapHandler[Req any, Resp webFramework.RecordData](title, sql string,
 		for _, row := range result {
 			respMap[row.GetId()] = row.GetValue()
 		}
-
-		respData := response.RespData{
-			Code:    http.StatusOK,
-			Status:  0,
-			Message: "OK",
-			Type:    response.Json,
-			JSON:    respMap,
-		}
-
-		core.Responder().Respond(respData, false, w)
+		core.Responder().Respond(200, 0, "OK", respMap, false, w)
 	}
 }
 
@@ -181,15 +163,7 @@ func GetMapBySubHandler[Req any, Resp webFramework.RecordData](title, sql string
 				respMap[row.GetSubCategory()][row.GetId()] = row.GetValue()
 			}
 		}
-
-		respData := response.RespData{
-			Code:    http.StatusOK,
-			Status:  0,
-			Message: "OK",
-			Type:    response.Json,
-			JSON:    respMap,
-		}
-		core.Responder().Respond(respData, false, w)
+		core.Responder().Respond(200, 0, "OK", respMap, false, w)
 	}
 }
 
@@ -237,16 +211,7 @@ func GetQuery[Req any](title, sql string,
 				http.StatusInternalServerError, "DB_RESP_PARSE_ERROR", respRaw[0].DataRaw, w)
 			return
 		}
-
-		respData := response.RespData{
-			Code:    http.StatusOK,
-			Status:  0,
-			Message: "OK",
-			Type:    response.Json,
-			JSON:    result,
-		}
-
-		core.Responder().Respond(respData, false, w)
+		core.Responder().Respond(200, 0, "OK", result, false, w)
 	}
 }
 
@@ -311,16 +276,7 @@ func GetQueryMap[Req any](title, sql string,
 				//result[row.Key] = mapFlat
 			}
 		}
-
-		respData := response.RespData{
-			Code:    http.StatusOK,
-			Status:  0,
-			Message: "OK",
-			Type:    response.Json,
-			JSON:    result,
-		}
-
-		core.Responder().Respond(respData, false, w)
+		core.Responder().Respond(200, 0, "OK", result, false, w)
 	}
 }
 
@@ -332,28 +288,12 @@ func GetQueryHandler[Req, Resp any](title, sql string,
 		w := libContext.InitContextNoAuditTrail(c)
 		code, desc, arrayErr, _, _, err := libRequest.GetRequest[Req](w, false)
 		if err != nil {
-			errData := response.RespData{
-				Code:    code,
-				Status:  1,
-				Message: desc,
-				Type:    response.Json,
-				JSON:    arrayErr,
-			}
-
-			core.Responder().Respond(errData, true, w)
+			core.Responder().Respond(code, 1, desc, arrayErr, true, w)
 			return
 		}
 		code, desc, data, respRaw, err := libQuery.CallSql[libQuery.QueryData](sql, core.GetDB())
 		if err != nil {
-			errData := response.RespData{
-				Code:    code,
-				Status:  1,
-				Message: desc,
-				Type:    response.Json,
-				JSON:    data,
-			}
-
-			core.Responder().Respond(errData, true, w)
+			core.Responder().Respond(code, 1, desc, data, true, w)
 			return
 		}
 
@@ -370,16 +310,7 @@ func GetQueryHandler[Req, Resp any](title, sql string,
 				http.StatusInternalServerError, "DB_RESP_PARSE_ERROR", respRaw[0].DataRaw, w)
 			return
 		}
-
-		respData := response.RespData{
-			Code:    http.StatusOK,
-			Status:  0,
-			Message: "OK",
-			Type:    response.Json,
-			JSON:    result,
-		}
-
-		core.Responder().Respond(respData, false, w)
+		core.Responder().Respond(200, 0, "OK", result, false, w)
 	}
 }
 
@@ -404,15 +335,7 @@ func GetQueryFillable[Resp libQuery.QueryWithDeps](
 			return
 		}
 		if len(result) == 0 {
-			errData := response.RespData{
-				Code:    http.StatusBadRequest,
-				Status:  1,
-				Message: libQuery.NO_DATA_FOUND,
-				Type:    response.Json,
-				JSON:    "No Data Found",
-			}
-
-			core.Responder().Respond(errData, true, w)
+			core.Responder().Respond(http.StatusBadRequest, 1, libQuery.NO_DATA_FOUND, "No Data Found", true, w)
 			return
 		}
 		var filledResp []Resp
@@ -426,16 +349,7 @@ func GetQueryFillable[Resp libQuery.QueryWithDeps](
 			}
 			filledResp = append(filledResp, fillResp["Filled"].(Resp))
 		}
-
-		respData := response.RespData{
-			Code:    http.StatusOK,
-			Status:  0,
-			Message: "OK",
-			Type:    response.Json,
-			JSON:    filledResp,
-		}
-
-		core.Responder().Respond(respData, false, w)
+		core.Responder().Respond(http.StatusOK, 0, "OK", filledResp, false, w)
 	}
 }
 
@@ -455,39 +369,14 @@ func GetAllMapHandler[Model MapHandler](title string,
 		var model Model
 		result, desc, err := model.GetAllMap(core)
 		if err != nil {
-			errData := response.RespData{
-				Code:    http.StatusBadRequest,
-				Status:  1,
-				Message: desc,
-				Type:    response.Json,
-				JSON:    err.Error(),
-			}
-
-			respHandler.Respond(errData, true, w)
+			respHandler.Respond(http.StatusBadRequest, 1, desc, err.Error(), true, w)
 			return
 		}
 		if len(result) == 0 {
-			errData := response.RespData{
-				Code:    http.StatusBadRequest,
-				Status:  1,
-				Message: libQuery.NO_DATA_FOUND,
-				Type:    response.Json,
-				JSON:    "No Data Found",
-			}
-
-			respHandler.Respond(errData, true, w)
+			respHandler.Respond(http.StatusBadRequest, 1, libQuery.NO_DATA_FOUND, "No Data Found", true, w)
 			return
 		}
-
-		respData := response.RespData{
-			Code:    http.StatusOK,
-			Status:  0,
-			Message: "OK",
-			Type:    response.Json,
-			JSON:    result,
-		}
-
-		respHandler.Respond(respData, false, w)
+		respHandler.Respond(http.StatusOK, 0, "OK", result, false, w)
 	}
 }
 
@@ -523,40 +412,15 @@ func GetSingleRecord[Model GetHandler](title string,
 		params := GetParams(w, args...)
 		code, desc, arrayErr, model, _, err := libRequest.GetRequest[Model](w, false)
 		if err != nil {
-			errData := response.RespData{
-				Code:    code,
-				Status:  1,
-				Message: desc,
-				Type:    response.Json,
-				JSON:    arrayErr,
-			}
-
-			respHandler.Respond(errData, true, w)
+			respHandler.Respond(code, 1, desc, arrayErr, true, w)
 			return
 		}
 		result, desc, err := model.GetSingle(core, params)
 		if err != nil {
-			errData := response.RespData{
-				Code:    http.StatusBadRequest,
-				Status:  1,
-				Message: desc,
-				Type:    response.Json,
-				JSON:    err.Error(),
-			}
-
-			respHandler.Respond(errData, true, w)
+			respHandler.Respond(http.StatusBadRequest, 1, desc, err.Error(), true, w)
 			return
 		}
-
-		respData := response.RespData{
-			Code:    http.StatusOK,
-			Status:  0,
-			Message: "OK",
-			Type:    response.Json,
-			JSON:    result,
-		}
-
-		respHandler.Respond(respData, false, w)
+		respHandler.Respond(http.StatusOK, 0, "OK", result, false, w)
 	}
 }
 
@@ -570,40 +434,15 @@ func GetAll[Model GetHandler](title string,
 		params := GetParams(w, args...)
 		code, desc, arrayErr, model, _, err := libRequest.GetRequest[Model](w, false)
 		if err != nil {
-			errData := response.RespData{
-				Code:    code,
-				Status:  1,
-				Message: desc,
-				Type:    response.Json,
-				JSON:    arrayErr,
-			}
-
-			respHandler.Respond(errData, true, w)
+			respHandler.Respond(code, 1, desc, arrayErr, true, w)
 			return
 		}
 		result, desc, err := model.GetAll(core, params)
 		if err != nil {
-			errData := response.RespData{
-				Code:    http.StatusBadRequest,
-				Status:  1,
-				Message: desc,
-				Type:    response.Json,
-				JSON:    err.Error(),
-			}
-
-			respHandler.Respond(errData, true, w)
+			respHandler.Respond(http.StatusBadRequest, 1, desc, err.Error(), true, w)
 			return
 		}
-
-		respData := response.RespData{
-			Code:    http.StatusOK,
-			Status:  0,
-			Message: "OK",
-			Type:    response.Json,
-			JSON:    result,
-		}
-
-		respHandler.Respond(respData, false, w)
+		respHandler.Respond(http.StatusOK, 0, "OK", result, false, w)
 	}
 }
 
@@ -626,15 +465,7 @@ func GetPage[Model GetPageHandler](title string,
 		params := GetParams(w, args...)
 		code, desc, arrayErr, model, _, err := libRequest.GetRequest[Model](w, false)
 		if err != nil {
-			errData := response.RespData{
-				Code:    code,
-				Status:  1,
-				Message: desc,
-				Type:    response.Json,
-				JSON:    arrayErr,
-			}
-
-			respHandler.Respond(errData, true, w)
+			respHandler.Respond(code, 1, desc, arrayErr, true, w)
 			return
 		}
 		pageSize, pageId := model.GetPageParams()
@@ -643,16 +474,7 @@ func GetPage[Model GetPageHandler](title string,
 			respHandler.HandleErrorState(err, http.StatusBadRequest, desc, err.Error(), w)
 			return
 		}
-
-		respData := response.RespData{
-			Code:    http.StatusOK,
-			Status:  0,
-			Message: "OK",
-			Type:    response.Json,
-			JSON:    result,
-		}
-
-		respHandler.Respond(respData, false, w)
+		respHandler.Respond(http.StatusOK, 0, "OK", result, false, w)
 	}
 }
 
@@ -689,14 +511,6 @@ func QueryHandler[Req libQuery.QueryRequest, Resp libQuery.QueryResult](
 			return
 		}
 
-		respData := response.RespData{
-			Code:    http.StatusOK,
-			Status:  0,
-			Message: "OK",
-			Type:    response.Json,
-			JSON:    resp,
-		}
-
-		core.Responder().Respond(respData, false, w)
+		core.Responder().Respond(http.StatusOK, 0, "OK", resp, false, w)
 	}
 }

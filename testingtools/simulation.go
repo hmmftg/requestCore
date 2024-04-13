@@ -8,7 +8,6 @@ import (
 	"github.com/hmmftg/requestCore"
 	"github.com/hmmftg/requestCore/libContext"
 	"github.com/hmmftg/requestCore/libRequest"
-	"github.com/hmmftg/requestCore/response"
 )
 
 func InitSimulationHandler[Req any](c context.Context, core requestCore.RequestCoreInterface) (*Req, error) {
@@ -28,16 +27,7 @@ func GetSingleSimulationHandler[Req any](core requestCore.RequestCoreInterface) 
 		if err != nil {
 			return
 		}
-
-		respData := response.RespData{
-			Code:    http.StatusOK,
-			Status:  0,
-			Message: "OK",
-			Type:    response.Json,
-			JSON:    request,
-		}
-
-		core.Responder().Respond(respData, false, w)
+		core.Responder().Respond(http.StatusOK, 0, "OK", request, false, w)
 	}
 }
 
@@ -48,15 +38,6 @@ func GetAllSimulationHandler[Req any](core requestCore.RequestCoreInterface) gin
 		if err != nil {
 			return
 		}
-
-		respData := response.RespData{
-			Code:    http.StatusOK,
-			Status:  0,
-			Message: "OK",
-			Type:    response.Json,
-			JSON:    []Req{*request},
-		}
-
-		core.Responder().Respond(respData, false, w)
+		core.Responder().Respond(http.StatusOK, 0, "OK", []Req{*request}, false, w)
 	}
 }

@@ -12,7 +12,6 @@ import (
 	"github.com/hmmftg/requestCore/libError"
 	"github.com/hmmftg/requestCore/libQuery"
 	"github.com/hmmftg/requestCore/libRequest"
-	"github.com/hmmftg/requestCore/response"
 	"github.com/hmmftg/requestCore/webFramework"
 )
 
@@ -58,15 +57,7 @@ func PutHandler[Req libQuery.RecordDataDml](title string,
 			return
 		}
 
-		data := response.RespData{
-			Code:    http.StatusOK,
-			Status:  0,
-			Message: "OK",
-			Type:    response.Json,
-			JSON:    resp,
-		}
-
-		core.Responder().Respond(data, false, w)
+		core.Responder().Respond(http.StatusOK, 0, "OK", resp, false, w)
 		if finalizer != nil {
 			finalizer(request, c)
 		}
@@ -106,15 +97,7 @@ func DeleteHandler[Req webFramework.RecordData](title, delete, checkQuery string
 			return
 		}
 		if err != nil {
-			errData := response.RespData{
-				Code:    code,
-				Status:  1,
-				Message: desc,
-				Type:    response.Json,
-				JSON:    data,
-			}
-
-			core.Responder().Respond(errData, true, w)
+			core.Responder().Respond(code, 1, desc, data, true, w)
 			return
 		}
 		var request Req
@@ -129,15 +112,7 @@ func DeleteHandler[Req webFramework.RecordData](title, delete, checkQuery string
 		resp.LastInsertId, _ = resultDb.LastInsertId()
 		resp.RowsAffected, _ = resultDb.RowsAffected()
 
-		respData := response.RespData{
-			Code:    http.StatusOK,
-			Status:  0,
-			Message: "OK",
-			Type:    response.Json,
-			JSON:    resp,
-		}
-
-		core.Responder().Respond(respData, false, w)
+		core.Responder().Respond(http.StatusOK, 0, "OK", resp, false, w)
 	}
 }
 
@@ -211,15 +186,7 @@ func UpdateHandler[Req libQuery.Updatable](title string, hasReqLog bool,
 			return
 		}
 
-		respData := response.RespData{
-			Code:    http.StatusOK,
-			Status:  0,
-			Message: "OK",
-			Type:    response.Json,
-			JSON:    resp,
-		}
-
-		core.Responder().Respond(respData, false, w)
+		core.Responder().Respond(http.StatusOK, 0, "OK", resp, false, w)
 		if finalizer != nil {
 			finalizer(request, c)
 		}

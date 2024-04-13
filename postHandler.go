@@ -10,7 +10,6 @@ import (
 	"github.com/hmmftg/requestCore/libError"
 	"github.com/hmmftg/requestCore/libQuery"
 	"github.com/hmmftg/requestCore/libRequest"
-	"github.com/hmmftg/requestCore/response"
 )
 
 func PostHandler[Req libQuery.RecordDataDml](title string,
@@ -64,15 +63,7 @@ func PostHandler[Req libQuery.RecordDataDml](title string,
 			return
 		}
 
-		data := response.RespData{
-			Code:    http.StatusOK,
-			Status:  0,
-			Message: "OK",
-			Type:    response.Json,
-			JSON:    resp,
-		}
-
-		core.Responder().Respond(data, false, w)
+		core.Responder().Respond(http.StatusOK, 0, "OK", resp, false, w)
 		if finalizer != nil {
 			finalizer(request, c)
 		}

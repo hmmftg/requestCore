@@ -308,15 +308,7 @@ func CallHandler[Req any, Resp any](
 			return
 		}
 
-		data := response.RespData{
-			Code:    http.StatusOK,
-			Status:  0,
-			Message: "OK",
-			Type:    response.Json,
-			JSON:    resp,
-		}
-
-		core.Responder().Respond(data, false, w)
+		core.Responder().Respond(http.StatusOK, 0, "OK", resp, false, w)
 	}
 }
 
