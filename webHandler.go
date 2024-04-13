@@ -68,7 +68,7 @@ func (m WebHanlder) OKWithReceipt(w webFramework.WebFramework, resp any, receipt
 }
 
 func (m WebHanlder) OKWithAttachment(w webFramework.WebFramework, attachment *response.FileResponse) {
-	m.RespondWitAttachment(http.StatusOK, 0, "OK", attachment, false, w)
+	m.RespondWithAttachment(http.StatusOK, 0, "OK", attachment, false, w)
 }
 
 func (m WebHanlder) GetErrorsArray(message string, data any) []response.ErrorResponse {
@@ -122,7 +122,7 @@ func (m WebHanlder) RespondWithReceipt(code, status int, message string, data an
 	}
 }
 
-func (m WebHanlder) RespondWitAttachment(code, status int, message string, file *response.FileResponse, abort bool, w webFramework.WebFramework) {
+func (m WebHanlder) RespondWithAttachment(code, status int, message string, file *response.FileResponse, abort bool, w webFramework.WebFramework) {
 	var resp response.WsResponse
 	resp.Status = status
 	if code == 200 {
