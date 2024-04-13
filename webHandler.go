@@ -131,6 +131,12 @@ func (m WebHanlder) RespondWithAttachment(code, status int, message string, file
 		resp.ErrorData = m.GetErrorsArray(message, nil)
 	}
 
+	if status == 200 {
+		resp.Description = m.MessageDesc[message]
+	} else {
+		resp.ErrorData = m.GetErrorsArray(message, nil)
+	}
+
 	w.Parser.FileAttachment(file.Path, file.FileName)
 
 	if r := w.Parser.GetLocal("reqLog"); r != nil {
