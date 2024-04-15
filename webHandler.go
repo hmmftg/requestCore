@@ -122,7 +122,7 @@ func (m WebHanlder) respond(data response.RespData, abort bool, w webFramework.W
 	} else {
 		resp.ErrorData = m.GetErrorsArray(data.Message, data)
 
-		w.Parser.SetLocal("downTime", data.Message)
+		w.Parser.SetLocal("errorArray", resp.ErrorData)
 
 		err := w.Parser.SendJSONRespBody(data.Code, resp)
 		if err != nil {
