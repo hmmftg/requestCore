@@ -1,2 +1,2 @@
-git tag v0.10.7
-git push origin v0.10.7
+git tag v0.10.8
+git push origin v0.10.8
