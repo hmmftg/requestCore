@@ -149,7 +149,7 @@ func GetResp[Resp any, Error any](api RemoteApi, resp *http.Response) (*Resp, *E
 	case http.StatusOK:
 		err = json.Unmarshal(responseData, &respJson)
 		if err != nil {
-			return nil, nil, nil, response.Error(resp.StatusCode, "API_OK_RESP_JSON", api.Name, err).Input(fmt.Sprintf("GetResp.Unmarshal:%s", string(responseData)))
+			return nil, nil, nil, response.Error(http.StatusInternalServerError, "API_OK_RESP_JSON", api.Name, err).Input(fmt.Sprintf("GetResp.Unmarshal:%s", string(responseData)))
 		}
 	default:
 		err = json.Unmarshal(responseData, &errJson)
