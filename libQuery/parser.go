@@ -2,6 +2,7 @@ package libQuery
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"reflect"
@@ -12,6 +13,19 @@ import (
 	"github.com/hmmftg/requestCore/webFramework"
 	"github.com/valyala/fasttemplate"
 )
+
+func parseTimeUsingTimeFormat(field reflect.StructField, value string) (reflect.Value, error) {
+	if len(value) > 0 {
+		format := field.Tag.Get("timeFormat")
+		tm, errParseTime := time.Parse(field.Tag.Get("timeFormat"), value)
+		if errParseTime != nil {
+			return reflect.Value{}, fmt.Errorf("unable to parse time field with timeFormat tag: %s, => %s", format, errParseTime.Error())
+		} else {
+			return reflect.ValueOf(&tm), nil
+		}
+	}
+	return reflect.Value{}, errors.New("empty value")
+}
 
 func ParseQueryResult(result map[string]any, t reflect.Type, v reflect.Value) {
 	for i := 0; i < t.NumField(); i++ {
@@ -34,15 +48,12 @@ func ParseQueryResult(result map[string]any, t reflect.Type, v reflect.Value) {
 					v.FieldByName(t.Field(i).Name).Set(reflect.MakeSlice(reflect.TypeOf([]string{}), 0, 0))
 				} else if t.Field(i).Type.Kind() == reflect.Ptr {
 					if t.Field(i).Type.String() == "*time.Time" {
-						if len(value) > 0 {
-							format := t.Field(i).Tag.Get("timeFormat")
-							tm, errParseTime := time.Parse(t.Field(i).Tag.Get("timeFormat"), value)
-							if errParseTime != nil {
-								log.Println("unable to parse time field with tag: timeFormat=", format, errParseTime)
-							} else {
-								v.FieldByName(t.Field(i).Name).Set(reflect.ValueOf(&tm))
-							}
+						newV, err := parseTimeUsingTimeFormat(t.Field(i), value)
+						if err != nil {
+							log.Println(err.Error())
+							continue
 						}
+						v.FieldByName(t.Field(i).Name).Set(newV)
 					} else {
 						log.Println(
 							"no parser defined for name:", t.Field(i).Type.Name(),
@@ -77,8 +88,13 @@ func ParseQueryResult(result map[string]any, t reflect.Type, v reflect.Value) {
 					v.FieldByName(t.Field(i).Name).Type().String(),
 					result[tag])
 			}
-		case time.Time:
-			v.FieldByName(t.Field(i).Name).Set(reflect.ValueOf(result[tag]))
+		case *time.Time:
+			switch t.Field(i).Type.String() {
+			case "*time.Time":
+				v.FieldByName(t.Field(i).Name).Set(reflect.ValueOf(result[tag]))
+			default:
+				continue
+			}
 		case nil:
 		case []uint8:
 			switch t.Field(i).Type.Kind() {
