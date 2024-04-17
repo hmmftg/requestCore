@@ -77,6 +77,17 @@ func ParseQueryResult(result map[string]any, t reflect.Type, v reflect.Value) {
 					v.FieldByName(t.Field(i).Name).Type().String(),
 					result[tag])
 			}
+		case uint64:
+			switch t.Field(i).Type.Kind() {
+			case reflect.Int64:
+				v.FieldByName(t.Field(i).Name).SetInt(int64(value))
+			case reflect.Uint64:
+				v.FieldByName(t.Field(i).Name).SetUint(value)
+			default:
+				log.Printf("ParseQueryResult, unknown uint64 sub-type: %s->%T\n",
+					v.FieldByName(t.Field(i).Name).Type().String(),
+					result[tag])
+			}
 		case float64:
 			switch t.Field(i).Type.Kind() {
 			case reflect.Int64:
