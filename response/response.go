@@ -351,15 +351,20 @@ func GetDescFromCode(code string, data any, errDescList map[string]string) (stri
 
 func GetErrorsArrayWithMap(incomingDesc string, data any, errDescList map[string]string) []ErrorResponse {
 	var errorResponses []ErrorResponse
-	errorResponses, ok := data.([]ErrorResponse)
+	respData, okRespData := data.(RespData)
+	if okRespData {
+		log.Printf("GetErrorsArrayWithMap invalid type: %T is not RespData\n", data)
+		return nil
+	}
+	errorResponses, ok := respData.JSON.([]ErrorResponse)
 	desc := incomingDesc
 	if !ok || len(errorResponses) == 0 {
 		errorResponses = make([]ErrorResponse, 0)
 		var errorResp ErrorResponse
 		if strings.Contains(desc, "-") {
-			if data != nil { //error already translated
+			if respData.JSON != nil { //error already translated
 				errorResp.Code = desc
-				errorResp.Description = data
+				errorResp.Description = respData.JSON
 				return append(errorResponses, errorResp)
 			}
 			desc = strings.ReplaceAll(desc, "-", "_")
