@@ -105,7 +105,7 @@ func ParseQueryResult(result map[string]any, t reflect.Type, v reflect.Value) {
 				v.FieldByName(t.Field(i).Name).Set(reflect.ValueOf(result[tag]))
 			default:
 				log.Printf("ParseQueryResult, unknown *time.Time sub-type: %s->%T\n",
-					v.FieldByName(t.Field(i).Name).Type().String(),
+					t.Field(i).Type.String(),
 					result[tag])
 			}
 		case time.Time:
@@ -114,7 +114,7 @@ func ParseQueryResult(result map[string]any, t reflect.Type, v reflect.Value) {
 				v.FieldByName(t.Field(i).Name).Set(reflect.ValueOf(result[tag]))
 			default:
 				log.Printf("ParseQueryResult, unknown time.Time sub-type: %s->%T\n",
-					v.FieldByName(t.Field(i).Name).Type().String(),
+					t.Field(i).Type.String(),
 					result[tag])
 			}
 		case nil:
