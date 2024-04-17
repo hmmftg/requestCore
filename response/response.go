@@ -352,7 +352,7 @@ func GetDescFromCode(code string, data any, errDescList map[string]string) (stri
 func GetErrorsArrayWithMap(incomingDesc string, data any, errDescList map[string]string) []ErrorResponse {
 	var errorResponses []ErrorResponse
 	respData, okRespData := data.(RespData)
-	if okRespData {
+	if !okRespData {
 		log.Printf("GetErrorsArrayWithMap invalid type: %T is not RespData\n", data)
 		return nil
 	}
