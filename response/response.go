@@ -369,7 +369,7 @@ func GetErrorsArrayWithMap(incomingDesc string, data any, errDescList map[string
 			}
 			desc = strings.ReplaceAll(desc, "-", "_")
 		}
-		errorResp.Code, errorResp.Description = GetDescFromCode(desc, data, errDescList)
+		errorResp.Code, errorResp.Description = GetDescFromCode(desc, respData.JSON, errDescList)
 		errorResponses = append(errorResponses, errorResp)
 	}
 	for i := 0; i < len(errorResponses); i++ {
