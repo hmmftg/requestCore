@@ -33,8 +33,17 @@ func ParseQueryResult(result map[string]any, t reflect.Type, v reflect.Value) {
 		switch value := result[tag].(type) {
 		case string:
 			if value == "true" || value == "false" {
-				bl, _ := strconv.ParseBool(value)
-				v.FieldByName(t.Field(i).Name).SetBool(bl)
+				switch t.Field(i).Type.String() {
+				case "bool":
+					bl, _ := strconv.ParseBool(value)
+					v.FieldByName(t.Field(i).Name).SetBool(bl)
+				case "string":
+					v.FieldByName(t.Field(i).Name).SetString(value)
+				default:
+					log.Printf("ParseQueryResult, unknown bool: %s->%T\n",
+						t.Field(i).Type.String(),
+						result[tag])
+				}
 			} else if strings.HasPrefix(value, "{") && strings.HasSuffix(value, "}") {
 				values := strings.Split(value[1:len(value)-1], ",")
 				slice := reflect.MakeSlice(reflect.TypeOf([]string{}), 0, 0)
@@ -65,7 +74,20 @@ func ParseQueryResult(result map[string]any, t reflect.Type, v reflect.Value) {
 				}
 			}
 		case bool:
-			v.FieldByName(t.Field(i).Name).SetBool(value)
+			switch t.Field(i).Type.String() {
+			case "bool":
+				v.FieldByName(t.Field(i).Name).SetBool(value)
+			case "string":
+				if value {
+					v.FieldByName(t.Field(i).Name).SetString("true")
+				} else {
+					v.FieldByName(t.Field(i).Name).SetString("false")
+				}
+			default:
+				log.Printf("ParseQueryResult, unknown bool: %s->%T\n",
+					t.Field(i).Type.String(),
+					result[tag])
+			}
 		case int64:
 			switch t.Field(i).Type.Kind() {
 			case reflect.Int64:
