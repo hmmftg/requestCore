@@ -70,7 +70,16 @@ func ParseQueryResult(result map[string]any, t reflect.Type, v reflect.Value) {
 							"string:", t.Field(i).Type.String())
 					}
 				} else {
-					v.FieldByName(t.Field(i).Name).SetString(value)
+					switch t.Field(i).Type.String() {
+					case "bool": // value is not true or false(first if condition), it should be 0 or 1 then
+						v.FieldByName(t.Field(i).Name).SetBool(value == "1")
+					case "string":
+						v.FieldByName(t.Field(i).Name).SetString(value)
+					default:
+						log.Printf("ParseQueryResult, unknown string: %s->%T\n",
+							t.Field(i).Type.String(),
+							result[tag])
+					}
 				}
 			}
 		case bool:
