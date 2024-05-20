@@ -32,6 +32,8 @@ func (m QueryRunnerModel) Dml(ctx context.Context, moduleName, methodName, comma
 		return nil, libError.Join(err, "error in Dml->BeginTrx()")
 	}
 
+	defer tx.Rollback()
+
 	err = m.SetModifVariables(ctx, moduleName, methodName, tx)
 	if err != nil {
 		return nil, err
