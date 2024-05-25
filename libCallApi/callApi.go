@@ -42,6 +42,7 @@ func (m RemoteApiModel) ConsumeRestBasicAuthApi(requestJson []byte, apiName, pat
 		}
 		return nil, "API_UNABLE_TO_CALL#" + apiName + "#" + m.RemoteApiList[apiName].Name + "#", err
 	}
+	defer resp.Body.Close()
 
 	responseData, err := io.ReadAll(resp.Body)
 	if err != nil {
@@ -97,6 +98,7 @@ func (m RemoteApiModel) ConsumeRestApi(requestJson []byte, apiName, path, conten
 		}
 		return nil, "API_UNABLE_TO_CALL#" + apiName + "# " + m.RemoteApiList[apiName].Name + "#", http.StatusRequestTimeout, err
 	}
+	defer resp.Body.Close()
 
 	responseData, err := io.ReadAll(resp.Body)
 	if err != nil {
@@ -263,6 +265,8 @@ func ConsumeRest[Resp any](c CallData) (*Resp, *response.WsRemoteResponse, *Call
 		}
 		return nil, nil, nil, response.Error(http.StatusRequestTimeout, "API_UNABLE_TO_CALL", c, err).Input(fmt.Sprintf("ConsumeRest.ClientDo:%v", req))
 	}
+	defer resp.Body.Close()
+
 	var respJson *Resp
 	var errResp *response.WsRemoteResponse
 
@@ -300,6 +304,7 @@ func ConsumeRestJSON[Resp ApiResp](c *CallData) (*Resp, response.ErrorState) {
 		}
 		return nil, response.Error(http.StatusRequestTimeout, "API_UNABLE_TO_CALL", c, err).Input(fmt.Sprintf("ConsumeRest.ClientDo:%v", req))
 	}
+	defer resp.Body.Close()
 
 	respJson, errParse := GetJSONResp[Resp](c.Api, resp)
 	if errParse != nil {
