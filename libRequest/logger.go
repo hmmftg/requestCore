@@ -43,7 +43,9 @@ func (m RequestModel) AddRequestLog(method, log string, req RequestPtr) {
 	if lastEventId < 0 {
 		lastEventId = 0
 	}
-	req.Events[lastEventId].Logs = append(req.Events[lastEventId].Logs, logData)
+	if len(req.Events[lastEventId].Logs) == 0 {
+		req.Events[lastEventId].Logs = append(req.Events[lastEventId].Logs, logData)
+	}
 }
 
 func (m RequestModel) AddLogEvent(method, log string, req RequestPtr) {
