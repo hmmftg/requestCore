@@ -2,7 +2,6 @@ package libCallApi
 
 import (
 	"bytes"
-	"crypto/tls"
 	"encoding/base64"
 	"encoding/json"
 	"encoding/xml"
@@ -19,12 +18,10 @@ import (
 )
 
 func (m RemoteApiModel) ConsumeRestBasicAuthApi(requestJson []byte, apiName, path, contentType, method string, headers map[string]string) ([]byte, string, error) {
-	timeout := time.Duration(30 * time.Second)
 	if timeOutString, ok := headers["Time-Out"]; ok {
 		timeoutSeconds, _ := strconv.Atoi(timeOutString)
-		timeout = time.Duration(timeoutSeconds * int(time.Second))
+		httpClient.Timeout = time.Duration(timeoutSeconds * int(time.Second))
 	}
-	client := &http.Client{Timeout: timeout}
 	req, err := http.NewRequest(method, m.RemoteApiList[apiName].Domain+"/"+path, bytes.NewBuffer(requestJson))
 	if err != nil {
 		return nil, "Generate Request Failed", err
@@ -35,7 +32,7 @@ func (m RemoteApiModel) ConsumeRestBasicAuthApi(requestJson []byte, apiName, pat
 		req.Header.Add(header, value)
 	}
 
-	resp, err := client.Do(req)
+	resp, err := httpClient.Do(req)
 	if err != nil {
 		if os.IsTimeout(err) {
 			return nil, "API_CONNECT_TIMED_OUT#" + apiName + "#" + m.RemoteApiList[apiName].Name + "#", err
@@ -69,16 +66,10 @@ func (m RemoteApiModel) GetApi(apiName string) RemoteApi {
 }
 
 func (m RemoteApiModel) ConsumeRestApi(requestJson []byte, apiName, path, contentType, method string, headers map[string]string) ([]byte, string, int, error) {
-	timeout := time.Duration(30 * time.Second)
 	if timeOutString, ok := headers["Time-Out"]; ok {
 		timeoutSeconds, _ := strconv.Atoi(timeOutString)
-		timeout = time.Duration(timeoutSeconds * int(time.Second))
+		httpClient.Timeout = time.Duration(timeoutSeconds * int(time.Second))
 	}
-	client := &http.Client{
-		Timeout: timeout,
-		Transport: &http.Transport{
-			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
-		}}
 	req, err := http.NewRequest(method, m.RemoteApiList[apiName].Domain+"/"+path, bytes.NewBuffer(requestJson))
 	if err != nil {
 		return nil, "Generate Request Failed", http.StatusInternalServerError, err
@@ -91,7 +82,7 @@ func (m RemoteApiModel) ConsumeRestApi(requestJson []byte, apiName, path, conten
 		req.Header.Add(header, value)
 	}
 
-	resp, err := client.Do(req)
+	resp, err := httpClient.Do(req)
 	if err != nil {
 		if os.IsTimeout(err) {
 			return nil, "API_CONNECT_TIMED_OUT#" + apiName + "# " + m.RemoteApiList[apiName].Name + "#", http.StatusRequestTimeout, err
@@ -192,7 +183,7 @@ func GetJSONResp[Resp ApiResp](api RemoteApi, resp *http.Response) (*Resp, respo
 func PrepareCall(c CallData) (*http.Request, response.ErrorState) {
 	if timeOutString, ok := c.Headers["Time-Out"]; ok {
 		timeoutSeconds, _ := strconv.Atoi(timeOutString)
-		c.Timeout = time.Duration(timeoutSeconds * int(time.Second))
+		httpClient.Timeout = time.Duration(timeoutSeconds * int(time.Second))
 	}
 	requestJson, err := json.Marshal(c.Req)
 	if err != nil {
@@ -240,25 +231,15 @@ func (c CallData) SetLogs(req *http.Request) *http.Request {
 }
 
 func ConsumeRest[Resp any](c CallData) (*Resp, *response.WsRemoteResponse, *CallResp, response.ErrorState) {
-	if c.Timeout == 0 {
-		c.Timeout = time.Duration(30 * time.Second)
-	}
-
 	req, errPrepare := PrepareCall(c)
 	if errPrepare != nil {
 		return nil, nil, nil, errPrepare.Input(c)
 	}
 
-	client := &http.Client{
-		Timeout: c.Timeout,
-		Transport: &http.Transport{
-			TLSClientConfig: &tls.Config{InsecureSkipVerify: c.SslVerify},
-		}}
-
 	if c.EnableLog {
 		req = c.SetLogs(req)
 	}
-	resp, err := client.Do(req)
+	resp, err := httpClient.Do(req)
 	if err != nil {
 		if os.IsTimeout(err) {
 			return nil, nil, nil, response.Error(http.StatusRequestTimeout, "API_CONNECT_TIMED_OUT", c, err).Input(fmt.Sprintf("ConsumeRest.ClientDo:%v", req))
@@ -279,25 +260,15 @@ func ConsumeRest[Resp any](c CallData) (*Resp, *response.WsRemoteResponse, *Call
 }
 
 func ConsumeRestJSON[Resp ApiResp](c *CallData) (*Resp, response.ErrorState) {
-	if c.Timeout == 0 {
-		c.Timeout = time.Duration(30 * time.Second)
-	}
-
 	req, errPrepare := PrepareCall(*c)
 	if errPrepare != nil {
 		return nil, errPrepare.Input(c)
 	}
 
-	client := &http.Client{
-		Timeout: c.Timeout,
-		Transport: &http.Transport{
-			TLSClientConfig: &tls.Config{InsecureSkipVerify: c.SslVerify},
-		}}
-
 	if c.EnableLog {
 		req = c.SetLogs(req)
 	}
-	resp, err := client.Do(req)
+	resp, err := httpClient.Do(req)
 	if err != nil {
 		if os.IsTimeout(err) {
 			return nil, response.Error(http.StatusRequestTimeout, "API_CONNECT_TIMED_OUT", c, err).Input(fmt.Sprintf("ConsumeRest.ClientDo:%v", req))
@@ -340,9 +311,19 @@ func BasicAuth(username, password string) string {
 
 func TransmitSoap[Resp any](request any, url string, debug bool, timeout time.Duration) (*Resp, error) {
 	requestBytes, _ := xml.MarshalIndent(&request, " ", "  ")
-	client := &http.Client{Timeout: timeout}
-	resp, err := client.Post(url, "text/xml", bytes.NewBuffer(requestBytes))
+	req, requestErr := http.NewRequest(
+		http.MethodPost,
+		url,
+		bytes.NewBuffer(requestBytes),
+	)
+	if requestErr != nil {
+		return nil, requestErr
+	}
+	resp, err := httpClient.Do(req)
 	if err != nil {
+		if os.IsTimeout(err) {
+			return nil, err
+		}
 		return nil, err
 	}
 	defer resp.Body.Close()
