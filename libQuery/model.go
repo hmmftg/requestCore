@@ -22,6 +22,7 @@ type DBMode int
 const (
 	Oracle DBMode = iota
 	Postgres
+	SqlLite
 	MockDB
 )
 
