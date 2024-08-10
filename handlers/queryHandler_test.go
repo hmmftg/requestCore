@@ -8,6 +8,7 @@ import (
 	"github.com/hmmftg/requestCore/libParams"
 	"github.com/hmmftg/requestCore/libQuery"
 	"github.com/hmmftg/requestCore/libRequest"
+	"github.com/hmmftg/requestCore/response"
 	"github.com/hmmftg/requestCore/testingtools"
 )
 
@@ -207,6 +208,78 @@ func TestQueryHandlerWithArgs(t *testing.T) {
 				Name:    "check query with args handler",
 				Method:  "GET",
 				Handler: env.handlerWithArgs(),
+				Silent:  true,
+			})
+	}
+}
+
+type testQueryResp struct {
+	ID      string `json:"id"`
+	Name    string `json:"name" `
+	Address string `json:"address"`
+}
+
+type testTransformer[Row testQueryReq, Resp []testQueryResp] struct {
+}
+
+func (s testTransformer[Row, Resp]) Translate(rows []testQueryReq) (Resp, response.ErrorState) {
+	result := make([]testQueryResp, len(rows))
+	for id := range rows {
+		result[id] = testQueryResp{
+			ID:      rows[id].ID,
+			Name:    rows[id].P2,
+			Address: rows[id].Data,
+		}
+	}
+	return result, nil
+}
+
+func (env *testQueryEnv) handlerWithTransform() any {
+	return QueryHandlerWithTransform[testQueryReq, []testQueryResp, testTransformer[testQueryReq, []testQueryResp]](
+		"query_handler_with_transform",
+		Query3,
+		"/",
+		QueryMap,
+		env.Interface,
+		libRequest.Query,
+		true,
+		false,
+		nil,
+	)
+}
+
+func TestQueryHandlerWithTransform(t *testing.T) {
+	testCases := []testingtools.TestCase{
+		{
+			Name:      "Valid",
+			Url:       "/?id=1&p2=3",
+			Status:    200,
+			CheckBody: []string{`"result":[`, `{"id":"1","name":"2","address":"3"}`, `{"id":"4","name":"5","address":"6"}`},
+			Model: testingtools.SampleQueryMock(t, func(mockDB sqlmock.Sqlmock) {
+				mockDB.ExpectPrepare(Command3).
+					ExpectQuery().
+					WithArgs(QueryMap[Query3].GetDriverArgs(testQueryReq{ID: "1", P2: "3"})...).
+					WillReturnRows(
+						sqlmock.NewRows([]string{"ID", "P2", "DATA"}).
+							AddRow("1", "2", "3").
+							AddRow("4", "5", "6"))
+			}),
+		},
+	}
+
+	for id := range testCases {
+		env := testingtools.GetEnvWithDB[testQueryEnv](
+			testCases[id].Model.DB,
+			testingtools.DefaultAPIList)
+
+		testingtools.TestDB(
+			t,
+			&testCases[id],
+			&testingtools.TestOptions{
+				Path:    "/",
+				Name:    "check query with args handler",
+				Method:  "GET",
+				Handler: env.handlerWithTransform(),
 				Silent:  true,
 			})
 	}

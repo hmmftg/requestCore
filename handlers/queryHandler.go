@@ -1,7 +1,7 @@
 package handlers
 
 import (
-	"fmt"
+	"log"
 	"net/http"
 
 	"github.com/hmmftg/requestCore"
@@ -10,7 +10,25 @@ import (
 	"github.com/hmmftg/requestCore/response"
 )
 
-type QueryHandlerType[Row any, Resp []Row] struct {
+type RowTranslator[Row, Resp any] interface {
+	Translate([]Row) (Resp, response.ErrorState)
+}
+
+type QuerySingleTransformer[Row any, Resp []Row] struct {
+}
+
+func (s QuerySingleTransformer[Row, Resp]) Translate(rows []Row) (Resp, response.ErrorState) {
+	return Resp{rows[0]}, nil
+}
+
+type QueryAllTransformer[Row any, Resp []Row] struct {
+}
+
+func (s QueryAllTransformer[Row, Resp]) Translate(rows []Row) (Resp, response.ErrorState) {
+	return rows, nil
+}
+
+type QueryHandlerType[Row, Resp any, Translator RowTranslator[Row, Resp]] struct {
 	Title           string
 	Path            string
 	Mode            libRequest.Type
@@ -20,18 +38,18 @@ type QueryHandlerType[Row any, Resp []Row] struct {
 	RecoveryHandler func(any)
 }
 
-func (q QueryHandlerType[Row, Resp]) Parameters() HandlerParameters {
+func (q QueryHandlerType[Row, Resp, Translator]) Parameters() HandlerParameters {
 	return HandlerParameters{q.Title, q.Mode, q.VerifyHeader, false, q.Path, false, q.RecoveryHandler, false}
 }
-func (q QueryHandlerType[Row, Resp]) Initializer(req HandlerRequest[Row, Resp]) response.ErrorState {
+func (q QueryHandlerType[Row, Resp, Translator]) Initializer(req HandlerRequest[Row, Resp]) response.ErrorState {
 	return nil
 }
-func (q QueryHandlerType[Row, Resp]) Handler(req HandlerRequest[Row, Resp]) (Resp, response.ErrorState) {
+func (q QueryHandlerType[Row, Resp, Translator]) Handler(req HandlerRequest[Row, Resp]) (Resp, response.ErrorState) {
 	anyArgs := []any{}
 	for id := range q.Command.Args {
 		_, val, err := libQuery.GetFormTagValue(q.Command.Args[id], req.Request)
 		if err != nil {
-			return nil, response.Error(
+			return req.Response, response.Error(
 				http.StatusInternalServerError,
 				"COMMAND_ARGUMENT_ERROR",
 				q.Command,
@@ -39,29 +57,25 @@ func (q QueryHandlerType[Row, Resp]) Handler(req HandlerRequest[Row, Resp]) (Res
 		}
 		anyArgs = append(anyArgs, *val)
 	}
-	resp, err := libQuery.GetQuery[Row](
+	rows, err := libQuery.GetQuery[Row](
 		q.Command.Command,
 		req.Core.GetDB(),
 		anyArgs...)
 	if err != nil {
 		return req.Response, err
 	}
-	switch q.Command.Type {
-	case libQuery.QuerySingle:
-		return Resp{resp[0]}, nil
-	case libQuery.QueryAll:
-		return resp, nil
+	translator := new(Translator)
+	resp, err := (*translator).Translate(rows)
+	if err != nil {
+		return req.Response, err
 	}
-	return nil, response.Error(
-		http.StatusInternalServerError,
-		"COMMAND_TYPE_NOT_SUPPORTED",
-		q.Command,
-		fmt.Errorf("commandNotDefined"))
+
+	return resp, nil
 }
-func (q QueryHandlerType[Req, Resp]) Simulation(req HandlerRequest[Req, Resp]) (Resp, response.ErrorState) {
+func (q QueryHandlerType[Req, Resp, Translator]) Simulation(req HandlerRequest[Req, Resp]) (Resp, response.ErrorState) {
 	return req.Response, nil
 }
-func (q QueryHandlerType[Req, Resp]) Finalizer(req HandlerRequest[Req, Resp]) {
+func (q QueryHandlerType[Req, Resp, Translator]) Finalizer(req HandlerRequest[Req, Resp]) {
 }
 
 func QueryHandler[Row any, Resp []Row](
@@ -71,13 +85,54 @@ func QueryHandler[Row any, Resp []Row](
 	validateHeader, simulation bool,
 	recoveryHandler func(any),
 ) any {
-	return BaseHandler[Row, Resp, QueryHandlerType[Row, Resp]](core,
-		QueryHandlerType[Row, Resp]{
+	command := queryMap[key]
+	switch command.Type {
+	case libQuery.QuerySingle:
+		return BaseHandler(core,
+			QueryHandlerType[Row, Resp, QuerySingleTransformer[Row, Resp]]{
+				Mode:            mode,
+				VerifyHeader:    validateHeader,
+				Title:           title,
+				Key:             key,
+				Command:         command,
+				Path:            path,
+				RecoveryHandler: recoveryHandler,
+			},
+			simulation)
+	case libQuery.QueryAll:
+		return BaseHandler(core,
+			QueryHandlerType[Row, Resp, QueryAllTransformer[Row, Resp]]{
+				Mode:            mode,
+				VerifyHeader:    validateHeader,
+				Title:           title,
+				Key:             key,
+				Command:         command,
+				Path:            path,
+				RecoveryHandler: recoveryHandler,
+			},
+			simulation)
+	default:
+		log.Fatalln("invalid command type", command.Type)
+		return nil
+	}
+}
+
+func QueryHandlerWithTransform[Row, Resp any, Translator RowTranslator[Row, Resp]](
+	title, key, path string, queryMap map[string]libQuery.QueryCommand,
+	core requestCore.RequestCoreInterface,
+	mode libRequest.Type,
+	validateHeader, simulation bool,
+	recoveryHandler func(any),
+) any {
+	command := queryMap[key]
+	command.Type = libQuery.Transforms
+	return BaseHandler(core,
+		QueryHandlerType[Row, Resp, Translator]{
 			Mode:            mode,
 			VerifyHeader:    validateHeader,
 			Title:           title,
 			Key:             key,
-			Command:         queryMap[key],
+			Command:         command,
 			Path:            path,
 			RecoveryHandler: recoveryHandler,
 		},

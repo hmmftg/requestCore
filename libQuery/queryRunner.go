@@ -240,6 +240,7 @@ const (
 	QuerySingle QueryCommandType = iota
 	QueryAll
 	QueryMap
+	Transforms
 )
 
 func Query[Result QueryResult](core QueryRunnerInterface, command QueryCommand, args ...any) (any, response.ErrorState) {
