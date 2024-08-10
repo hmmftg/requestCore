@@ -215,6 +215,7 @@ func TestQueryHandlerWithArgs(t *testing.T) {
 
 type testQueryResp struct {
 	ID      string `json:"id"`
+	API     string `json:"api"`
 	Name    string `json:"name" `
 	Address string `json:"address"`
 }
@@ -222,11 +223,12 @@ type testQueryResp struct {
 type testTransformer[Row testQueryReq, Resp []testQueryResp] struct {
 }
 
-func (s testTransformer[Row, Resp]) Translate(rows []testQueryReq) (Resp, response.ErrorState) {
+func (s testTransformer[Row, Resp]) Translate(rows []testQueryReq, req HandlerRequest[Row, Resp]) (Resp, response.ErrorState) {
 	result := make([]testQueryResp, len(rows))
 	for id := range rows {
 		result[id] = testQueryResp{
 			ID:      rows[id].ID,
+			API:     req.Title,
 			Name:    rows[id].P2,
 			Address: rows[id].Data,
 		}
@@ -251,10 +253,12 @@ func (env *testQueryEnv) handlerWithTransform() any {
 func TestQueryHandlerWithTransform(t *testing.T) {
 	testCases := []testingtools.TestCase{
 		{
-			Name:      "Valid",
-			Url:       "/?id=1&p2=3",
-			Status:    200,
-			CheckBody: []string{`"result":[`, `{"id":"1","name":"2","address":"3"}`, `{"id":"4","name":"5","address":"6"}`},
+			Name:   "Valid",
+			Url:    "/?id=1&p2=3",
+			Status: 200,
+			CheckBody: []string{`"result":[`,
+				`{"id":"1","api":"query_handler_with_transform","name":"2","address":"3"}`,
+				`{"id":"4","api":"query_handler_with_transform","name":"5","address":"6"}`},
 			Model: testingtools.SampleQueryMock(t, func(mockDB sqlmock.Sqlmock) {
 				mockDB.ExpectPrepare(Command3).
 					ExpectQuery().

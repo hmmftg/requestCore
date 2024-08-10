@@ -11,20 +11,20 @@ import (
 )
 
 type RowTranslator[Row, Resp any] interface {
-	Translate([]Row) (Resp, response.ErrorState)
+	Translate([]Row, HandlerRequest[Row, Resp]) (Resp, response.ErrorState)
 }
 
 type QuerySingleTransformer[Row any, Resp []Row] struct {
 }
 
-func (s QuerySingleTransformer[Row, Resp]) Translate(rows []Row) (Resp, response.ErrorState) {
+func (s QuerySingleTransformer[Row, Resp]) Translate(rows []Row, req HandlerRequest[Row, Resp]) (Resp, response.ErrorState) {
 	return Resp{rows[0]}, nil
 }
 
 type QueryAllTransformer[Row any, Resp []Row] struct {
 }
 
-func (s QueryAllTransformer[Row, Resp]) Translate(rows []Row) (Resp, response.ErrorState) {
+func (s QueryAllTransformer[Row, Resp]) Translate(rows []Row, req HandlerRequest[Row, Resp]) (Resp, response.ErrorState) {
 	return rows, nil
 }
 
@@ -65,7 +65,7 @@ func (q QueryHandlerType[Row, Resp, Translator]) Handler(req HandlerRequest[Row,
 		return req.Response, err
 	}
 	translator := new(Translator)
-	resp, err := (*translator).Translate(rows)
+	resp, err := (*translator).Translate(rows, req)
 	if err != nil {
 		return req.Response, err
 	}
