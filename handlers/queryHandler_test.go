@@ -237,7 +237,7 @@ func (s testTransformer[Row, Resp]) Translate(rows []testQueryReq, req HandlerRe
 }
 
 func (env *testQueryEnv) handlerWithTransform() any {
-	return QueryHandlerWithTransform[testQueryReq, []testQueryResp, testTransformer[testQueryReq, []testQueryResp]](
+	return QueryHandlerWithTransform[testQueryReq, []testQueryResp](
 		"query_handler_with_transform",
 		Query3,
 		"/",
@@ -247,6 +247,7 @@ func (env *testQueryEnv) handlerWithTransform() any {
 		true,
 		false,
 		nil,
+		testTransformer[testQueryReq, []testQueryResp]{},
 	)
 }
 

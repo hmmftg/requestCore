@@ -28,23 +28,24 @@ func (s QueryAllTransformer[Row, Resp]) Translate(rows []Row, req HandlerRequest
 	return rows, nil
 }
 
-type QueryHandlerType[Row, Resp any, Translator RowTranslator[Row, Resp]] struct {
+type QueryHandlerType[Row, Resp any] struct {
 	Title           string
 	Path            string
 	Mode            libRequest.Type
 	VerifyHeader    bool
 	Key             string
 	Command         libQuery.QueryCommand
+	Translator      RowTranslator[Row, Resp]
 	RecoveryHandler func(any)
 }
 
-func (q QueryHandlerType[Row, Resp, Translator]) Parameters() HandlerParameters {
+func (q QueryHandlerType[Row, Resp]) Parameters() HandlerParameters {
 	return HandlerParameters{q.Title, q.Mode, q.VerifyHeader, false, q.Path, false, q.RecoveryHandler, false}
 }
-func (q QueryHandlerType[Row, Resp, Translator]) Initializer(req HandlerRequest[Row, Resp]) response.ErrorState {
+func (q QueryHandlerType[Row, Resp]) Initializer(req HandlerRequest[Row, Resp]) response.ErrorState {
 	return nil
 }
-func (q QueryHandlerType[Row, Resp, Translator]) Handler(req HandlerRequest[Row, Resp]) (Resp, response.ErrorState) {
+func (q QueryHandlerType[Row, Resp]) Handler(req HandlerRequest[Row, Resp]) (Resp, response.ErrorState) {
 	anyArgs := []any{}
 	for id := range q.Command.Args {
 		_, val, err := libQuery.GetFormTagValue(q.Command.Args[id], req.Request)
@@ -64,18 +65,17 @@ func (q QueryHandlerType[Row, Resp, Translator]) Handler(req HandlerRequest[Row,
 	if err != nil {
 		return req.Response, err
 	}
-	translator := new(Translator)
-	resp, err := (*translator).Translate(rows, req)
+	resp, err := q.Translator.Translate(rows, req)
 	if err != nil {
 		return req.Response, err
 	}
 
 	return resp, nil
 }
-func (q QueryHandlerType[Req, Resp, Translator]) Simulation(req HandlerRequest[Req, Resp]) (Resp, response.ErrorState) {
+func (q QueryHandlerType[Req, Resp]) Simulation(req HandlerRequest[Req, Resp]) (Resp, response.ErrorState) {
 	return req.Response, nil
 }
-func (q QueryHandlerType[Req, Resp, Translator]) Finalizer(req HandlerRequest[Req, Resp]) {
+func (q QueryHandlerType[Req, Resp]) Finalizer(req HandlerRequest[Req, Resp]) {
 }
 
 func QueryHandler[Row any, Resp []Row](
@@ -89,25 +89,27 @@ func QueryHandler[Row any, Resp []Row](
 	switch command.Type {
 	case libQuery.QuerySingle:
 		return BaseHandler(core,
-			QueryHandlerType[Row, Resp, QuerySingleTransformer[Row, Resp]]{
+			QueryHandlerType[Row, Resp]{
 				Mode:            mode,
 				VerifyHeader:    validateHeader,
 				Title:           title,
 				Key:             key,
 				Command:         command,
 				Path:            path,
+				Translator:      QuerySingleTransformer[Row, Resp]{},
 				RecoveryHandler: recoveryHandler,
 			},
 			simulation)
 	case libQuery.QueryAll:
 		return BaseHandler(core,
-			QueryHandlerType[Row, Resp, QueryAllTransformer[Row, Resp]]{
+			QueryHandlerType[Row, Resp]{
 				Mode:            mode,
 				VerifyHeader:    validateHeader,
 				Title:           title,
 				Key:             key,
 				Command:         command,
 				Path:            path,
+				Translator:      QueryAllTransformer[Row, Resp]{},
 				RecoveryHandler: recoveryHandler,
 			},
 			simulation)
@@ -117,23 +119,25 @@ func QueryHandler[Row any, Resp []Row](
 	}
 }
 
-func QueryHandlerWithTransform[Row, Resp any, Translator RowTranslator[Row, Resp]](
+func QueryHandlerWithTransform[Row, Resp any](
 	title, key, path string, queryMap map[string]libQuery.QueryCommand,
 	core requestCore.RequestCoreInterface,
 	mode libRequest.Type,
 	validateHeader, simulation bool,
 	recoveryHandler func(any),
+	translator RowTranslator[Row, Resp],
 ) any {
 	command := queryMap[key]
 	command.Type = libQuery.Transforms
 	return BaseHandler(core,
-		QueryHandlerType[Row, Resp, Translator]{
+		QueryHandlerType[Row, Resp]{
 			Mode:            mode,
 			VerifyHeader:    validateHeader,
 			Title:           title,
 			Key:             key,
 			Command:         command,
 			Path:            path,
+			Translator:      translator,
 			RecoveryHandler: recoveryHandler,
 		},
 		simulation)
