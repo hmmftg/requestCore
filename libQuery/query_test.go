@@ -52,13 +52,8 @@ func TestOldQueryRunner(t *testing.T) {
 	testCases := []TestCase{{
 		Name:    "Valid Query",
 		Command: "query",
-		Model:   getQueryMock(nil, cols, "a", true, tm, &tm, tm.Format("2006"), 10, 12.1),
-		Result:  []sampleOutput{{String: "a", Bool: true, Int64: 10, Float64: 12.1, Time: tm}},
-	}, {
-		Name:    "Valid Query 2",
-		Command: "query",
-		Model:   getQueryMock(nil, cols, "a", true, &tm, tm, tm.Format("2006"), 10, 12.1),
-		Result:  []sampleOutput{{String: "a", Bool: true, Int64: 10, Float64: 12.1, Time: tm}},
+		Model:   getQueryMock(nil, cols, "a", true, tm, nil, tm.Format("2006"), 10, 12.1),
+		Result:  []sampleOutput{{String: "a", Bool: true, Int64: 10, Float64: 12.1, Time: tm, TimePtr: nil, TimeString: tm.Format("2006")}},
 	}, {
 		Name:    "Query On Some Fields",
 		Command: "query",
