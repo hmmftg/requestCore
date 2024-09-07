@@ -9,6 +9,7 @@ require (
 	github.com/go-playground/locales v0.14.1
 	github.com/go-playground/universal-translator v0.18.1
 	github.com/go-playground/validator/v10 v10.22.0
+	github.com/go-viper/mapstructure/v2 v2.1.0
 	github.com/gofiber/fiber/v2 v2.52.5
 	github.com/hmmftg/image v0.12.1
 	github.com/lib/pq v1.10.9

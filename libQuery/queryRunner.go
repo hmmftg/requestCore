@@ -24,6 +24,18 @@ const (
 	SCAN_ERROR    = -4
 )
 
+func (m QueryRunnerModel) NewStatement(command string) (*sql.Stmt, error) {
+	errPing := m.DB.Ping()
+	if errPing != nil {
+		log.Println("error in ping", errPing)
+	}
+	stmt, err := m.DB.Prepare(command)
+	if err != nil {
+		return nil, libError.Join(err, "QueryRunner[prepare](%s)", command)
+	}
+	return stmt, nil
+}
+
 func (m QueryRunnerModel) QueryRunner(querySql string, args ...any) (int, []map[string]any, error) {
 	errPing := m.DB.Ping()
 	if errPing != nil {
@@ -82,6 +94,58 @@ func (m QueryRunnerModel) QueryRunner(querySql string, args ...any) (int, []map[
 	}
 	//resp, _ := json.Marshal(finalRows)
 	return 0, finalRows, nil
+}
+
+func QueryToStruct[Target any](q QueryRunnerInterface, querySql string, args ...any) ([]Target, error) {
+	stmt, err := q.NewStatement(querySql)
+	if err != nil {
+		return nil, libError.Join(err, "QueryRunner[prepare](%s,%v)", querySql, args)
+	}
+	defer stmt.Close()
+	rows, err := stmt.Query(args...)
+	if err != nil {
+		return nil, libError.Join(err, "QueryRunner[query](%s,%v)", querySql, args)
+	}
+	defer rows.Close()
+
+	columnTypes, err := rows.ColumnTypes()
+
+	if err != nil {
+		return nil, libError.Join(err, "QueryRunner[ColumnTypes](%s,%v)", querySql, args)
+	}
+
+	count := len(columnTypes)
+
+	baseArgs := make([]any, count)
+
+	for i := range columnTypes {
+		baseArgs[i] = new(sql.Null[any])
+	}
+
+	finalRows := make([]Target, 0)
+
+	for rows.Next() {
+		scanArgs := slices.Clone(baseArgs)
+		err := rows.Scan(scanArgs...)
+
+		if err != nil {
+			return nil, libError.Join(err, "QueryRunner[Scan](%s,%v)", querySql, scanArgs)
+		}
+
+		masterData := map[string]any{}
+
+		for i, v := range columnTypes {
+			masterData[v.Name()] = scanArgs[i].(*sql.Null[any]).V
+		}
+
+		parsed, err := ParseMap[Target](masterData)
+		if parsed == nil {
+			return nil, libError.Join(err, "QueryRunner[parse](unable to parse: %v)", masterData)
+		}
+		finalRows = append(finalRows, *parsed)
+	}
+	//resp, _ := json.Marshal(finalRows)
+	return finalRows, nil
 }
 
 func GetTagValue(name, tag string, s any) (*string, *string, error) {

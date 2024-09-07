@@ -55,6 +55,11 @@ func TestOldQueryRunner(t *testing.T) {
 		Model:   getQueryMock(nil, cols, "a", true, tm, &tm, tm.Format("2006"), 10, 12.1),
 		Result:  []sampleOutput{{String: "a", Bool: true, Int64: 10, Float64: 12.1, Time: tm}},
 	}, {
+		Name:    "Valid Query 2",
+		Command: "query",
+		Model:   getQueryMock(nil, cols, "a", true, &tm, tm, tm.Format("2006"), 10, 12.1),
+		Result:  []sampleOutput{{String: "a", Bool: true, Int64: 10, Float64: 12.1, Time: tm}},
+	}, {
 		Name:    "Query On Some Fields",
 		Command: "query",
 		Model:   getQueryMock(nil, []string{"string", "bool"}, "a", true),
@@ -110,6 +115,48 @@ func TestQueryRunner(t *testing.T) {
 	}
 	for _, testCase := range testCases {
 		result, err := libQuery.Query[sampleOutput](testCase.Model, testCase.Command)
+		if err != nil && testCase.Error == "" {
+			t.Fatal("unwanted error", err)
+		}
+		if err == nil && testCase.Error != "" {
+			t.Fatal("error wanted", testCase.Error, "got", err)
+		}
+		assert.DeepEqual(t, result, testCase.Result)
+		if err != nil {
+			assert.Equal(t, err.Error(), testCase.Error)
+		}
+	}
+}
+
+func TestQueryToStruct(t *testing.T) {
+	type TestCase struct {
+		Name      string
+		Interface libQuery.QueryRunnerInterface
+		SQL       string
+		Result    []sampleOutput
+		Error     string
+	}
+	cols := []string{"string", "bool", "time", "time_p", "time_s", "int64", "float64"}
+	tm := time.Now()
+	testCases := []TestCase{{
+		Name:      "Valid Query",
+		SQL:       "query",
+		Interface: getQueryMock(nil, cols, "a", true, tm, &tm, tm.Format("2006"), 10, 12.1),
+		Result:    []sampleOutput{{String: "a", Bool: true, Int64: 10, Float64: 12.1, Time: tm}},
+	}, {
+		Name:      "Query On Some Fields",
+		SQL:       "query",
+		Interface: getQueryMock(nil, []string{"string", "bool"}, "a", true),
+		Result:    []sampleOutput{{String: "a", Bool: true}},
+	}, {
+		Name:      "Replace float64 with int64",
+		SQL:       "query",
+		Interface: getQueryMock(nil, []string{"string", "float64"}, "a", 10),
+		Result:    []sampleOutput{{String: "a", Float64: 10}},
+	},
+	}
+	for _, testCase := range testCases {
+		result, err := libQuery.QueryToStruct[sampleOutput](testCase.Interface, testCase.SQL)
 		if err != nil && testCase.Error == "" {
 			t.Fatal("unwanted error", err)
 		}
