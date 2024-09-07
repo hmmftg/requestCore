@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"fmt"
 	"log"
 	"net/http"
 
@@ -10,22 +11,33 @@ import (
 	"github.com/hmmftg/requestCore/response"
 )
 
+type QueryResp[Resp any] struct {
+	TotalRows int
+	Resp      Resp
+}
+
 type RowTranslator[Row, Resp any] interface {
-	Translate([]Row, HandlerRequest[Row, Resp]) (Resp, response.ErrorState)
+	Translate([]Row, HandlerRequest[Row, Resp]) (QueryResp[Resp], response.ErrorState)
 }
 
 type QuerySingleTransformer[Row any, Resp []Row] struct {
 }
 
-func (s QuerySingleTransformer[Row, Resp]) Translate(rows []Row, req HandlerRequest[Row, Resp]) (Resp, response.ErrorState) {
-	return Resp{rows[0]}, nil
+func (s QuerySingleTransformer[Row, Resp]) Translate(rows []Row, req HandlerRequest[Row, Resp]) (QueryResp[Resp], response.ErrorState) {
+	return QueryResp[Resp]{
+		TotalRows: 1,
+		Resp:      Resp{rows[0]},
+	}, nil
 }
 
 type QueryAllTransformer[Row any, Resp []Row] struct {
 }
 
-func (s QueryAllTransformer[Row, Resp]) Translate(rows []Row, req HandlerRequest[Row, Resp]) (Resp, response.ErrorState) {
-	return rows, nil
+func (s QueryAllTransformer[Row, Resp]) Translate(rows []Row, req HandlerRequest[Row, Resp]) (QueryResp[Resp], response.ErrorState) {
+	return QueryResp[Resp]{
+		TotalRows: len(rows),
+		Resp:      rows,
+	}, nil
 }
 
 type QueryHandlerType[Row, Resp any] struct {
@@ -70,7 +82,9 @@ func (q QueryHandlerType[Row, Resp]) Handler(req HandlerRequest[Row, Resp]) (Res
 		return req.Response, err
 	}
 
-	return resp, nil
+	req.W.Parser.SetRespHeader("X-TOTAL-COUNT", fmt.Sprintf("%d", resp.TotalRows))
+
+	return resp.Resp, nil
 }
 func (q QueryHandlerType[Req, Resp]) Simulation(req HandlerRequest[Req, Resp]) (Resp, response.ErrorState) {
 	return req.Response, nil

@@ -223,7 +223,7 @@ type testQueryResp struct {
 type testTransformer[Row testQueryReq, Resp []testQueryResp] struct {
 }
 
-func (s testTransformer[Row, Resp]) Translate(rows []testQueryReq, req HandlerRequest[Row, Resp]) (Resp, response.ErrorState) {
+func (s testTransformer[Row, Resp]) Translate(rows []testQueryReq, req HandlerRequest[Row, Resp]) (QueryResp[Resp], response.ErrorState) {
 	result := make([]testQueryResp, len(rows))
 	for id := range rows {
 		result[id] = testQueryResp{
@@ -233,7 +233,7 @@ func (s testTransformer[Row, Resp]) Translate(rows []testQueryReq, req HandlerRe
 			Address: rows[id].Data,
 		}
 	}
-	return result, nil
+	return QueryResp[Resp]{Resp: result, TotalRows: len(result)}, nil
 }
 
 func (env *testQueryEnv) handlerWithTransform() any {
