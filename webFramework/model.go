@@ -55,6 +55,7 @@ type RequestParser interface {
 	CheckUrlParam(name string) (string, bool)
 	SetLocal(name string, value any)
 	SetReqHeader(name string, value string)
+	SetRespHeader(name string, value string)
 	GetArgs(args ...any) map[string]string
 	ParseCommand(command, title string, request RecordData, parser FieldParser) string
 	SendJSONRespBody(status int, resp any) error

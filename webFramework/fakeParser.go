@@ -12,6 +12,7 @@ type FakeParser struct {
 	Header      HeaderInterface
 	HttpHeader  http.Header
 	ReqHeader   map[string]string
+	RespHeader  map[string]string
 	Body        any
 	Uri         any
 	UrlQuery    any
@@ -73,6 +74,9 @@ func (f FakeParser) SetLocal(name string, value any) {
 }
 func (f FakeParser) SetReqHeader(name string, value string) {
 	f.ReqHeader[name] = value
+}
+func (f FakeParser) SetRespHeader(name string, value string) {
+	f.RespHeader[name] = value
 }
 func (f FakeParser) GetArgs(args ...any) map[string]string {
 	return f.Args

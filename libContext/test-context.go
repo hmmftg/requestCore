@@ -126,6 +126,9 @@ func (t TestingParser) SetLocal(name string, value any) {
 func (t TestingParser) SetReqHeader(name string, value string) {
 	t.Headers[name] = value
 }
+func (t TestingParser) SetRespHeader(name string, value string) {
+	t.Headers[name] = value
+}
 func (t TestingParser) GetArgs(args ...any) map[string]string {
 	return t.Args
 }
@@ -143,22 +146,22 @@ func (t TestingParser) Abort() error {
 }
 
 func (c TestingParser) FormValue(name string) string {
-	value := c.FormValue(name)
+	// value := c.FormValue(name)
 
-	return value
+	return ""
 }
 
 func (c TestingParser) SaveFile(
 	formTagName, path string,
 ) error {
-	fileErr := c.SaveFile(formTagName, path)
-	if fileErr != nil {
-		return fileErr
-	}
+	// fileErr := c.SaveFile(formTagName, path)
+	// if fileErr != nil {
+	// 	return fileErr
+	// }
 
 	return nil
 }
 
 func (c TestingParser) FileAttachment(path, fileName string) {
-	c.FileAttachment(path, fileName)
+	// c.FileAttachment(path, fileName)
 }
