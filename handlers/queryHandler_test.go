@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/DATA-DOG/go-sqlmock"
@@ -243,10 +244,13 @@ func (env *testQueryEnv) handlerWithTransform() any {
 		"/",
 		QueryMap,
 		env.Interface,
-		libRequest.Query,
+		libRequest.QueryWithPagination,
 		true,
 		false,
 		nil,
+		CommandReplacer[libRequest.PaginationData]{Token: "#", Builder: func(a libRequest.PaginationData) string {
+			return fmt.Sprintf("page=%d and perpage=%d", a.Page, a.PerPage)
+		}},
 		testTransformer[testQueryReq, []testQueryResp]{},
 	)
 }
@@ -256,6 +260,7 @@ func TestQueryHandlerWithTransform(t *testing.T) {
 		{
 			Name:   "Valid",
 			Url:    "/?id=1&p2=3",
+			Header: testingtools.Header{testingtools.KeyValuePair{Key: "Request-Id", Value: "11111"}},
 			Status: 200,
 			CheckBody: []string{`"result":[`,
 				`{"id":"1","api":"query_handler_with_transform","name":"2","address":"3"}`,
@@ -268,6 +273,43 @@ func TestQueryHandlerWithTransform(t *testing.T) {
 						sqlmock.NewRows([]string{"ID", "P2", "DATA"}).
 							AddRow("1", "2", "3").
 							AddRow("4", "5", "6"))
+			}),
+		},
+		{
+			Name:        "ValidWithPagination",
+			Url:         "/?id=1&p2=3&_page=1&_per_page=12",
+			Status:      200,
+			CheckHeader: map[string]string{"X-Total-Count": "12"},
+			CheckBody: []string{`"result":[`,
+				`{"id":"1","api":"query_handler_with_transform","name":"2","address":"3"}`,
+				`{"id":"4","api":"query_handler_with_transform","name":"5","address":"6"}`},
+			Model: testingtools.SampleQueryMock(t, func(mockDB sqlmock.Sqlmock) {
+				mockDB.ExpectPrepare(Command3).
+					ExpectQuery().
+					WithArgs(QueryMap[Query3].GetDriverArgs(testQueryReq{ID: "1", P2: "3"})...).
+					WillReturnRows(
+						sqlmock.NewRows([]string{"ID", "P2", "DATA"}).
+							AddRow("1", "2", "3").
+							AddRow("4", "5", "6").
+							AddRow("7", "8", "9").
+							AddRow("1", "2", "3").
+							AddRow("4", "5", "6").
+							AddRow("7", "8", "9").
+							AddRow("1", "2", "3").
+							AddRow("4", "5", "6").
+							AddRow("7", "8", "9").
+							AddRow("1", "2", "3").
+							AddRow("4", "5", "6").
+							AddRow("7", "8", "9").
+							AddRow("1", "2", "3").
+							AddRow("4", "5", "6").
+							AddRow("7", "8", "9").
+							AddRow("1", "2", "3").
+							AddRow("4", "5", "6").
+							AddRow("7", "8", "9").
+							AddRow("1", "2", "3").
+							AddRow("4", "5", "6").
+							AddRow("7", "8", "9"))
 			}),
 		},
 	}

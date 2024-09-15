@@ -28,8 +28,17 @@ const (
 	JSONWithURI
 	Query
 	QueryWithURI
+	QueryWithPagination
 	URI
+	URIAndPagination
 )
+
+const PaginationLocalTag string = "pagination"
+
+type PaginationData struct {
+	Page    int `form:"_page" query:"_page" validate:"omitempty"`
+	PerPage int `form:"_per_page" query:"_per_page" validate:"omitempty"`
+}
 
 func parseRequest[Req any](w webFramework.WebFramework, mode Type, validateHeader bool, header webFramework.HeaderInterface, name string) (*Req, RequestPtr, response.ErrorState, []response.ErrorResponse) {
 	libValidate.Init()
@@ -62,6 +71,15 @@ func parseRequest[Req any](w webFramework.WebFramework, mode Type, validateHeade
 			err = libError.Join(err, "%s[GetUrlQuery](fails)", name)
 			desc += "QUERY"
 		}
+	case QueryWithPagination:
+		var pagination PaginationData
+		err = w.Parser.GetUrlQuery(&pagination)
+		if err != nil {
+			err = libError.Join(err, "%s[GetPaginationQuery](fails)", name)
+			desc += "PAGINATION"
+		} else {
+			w.Parser.SetLocal(PaginationLocalTag, pagination)
+		}
 	case QueryWithURI:
 		err = w.Parser.GetUrlQuery(&request)
 		if err != nil {
@@ -77,6 +95,20 @@ func parseRequest[Req any](w webFramework.WebFramework, mode Type, validateHeade
 		err = w.Parser.GetUri(&request)
 		if err != nil {
 			err = libError.Join(err, "%s[GetUri](fails)", name)
+			desc += "URI"
+		}
+	case URIAndPagination:
+		var pagination PaginationData
+		err = w.Parser.GetUrlQuery(&pagination)
+		if err != nil {
+			err = libError.Join(err, "%s[GetPaginationQuery](fails)", name)
+			desc += "PAGINATION"
+		} else {
+			w.Parser.SetLocal(PaginationLocalTag, pagination)
+		}
+		errUri := w.Parser.GetUri(&request)
+		if errUri != nil {
+			err = libError.Append(err, errUri, "%s[GetUri](fails)", name)
 			desc += "URI"
 		}
 	default:

@@ -110,7 +110,11 @@ func compareTest(t *testing.T, tc *TestCase, status int, response string, respon
 	}
 
 	for expectedKey, expectedHeader := range tc.CheckHeader {
-		assert.Assert(t, cmp.Regexp(expectedHeader, responseHeaders[expectedKey][0]), "Name:%s, Resp: %s", tc.Name, response)
+		val, ok := responseHeaders[expectedKey]
+		if !ok {
+			t.Errorf("expected header: %s, got headers: %v", expectedKey, responseHeaders)
+		}
+		assert.Assert(t, cmp.Regexp(expectedHeader, val[0]), "Name:%s, RespHeaders: %v", tc.Name, responseHeaders)
 	}
 }
 

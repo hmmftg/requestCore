@@ -8,11 +8,11 @@ import (
 	"strings"
 )
 
-const _TypeName = "NoBindingJSONJSONWithURIQueryQueryWithURIURI"
+const _TypeName = "NoBindingJSONJSONWithURIQueryQueryWithURIQueryWithPaginationURIURIAndPagination"
 
-var _TypeIndex = [...]uint8{0, 9, 13, 24, 29, 41, 44}
+var _TypeIndex = [...]uint8{0, 9, 13, 24, 29, 41, 60, 63, 79}
 
-const _TypeLowerName = "nobindingjsonjsonwithuriqueryquerywithuriuri"
+const _TypeLowerName = "nobindingjsonjsonwithuriqueryquerywithuriquerywithpaginationuriuriandpagination"
 
 func (i Type) String() string {
 	if i < 0 || i >= Type(len(_TypeIndex)-1) {
@@ -30,10 +30,12 @@ func _TypeNoOp() {
 	_ = x[JSONWithURI-(2)]
 	_ = x[Query-(3)]
 	_ = x[QueryWithURI-(4)]
-	_ = x[URI-(5)]
+	_ = x[QueryWithPagination-(5)]
+	_ = x[URI-(6)]
+	_ = x[URIAndPagination-(7)]
 }
 
-var _TypeValues = []Type{NoBinding, JSON, JSONWithURI, Query, QueryWithURI, URI}
+var _TypeValues = []Type{NoBinding, JSON, JSONWithURI, Query, QueryWithURI, QueryWithPagination, URI, URIAndPagination}
 
 var _TypeNameToValueMap = map[string]Type{
 	_TypeName[0:9]:        NoBinding,
@@ -46,8 +48,12 @@ var _TypeNameToValueMap = map[string]Type{
 	_TypeLowerName[24:29]: Query,
 	_TypeName[29:41]:      QueryWithURI,
 	_TypeLowerName[29:41]: QueryWithURI,
-	_TypeName[41:44]:      URI,
-	_TypeLowerName[41:44]: URI,
+	_TypeName[41:60]:      QueryWithPagination,
+	_TypeLowerName[41:60]: QueryWithPagination,
+	_TypeName[60:63]:      URI,
+	_TypeLowerName[60:63]: URI,
+	_TypeName[63:79]:      URIAndPagination,
+	_TypeLowerName[63:79]: URIAndPagination,
 }
 
 var _TypeNames = []string{
@@ -56,7 +62,9 @@ var _TypeNames = []string{
 	_TypeName[13:24],
 	_TypeName[24:29],
 	_TypeName[29:41],
-	_TypeName[41:44],
+	_TypeName[41:60],
+	_TypeName[60:63],
+	_TypeName[63:79],
 }
 
 // TypeString retrieves an enum value from the enum constants string name.

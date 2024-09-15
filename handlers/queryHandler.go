@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"strings"
 
 	"github.com/hmmftg/requestCore"
 	"github.com/hmmftg/requestCore/libQuery"
@@ -49,6 +50,16 @@ type QueryHandlerType[Row, Resp any] struct {
 	Command         libQuery.QueryCommand
 	Translator      RowTranslator[Row, Resp]
 	RecoveryHandler func(any)
+	PaginationFunc  func(string, libRequest.PaginationData) string
+}
+
+type CommandReplacer[T any] struct {
+	Token   string
+	Builder func(T) string
+}
+
+func (c CommandReplacer[T]) Replace(command string, data T) string {
+	return strings.Replace(command, c.Token, c.Builder(data), 1)
 }
 
 func (q QueryHandlerType[Row, Resp]) Parameters() HandlerParameters {
@@ -70,8 +81,17 @@ func (q QueryHandlerType[Row, Resp]) Handler(req HandlerRequest[Row, Resp]) (Res
 		}
 		anyArgs = append(anyArgs, *val)
 	}
+	command := q.Command.Command
+	if q.PaginationFunc != nil {
+		if q.Mode == libRequest.QueryWithPagination || q.Mode == libRequest.URIAndPagination {
+			pgData, ok := req.W.Parser.GetLocal(libRequest.PaginationLocalTag).(libRequest.PaginationData)
+			if ok {
+				command = q.PaginationFunc(command, pgData)
+			}
+		}
+	}
 	rows, err := libQuery.GetQuery[Row](
-		q.Command.Command,
+		command,
 		req.Core.GetDB(),
 		anyArgs...)
 	if err != nil {
@@ -82,7 +102,7 @@ func (q QueryHandlerType[Row, Resp]) Handler(req HandlerRequest[Row, Resp]) (Res
 		return req.Response, err
 	}
 
-	req.W.Parser.SetRespHeader("X-TOTAL-COUNT", fmt.Sprintf("%d", resp.TotalRows))
+	req.W.Parser.SetRespHeader("X-Total-Count", fmt.Sprintf("%d", resp.TotalRows))
 
 	return resp.Resp, nil
 }
@@ -139,6 +159,7 @@ func QueryHandlerWithTransform[Row, Resp any](
 	mode libRequest.Type,
 	validateHeader, simulation bool,
 	recoveryHandler func(any),
+	replacer CommandReplacer[libRequest.PaginationData],
 	translator RowTranslator[Row, Resp],
 ) any {
 	command := queryMap[key]
@@ -153,6 +174,7 @@ func QueryHandlerWithTransform[Row, Resp any](
 			Path:            path,
 			Translator:      translator,
 			RecoveryHandler: recoveryHandler,
+			PaginationFunc:  replacer.Replace,
 		},
 		simulation)
 }
