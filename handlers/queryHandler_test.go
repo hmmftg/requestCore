@@ -237,6 +237,23 @@ func (s testTransformer[Row, Resp]) Translate(rows []testQueryReq, req HandlerRe
 	return QueryResp[Resp]{Resp: result, TotalRows: len(result)}, nil
 }
 
+func (s testTransformer[Row, Resp]) TranslateWithPaginate(rows []testQueryReq, req HandlerRequest[Row, Resp], pd libRequest.PaginationData) (QueryResp[Resp], response.ErrorState) {
+	result := make([]testQueryResp, len(rows))
+	for id := range rows {
+		result[id] = testQueryResp{
+			ID:      rows[id].ID,
+			API:     req.Title,
+			Name:    rows[id].P2,
+			Address: rows[id].Data,
+		}
+	}
+	totalRows := len(result)
+	paginatedResult := Paginate[testQueryResp](pd, result, func(i, j int) bool {
+		return result[i].ID < result[j].ID
+	})
+	return QueryResp[Resp]{Resp: paginatedResult, TotalRows: totalRows}, nil
+}
+
 func (env *testQueryEnv) handlerWithTransform() any {
 	return QueryHandlerWithTransform[testQueryReq, []testQueryResp](
 		"query_handler_with_transform",
@@ -249,7 +266,7 @@ func (env *testQueryEnv) handlerWithTransform() any {
 		false,
 		nil,
 		CommandReplacer[libRequest.PaginationData]{Token: "#", Builder: func(a libRequest.PaginationData) string {
-			return fmt.Sprintf("page=%d and perpage=%d", a.Page, a.PerPage)
+			return fmt.Sprintf("Start=%d and End=%d", a.Start, a.End)
 		}},
 		testTransformer[testQueryReq, []testQueryResp]{},
 	)
@@ -258,10 +275,11 @@ func (env *testQueryEnv) handlerWithTransform() any {
 func TestQueryHandlerWithTransform(t *testing.T) {
 	testCases := []testingtools.TestCase{
 		{
-			Name:   "Valid",
-			Url:    "/?id=1&p2=3",
-			Header: testingtools.Header{testingtools.KeyValuePair{Key: "Request-Id", Value: "11111"}},
-			Status: 200,
+			Name:        "Valid",
+			Url:         "/?id=1&p2=3",
+			Header:      testingtools.Header{testingtools.KeyValuePair{Key: "Request-Id", Value: "11111"}},
+			Status:      200,
+			CheckHeader: map[string]string{"X-Total-Count": "2"},
 			CheckBody: []string{`"result":[`,
 				`{"id":"1","api":"query_handler_with_transform","name":"2","address":"3"}`,
 				`{"id":"4","api":"query_handler_with_transform","name":"5","address":"6"}`},
@@ -277,11 +295,12 @@ func TestQueryHandlerWithTransform(t *testing.T) {
 		},
 		{
 			Name:        "ValidWithPagination",
-			Url:         "/?id=1&p2=3&_page=1&_per_page=12",
+			Url:         "/?id=1&p2=3&_start=0&_end=12",
 			Status:      200,
-			CheckHeader: map[string]string{"X-Total-Count": "12"},
+			CheckHeader: map[string]string{"X-Total-Count": "21"},
 			CheckBody: []string{`"result":[`,
 				`{"id":"1","api":"query_handler_with_transform","name":"2","address":"3"}`,
+				`{"id":"c7","api":"query_handler_with_transform","name":"8","address":"9"}`,
 				`{"id":"4","api":"query_handler_with_transform","name":"5","address":"6"}`},
 			Model: testingtools.SampleQueryMock(t, func(mockDB sqlmock.Sqlmock) {
 				mockDB.ExpectPrepare(Command3).
@@ -292,24 +311,24 @@ func TestQueryHandlerWithTransform(t *testing.T) {
 							AddRow("1", "2", "3").
 							AddRow("4", "5", "6").
 							AddRow("7", "8", "9").
-							AddRow("1", "2", "3").
-							AddRow("4", "5", "6").
-							AddRow("7", "8", "9").
-							AddRow("1", "2", "3").
-							AddRow("4", "5", "6").
-							AddRow("7", "8", "9").
-							AddRow("1", "2", "3").
-							AddRow("4", "5", "6").
-							AddRow("7", "8", "9").
-							AddRow("1", "2", "3").
-							AddRow("4", "5", "6").
-							AddRow("7", "8", "9").
-							AddRow("1", "2", "3").
-							AddRow("4", "5", "6").
-							AddRow("7", "8", "9").
-							AddRow("1", "2", "3").
-							AddRow("4", "5", "6").
-							AddRow("7", "8", "9"))
+							AddRow("a1", "2", "3").
+							AddRow("a4", "5", "6").
+							AddRow("a7", "8", "9").
+							AddRow("b1", "2", "3").
+							AddRow("b4", "5", "6").
+							AddRow("b7", "8", "9").
+							AddRow("c1", "2", "3").
+							AddRow("c4", "5", "6").
+							AddRow("c7", "8", "9").
+							AddRow("d1", "2", "3").
+							AddRow("d4", "5", "6").
+							AddRow("d7", "8", "9").
+							AddRow("e1", "2", "3").
+							AddRow("e4", "5", "6").
+							AddRow("e7", "8", "9").
+							AddRow("f1", "2", "3").
+							AddRow("f4", "5", "6").
+							AddRow("f7", "8", "9"))
 			}),
 		},
 	}

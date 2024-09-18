@@ -36,8 +36,10 @@ const (
 const PaginationLocalTag string = "pagination"
 
 type PaginationData struct {
-	Page    int `form:"_page" query:"_page" validate:"omitempty"`
-	PerPage int `form:"_per_page" query:"_per_page" validate:"omitempty"`
+	Start int    `form:"_start" query:"_start" validate:"omitempty"`
+	End   int    `form:"_end" query:"_end" validate:"omitempty"`
+	Sort  string `form:"_sort" query:"_sort" validate:"omitempty"`
+	Order string `form:"_order" query:"_order" validate:"omitempty,oneof=asc desc"`
 }
 
 func parseRequest[Req any](w webFramework.WebFramework, mode Type, validateHeader bool, header webFramework.HeaderInterface, name string) (*Req, RequestPtr, response.ErrorState, []response.ErrorResponse) {
@@ -79,6 +81,11 @@ func parseRequest[Req any](w webFramework.WebFramework, mode Type, validateHeade
 			desc += "PAGINATION"
 		} else {
 			w.Parser.SetLocal(PaginationLocalTag, pagination)
+		}
+		err = w.Parser.GetUrlQuery(&request)
+		if err != nil {
+			err = libError.Join(err, "%s[GetUrlQuery](fails)", name)
+			desc += "QUERY"
 		}
 	case QueryWithURI:
 		err = w.Parser.GetUrlQuery(&request)

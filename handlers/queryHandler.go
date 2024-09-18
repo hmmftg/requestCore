@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"slices"
+	"sort"
 	"strings"
 
 	"github.com/hmmftg/requestCore"
@@ -19,12 +21,20 @@ type QueryResp[Resp any] struct {
 
 type RowTranslator[Row, Resp any] interface {
 	Translate([]Row, HandlerRequest[Row, Resp]) (QueryResp[Resp], response.ErrorState)
+	TranslateWithPaginate([]Row, HandlerRequest[Row, Resp], libRequest.PaginationData) (QueryResp[Resp], response.ErrorState)
 }
 
 type QuerySingleTransformer[Row any, Resp []Row] struct {
 }
 
 func (s QuerySingleTransformer[Row, Resp]) Translate(rows []Row, req HandlerRequest[Row, Resp]) (QueryResp[Resp], response.ErrorState) {
+	return QueryResp[Resp]{
+		TotalRows: 1,
+		Resp:      Resp{rows[0]},
+	}, nil
+}
+
+func (s QuerySingleTransformer[Row, Resp]) TranslateWithPaginate(rows []Row, req HandlerRequest[Row, Resp], pd libRequest.PaginationData) (QueryResp[Resp], response.ErrorState) {
 	return QueryResp[Resp]{
 		TotalRows: 1,
 		Resp:      Resp{rows[0]},
@@ -41,6 +51,13 @@ func (s QueryAllTransformer[Row, Resp]) Translate(rows []Row, req HandlerRequest
 	}, nil
 }
 
+func (s QueryAllTransformer[Row, Resp]) TranslateWithPaginate(rows []Row, req HandlerRequest[Row, Resp], pd libRequest.PaginationData) (QueryResp[Resp], response.ErrorState) {
+	return QueryResp[Resp]{
+		TotalRows: len(rows),
+		Resp:      rows,
+	}, nil
+}
+
 type QueryHandlerType[Row, Resp any] struct {
 	Title           string
 	Path            string
@@ -50,7 +67,7 @@ type QueryHandlerType[Row, Resp any] struct {
 	Command         libQuery.QueryCommand
 	Translator      RowTranslator[Row, Resp]
 	RecoveryHandler func(any)
-	PaginationFunc  func(string, libRequest.PaginationData) string
+	PaginateCommand func(string, libRequest.PaginationData) string
 }
 
 type CommandReplacer[T any] struct {
@@ -60,6 +77,35 @@ type CommandReplacer[T any] struct {
 
 func (c CommandReplacer[T]) Replace(command string, data T) string {
 	return strings.Replace(command, c.Token, c.Builder(data), 1)
+}
+
+type RowPaginator[Row any] struct {
+	Less func(libRequest.PaginationData) func(i, j int) bool
+}
+
+const (
+	Asc = "asc"
+	Dsc = "desc"
+)
+
+func Paginate[Row any](paginationData libRequest.PaginationData, data []Row, less func(i int, j int) bool) []Row {
+	start := paginationData.Start
+	end := paginationData.End
+	if start < 0 {
+		start = 0
+	}
+	if end < start {
+		end = start
+	}
+	if end == start && start == 0 && len(data) > 1 {
+		end = len(data)
+	}
+	result := data
+	sort.Slice(result, less)
+	if paginationData.Order == Dsc {
+		slices.Reverse(result)
+	}
+	return result[start:end]
 }
 
 func (q QueryHandlerType[Row, Resp]) Parameters() HandlerParameters {
@@ -82,11 +128,11 @@ func (q QueryHandlerType[Row, Resp]) Handler(req HandlerRequest[Row, Resp]) (Res
 		anyArgs = append(anyArgs, *val)
 	}
 	command := q.Command.Command
-	if q.PaginationFunc != nil {
+	if q.PaginateCommand != nil {
 		if q.Mode == libRequest.QueryWithPagination || q.Mode == libRequest.URIAndPagination {
 			pgData, ok := req.W.Parser.GetLocal(libRequest.PaginationLocalTag).(libRequest.PaginationData)
 			if ok {
-				command = q.PaginationFunc(command, pgData)
+				command = q.PaginateCommand(command, pgData)
 			}
 		}
 	}
@@ -97,7 +143,17 @@ func (q QueryHandlerType[Row, Resp]) Handler(req HandlerRequest[Row, Resp]) (Res
 	if err != nil {
 		return req.Response, err
 	}
-	resp, err := q.Translator.Translate(rows, req)
+	paginate := false
+	var pgData libRequest.PaginationData
+	if q.Mode == libRequest.QueryWithPagination || q.Mode == libRequest.URIAndPagination {
+		pgData, paginate = req.W.Parser.GetLocal(libRequest.PaginationLocalTag).(libRequest.PaginationData)
+	}
+	var resp QueryResp[Resp]
+	if paginate {
+		resp, err = q.Translator.TranslateWithPaginate(rows, req, pgData)
+	} else {
+		resp, err = q.Translator.Translate(rows, req)
+	}
 	if err != nil {
 		return req.Response, err
 	}
@@ -105,6 +161,7 @@ func (q QueryHandlerType[Row, Resp]) Handler(req HandlerRequest[Row, Resp]) (Res
 	req.W.Parser.SetRespHeader("X-Total-Count", fmt.Sprintf("%d", resp.TotalRows))
 
 	return resp.Resp, nil
+
 }
 func (q QueryHandlerType[Req, Resp]) Simulation(req HandlerRequest[Req, Resp]) (Resp, response.ErrorState) {
 	return req.Response, nil
@@ -174,7 +231,7 @@ func QueryHandlerWithTransform[Row, Resp any](
 			Path:            path,
 			Translator:      translator,
 			RecoveryHandler: recoveryHandler,
-			PaginationFunc:  replacer.Replace,
+			PaginateCommand: replacer.Replace,
 		},
 		simulation)
 }
