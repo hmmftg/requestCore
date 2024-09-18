@@ -248,8 +248,10 @@ func (s testTransformer[Row, Resp]) TranslateWithPaginate(rows []testQueryReq, r
 		}
 	}
 	totalRows := len(result)
-	paginatedResult := Paginate[testQueryResp](pd, result, func(i, j int) bool {
-		return result[i].ID < result[j].ID
+	paginatedResult := Paginate[testQueryResp](pd, result, func(string) func(i, j int) bool {
+		return func(i, j int) bool {
+			return result[i].ID < result[j].ID
+		}
 	})
 	return QueryResp[Resp]{Resp: paginatedResult, TotalRows: totalRows}, nil
 }

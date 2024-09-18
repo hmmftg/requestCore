@@ -88,7 +88,7 @@ const (
 	Dsc = "desc"
 )
 
-func Paginate[Row any](paginationData libRequest.PaginationData, data []Row, less func(i int, j int) bool) []Row {
+func Paginate[Row any](paginationData libRequest.PaginationData, data []Row, less func(string) func(i int, j int) bool) []Row {
 	start := paginationData.Start
 	end := paginationData.End
 	if start < 0 {
@@ -100,8 +100,13 @@ func Paginate[Row any](paginationData libRequest.PaginationData, data []Row, les
 	if end == start && start == 0 && len(data) > 1 {
 		end = len(data)
 	}
+	if end > len(data) {
+		end = len(data)
+	}
 	result := data
-	sort.Slice(result, less)
+	if len(paginationData.Sort) > 0 {
+		sort.Slice(result, less(paginationData.Sort))
+	}
 	if paginationData.Order == Dsc {
 		slices.Reverse(result)
 	}
