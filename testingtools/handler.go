@@ -4,10 +4,13 @@ import (
 	"bytes"
 	"database/sql/driver"
 	"encoding/json"
+	"fmt"
 	"io"
 	"log"
 	"net/http"
 	"net/http/httptest"
+	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/DATA-DOG/go-sqlmock"
@@ -98,6 +101,35 @@ func getResponse(t *testing.T, res *http.Response, tc *TestCase) (int, string, h
 	return res.StatusCode, "", res.Header
 }
 
+func toResult(success bool, msg string) cmp.Result {
+	if success {
+		return cmp.ResultSuccess
+	}
+	return cmp.ResultFailure(msg)
+}
+
+func doesNotContain(collection interface{}, item interface{}) cmp.Comparison {
+	return func() cmp.Result {
+		colValue := reflect.ValueOf(collection)
+		if !colValue.IsValid() {
+			return cmp.ResultSuccess
+		}
+		msg := fmt.Sprintf("%v does contain %v", collection, item)
+
+		itemValue := reflect.ValueOf(item)
+		switch colValue.Type().Kind() {
+		case reflect.String:
+			if itemValue.Type().Kind() != reflect.String {
+				return cmp.ResultFailure("string may only contain strings")
+			}
+			return toResult(
+				!strings.Contains(colValue.String(), itemValue.String()),
+				fmt.Sprintf("string %q does contain %q", collection, item))
+		}
+		return toResult(false, msg)
+	}
+}
+
 // compareTest checks expected status code and expected response
 // against the returned response.
 func compareTest(t *testing.T, tc *TestCase, status int, response string, responseHeaders http.Header) {
@@ -107,6 +139,10 @@ func compareTest(t *testing.T, tc *TestCase, status int, response string, respon
 
 	for _, expect := range tc.CheckBody {
 		assert.Assert(t, cmp.Contains(response, expect), "Name:%s, Resp: %s", tc.Name, response)
+	}
+
+	for _, expect := range tc.CheckNotInBody {
+		assert.Assert(t, doesNotContain(response, expect), "Name:%s, Resp: %s", tc.Name, response)
 	}
 
 	for expectedKey, expectedHeader := range tc.CheckHeader {

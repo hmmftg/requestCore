@@ -88,6 +88,37 @@ const (
 	Dsc = "desc"
 )
 
+type Filter struct {
+	Field    string
+	Operator string
+	Value    string
+}
+
+func Filterate[Row any](paginationData libRequest.PaginationData, data []Row, filterFunc func(Filter) func(Row) bool) []Row {
+	if len(paginationData.Filters) == 0 {
+		return data
+	}
+	filterList := strings.Split(paginationData.Filters, " and ")
+	if len(filterList) <= 0 {
+		return data
+	}
+	result := data
+	for id := range filterList {
+		split := strings.Split(filterList[id], " ")
+		result = slices.DeleteFunc(
+			result,
+			filterFunc(
+				Filter{
+					Field:    split[0],
+					Operator: split[1],
+					Value:    split[2],
+				},
+			))
+	}
+
+	return result
+}
+
 func Paginate[Row any](paginationData libRequest.PaginationData, data []Row, less func(string) func(i int, j int) bool) []Row {
 	start := paginationData.Start
 	end := paginationData.End

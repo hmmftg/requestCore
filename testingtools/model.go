@@ -37,19 +37,20 @@ type TestOptions struct {
 }
 
 type TestCase struct {
-	Name         string
-	Url          string
-	Header       Header
-	Model        libQuery.QueryRunnerModel
-	Request      any
-	Status       int
-	CheckBody    []string
-	CheckHeader  map[string]string
-	DontReadBody bool
-	MockError    error
-	Desired      any
-	DesiredError string
-	DesiredResp  string
+	Name           string
+	Url            string
+	Header         Header
+	Model          libQuery.QueryRunnerModel
+	Request        any
+	Status         int
+	CheckBody      []string
+	CheckNotInBody []string
+	CheckHeader    map[string]string
+	DontReadBody   bool
+	MockError      error
+	Desired        any
+	DesiredError   string
+	DesiredResp    string
 }
 
 type KeyValuePair struct {

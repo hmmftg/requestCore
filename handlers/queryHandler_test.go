@@ -247,8 +247,13 @@ func (s testTransformer[Row, Resp]) TranslateWithPaginate(rows []testQueryReq, r
 			Address: rows[id].Data,
 		}
 	}
+	result = Filterate(pd, result, func(f Filter) func(testQueryResp) bool {
+		return func(r testQueryResp) bool {
+			return r.Address == "filtered"
+		}
+	})
 	totalRows := len(result)
-	paginatedResult := Paginate[testQueryResp](pd, result, func(string) func(i, j int) bool {
+	paginatedResult := Paginate(pd, result, func(string) func(i, j int) bool {
 		return func(i, j int) bool {
 			return result[i].ID < result[j].ID
 		}
@@ -257,7 +262,7 @@ func (s testTransformer[Row, Resp]) TranslateWithPaginate(rows []testQueryReq, r
 }
 
 func (env *testQueryEnv) handlerWithTransform() any {
-	return QueryHandlerWithTransform[testQueryReq, []testQueryResp](
+	return QueryHandlerWithTransform(
 		"query_handler_with_transform",
 		Query3,
 		"/",
@@ -321,6 +326,47 @@ func TestQueryHandlerWithTransform(t *testing.T) {
 							AddRow("b7", "8", "9").
 							AddRow("c1", "2", "3").
 							AddRow("c4", "5", "6").
+							AddRow("c7", "8", "9").
+							AddRow("d1", "2", "3").
+							AddRow("d4", "5", "6").
+							AddRow("d7", "8", "9").
+							AddRow("e1", "2", "3").
+							AddRow("e4", "5", "6").
+							AddRow("e7", "8", "9").
+							AddRow("f1", "2", "3").
+							AddRow("f4", "5", "6").
+							AddRow("f7", "8", "9"))
+			}),
+		},
+		{
+			Name:        "ValidWithPaginationAndFilteration",
+			Url:         "/?id=1&p2=3&_start=0&_end=12&_filters=address%20ne%20filtered",
+			Status:      200,
+			CheckHeader: map[string]string{"X-Total-Count": "19"},
+			CheckBody: []string{`"result":[`,
+				`{"id":"1","api":"query_handler_with_transform","name":"2","address":"3"}`,
+				`{"id":"c7","api":"query_handler_with_transform","name":"8","address":"9"}`,
+				`{"id":"4","api":"query_handler_with_transform","name":"5","address":"6"}`},
+			CheckNotInBody: []string{
+				`{"id":"a7","api":"query_handler_with_transform","name":"8","address":"filtered"}`,
+				`{"id":"c4","api":"query_handler_with_transform","name":"5","address":"filtered"}`},
+			Model: testingtools.SampleQueryMock(t, func(mockDB sqlmock.Sqlmock) {
+				mockDB.ExpectPrepare(Command3).
+					ExpectQuery().
+					WithArgs(QueryMap[Query3].GetDriverArgs(testQueryReq{ID: "1", P2: "3"})...).
+					WillReturnRows(
+						sqlmock.NewRows([]string{"ID", "P2", "DATA"}).
+							AddRow("1", "2", "3").
+							AddRow("4", "5", "6").
+							AddRow("7", "8", "9").
+							AddRow("a1", "2", "3").
+							AddRow("a4", "5", "6").
+							AddRow("a7", "8", "filtered").
+							AddRow("b1", "2", "3").
+							AddRow("b4", "5", "6").
+							AddRow("b7", "8", "9").
+							AddRow("c1", "2", "3").
+							AddRow("c4", "5", "filtered").
 							AddRow("c7", "8", "9").
 							AddRow("d1", "2", "3").
 							AddRow("d4", "5", "6").

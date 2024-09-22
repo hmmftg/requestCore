@@ -36,10 +36,11 @@ const (
 const PaginationLocalTag string = "pagination"
 
 type PaginationData struct {
-	Start int    `form:"_start" query:"_start" validate:"omitempty"`
-	End   int    `form:"_end" query:"_end" validate:"omitempty"`
-	Sort  string `form:"_sort" query:"_sort" validate:"omitempty"`
-	Order string `form:"_order" query:"_order" validate:"omitempty,oneof=asc desc"`
+	Start   int    `form:"_start" query:"_start" validate:"omitempty"`
+	End     int    `form:"_end" query:"_end" validate:"omitempty"`
+	Filters string `form:"_filters" query:"_filters" validate:"omitempty"`
+	Sort    string `form:"_sort" query:"_sort" validate:"omitempty"`
+	Order   string `form:"_order" query:"_order" validate:"omitempty,oneof=asc desc"`
 }
 
 func parseRequest[Req any](w webFramework.WebFramework, mode Type, validateHeader bool, header webFramework.HeaderInterface, name string) (*Req, RequestPtr, response.ErrorState, []response.ErrorResponse) {
@@ -82,9 +83,9 @@ func parseRequest[Req any](w webFramework.WebFramework, mode Type, validateHeade
 		} else {
 			w.Parser.SetLocal(PaginationLocalTag, pagination)
 		}
-		err = w.Parser.GetUrlQuery(&request)
-		if err != nil {
-			err = libError.Join(err, "%s[GetUrlQuery](fails)", name)
+		errQuery := w.Parser.GetUrlQuery(&request)
+		if errQuery != nil {
+			err = libError.Append(err, errQuery, "%s[GetUrlQuery](fails)", name)
 			desc += "QUERY"
 		}
 	case QueryWithURI:
