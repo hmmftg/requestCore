@@ -7,6 +7,7 @@ import (
 	"slices"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/hmmftg/requestCore"
 	"github.com/hmmftg/requestCore/libQuery"
@@ -68,6 +69,10 @@ type QueryHandlerType[Row, Resp any] struct {
 	Translator      RowTranslator[Row, Resp]
 	RecoveryHandler func(any)
 	PaginateCommand func(string, libRequest.PaginationData) string
+	Cache           bool
+	CacheTime       time.Time
+	CacheMaxAge     time.Duration
+	CacheData       map[string]Resp
 }
 
 type CommandReplacer[T any] struct {
@@ -147,9 +152,42 @@ func Paginate[Row any](paginationData libRequest.PaginationData, data []Row, les
 func (q QueryHandlerType[Row, Resp]) Parameters() HandlerParameters {
 	return HandlerParameters{q.Title, q.Mode, q.VerifyHeader, false, q.Path, false, q.RecoveryHandler, false}
 }
+
 func (q QueryHandlerType[Row, Resp]) Initializer(req HandlerRequest[Row, Resp]) response.ErrorState {
 	return nil
 }
+
+func (q QueryHandlerType[Row, Resp]) CacheKey(args []any) string {
+	return fmt.Sprintf("%s-%v", q.Title, args)
+}
+
+type Cacheable struct {
+	SetTime time.Time
+	Data    any
+}
+
+var CacheData = map[string]Cacheable{}
+
+func (q QueryHandlerType[Row, Resp]) CheckCache(args []any) *Resp {
+	key := q.CacheKey(args)
+	if q.CacheData == nil {
+		q.CacheData = map[string]Resp{}
+	}
+	if data, ok := q.CacheData[key]; ok {
+		if q.CacheTime.Add(q.CacheMaxAge).Before(time.Now()) {
+			return &data
+		}
+		delete(q.CacheData, key)
+	}
+	return nil
+}
+
+func (q QueryHandlerType[Row, Resp]) CacheResult(args []any, resp Resp) {
+	key := q.CacheKey(args)
+	q.CacheData[key] = resp
+	q.CacheTime = time.Now()
+}
+
 func (q QueryHandlerType[Row, Resp]) Handler(req HandlerRequest[Row, Resp]) (Resp, response.ErrorState) {
 	anyArgs := []any{}
 	for id := range q.Command.Args {
@@ -163,6 +201,13 @@ func (q QueryHandlerType[Row, Resp]) Handler(req HandlerRequest[Row, Resp]) (Res
 		}
 		anyArgs = append(anyArgs, *val)
 	}
+	if q.Cache {
+		data := q.CheckCache(anyArgs)
+		if data != nil {
+			return *data, nil
+		}
+	}
+
 	command := q.Command.Command
 	if q.PaginateCommand != nil {
 		if q.Mode == libRequest.QueryWithPagination || q.Mode == libRequest.URIAndPagination {
@@ -194,14 +239,20 @@ func (q QueryHandlerType[Row, Resp]) Handler(req HandlerRequest[Row, Resp]) (Res
 		return req.Response, err
 	}
 
+	if q.Cache {
+		q.CacheResult(anyArgs, resp.Resp)
+	}
+
 	req.W.Parser.SetRespHeader("X-Total-Count", fmt.Sprintf("%d", resp.TotalRows))
 
 	return resp.Resp, nil
 
 }
+
 func (q QueryHandlerType[Req, Resp]) Simulation(req HandlerRequest[Req, Resp]) (Resp, response.ErrorState) {
 	return req.Response, nil
 }
+
 func (q QueryHandlerType[Req, Resp]) Finalizer(req HandlerRequest[Req, Resp]) {
 }
 
