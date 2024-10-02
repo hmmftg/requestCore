@@ -170,9 +170,6 @@ var CacheData = map[string]Cacheable{}
 
 func (q QueryHandlerType[Row, Resp]) CheckCache(args []any) *Resp {
 	key := q.CacheKey(args)
-	if q.CacheData == nil {
-		q.CacheData = map[string]Resp{}
-	}
 	if data, ok := q.CacheData[key]; ok {
 		if q.CacheTime.Add(q.CacheMaxAge).Before(time.Now()) {
 			return &data
@@ -256,6 +253,56 @@ func (q QueryHandlerType[Req, Resp]) Simulation(req HandlerRequest[Req, Resp]) (
 func (q QueryHandlerType[Req, Resp]) Finalizer(req HandlerRequest[Req, Resp]) {
 }
 
+type CachingArgs struct {
+	Cache       bool
+	CacheMaxAge time.Duration
+}
+
+func queryHandler[Row any, Resp []Row](
+	title, key, path string, queryMap map[string]libQuery.QueryCommand,
+	core requestCore.RequestCoreInterface,
+	mode libRequest.Type,
+	validateHeader, simulation bool,
+	recoveryHandler func(any),
+	caching *CachingArgs,
+) any {
+	command := queryMap[key]
+	var handler QueryHandlerType[Row, Resp]
+	switch command.Type {
+	case libQuery.QuerySingle:
+		handler = QueryHandlerType[Row, Resp]{
+			Mode:            mode,
+			VerifyHeader:    validateHeader,
+			Title:           title,
+			Key:             key,
+			Command:         command,
+			Path:            path,
+			Translator:      QuerySingleTransformer[Row, Resp]{},
+			RecoveryHandler: recoveryHandler,
+		}
+	case libQuery.QueryAll:
+		handler = QueryHandlerType[Row, Resp]{
+			Mode:            mode,
+			VerifyHeader:    validateHeader,
+			Title:           title,
+			Key:             key,
+			Command:         command,
+			Path:            path,
+			Translator:      QueryAllTransformer[Row, Resp]{},
+			RecoveryHandler: recoveryHandler,
+		}
+	default:
+		log.Fatalln("invalid command type", command.Type)
+		return nil
+	}
+	if caching != nil {
+		handler.Cache = caching.Cache
+		handler.CacheMaxAge = caching.CacheMaxAge
+		handler.CacheData = map[string]Resp{}
+	}
+	return BaseHandler(core, handler, simulation)
+}
+
 func QueryHandler[Row any, Resp []Row](
 	title, key, path string, queryMap map[string]libQuery.QueryCommand,
 	core requestCore.RequestCoreInterface,
@@ -263,38 +310,26 @@ func QueryHandler[Row any, Resp []Row](
 	validateHeader, simulation bool,
 	recoveryHandler func(any),
 ) any {
-	command := queryMap[key]
-	switch command.Type {
-	case libQuery.QuerySingle:
-		return BaseHandler(core,
-			QueryHandlerType[Row, Resp]{
-				Mode:            mode,
-				VerifyHeader:    validateHeader,
-				Title:           title,
-				Key:             key,
-				Command:         command,
-				Path:            path,
-				Translator:      QuerySingleTransformer[Row, Resp]{},
-				RecoveryHandler: recoveryHandler,
-			},
-			simulation)
-	case libQuery.QueryAll:
-		return BaseHandler(core,
-			QueryHandlerType[Row, Resp]{
-				Mode:            mode,
-				VerifyHeader:    validateHeader,
-				Title:           title,
-				Key:             key,
-				Command:         command,
-				Path:            path,
-				Translator:      QueryAllTransformer[Row, Resp]{},
-				RecoveryHandler: recoveryHandler,
-			},
-			simulation)
-	default:
-		log.Fatalln("invalid command type", command.Type)
-		return nil
-	}
+	return queryHandler[Row, Resp](title, key, path, queryMap,
+		core,
+		mode,
+		validateHeader, simulation,
+		recoveryHandler, nil)
+}
+
+func QueryHandlerWithCaching[Row any, Resp []Row](
+	title, key, path string, queryMap map[string]libQuery.QueryCommand,
+	core requestCore.RequestCoreInterface,
+	mode libRequest.Type,
+	validateHeader, simulation bool,
+	recoveryHandler func(any),
+	caching *CachingArgs,
+) any {
+	return queryHandler[Row, Resp](
+		title, key, path, queryMap,
+		core, mode, validateHeader, simulation,
+		recoveryHandler, caching,
+	)
 }
 
 func QueryHandlerWithTransform[Row, Resp any](
@@ -305,20 +340,27 @@ func QueryHandlerWithTransform[Row, Resp any](
 	recoveryHandler func(any),
 	replacer CommandReplacer[libRequest.PaginationData],
 	translator RowTranslator[Row, Resp],
+	caching *CachingArgs,
 ) any {
 	command := queryMap[key]
 	command.Type = libQuery.Transforms
+	handler := QueryHandlerType[Row, Resp]{
+		Mode:            mode,
+		VerifyHeader:    validateHeader,
+		Title:           title,
+		Key:             key,
+		Command:         command,
+		Path:            path,
+		Translator:      translator,
+		RecoveryHandler: recoveryHandler,
+		PaginateCommand: replacer.Replace,
+	}
+	if caching != nil {
+		handler.Cache = caching.Cache
+		handler.CacheMaxAge = caching.CacheMaxAge
+		handler.CacheData = map[string]Resp{}
+	}
 	return BaseHandler(core,
-		QueryHandlerType[Row, Resp]{
-			Mode:            mode,
-			VerifyHeader:    validateHeader,
-			Title:           title,
-			Key:             key,
-			Command:         command,
-			Path:            path,
-			Translator:      translator,
-			RecoveryHandler: recoveryHandler,
-			PaginateCommand: replacer.Replace,
-		},
+		handler,
 		simulation)
 }

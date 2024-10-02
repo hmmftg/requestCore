@@ -276,6 +276,7 @@ func (env *testQueryEnv) handlerWithTransform() any {
 			return fmt.Sprintf("Start=%d and End=%d", a.Start, a.End)
 		}},
 		testTransformer[testQueryReq, []testQueryResp]{},
+		nil,
 	)
 }
 
