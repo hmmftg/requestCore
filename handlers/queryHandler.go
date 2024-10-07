@@ -213,7 +213,7 @@ func (q QueryHandlerType[Row, Resp]) Handler(req HandlerRequest[Row, Resp]) (Res
 		req.Core.GetDB(),
 		anyArgs...)
 	if err != nil {
-		if q.OnEmpty200 && err.GetStatus() == http.StatusInternalServerError &&
+		if q.OnEmpty200 && err.GetStatus() == http.StatusBadRequest &&
 			err.GetDescription() == libQuery.NO_DATA_FOUND {
 			rows = []Row{}
 		} else {
