@@ -73,6 +73,7 @@ type QueryHandlerType[Row, Resp any] struct {
 	CacheTime       time.Time
 	CacheMaxAge     time.Duration
 	CacheData       map[string]Resp
+	OnEmpty200      bool
 }
 
 type CommandReplacer[T any] struct {
@@ -219,7 +220,12 @@ func (q QueryHandlerType[Row, Resp]) Handler(req HandlerRequest[Row, Resp]) (Res
 		req.Core.GetDB(),
 		anyArgs...)
 	if err != nil {
-		return req.Response, err
+		if q.OnEmpty200 && err.GetStatus() == http.StatusInternalServerError &&
+			err.GetDescription() == libQuery.NO_DATA_FOUND {
+			rows = []Row{}
+		} else {
+			return req.Response, err
+		}
 	}
 	paginate := false
 	var pgData libRequest.PaginationData
