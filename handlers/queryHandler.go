@@ -162,13 +162,6 @@ func (q QueryHandlerType[Row, Resp]) CacheKey(args []any) string {
 	return fmt.Sprintf("%s-%v", q.Title, args)
 }
 
-type Cacheable struct {
-	SetTime time.Time
-	Data    any
-}
-
-var CacheData = map[string]Cacheable{}
-
 func (q QueryHandlerType[Row, Resp]) CheckCache(args []any) *Resp {
 	key := q.CacheKey(args)
 	if data, ok := q.CacheData[key]; ok {
@@ -259,6 +252,16 @@ func (q QueryHandlerType[Req, Resp]) Simulation(req HandlerRequest[Req, Resp]) (
 func (q QueryHandlerType[Req, Resp]) Finalizer(req HandlerRequest[Req, Resp]) {
 }
 
+func Query[Row, Resp any](
+	core requestCore.RequestCoreInterface,
+	handler QueryHandlerType[Row, Resp],
+	simulation bool,
+) any {
+	return BaseHandler(core,
+		handler,
+		simulation)
+}
+
 type CachingArgs struct {
 	Cache       bool
 	CacheMaxAge time.Duration
@@ -306,7 +309,7 @@ func queryHandler[Row any, Resp []Row](
 		handler.CacheMaxAge = caching.CacheMaxAge
 		handler.CacheData = map[string]Resp{}
 	}
-	return BaseHandler(core, handler, simulation)
+	return Query(core, handler, simulation)
 }
 
 func QueryHandler[Row any, Resp []Row](
@@ -366,7 +369,7 @@ func QueryHandlerWithTransform[Row, Resp any](
 		handler.CacheMaxAge = caching.CacheMaxAge
 		handler.CacheData = map[string]Resp{}
 	}
-	return BaseHandler(core,
+	return Query(core,
 		handler,
 		simulation)
 }
