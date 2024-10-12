@@ -179,7 +179,18 @@ func ParseQueryResult(result map[string]any, t reflect.Type, v reflect.Value) {
 
 func ParseMap[Target any](input map[string]any) (*Target, error) {
 	result := new(Target)
-	err := mapstructure.Decode(input, result)
+	config := &mapstructure.DecoderConfig{
+		Metadata: nil,
+		Result:   result,
+		TagName:  "db",
+	}
+
+	decoder, err := mapstructure.NewDecoder(config)
+	if err != nil {
+		return nil, err
+	}
+
+	err = decoder.Decode(input)
 	return result, err
 }
 
