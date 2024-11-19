@@ -98,6 +98,7 @@ type Filter struct {
 	Field    string
 	Operator string
 	Value    string
+	Value2nd string
 }
 
 func Filterate[Row any](paginationData libRequest.PaginationData, data []Row, filterFunc func(Filter) func(Row) bool) []Row {
@@ -108,7 +109,7 @@ func Filterate[Row any](paginationData libRequest.PaginationData, data []Row, fi
 	if len(filterList) <= 0 {
 		return data
 	}
-	result := data
+	result := slices.Clone(data)
 	for id := range filterList {
 		split := strings.Split(filterList[id], " ")
 		result = slices.DeleteFunc(
@@ -118,6 +119,7 @@ func Filterate[Row any](paginationData libRequest.PaginationData, data []Row, fi
 					Field:    split[0],
 					Operator: split[1],
 					Value:    split[2],
+					Value2nd: split[3],
 				},
 			))
 	}
