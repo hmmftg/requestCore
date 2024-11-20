@@ -252,17 +252,9 @@ func CallSql[R any](query string,
 
 func GetQuery[R any](query string, core QueryRunnerInterface, args ...any) ([]R, response.ErrorState) {
 	//Query
-	var target R
-	nRet, result, err := core.QueryToStruct(query, target, args...)
-	if nRet == QUERY_ERROR && strings.HasPrefix(err.Error(), "no data found") {
-		return nil, response.Error(http.StatusBadRequest, NO_DATA_FOUND, "No Data Found", err)
-	}
-	if nRet != 0 || err != nil {
+	rows, err := QueryToStruct[R](core, query, args...)
+	if err != nil {
 		return nil, response.ToError(DB_READ_ERROR, err.Error(), err)
-	}
-	rows, ok := result.([]R)
-	if !ok {
-		return nil, response.ToError(PARSE_DB_RESP_ERROR, "Unable to parse response struct", err)
 	}
 	if len(rows) == 0 {
 		return nil, response.Error(
