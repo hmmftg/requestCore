@@ -72,7 +72,7 @@ type QueryHandlerType[Row, Resp any] struct {
 	Cache           bool
 	CacheTime       time.Time
 	CacheMaxAge     time.Duration
-	CacheData       map[string]Resp
+	CacheData       map[string][]Row
 	OnEmpty200      bool
 }
 
@@ -164,20 +164,20 @@ func (q QueryHandlerType[Row, Resp]) CacheKey(args []any) string {
 	return fmt.Sprintf("%s-%v", q.Title, args)
 }
 
-func (q QueryHandlerType[Row, Resp]) CheckCache(args []any) *Resp {
+func (q QueryHandlerType[Row, Resp]) CheckCache(args []any) []Row {
 	key := q.CacheKey(args)
 	if data, ok := q.CacheData[key]; ok {
 		if q.CacheTime.Add(q.CacheMaxAge).Before(time.Now()) {
-			return &data
+			return data
 		}
 		delete(q.CacheData, key)
 	}
 	return nil
 }
 
-func (q QueryHandlerType[Row, Resp]) CacheResult(args []any, resp Resp) {
+func (q QueryHandlerType[Row, Resp]) CacheResult(args []any, rows []Row) {
 	key := q.CacheKey(args)
-	q.CacheData[key] = resp
+	q.CacheData[key] = rows
 	q.CacheTime = time.Now()
 }
 
@@ -194,32 +194,36 @@ func (q QueryHandlerType[Row, Resp]) Handler(req HandlerRequest[Row, Resp]) (Res
 		}
 		anyArgs = append(anyArgs, *val)
 	}
+	var rows []Row
+	var err response.ErrorState
 	if q.Cache {
-		data := q.CheckCache(anyArgs)
-		if data != nil {
-			return *data, nil
-		}
+		rows = q.CheckCache(anyArgs)
 	}
-
-	command := q.Command.Command
-	if q.PaginateCommand != nil {
-		if q.Mode == libRequest.QueryWithPagination || q.Mode == libRequest.URIAndPagination {
-			pgData, ok := req.W.Parser.GetLocal(libRequest.PaginationLocalTag).(libRequest.PaginationData)
-			if ok {
-				command = q.PaginateCommand(command, pgData)
+	if rows == nil {
+		command := q.Command.Command
+		if q.PaginateCommand != nil {
+			if q.Mode == libRequest.QueryWithPagination || q.Mode == libRequest.URIAndPagination {
+				pgData, ok := req.W.Parser.GetLocal(libRequest.PaginationLocalTag).(libRequest.PaginationData)
+				if ok {
+					command = q.PaginateCommand(command, pgData)
+				}
 			}
 		}
-	}
-	rows, err := libQuery.GetQuery[Row](
-		command,
-		req.Core.GetDB(),
-		anyArgs...)
-	if err != nil {
-		if q.OnEmpty200 && err.GetStatus() == http.StatusBadRequest &&
-			err.GetDescription() == libQuery.NO_DATA_FOUND {
-			rows = []Row{}
-		} else {
-			return req.Response, err
+		rows, err = libQuery.GetQuery[Row](
+			command,
+			req.Core.GetDB(),
+			anyArgs...)
+		if err != nil {
+			if q.OnEmpty200 && err.GetStatus() == http.StatusBadRequest &&
+				err.GetDescription() == libQuery.NO_DATA_FOUND {
+				rows = []Row{}
+			} else {
+				return req.Response, err
+			}
+		}
+
+		if q.Cache {
+			q.CacheResult(anyArgs, rows)
 		}
 	}
 	paginate := false
@@ -235,10 +239,6 @@ func (q QueryHandlerType[Row, Resp]) Handler(req HandlerRequest[Row, Resp]) (Res
 	}
 	if err != nil {
 		return req.Response, err
-	}
-
-	if q.Cache {
-		q.CacheResult(anyArgs, resp.Resp)
 	}
 
 	req.W.Parser.SetRespHeader("X-Total-Count", fmt.Sprintf("%d", resp.TotalRows))
@@ -309,7 +309,7 @@ func queryHandler[Row any, Resp []Row](
 	if caching != nil {
 		handler.Cache = caching.Cache
 		handler.CacheMaxAge = caching.CacheMaxAge
-		handler.CacheData = map[string]Resp{}
+		handler.CacheData = map[string][]Row{}
 	}
 	return Query(core, handler, simulation)
 }
@@ -369,7 +369,7 @@ func QueryHandlerWithTransform[Row, Resp any](
 	if caching != nil {
 		handler.Cache = caching.Cache
 		handler.CacheMaxAge = caching.CacheMaxAge
-		handler.CacheData = map[string]Resp{}
+		handler.CacheData = map[string][]Row{}
 	}
 	return Query(core,
 		handler,
