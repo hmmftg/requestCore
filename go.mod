@@ -11,6 +11,7 @@ require (
 	github.com/go-playground/validator/v10 v10.22.0
 	github.com/go-viper/mapstructure/v2 v2.1.0
 	github.com/gofiber/fiber/v2 v2.52.5
+	github.com/google/go-querystring v1.1.0
 	github.com/hmmftg/image v0.12.1
 	github.com/lib/pq v1.10.9
 	github.com/valyala/fasthttp v1.55.0
