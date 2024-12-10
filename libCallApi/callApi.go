@@ -209,6 +209,8 @@ func PrepareCall(c CallData) (*http.Request, response.ErrorState) {
 			return nil, response.Error(http.StatusInternalServerError, "Generate Request Failed", c.Req, err).Input(fmt.Sprintf("PrepareCall.Marshal:%v", c.Req))
 		}
 		buffer = bytes.NewBuffer([]byte(form.Encode()))
+	case Empty:
+		buffer = bytes.NewBuffer([]byte(""))
 	}
 	if buffer == nil {
 		return nil, response.Error(http.StatusInternalServerError, "Generate Request Failed", c.Req, fmt.Errorf("type is not defined"))
