@@ -96,7 +96,7 @@ func CallApiJSON[Req any, Resp libCallApi.ApiResp](
 	} else {
 		reqLog = core.RequestTools().LogStart(w, method, fmt.Sprintf("params: %+v", param))
 	}
-	param.IsForm = false
+	param.BodyType = libCallApi.JSON
 	resp, err := libCallApi.RemoteCall[Req, Resp](param)
 	dump, errJSON := json.MarshalIndent(resp, "", "  ")
 	if err == nil {
@@ -121,7 +121,7 @@ func CallApiForm[Req any, Resp libCallApi.ApiResp](
 	} else {
 		reqLog = core.RequestTools().LogStart(w, method, fmt.Sprintf("params: %+v", param))
 	}
-	param.IsForm = true
+	param.BodyType = libCallApi.Form
 	resp, err := libCallApi.RemoteCall[Req, Resp](param)
 	dump, errJSON := json.MarshalIndent(resp, "", "  ")
 	if err == nil {

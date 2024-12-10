@@ -56,7 +56,7 @@ func (m RemoteApiModel) ConsumeRestBasicAuthApi(requestJson []byte, apiName, pat
 			return responseData, resp.Status, nil
 		}
 		errorDesc := fmt.Sprintf("API_NOK#%s#%s#%s#", apiName, m.RemoteApiList[apiName].Name, resp.Status)
-		return nil, errorDesc, fmt.Errorf(errorDesc)
+		return nil, errorDesc, fmt.Errorf("API_NOK#%s#%s#%s#", apiName, m.RemoteApiList[apiName].Name, resp.Status)
 	}
 
 	return responseData, resp.Status, nil
@@ -106,11 +106,19 @@ func (m RemoteApiModel) ConsumeRestApi(requestJson []byte, apiName, path, conten
 			return responseData, resp.Status, resp.StatusCode, nil
 		}
 		errorDesc := fmt.Sprintf("API_NOK#%s#%s#%s#", apiName, m.RemoteApiList[apiName].Name, resp.Status)
-		return nil, errorDesc, resp.StatusCode, fmt.Errorf(errorDesc)
+		return nil, errorDesc, resp.StatusCode, fmt.Errorf("API_NOK#%s#%s#%s#", apiName, m.RemoteApiList[apiName].Name, resp.Status)
 	}
 
 	return responseData, resp.Status, resp.StatusCode, nil
 }
+
+type RequestBodyType int
+
+const (
+	JSON RequestBodyType = iota
+	Form
+	Empty
+)
 
 type CallData struct {
 	Api       RemoteApi
@@ -119,9 +127,7 @@ type CallData struct {
 	Headers   map[string]string
 	Req       any
 	SslVerify bool
-	IsJson    bool
-	IsForm    bool
-	IsQuery   bool
+	BodyType  RequestBodyType
 	Timeout   time.Duration
 	EnableLog bool
 	LogLevel  int
@@ -190,14 +196,14 @@ func PrepareCall(c CallData) (*http.Request, response.ErrorState) {
 		httpClient.Timeout = time.Duration(timeoutSeconds * int(time.Second))
 	}
 	var buffer *bytes.Buffer
-	if c.IsJson {
+	switch c.BodyType {
+	case JSON:
 		jString, err := json.Marshal(c.Req)
 		if err != nil {
 			return nil, response.Error(http.StatusInternalServerError, "Generate Request Failed", c.Req, err).Input(fmt.Sprintf("PrepareCall.Marshal:%v", c.Req))
 		}
 		buffer = bytes.NewBuffer(jString)
-	}
-	if c.IsForm {
+	case Form:
 		form, err := query.Values(c.Req)
 		if err != nil {
 			return nil, response.Error(http.StatusInternalServerError, "Generate Request Failed", c.Req, err).Input(fmt.Sprintf("PrepareCall.Marshal:%v", c.Req))
@@ -214,10 +220,10 @@ func PrepareCall(c CallData) (*http.Request, response.ErrorState) {
 	if _, ok := c.Headers["Authorization"]; !ok {
 		req.SetBasicAuth(c.Api.User, c.Api.Password)
 	}
-	if c.IsJson {
+	switch c.BodyType {
+	case JSON:
 		req.Header.Add("Content-Type", "application/json")
-	}
-	if c.IsForm {
+	case Form:
 		req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 	}
 	for header, value := range c.Headers {
