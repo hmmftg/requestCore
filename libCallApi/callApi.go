@@ -228,6 +228,7 @@ func PrepareCall(c CallData) (*http.Request, response.ErrorState) {
 	case Form:
 		req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 	}
+	req.Header.Add("Accept", "application/json")
 	for header, value := range c.Headers {
 		req.Header.Add(header, value)
 	}
