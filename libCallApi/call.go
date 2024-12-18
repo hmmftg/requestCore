@@ -32,6 +32,7 @@ type RemoteCallParamData[Req any] struct {
 	ValidateTls bool
 	EnableLog   bool
 	JsonBody    Req
+	BodyType    RequestBodyType
 }
 
 type CallResult[RespType any] struct {
@@ -87,6 +88,7 @@ func RemoteCall[Req any, Resp ApiResp](param *RemoteCallParamData[Req]) (*Resp, 
 		EnableLog: param.EnableLog,
 		Timeout:   param.Timeout,
 		Req:       param.JsonBody,
+		BodyType:  param.BodyType,
 	}
 	return ConsumeRestJSON[Resp](&callData)
 }

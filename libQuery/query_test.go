@@ -131,12 +131,12 @@ func TestQueryToStruct(t *testing.T) {
 		Result    []sampleOutput
 		Error     string
 	}
-	cols := []string{"string", "bool", "time", "time_p", "time_s", "int64", "float64"}
+	cols := []string{"string", "bool", "time", "int64", "float64"}
 	tm := time.Now()
 	testCases := []TestCase{{
 		Name:      "Valid Query",
 		SQL:       "query",
-		Interface: getQueryMock(nil, cols, "a", true, tm, &tm, tm.Format("2006"), 10, 12.1),
+		Interface: getQueryMock(nil, cols, "a", true, tm, 10, 12.1),
 		Result:    []sampleOutput{{String: "a", Bool: true, Int64: 10, Float64: 12.1, Time: tm}},
 	}, {
 		Name:      "Query On Some Fields",

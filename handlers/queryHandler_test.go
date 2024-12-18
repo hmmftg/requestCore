@@ -341,7 +341,7 @@ func TestQueryHandlerWithTransform(t *testing.T) {
 		},
 		{
 			Name:        "ValidWithPaginationAndFilteration",
-			Url:         "/?id=1&p2=3&_start=0&_end=12&_filters=address%20ne%20filtered",
+			Url:         "/?id=1&p2=3&_start=0&_end=12&_filters=address%20ne%20filtered%20",
 			Status:      200,
 			CheckHeader: map[string]string{"X-Total-Count": "19"},
 			CheckBody: []string{`"result":[`,

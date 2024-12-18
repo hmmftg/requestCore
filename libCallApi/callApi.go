@@ -14,6 +14,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/google/go-querystring/query"
 	"github.com/hmmftg/requestCore/response"
 )
 
@@ -55,7 +56,7 @@ func (m RemoteApiModel) ConsumeRestBasicAuthApi(requestJson []byte, apiName, pat
 			return responseData, resp.Status, nil
 		}
 		errorDesc := fmt.Sprintf("API_NOK#%s#%s#%s#", apiName, m.RemoteApiList[apiName].Name, resp.Status)
-		return nil, errorDesc, fmt.Errorf(errorDesc)
+		return nil, errorDesc, fmt.Errorf("API_NOK#%s#%s#%s#", apiName, m.RemoteApiList[apiName].Name, resp.Status)
 	}
 
 	return responseData, resp.Status, nil
@@ -105,11 +106,19 @@ func (m RemoteApiModel) ConsumeRestApi(requestJson []byte, apiName, path, conten
 			return responseData, resp.Status, resp.StatusCode, nil
 		}
 		errorDesc := fmt.Sprintf("API_NOK#%s#%s#%s#", apiName, m.RemoteApiList[apiName].Name, resp.Status)
-		return nil, errorDesc, resp.StatusCode, fmt.Errorf(errorDesc)
+		return nil, errorDesc, resp.StatusCode, fmt.Errorf("API_NOK#%s#%s#%s#", apiName, m.RemoteApiList[apiName].Name, resp.Status)
 	}
 
 	return responseData, resp.Status, resp.StatusCode, nil
 }
+
+type RequestBodyType int
+
+const (
+	JSON RequestBodyType = iota
+	Form
+	Empty
+)
 
 type CallData struct {
 	Api       RemoteApi
@@ -118,6 +127,7 @@ type CallData struct {
 	Headers   map[string]string
 	Req       any
 	SslVerify bool
+	BodyType  RequestBodyType
 	Timeout   time.Duration
 	EnableLog bool
 	LogLevel  int
@@ -185,18 +195,40 @@ func PrepareCall(c CallData) (*http.Request, response.ErrorState) {
 		timeoutSeconds, _ := strconv.Atoi(timeOutString)
 		httpClient.Timeout = time.Duration(timeoutSeconds * int(time.Second))
 	}
-	requestJson, err := json.Marshal(c.Req)
-	if err != nil {
-		return nil, response.Error(http.StatusInternalServerError, "Generate Request Failed", c.Req, err).Input(fmt.Sprintf("PrepareCall.Marshal:%v", c.Req))
+	var buffer *bytes.Buffer
+	switch c.BodyType {
+	case JSON:
+		jString, err := json.Marshal(c.Req)
+		if err != nil {
+			return nil, response.Error(http.StatusInternalServerError, "Generate Request Failed", c.Req, err).Input(fmt.Sprintf("PrepareCall.Marshal:%v", c.Req))
+		}
+		buffer = bytes.NewBuffer(jString)
+	case Form:
+		form, err := query.Values(c.Req)
+		if err != nil {
+			return nil, response.Error(http.StatusInternalServerError, "Generate Request Failed", c.Req, err).Input(fmt.Sprintf("PrepareCall.Marshal:%v", c.Req))
+		}
+		buffer = bytes.NewBuffer([]byte(form.Encode()))
+	case Empty:
+		buffer = bytes.NewBuffer([]byte(""))
 	}
-	req, err := http.NewRequest(c.Method, c.Api.Domain+"/"+c.Path, bytes.NewBuffer(requestJson))
+	if buffer == nil {
+		return nil, response.Error(http.StatusInternalServerError, "Generate Request Failed", c.Req, fmt.Errorf("type is not defined"))
+	}
+	req, err := http.NewRequest(c.Method, c.Api.Domain+"/"+c.Path, buffer)
 	if err != nil {
-		return nil, response.Error(http.StatusInternalServerError, "Generate Request Failed", fmt.Sprintf("M=%s,Url:%s,json:%s", c.Method, c.Api.Domain+"/"+c.Path, string(requestJson)), err).Input(fmt.Sprintf("PrepareCall.NewRequest:%v", c))
+		return nil, response.Error(http.StatusInternalServerError, "Generate Request Failed", fmt.Sprintf("M=%s,Url:%s,json:%s", c.Method, c.Api.Domain+"/"+c.Path, buffer.String()), err).Input(fmt.Sprintf("PrepareCall.NewRequest:%v", c))
 	}
 	if _, ok := c.Headers["Authorization"]; !ok {
 		req.SetBasicAuth(c.Api.User, c.Api.Password)
 	}
-	req.Header.Add("Content-Type", "application/json")
+	switch c.BodyType {
+	case JSON:
+		req.Header.Add("Content-Type", "application/json")
+	case Form:
+		req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+	}
+	req.Header.Add("Accept", "application/json")
 	for header, value := range c.Headers {
 		req.Header.Add(header, value)
 	}
