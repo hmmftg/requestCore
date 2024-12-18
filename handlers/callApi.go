@@ -3,7 +3,6 @@ package handlers
 import (
 	"encoding/json"
 	"fmt"
-	"log"
 	"net/http"
 
 	"github.com/hmmftg/requestCore"
@@ -90,20 +89,24 @@ func CallApiJSON[Req any, Resp libCallApi.ApiResp](
 	param *libCallApi.RemoteCallParamData[Req],
 ) (Resp, response.ErrorState) {
 	var reqLog libRequest.RequestPtr
-	dump, err := json.MarshalIndent(param, "", "  ")
-	if err == nil {
+	dump, errJSON := json.MarshalIndent(param, "", "  ")
+	if errJSON == nil {
 		reqLog = core.RequestTools().LogStart(w, method, string(dump))
 	} else {
 		reqLog = core.RequestTools().LogStart(w, method, fmt.Sprintf("params: %+v", param))
 	}
 	resp, err := libCallApi.RemoteCall[Req, Resp](param)
-	dump, errJSON := json.MarshalIndent(resp, "", "  ")
-	if err == nil {
-		core.RequestTools().LogEnd(method, string(dump), reqLog)
-	} else {
-		log.Println(errJSON)
-		core.RequestTools().LogEnd(method, fmt.Sprintf("resp: %+v", resp), reqLog)
+	if err != nil {
+		core.RequestTools().LogEnd(method, "remote call error: "+err.Error(), reqLog)
+		return *new(Resp), err
 	}
+	// core.RequestTools().LogEnd(method, fmt.Sprintf("resp: %+v", resp), reqLog)
+	dump, errJSON = json.MarshalIndent(resp, "", "  ")
+	if errJSON != nil {
+		core.RequestTools().LogEnd(method, "invalid json resp: "+errJSON.Error(), reqLog)
+		return *new(Resp), response.ToError("", "", errJSON)
+	}
+	core.RequestTools().LogEnd(method, string(dump), reqLog)
 	return *resp, nil
 }
 
