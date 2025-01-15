@@ -3,15 +3,18 @@ package libCallApi
 import (
 	"crypto/tls"
 	"net/http"
+	"sync"
 	"time"
 )
 
 type RemoteApi struct {
-	User     string `yaml:"user"`
-	Password string `yaml:"password"`
-	Domain   string `yaml:"domain"`
-	Name     string `yaml:"name"`
-	Options  map[string]string
+	Domain         string            `yaml:"domain"`
+	Name           string            `yaml:"name"`
+	AuthData       Auth              `yaml:"auth"`
+	Options        map[string]string `yaml:"options"`
+	Auth           AuthSystem
+	TokenCacheLock *sync.Mutex
+	TokenCache     *TokenCache
 }
 
 type RemoteApiModel struct {

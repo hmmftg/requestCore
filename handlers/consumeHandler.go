@@ -103,7 +103,7 @@ func (c CallArgs[Req, Resp]) Initializer(req HandlerRequest[Req, Resp]) response
 	headersMap := ExtractHeaders(req.W, headers, locals)
 	if !c.ForwardAuth {
 		remoteApi := req.Core.Consumer().GetApi(c.Api)
-		headersMap["Authorization"] = "Basic " + libCallApi.BasicAuth(remoteApi.User, remoteApi.Password)
+		headersMap["Authorization"] = "Basic " + libCallApi.BasicAuth(remoteApi.AuthData.User, remoteApi.AuthData.Password)
 	}
 	req.W.Parser.SetLocal(HeadersMap, headersMap)
 

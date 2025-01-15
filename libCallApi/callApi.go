@@ -27,7 +27,7 @@ func (m RemoteApiModel) ConsumeRestBasicAuthApi(requestJson []byte, apiName, pat
 	if err != nil {
 		return nil, "Generate Request Failed", err
 	}
-	req.SetBasicAuth(m.RemoteApiList[apiName].User, m.RemoteApiList[apiName].Password)
+	req.SetBasicAuth(m.RemoteApiList[apiName].AuthData.User, m.RemoteApiList[apiName].AuthData.Password)
 	req.Header.Add("Content-Type", contentType)
 	for header, value := range headers {
 		req.Header.Add(header, value)
@@ -76,7 +76,7 @@ func (m RemoteApiModel) ConsumeRestApi(requestJson []byte, apiName, path, conten
 		return nil, "Generate Request Failed", http.StatusInternalServerError, err
 	}
 	if _, ok := headers["Authorization"]; !ok {
-		req.SetBasicAuth(m.RemoteApiList[apiName].User, m.RemoteApiList[apiName].Password)
+		req.SetBasicAuth(m.RemoteApiList[apiName].AuthData.User, m.RemoteApiList[apiName].AuthData.Password)
 	}
 	req.Header.Add("Content-Type", contentType)
 	for header, value := range headers {
@@ -220,7 +220,7 @@ func PrepareCall(c CallData) (*http.Request, response.ErrorState) {
 		return nil, response.Error(http.StatusInternalServerError, "Generate Request Failed", fmt.Sprintf("M=%s,Url:%s,json:%s", c.Method, c.Api.Domain+"/"+c.Path, buffer.String()), err).Input(fmt.Sprintf("PrepareCall.NewRequest:%v", c))
 	}
 	if _, ok := c.Headers["Authorization"]; !ok {
-		req.SetBasicAuth(c.Api.User, c.Api.Password)
+		req.SetBasicAuth(c.Api.AuthData.User, c.Api.AuthData.Password)
 	}
 	switch c.BodyType {
 	case JSON:
