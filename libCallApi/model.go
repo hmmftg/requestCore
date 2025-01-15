@@ -11,6 +11,7 @@ type RemoteApi struct {
 	Password string `yaml:"password"`
 	Domain   string `yaml:"domain"`
 	Name     string `yaml:"name"`
+	Options  map[string]string
 }
 
 type RemoteApiModel struct {
