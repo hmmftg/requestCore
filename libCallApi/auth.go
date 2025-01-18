@@ -75,7 +75,8 @@ func (api *RemoteApi) handleToken() libError.Error {
 	if err != nil {
 		return err
 	}
-	api.TokenCache = tokens
+	api.TokenCache.AccessToken = tokens.AccessToken
+	api.TokenCache.RefreshToken = tokens.RefreshToken
 	return nil
 }
 
