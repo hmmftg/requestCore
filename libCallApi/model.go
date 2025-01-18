@@ -12,9 +12,9 @@ type RemoteApi struct {
 	Name           string            `yaml:"name"`
 	AuthData       Auth              `yaml:"auth"`
 	Options        map[string]string `yaml:"options"`
-	Auth           AuthSystem
-	TokenCacheLock *sync.Mutex
-	TokenCache     *TokenCache
+	Auth           AuthSystem        `yaml:"-"`
+	TokenCacheLock *sync.Mutex       `yaml:"-"`
+	TokenCache     *TokenCache       `yaml:"-"`
 }
 
 type RemoteApiModel struct {
