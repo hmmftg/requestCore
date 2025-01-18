@@ -61,6 +61,7 @@ func (api RemoteApi) GetAuthHeader() (string, error) {
 
 func (api *RemoteApi) handleToken() libError.Error {
 	api.TokenCacheLock.Lock()
+	defer api.TokenCacheLock.Unlock()
 	if api.TokenCache.AccessToken != nil && api.TokenCache.RefreshToken != nil {
 		return nil
 	}
@@ -69,7 +70,6 @@ func (api *RemoteApi) handleToken() libError.Error {
 		return err
 	}
 	api.TokenCache = tokens
-	api.TokenCacheLock.Unlock()
 	return nil
 }
 
