@@ -53,10 +53,16 @@ func (api RemoteApi) AddBasicAuthHeader(headers map[string]string) map[string]st
 }
 
 func (api RemoteApi) GetAuthHeader() (string, error) {
-	if api.TokenCache == nil || api.TokenCache.AccessToken == nil {
+	if api.TokenCache == nil {
 		return "", fmt.Errorf("empty token cache")
 	}
-	return fmt.Sprintf("%s %s", api.TokenCache.AccessToken.Type, api.TokenCache.AccessToken), nil
+	if api.TokenCache.AccessToken == nil || len(api.TokenCache.AccessToken.Token) == 0 {
+		return "", fmt.Errorf("empty token data")
+	}
+	if time.Now().After(api.TokenCache.AccessToken.TimeTaken.Add(api.TokenCache.AccessToken.ValidUntil)) {
+		return "", fmt.Errorf("expired token")
+	}
+	return fmt.Sprintf("%s %s", api.TokenCache.AccessToken.Type, api.TokenCache.AccessToken.Token), nil
 }
 
 func (api *RemoteApi) handleToken() libError.Error {
