@@ -3,10 +3,11 @@ package libCallApi
 import (
 	"encoding/base64"
 	"fmt"
-	"log"
+	"sync"
 	"time"
 
 	"github.com/hmmftg/requestCore/libError"
+	"github.com/hmmftg/requestCore/status"
 )
 
 type Auth struct {
@@ -31,6 +32,12 @@ type TokenCache struct {
 	RefreshToken *OAuth2Token
 }
 
+// initilaizes a token cache which will be used across all APIs
+// should be called once per remote-api
+func InitTokenCache() (*TokenCache, *sync.Mutex) {
+	return &TokenCache{}, &sync.Mutex{}
+}
+
 type AuthSystem interface {
 	Login() (*TokenCache, libError.Error)
 }
@@ -43,6 +50,13 @@ func (api RemoteApi) GetBasicAuthHeader() string {
 func (api RemoteApi) AddBasicAuthHeader(headers map[string]string) map[string]string {
 	headers["Authorization"] = api.GetBasicAuthHeader()
 	return headers
+}
+
+func (api RemoteApi) GetAuthHeader() (string, error) {
+	if api.TokenCache == nil || api.TokenCache.AccessToken == nil {
+		return "", fmt.Errorf("empty token cache")
+	}
+	return fmt.Sprintf("%s %s", api.TokenCache.AccessToken.Type, api.TokenCache.AccessToken), nil
 }
 
 func (api *RemoteApi) handleToken() libError.Error {
@@ -61,7 +75,7 @@ func (api *RemoteApi) handleToken() libError.Error {
 
 func (api *RemoteApi) Authenticate() libError.Error {
 	if api.TokenCacheLock == nil {
-		log.Fatalf("token cache lock of api %s is null", api.Name)
+		return libError.New(status.InternalServerError, "TOKEN_CACHE_NOT_INITIALIZED", "token cache lock of api %s is null", api.Name)
 	}
 	if api.TokenCache.AccessToken == nil {
 		err := api.handleToken()
