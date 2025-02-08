@@ -62,6 +62,10 @@ func firstTime() (ut.Translator, *validator.Validate, error) {
 		return nil, nil, libError.Join(err, "error in RegisterValidation(padded_ip)")
 	}
 	Validator.RegisterTagNameFunc(func(fld reflect.StructField) string {
+		faName := fld.Tag.Get("name")
+		if len(faName) > 0 {
+			return faName
+		}
 		name := strings.SplitN(fld.Tag.Get("json"), ",", 2)[0]
 		if name == "-" {
 			return ""
