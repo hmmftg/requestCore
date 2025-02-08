@@ -235,6 +235,8 @@ func FormatErrorResp(errs error, trans ut.Translator) []ErrorResponse {
 			errorResp.Code = "REQUIRED-FIELD"
 		case "padded_ip":
 			fallthrough
+		case "startswith":
+			fallthrough
 		case "alphanum":
 			fallthrough
 		case "oneof":

@@ -8,7 +8,8 @@ import (
 )
 
 type Customer struct {
-	ID string `json:"id" validate:"numeric,len=10" name:"شناسه"`
+	ID   string `json:"id,omitempty" validate:"omitempty,numeric,len=10" name:"شناسه"`
+	Name string `json:"name,omitempty" validate:"omitempty,startswith=name." name:"نام"`
 }
 
 func TestValidate(t *testing.T) {
@@ -21,6 +22,12 @@ func TestValidate(t *testing.T) {
 			Struct: Customer{ID: "222"},
 			Expected: validator.ValidationErrorsTranslations{
 				"Customer.شناسه": "طول شناسه باید 10 کاراکتر باشد",
+			},
+		},
+		{
+			Struct: Customer{Name: "aname.aa"},
+			Expected: validator.ValidationErrorsTranslations{
+				"Customer.نام": "Key: 'Customer.نام' Error:Field validation for 'نام' failed on the 'startswith' tag",
 			},
 		},
 	}
