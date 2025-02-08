@@ -32,6 +32,10 @@ type TokenCache struct {
 	RefreshToken *OAuth2Token
 }
 
+func (t TokenCache) Expired() bool {
+	return time.Now().After(t.AccessToken.TimeTaken.Add(t.AccessToken.ValidUntil))
+}
+
 // initilaizes a token cache which will be used across all APIs
 // should be called once per remote-api
 func InitTokenCache() (*TokenCache, *sync.Mutex) {
@@ -59,7 +63,7 @@ func (api RemoteApi) GetAuthHeader() (string, error) {
 	if api.TokenCache.AccessToken == nil || len(api.TokenCache.AccessToken.Token) == 0 {
 		return "", fmt.Errorf("empty token data")
 	}
-	if time.Now().After(api.TokenCache.AccessToken.TimeTaken.Add(api.TokenCache.AccessToken.ValidUntil)) {
+	if api.TokenCache.Expired() {
 		return "", fmt.Errorf("expired token")
 	}
 	return fmt.Sprintf("%s %s", api.TokenCache.AccessToken.Type, api.TokenCache.AccessToken.Token), nil
@@ -68,9 +72,10 @@ func (api RemoteApi) GetAuthHeader() (string, error) {
 func (api *RemoteApi) handleToken() libError.Error {
 	api.TokenCacheLock.Lock()
 	defer api.TokenCacheLock.Unlock()
-	if api.TokenCache.AccessToken != nil && api.TokenCache.RefreshToken != nil {
-		return nil
-	}
+
+	api.TokenCache.AccessToken = nil
+	api.TokenCache.RefreshToken = nil
+
 	tokens, err := api.Auth.Login()
 	if err != nil {
 		return err
@@ -90,7 +95,7 @@ func (api *RemoteApi) Authenticate() libError.Error {
 			return err
 		}
 	}
-	if time.Since(api.TokenCache.AccessToken.TimeTaken) >= api.TokenCache.AccessToken.ValidUntil {
+	if api.TokenCache.Expired() {
 		err := api.handleToken()
 		if err != nil {
 			return err
