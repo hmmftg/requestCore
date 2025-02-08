@@ -3,7 +3,7 @@ package libQuery
 import (
 	"database/sql"
 	"fmt"
-	"log"
+	"log/slog"
 	"net/http"
 	"reflect"
 	"slices"
@@ -27,7 +27,7 @@ const (
 func (m QueryRunnerModel) NewStatement(command string) (*sql.Stmt, error) {
 	errPing := m.DB.Ping()
 	if errPing != nil {
-		log.Println("error in ping", errPing)
+		slog.Error("error in ping", slog.Any("error", errPing))
 	}
 	stmt, err := m.DB.Prepare(command)
 	if err != nil {
@@ -39,7 +39,7 @@ func (m QueryRunnerModel) NewStatement(command string) (*sql.Stmt, error) {
 func (m QueryRunnerModel) QueryRunner(querySql string, args ...any) (int, []map[string]any, error) {
 	errPing := m.DB.Ping()
 	if errPing != nil {
-		log.Println("error in ping", errPing)
+		slog.Error("error in ping", slog.Any("error", errPing))
 	}
 	stmt, err := m.DB.Prepare(querySql)
 	finalRows := []map[string]any{}

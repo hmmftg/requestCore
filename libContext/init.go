@@ -3,6 +3,7 @@ package libContext
 import (
 	"context"
 	"log"
+	"log/slog"
 	"testing"
 
 	"github.com/gin-gonic/gin"
@@ -72,7 +73,7 @@ func initContext(c any, unknownUser bool) webFramework.WebFramework {
 	}
 	if len(userId) == 0 {
 		stack := response.GetStack(1, "libContext/init.go")
-		log.Println("unable to find userId in header and locals => audit trail will fail: ", stack)
+		slog.Error("unable to find userId in header and locals => audit trail will fail", slog.String("title", stack))
 	}
 	w.Ctx = context.WithValue(w.Ctx, libQuery.ContextKey(libQuery.USER), userId)
 	return w

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"log/slog"
 	"net/http"
 
 	"github.com/hmmftg/requestCore"
@@ -169,10 +170,10 @@ func BaseHandler[Req any, Resp any, Handler HandlerInterface[Req, Resp]](
 					core.Responder().OKWithReceipt(trx.W, trx.Response, rc)
 					trx.RespSent = true
 				} else {
-					log.Printf("registered as handler with receipt, but receipt local was: %t\n", receipt)
+					slog.Error("registered as handler with receipt, but receipt local was", slog.Any("receipt", fmt.Sprintf("%t", receipt)))
 				}
 			} else {
-				log.Println("registered as handler with receipt, but receipt local was abset")
+				slog.Error("registered as handler with receipt, but receipt local was absent")
 			}
 		}
 
@@ -184,10 +185,10 @@ func BaseHandler[Req any, Resp any, Handler HandlerInterface[Req, Resp]](
 					core.Responder().OKWithAttachment(trx.W, rc)
 					trx.RespSent = true
 				} else {
-					log.Printf("registered as handler with attachment, but attachment local was: %t\n", attachment)
+					slog.Error("registered as handler with attachment, but attachment local was", slog.Any("receipt", fmt.Sprintf("%t", attachment)))
 				}
 			} else {
-				log.Println("registered as handler with attachment, but attachment local was abset")
+				slog.Error("registered as handler with attachment, but attachment local was absent")
 			}
 		}
 

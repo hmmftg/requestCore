@@ -4,7 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"log"
+	"log/slog"
 	"strings"
 
 	"github.com/hmmftg/requestCore/libError"
@@ -23,7 +23,7 @@ const (
 func (m QueryRunnerModel) CallDbFunction(callString string, args ...any) (int, string, error) {
 	errPing := m.DB.Ping()
 	if errPing != nil {
-		log.Println("error in ping", errPing)
+		slog.Error("error in ping", slog.Any("error", errPing))
 	}
 	_, err := m.DB.Exec(callString, args...)
 	if err != nil {
@@ -90,7 +90,7 @@ func GetOutArgs(parser webFramework.RequestParser, args ...any) map[string]strin
 					case *int64:
 						rows[dbParameter.Name] = fmt.Sprintf("%d", *outValue)
 					default:
-						log.Printf("wrong db-out parameter type %T\n", namedParameter.Dest)
+						slog.Error("wrong db-out parameter type", slog.Any("type", fmt.Sprintf("%T", namedParameter.Dest)))
 					}
 					parser.SetLocal(dbParameter.Name, rows[dbParameter.Name])
 				}
@@ -108,7 +108,7 @@ func GetOutArgs(parser webFramework.RequestParser, args ...any) map[string]strin
 				case *int64:
 					rows[name] = fmt.Sprintf("%d", *outValue)
 				default:
-					log.Printf("wrong db-out parameter type %T\n", dbParameter.Dest)
+					slog.Error("wrong db-out parameter type", slog.Any("type", fmt.Sprintf("%T", dbParameter.Dest)))
 				}
 				parser.SetLocal(name, rows[name])
 			}

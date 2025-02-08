@@ -3,7 +3,7 @@ package libQuery
 import (
 	"context"
 	"database/sql"
-	"log"
+	"log/slog"
 
 	"github.com/hmmftg/requestCore/libError"
 )
@@ -11,7 +11,7 @@ import (
 func (m QueryRunnerModel) InsertRow(insert string, args ...any) (sql.Result, error) {
 	errPing := m.DB.Ping()
 	if errPing != nil {
-		log.Println("error in ping", errPing)
+		slog.Error("error in ping", slog.Any("error", errPing))
 	}
 	result, err := m.DB.Exec(
 		insert,
@@ -25,7 +25,7 @@ func (m QueryRunnerModel) InsertRow(insert string, args ...any) (sql.Result, err
 func (m QueryRunnerModel) Dml(ctx context.Context, moduleName, methodName, command string, args ...any) (sql.Result, error) {
 	errPing := m.DB.Ping()
 	if errPing != nil {
-		log.Println("error in ping", errPing)
+		slog.Error("error in ping", slog.Any("error", errPing))
 	}
 	tx, err := m.DB.BeginTx(ctx, nil)
 	if err != nil {

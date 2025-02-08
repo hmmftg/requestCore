@@ -3,7 +3,7 @@ package libsql
 import (
 	"database/sql"
 	"fmt"
-	"log"
+	"log/slog"
 
 	"github.com/hmmftg/requestCore/response"
 
@@ -13,7 +13,7 @@ import (
 func Query[Result any](db *sql.DB, querySql string, args ...any) ([]Result, response.ErrorState) {
 	errPing := db.Ping()
 	if errPing != nil {
-		log.Println("error in ping", errPing)
+		slog.Error("error in ping", slog.Any("error", errPing))
 	}
 	stmt, err := db.Prepare(querySql)
 	if err != nil {

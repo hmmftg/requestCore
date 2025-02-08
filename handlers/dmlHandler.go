@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"log/slog"
 	"net/http"
 	"net/url"
 
@@ -74,7 +75,7 @@ func FinalizeDML(request libQuery.DmlModel, key, title string, w webFramework.We
 		_, errFinalize := command.ExecuteWithContext(
 			w.Parser, w.Ctx, title, title, core.GetDB())
 		if errFinalize != nil {
-			log.Printf("Error executing finalize command: %s=>%v", title, errFinalize)
+			slog.Error("Error executing finalize command", slog.String("title", title), slog.Any("error", errFinalize))
 		}
 	}
 }

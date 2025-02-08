@@ -2,7 +2,7 @@ package requestCore
 
 import (
 	"fmt"
-	"log"
+	"log/slog"
 	"net/http"
 
 	"github.com/hmmftg/requestCore/libRequest"
@@ -17,7 +17,7 @@ type WebHanlder struct {
 }
 
 func (m WebHanlder) HandleErrorState(err error, status int, message string, data any, w webFramework.WebFramework) {
-	log.Printf("error state: %+v", err)
+	slog.Error("error state", slog.Any("error", err))
 
 	if r := w.Parser.GetLocal("reqLog"); r != nil {
 		reqLog := r.(libRequest.RequestPtr)
@@ -33,7 +33,7 @@ func (m WebHanlder) HandleErrorState(err error, status int, message string, data
 
 func (m WebHanlder) errorState(w webFramework.WebFramework, err response.ErrorState, depth int) {
 	src := response.GetStack(depth+1, "requestCore/webHandler.go")
-	log.Printf("error state: %s, \n%+v", src, err)
+	slog.Error("error state", slog.String("source", src), slog.Any("error", err))
 
 	if r := w.Parser.GetLocal("reqLog"); r != nil {
 		reqLog := r.(libRequest.RequestPtr)
@@ -116,7 +116,7 @@ func (m WebHanlder) respond(data response.RespData, abort bool, w webFramework.W
 
 			err := w.Parser.SendJSONRespBody(data.Code, resp)
 			if err != nil {
-				log.Println("error in SendJSONRespBody", err)
+				slog.Error("error in SendJSONRespBody", slog.Any("error", err))
 			}
 		}
 	} else {
@@ -126,7 +126,7 @@ func (m WebHanlder) respond(data response.RespData, abort bool, w webFramework.W
 
 		err := w.Parser.SendJSONRespBody(data.Code, resp)
 		if err != nil {
-			log.Println("error in SendJSONRespBody", err)
+			slog.Error("error in SendJSONRespBody", slog.Any("error", err))
 		}
 	}
 
@@ -144,7 +144,7 @@ func (m WebHanlder) respond(data response.RespData, abort bool, w webFramework.W
 		if data.Message != "DUPLICATE_REQUEST" {
 			err := m.RequestInterface.UpdateRequestWithContext(w.Ctx, reqLog)
 			if err != nil {
-				log.Println("error in UpdateRequest", err)
+				slog.Error("error in UpdateRequest", slog.Any("error", err))
 			}
 		}
 	}
@@ -152,12 +152,12 @@ func (m WebHanlder) respond(data response.RespData, abort bool, w webFramework.W
 	if abort {
 		err := w.Parser.Abort()
 		if err != nil {
-			log.Println("error in Abort", err)
+			slog.Error("error in Abort", slog.Any("error", err))
 		}
 	} else {
 		err := w.Parser.Next()
 		if err != nil {
-			log.Println("error in Next", err)
+			slog.Error("error in Next", slog.Any("error", err))
 		}
 	}
 }
@@ -174,17 +174,17 @@ func Respond(code, status int, message string, data any, abort bool, w webFramew
 
 	err := w.Parser.SendJSONRespBody(code, resp)
 	if err != nil {
-		log.Println("error in SendJSONRespBody", err)
+		slog.Error("error in SendJSONRespBody", slog.Any("error", err))
 	}
 	if abort {
 		err = w.Parser.Abort()
 		if err != nil {
-			log.Println("error in Abort", err)
+			slog.Error("error in Abort", slog.Any("error", err))
 		}
 	} else {
 		err = w.Parser.Next()
 		if err != nil {
-			log.Println("error in Next", err)
+			slog.Error("error in Next", slog.Any("error", err))
 		}
 	}
 }

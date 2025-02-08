@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log"
+	"log/slog"
 	"net/http"
 	"runtime"
 	"strings"
@@ -209,7 +209,7 @@ func Errors(status int, desc string, message any, err ErrorState) ErrorState {
 }
 
 func FormatErrorResp(errs error, trans ut.Translator) []ErrorResponse {
-	log.Println(errs)
+	slog.Error("error resp", slog.Any("errors", errs))
 	err := errs.(validator.ValidationErrors)
 	errorResponses := make([]ErrorResponse, 0)
 	for _, validationError := range err {
@@ -269,9 +269,9 @@ func JustPrintResp(respBytes []byte, desc string, status int) (int, map[string]s
 	var resp WsRemoteResponse
 	err = json.Unmarshal(respBytes, &resp)
 	if err != nil {
-		log.Println(string(respBytes))
+		slog.Error("error in PrintResp", slog.Any("error", err))
 	}
-	log.Println(resp)
+	slog.Error("PrintResp", slog.Any("resp", resp))
 	return status, nil, nil, nil
 }
 
@@ -355,7 +355,7 @@ func GetErrorsArrayWithMap(incomingDesc string, data any, errDescList map[string
 	var errorResponses []ErrorResponse
 	respData, okRespData := data.(RespData)
 	if !okRespData {
-		log.Printf("GetErrorsArrayWithMap invalid type: %T is not RespData\n", data)
+		slog.Error("GetErrorsArrayWithMap invalid type", slog.String("info", fmt.Sprintf("%T is not RespData", data)))
 		return nil
 	}
 	errorResponses, ok := respData.JSON.([]ErrorResponse)

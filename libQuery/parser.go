@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log"
+	"log/slog"
 	"reflect"
 	"strconv"
 	"strings"
@@ -41,9 +41,11 @@ func ParseQueryResult(result map[string]any, t reflect.Type, v reflect.Value) {
 				case "string":
 					v.FieldByName(t.Field(i).Name).SetString(value)
 				default:
-					log.Printf("ParseQueryResult, unknown bool: %s->%T\n",
-						t.Field(i).Type.String(),
-						result[tag])
+					slog.Error("ParseQueryResult, unknown bool",
+						slog.String("tag", tag),
+						slog.String("desired", t.Field(i).Type.String()),
+						slog.String("result", fmt.Sprintf("%T", result[tag])),
+					)
 				}
 			} else if strings.HasPrefix(value, "{") && strings.HasSuffix(value, "}") {
 				values := strings.Split(value[1:len(value)-1], ",")
@@ -60,15 +62,21 @@ func ParseQueryResult(result map[string]any, t reflect.Type, v reflect.Value) {
 					if t.Field(i).Type.String() == "*time.Time" {
 						newV, err := parseTimeUsingTimeFormat(t.Field(i), value)
 						if err != nil {
-							log.Println(err.Error())
+							slog.Error("error in parseTimeUsingTimeFormat",
+								slog.String("tag", tag),
+								slog.Any("error", err),
+								slog.String("data", value),
+							)
 							continue
 						}
 						v.FieldByName(t.Field(i).Name).Set(newV)
 					} else {
-						log.Println(
-							"no parser defined for name:", t.Field(i).Type.Name(),
-							"path:", t.Field(i).Type.PkgPath(),
-							"string:", t.Field(i).Type.String())
+						slog.Error("no parser defined for name",
+							slog.String("tag", tag),
+							slog.String("path", t.Field(i).Type.PkgPath()),
+							slog.String("name", t.Field(i).Type.Name()),
+							slog.String("data", t.Field(i).Type.String()),
+						)
 					}
 				} else {
 					switch t.Field(i).Type.String() {
@@ -77,9 +85,11 @@ func ParseQueryResult(result map[string]any, t reflect.Type, v reflect.Value) {
 					case "string":
 						v.FieldByName(t.Field(i).Name).SetString(value)
 					default:
-						log.Printf("ParseQueryResult, unknown string: %s->%T\n",
-							t.Field(i).Type.String(),
-							result[tag])
+						slog.Error("ParseQueryResult, unknown string",
+							slog.String("tag", tag),
+							slog.String("desired", t.Field(i).Type.String()),
+							slog.String("result", fmt.Sprintf("%T", result[tag])),
+						)
 					}
 				}
 			}
@@ -94,9 +104,11 @@ func ParseQueryResult(result map[string]any, t reflect.Type, v reflect.Value) {
 					v.FieldByName(t.Field(i).Name).SetString("false")
 				}
 			default:
-				log.Printf("ParseQueryResult, unknown bool: %s->%T\n",
-					t.Field(i).Type.String(),
-					result[tag])
+				slog.Error("ParseQueryResult, unknown bool",
+					slog.String("tag", tag),
+					slog.String("desired", t.Field(i).Type.String()),
+					slog.String("result", fmt.Sprintf("%T", result[tag])),
+				)
 			}
 		case int64:
 			switch t.Field(i).Type.Kind() {
@@ -105,9 +117,11 @@ func ParseQueryResult(result map[string]any, t reflect.Type, v reflect.Value) {
 			case reflect.Float64:
 				v.FieldByName(t.Field(i).Name).SetFloat(float64(value))
 			default:
-				log.Printf("ParseQueryResult, unknown int64 sub-type: %s->%T\n",
-					v.FieldByName(t.Field(i).Name).Type().String(),
-					result[tag])
+				slog.Error("ParseQueryResult, unknown int64 sub-type",
+					slog.String("tag", tag),
+					slog.String("desired", v.FieldByName(t.Field(i).Name).Type().String()),
+					slog.String("result", fmt.Sprintf("%T", result[tag])),
+				)
 			}
 		case uint64:
 			switch t.Field(i).Type.Kind() {
@@ -116,9 +130,11 @@ func ParseQueryResult(result map[string]any, t reflect.Type, v reflect.Value) {
 			case reflect.Uint64:
 				v.FieldByName(t.Field(i).Name).SetUint(value)
 			default:
-				log.Printf("ParseQueryResult, unknown uint64 sub-type: %s->%T\n",
-					v.FieldByName(t.Field(i).Name).Type().String(),
-					result[tag])
+				slog.Error("ParseQueryResult, unknown int64 sub-type",
+					slog.String("tag", tag),
+					slog.String("desired", v.FieldByName(t.Field(i).Name).Type().String()),
+					slog.String("result", fmt.Sprintf("%T", result[tag])),
+				)
 			}
 		case float64:
 			switch t.Field(i).Type.Kind() {
@@ -127,27 +143,33 @@ func ParseQueryResult(result map[string]any, t reflect.Type, v reflect.Value) {
 			case reflect.Float64:
 				v.FieldByName(t.Field(i).Name).SetFloat(value)
 			default:
-				log.Printf("ParseQueryResult, unknown float sub-type: %s->%T\n",
-					v.FieldByName(t.Field(i).Name).Type().String(),
-					result[tag])
+				slog.Error("ParseQueryResult, unknown float sub-type",
+					slog.String("tag", tag),
+					slog.String("desired", v.FieldByName(t.Field(i).Name).Type().String()),
+					slog.String("result", fmt.Sprintf("%T", result[tag])),
+				)
 			}
 		case *time.Time:
 			switch t.Field(i).Type.String() {
 			case "*time.Time":
 				v.FieldByName(t.Field(i).Name).Set(reflect.ValueOf(result[tag]))
 			default:
-				log.Printf("ParseQueryResult, unknown *time.Time sub-type: %s->%T\n",
-					t.Field(i).Type.String(),
-					result[tag])
+				slog.Error("ParseQueryResult, unknown *time.Time sub-type",
+					slog.String("tag", tag),
+					slog.String("desired", t.Field(i).Type.String()),
+					slog.String("result", fmt.Sprintf("%T", result[tag])),
+				)
 			}
 		case time.Time:
 			switch t.Field(i).Type.String() {
 			case "time.Time":
 				v.FieldByName(t.Field(i).Name).Set(reflect.ValueOf(result[tag]))
 			default:
-				log.Printf("ParseQueryResult, unknown time.Time sub-type: %s->%T\n",
-					t.Field(i).Type.String(),
-					result[tag])
+				slog.Error("ParseQueryResult, unknown time.Time sub-type",
+					slog.String("tag", tag),
+					slog.String("desired", t.Field(i).Type.String()),
+					slog.String("result", fmt.Sprintf("%T", result[tag])),
+				)
 			}
 		case nil:
 		case []uint8:
@@ -166,12 +188,17 @@ func ParseQueryResult(result map[string]any, t reflect.Type, v reflect.Value) {
 					}
 				}
 			default:
-				log.Printf("ParseQueryResult, unknown []uint8 sub-type: %s->%T\n",
-					v.FieldByName(t.Field(i).Name).Type().String(),
-					value)
+				slog.Error("ParseQueryResult, unknown []uint8 sub-type",
+					slog.String("tag", tag),
+					slog.String("desired", v.FieldByName(t.Field(i).Name).Type().String()),
+					slog.String("result", fmt.Sprintf("%T", value)),
+				)
 			}
 		default:
-			log.Printf("ParseQueryResult, unknown type: %T\n", result[tag])
+			slog.Error("ParseQueryResult, unknown type",
+				slog.String("tag", tag),
+				slog.String("result", fmt.Sprintf("%T", result[tag])),
+			)
 		}
 
 	}

@@ -2,7 +2,7 @@ package libRequest
 
 import (
 	"context"
-	"log"
+	"log/slog"
 	"net/http"
 
 	"github.com/hmmftg/requestCore/response"
@@ -23,13 +23,25 @@ func (l LogRequest) InitializeNoLog(c webFramework.WebFramework, method, url str
 
 }
 func (l LogRequest) AddRequestLog(method, logText string, req RequestPtr) {
-	log.Printf("%s - %s(): %s\n", req.Id, method, logText)
+	slog.Info("RequestLog",
+		slog.String("id", req.Id),
+		slog.String("method", method),
+		slog.String("logText", logText),
+	)
 }
 func (l LogRequest) LogEnd(method, logText string, req RequestPtr) {
-	log.Printf("%s - End %s() - log: %s\n", req.Id, method, logText)
+	slog.Info("LogEnd",
+		slog.String("id", req.Id),
+		slog.String("method", method),
+		slog.String("logText", logText),
+	)
 }
 func (l LogRequest) AddRequestEvent(c webFramework.WebFramework, branch, method, logText string, req RequestPtr) {
-	log.Printf("%s - Event %s() - log: %s\n", req.Id, method, logText)
+	slog.Info("LogEvent",
+		slog.String("id", req.Id),
+		slog.String("method", method),
+		slog.String("logText", logText),
+	)
 }
 func (l LogRequest) LogStart(w webFramework.WebFramework, method, logText string) RequestPtr {
 	r := w.Parser.GetLocal("reqLog")
@@ -46,13 +58,17 @@ func (l LogRequest) LogStart(w webFramework.WebFramework, method, logText string
 
 }
 func (l LogRequest) InsertRequest(req RequestPtr) response.ErrorState {
-	log.Println("Request Start:", req)
+	slog.Info("LogStart",
+		slog.Any("req", req),
+	)
 	return nil
 }
 func (l LogRequest) CheckDuplicateRequest(request RequestPtr) response.ErrorState {
 	return nil
 }
 func (l LogRequest) UpdateRequestWithContext(ctx context.Context, req RequestPtr) response.ErrorState {
-	log.Println("Request End:", req)
+	slog.Info("LogEnd",
+		slog.Any("req", req),
+	)
 	return nil
 }
