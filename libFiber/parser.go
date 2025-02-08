@@ -10,6 +10,7 @@ import (
 	"github.com/hmmftg/requestCore/webFramework"
 
 	"github.com/gofiber/fiber/v2"
+	slogfiber "github.com/samber/slog-fiber"
 )
 
 func InitContext(c *fiber.Ctx) FiberParser {
@@ -59,13 +60,8 @@ func (c FiberParser) GetLocalString(name string) string {
 	return ""
 }
 
-func (c FiberParser) GetLogger() *slog.Logger {
-	value := c.Ctx.Locals("logger")
-	switch lg := value.(type) {
-	case *slog.Logger:
-		return lg
-	}
-	return nil
+func (c FiberParser) AddCustomAttributes(attr slog.Attr) {
+	slogfiber.AddCustomAttributes(c.Ctx, attr)
 }
 
 func (c FiberParser) GetUrlParam(name string) string {

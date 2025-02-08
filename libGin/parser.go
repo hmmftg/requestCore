@@ -9,6 +9,7 @@ import (
 	"github.com/hmmftg/requestCore/webFramework"
 
 	"github.com/gin-gonic/gin"
+	sloggin "github.com/samber/slog-gin"
 )
 
 func InitContext(c any) GinParser {
@@ -63,16 +64,8 @@ func (c GinParser) CheckUrlParam(name string) (string, bool) {
 	return c.Ctx.Params.Get(name)
 }
 
-func (c GinParser) GetLogger() *slog.Logger {
-	value, ok := c.Ctx.Get("logger")
-	if !ok {
-		return nil
-	}
-	switch lg := value.(type) {
-	case *slog.Logger:
-		return lg
-	}
-	return nil
+func (c GinParser) AddCustomAttributes(attr slog.Attr) {
+	sloggin.AddCustomAttributes(c.Ctx, attr)
 }
 
 func (c GinParser) SetLocal(name string, value any) {

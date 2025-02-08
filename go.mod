@@ -14,6 +14,8 @@ require (
 	github.com/google/go-querystring v1.1.0
 	github.com/hmmftg/image v0.12.1
 	github.com/lib/pq v1.10.9
+	github.com/samber/slog-fiber v1.17.2
+	github.com/samber/slog-gin v1.14.1
 	github.com/valyala/fasthttp v1.58.0
 	github.com/valyala/fasttemplate v1.2.2
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1
@@ -33,7 +35,6 @@ require (
 	github.com/json-iterator/go v1.1.12 // indirect
 	github.com/klauspost/compress v1.17.11 // indirect
 	github.com/klauspost/cpuid/v2 v2.2.9 // indirect
-	github.com/kr/text v0.2.0 // indirect
 	github.com/leodido/go-urn v1.4.0 // indirect
 	github.com/mattn/go-colorable v0.1.14 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
@@ -46,6 +47,8 @@ require (
 	github.com/ugorji/go/codec v1.2.12 // indirect
 	github.com/valyala/bytebufferpool v1.0.0 // indirect
 	github.com/valyala/tcplisten v1.0.0 // indirect
+	go.opentelemetry.io/otel v1.29.0 // indirect
+	go.opentelemetry.io/otel/trace v1.29.0 // indirect
 	golang.org/x/arch v0.13.0 // indirect
 	golang.org/x/crypto v0.32.0 // indirect
 	golang.org/x/net v0.34.0 // indirect

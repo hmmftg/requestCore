@@ -85,6 +85,23 @@ func (f FakeParser) GetLogger() *slog.Logger {
 	}
 	return nil
 }
+
+const (
+	customAttributesCtxKey string = "slog-fake.custom-attributes"
+)
+
+func (t FakeParser) AddCustomAttributes(attr slog.Attr) {
+	v, ok := t.Locals[customAttributesCtxKey]
+	if !ok {
+		t.Locals[customAttributesCtxKey] = []slog.Attr{attr}
+		return
+	}
+
+	switch attrs := v.(type) {
+	case []slog.Attr:
+		t.Locals[customAttributesCtxKey] = append(attrs, attr)
+	}
+}
 func (f FakeParser) SetReqHeader(name string, value string) {
 	f.ReqHeader[name] = value
 }

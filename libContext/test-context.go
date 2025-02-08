@@ -112,17 +112,23 @@ func (t TestingParser) GetLocalString(name string) string {
 	return loc
 }
 
-func (t TestingParser) GetLogger() *slog.Logger {
-	value, ok := t.Locals["logger"]
+const (
+	customAttributesCtxKey string = "slog-test.custom-attributes"
+)
+
+func (t TestingParser) AddCustomAttributes(attr slog.Attr) {
+	v, ok := t.Locals[customAttributesCtxKey]
 	if !ok {
-		return nil
+		t.Locals[customAttributesCtxKey] = []slog.Attr{attr}
+		return
 	}
-	switch lg := value.(type) {
-	case *slog.Logger:
-		return lg
+
+	switch attrs := v.(type) {
+	case []slog.Attr:
+		t.Locals[customAttributesCtxKey] = append(attrs, attr)
 	}
-	return nil
 }
+
 func (t TestingParser) GetUrlParam(name string) string {
 	return t.UrlParams[name]
 }

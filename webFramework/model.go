@@ -65,7 +65,7 @@ type RequestParser interface {
 	FormValue(name string) string
 	SaveFile(formTagName, path string) error
 	FileAttachment(path, fileName string)
-	GetLogger() *slog.Logger
+	AddCustomAttributes(attr slog.Attr)
 }
 
 type RequestHandler interface {
