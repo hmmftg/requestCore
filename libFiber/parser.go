@@ -3,6 +3,7 @@ package libFiber
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"net/http"
 
 	"github.com/hmmftg/requestCore/libQuery"
@@ -57,6 +58,16 @@ func (c FiberParser) GetLocalString(name string) string {
 	}
 	return ""
 }
+
+func (c FiberParser) GetLogger() *slog.Logger {
+	value := c.Ctx.Locals("logger")
+	switch lg := value.(type) {
+	case *slog.Logger:
+		return lg
+	}
+	return nil
+}
+
 func (c FiberParser) GetUrlParam(name string) string {
 	return c.Ctx.Params(name)
 }

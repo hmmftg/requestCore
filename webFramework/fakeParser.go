@@ -3,6 +3,7 @@ package webFramework
 
 import (
 	"fmt"
+	"log/slog"
 	"net/http"
 )
 
@@ -71,6 +72,18 @@ func (f FakeParser) CheckUrlParam(name string) (string, bool) {
 }
 func (f FakeParser) SetLocal(name string, value any) {
 	value = f.Locals[name]
+}
+
+func (f FakeParser) GetLogger() *slog.Logger {
+	value, ok := f.Locals["logger"]
+	if !ok {
+		return nil
+	}
+	switch lg := value.(type) {
+	case *slog.Logger:
+		return lg
+	}
+	return nil
 }
 func (f FakeParser) SetReqHeader(name string, value string) {
 	f.ReqHeader[name] = value

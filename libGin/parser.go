@@ -2,6 +2,7 @@ package libGin
 
 import (
 	"context"
+	"log/slog"
 	"net/http"
 
 	"github.com/hmmftg/requestCore/libQuery"
@@ -60,6 +61,18 @@ func (c GinParser) GetUrlParams() map[string]string {
 }
 func (c GinParser) CheckUrlParam(name string) (string, bool) {
 	return c.Ctx.Params.Get(name)
+}
+
+func (c GinParser) GetLogger() *slog.Logger {
+	value, ok := c.Ctx.Get("logger")
+	if !ok {
+		return nil
+	}
+	switch lg := value.(type) {
+	case *slog.Logger:
+		return lg
+	}
+	return nil
 }
 
 func (c GinParser) SetLocal(name string, value any) {

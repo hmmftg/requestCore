@@ -1,6 +1,7 @@
 package libContext
 
 import (
+	"log/slog"
 	"net/http"
 	"os"
 	"reflect"
@@ -109,6 +110,18 @@ func (t TestingParser) GetLocalString(name string) string {
 		t.Root.Fatalf("wrong local[%s] type:%T\n", name, t.Locals[name])
 	}
 	return loc
+}
+
+func (t TestingParser) GetLogger() *slog.Logger {
+	value, ok := t.Locals["logger"]
+	if !ok {
+		return nil
+	}
+	switch lg := value.(type) {
+	case *slog.Logger:
+		return lg
+	}
+	return nil
 }
 func (t TestingParser) GetUrlParam(name string) string {
 	return t.UrlParams[name]

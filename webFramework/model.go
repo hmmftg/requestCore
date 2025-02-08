@@ -2,6 +2,7 @@ package webFramework
 
 import (
 	"context"
+	"log/slog"
 	"net/http"
 )
 
@@ -64,6 +65,7 @@ type RequestParser interface {
 	FormValue(name string) string
 	SaveFile(formTagName, path string) error
 	FileAttachment(path, fileName string)
+	GetLogger() *slog.Logger
 }
 
 type RequestHandler interface {
