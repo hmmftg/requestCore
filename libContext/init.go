@@ -73,7 +73,8 @@ func initContext(c any, unknownUser bool) webFramework.WebFramework {
 	}
 	if len(userId) == 0 {
 		stack := response.GetStack(1, "libContext/init.go")
-		slog.Error("unable to find userId in header and locals => audit trail will fail", slog.String("title", stack))
+		webFramework.AddLog(w, webFramework.HandlerLogTag,
+			slog.Group("unable to find userId in header and locals => audit trail will fail", slog.String("title", stack)))
 	}
 	w.Ctx = context.WithValue(w.Ctx, libQuery.ContextKey(libQuery.USER), userId)
 	return w

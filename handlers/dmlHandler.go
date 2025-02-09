@@ -75,7 +75,8 @@ func FinalizeDML(request libQuery.DmlModel, key, title string, w webFramework.We
 		_, errFinalize := command.ExecuteWithContext(
 			w.Parser, w.Ctx, title, title, core.GetDB())
 		if errFinalize != nil {
-			slog.Error("Error executing finalize command", slog.String("title", title), slog.Any("error", errFinalize))
+			webFramework.AddLog(w, webFramework.HandlerLogTag,
+				slog.Group("Error executing finalize command", slog.String("title", title), slog.Any("error", errFinalize)))
 		}
 	}
 }

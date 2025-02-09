@@ -5,6 +5,10 @@ import (
 	"log/slog"
 )
 
+const (
+	HandlerLogTag string = "handler"
+)
+
 func AddLog(w WebFramework, title string, log slog.Attr) {
 	name := fmt.Sprintf("LOG_%s", title)
 	v := w.Parser.GetLocal(name)

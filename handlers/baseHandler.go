@@ -56,10 +56,6 @@ type HandlerRequest[Req any, Resp any] struct {
 	Builder  func(status int, rawResp []byte, headers map[string]string) (*Resp, error)
 }
 
-const (
-	HandlerLogTag string = "handler"
-)
-
 func BaseHandler[Req any, Resp any, Handler HandlerInterface[Req, Resp]](
 	core requestCore.RequestCoreInterface,
 	handler Handler,
@@ -75,7 +71,7 @@ func BaseHandler[Req any, Resp any, Handler HandlerInterface[Req, Resp]](
 		} else {
 			w = libContext.InitContextNoAuditTrail(c)
 		}
-		webFramework.AddLog(w, HandlerLogTag, slog.String("title", params.Title))
+		webFramework.AddLog(w, webFramework.HandlerLogTag, slog.String("title", params.Title))
 		trx := HandlerRequest[Req, Resp]{
 			Title: params.Title,
 			Args:  args,
@@ -85,7 +81,7 @@ func BaseHandler[Req any, Resp any, Handler HandlerInterface[Req, Resp]](
 
 		defer func() {
 			handler.Finalizer(trx)
-			webFramework.CollectLogs(w, HandlerLogTag)
+			webFramework.CollectLogs(w, webFramework.HandlerLogTag)
 			webFramework.CollectLogs(w, CallApiLogEntry)
 			for id := range params.LogTags {
 				webFramework.CollectLogs(w, params.LogTags[id])
@@ -150,7 +146,7 @@ func BaseHandler[Req any, Resp any, Handler HandlerInterface[Req, Resp]](
 			core.Responder().Error(trx.W, errParse)
 			return
 		}
-		webFramework.AddLog(w, HandlerLogTag, slog.Any("request", trx.Request))
+		webFramework.AddLog(w, webFramework.HandlerLogTag, slog.Any("request", trx.Request))
 
 		if params.SaveToRequest {
 			errInitRequest := core.RequestTools().InitRequest(trx.W, params.Title, params.Path)
@@ -163,7 +159,7 @@ func BaseHandler[Req any, Resp any, Handler HandlerInterface[Req, Resp]](
 		}
 
 		errInit := handler.Initializer(trx)
-		webFramework.AddLog(w, HandlerLogTag, slog.Any("initialize", errInit))
+		webFramework.AddLog(w, webFramework.HandlerLogTag, slog.Any("initialize", errInit))
 		if errInit != nil {
 			core.Responder().Error(trx.W, errInit)
 			return
@@ -171,12 +167,12 @@ func BaseHandler[Req any, Resp any, Handler HandlerInterface[Req, Resp]](
 
 		var err response.ErrorState
 		trx.Response, err = handler.Handler(trx)
-		webFramework.AddLog(w, HandlerLogTag, slog.Any("main-handler", err))
+		webFramework.AddLog(w, webFramework.HandlerLogTag, slog.Any("main-handler", err))
 		if err != nil {
 			core.Responder().Error(trx.W, err)
 			return
 		}
-		webFramework.AddLog(w, HandlerLogTag, slog.Any("response", trx.Response))
+		webFramework.AddLog(w, webFramework.HandlerLogTag, slog.Any("response", trx.Response))
 		if params.HasReceipt {
 			receipt := trx.W.Parser.GetLocal("receipt")
 			if receipt != nil {
