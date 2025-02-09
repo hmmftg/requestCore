@@ -27,7 +27,17 @@ type testHandlerType[Req testReq, Resp testResp] struct {
 }
 
 func (h testHandlerType[Req, Resp]) Parameters() HandlerParameters {
-	return HandlerParameters{h.Title, h.Mode, h.VerifyHeader, h.SaveRequest, h.Path, false, nil, false}
+	return HandlerParameters{
+		h.Title,
+		h.Mode,
+		h.VerifyHeader,
+		h.SaveRequest,
+		h.Path,
+		false,
+		nil,
+		false,
+		nil,
+	}
 }
 func (h testHandlerType[Req, Resp]) Initializer(req HandlerRequest[Req, Resp]) response.ErrorState {
 	log.Println("Initializer")

@@ -205,6 +205,7 @@ func (h testConsumeHandlerType[Req, Resp]) Parameters() handlers.HandlerParamete
 		false,
 		nil,
 		false,
+		nil,
 	}
 }
 func (h testConsumeHandlerType[Req, Resp]) Initializer(req handlers.HandlerRequest[Req, handlers.WsResponse[testRemoteCallResp]]) response.ErrorState {

@@ -24,6 +24,7 @@ type HandlerParameters struct {
 	HasReceipt      bool
 	RecoveryHandler func(any)
 	FileResponse    bool
+	LogTags         []string
 }
 
 type HandlerInterface[Req any, Resp any] interface {
@@ -80,6 +81,9 @@ func BaseHandler[Req any, Resp any, Handler HandlerInterface[Req, Resp]](
 		defer func() {
 			handler.Finalizer(trx)
 			webFramework.CollectLogs(w, CallApiLogEntry)
+			for id := range params.LogTags {
+				webFramework.CollectLogs(w, params.LogTags[id])
+			}
 			if r := recover(); r != nil {
 				if params.RecoveryHandler != nil {
 					params.RecoveryHandler(r)
