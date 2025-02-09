@@ -2,6 +2,7 @@ package libCallApi
 
 import (
 	"log/slog"
+	"maps"
 	"time"
 
 	"github.com/hmmftg/requestCore/response"
@@ -52,6 +53,8 @@ type RemoteCallParamData[Req, Resp any] struct {
 }
 
 func (r RemoteCallParamData[Req, Resp]) LogValue() slog.Value {
+	headers := maps.Clone(r.Headers)
+	headers["Authorization"] = "[masked]"
 	return slog.GroupValue(
 		slog.String("api", r.Api.Name),
 		slog.String("domain", r.Api.Domain),
@@ -59,7 +62,7 @@ func (r RemoteCallParamData[Req, Resp]) LogValue() slog.Value {
 		slog.String("path", r.Path),
 		slog.String("query", r.Query),
 		slog.Any("params", r.Parameters),
-		slog.Any("headers", r.Headers),
+		slog.Any("headers", headers),
 		slog.Any("request", r.JsonBody),
 	)
 }
