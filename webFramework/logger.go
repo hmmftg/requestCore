@@ -8,7 +8,7 @@ import (
 func AddLog(w WebFramework, title string, log slog.Attr) {
 	name := fmt.Sprintf("LOG_%s", title)
 	v := w.Parser.GetLocal(name)
-	if v != nil {
+	if v == nil {
 		w.Parser.SetLocal(name, []slog.Attr{log})
 		return
 	}
