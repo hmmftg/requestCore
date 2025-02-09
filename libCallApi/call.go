@@ -1,6 +1,7 @@
 package libCallApi
 
 import (
+	"log/slog"
 	"time"
 
 	"github.com/hmmftg/requestCore/response"
@@ -20,7 +21,21 @@ type CallParamData struct {
 	EnableLog   bool
 	JsonBody    any
 }
-type RemoteCallParamData[Req any] struct {
+
+func (r CallParamData) LogValue() slog.Value {
+	return slog.GroupValue(
+		slog.String("api", r.Api.Name),
+		slog.String("domain", r.Api.Domain),
+		slog.String("method", r.Method),
+		slog.String("path", r.Path),
+		slog.String("query", r.Query),
+		slog.Any("params", r.Parameters),
+		slog.Any("headers", r.Headers),
+		slog.Any("request", r.JsonBody),
+	)
+}
+
+type RemoteCallParamData[Req, Resp any] struct {
 	Parameters  map[string]any
 	Headers     map[string]string
 	Api         RemoteApi
@@ -33,6 +48,20 @@ type RemoteCallParamData[Req any] struct {
 	EnableLog   bool
 	JsonBody    Req
 	BodyType    RequestBodyType
+	Builder     func(status int, rawResp []byte, headers map[string]string) (*Resp, error) `json:"-"`
+}
+
+func (r RemoteCallParamData[Req, Resp]) LogValue() slog.Value {
+	return slog.GroupValue(
+		slog.String("api", r.Api.Name),
+		slog.String("domain", r.Api.Domain),
+		slog.String("method", r.Method),
+		slog.String("path", r.Path),
+		slog.String("query", r.Query),
+		slog.Any("params", r.Parameters),
+		slog.Any("headers", r.Headers),
+		slog.Any("request", r.JsonBody),
+	)
 }
 
 type CallResult[RespType any] struct {
@@ -51,7 +80,7 @@ func Call[RespType any](param CallParam) CallResult[RespType] {
 			*param.QueryStack = nil
 		}
 	}
-	callData := CallData{
+	callData := CallData[RespType]{
 		Api:       param.Api,
 		Path:      param.Path + param.Query,
 		Method:    param.Method,
@@ -65,12 +94,7 @@ func Call[RespType any](param CallParam) CallResult[RespType] {
 	return CallResult[RespType]{resp, wsResp, callResp, err}
 }
 
-type ApiResp interface {
-	SetStatus(int)
-	SetHeaders(map[string]string)
-}
-
-func RemoteCall[Req any, Resp ApiResp](param *RemoteCallParamData[Req]) (*Resp, response.ErrorState) {
+func RemoteCall[Req, Resp any](param *RemoteCallParamData[Req, Resp]) (*Resp, response.ErrorState) {
 	if param.QueryStack != nil && len(*param.QueryStack) > 0 {
 		param.Query = (*param.QueryStack)[0]
 		if len(*param.QueryStack) > 1 {
@@ -79,7 +103,7 @@ func RemoteCall[Req any, Resp ApiResp](param *RemoteCallParamData[Req]) (*Resp, 
 			*param.QueryStack = nil
 		}
 	}
-	callData := CallData{
+	callData := CallData[Resp]{
 		Api:       param.Api,
 		Path:      param.Path + param.Query,
 		Method:    param.Method,

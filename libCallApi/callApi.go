@@ -120,7 +120,7 @@ const (
 	Empty
 )
 
-type CallData struct {
+type CallData[Resp any] struct {
 	Api       RemoteApi
 	Path      string
 	Method    string
@@ -131,6 +131,7 @@ type CallData struct {
 	Timeout   time.Duration
 	EnableLog bool
 	LogLevel  int
+	Builder   func(int, []byte, map[string]string) (*Resp, response.ErrorState)
 }
 
 type CallResp struct {
@@ -167,9 +168,7 @@ func GetResp[Resp any, Error any](api RemoteApi, resp *http.Response) (*Resp, *E
 	return &respJson, &errJson, &CallResp{Status: resp.StatusCode, Headers: headerMap}, nil
 }
 
-func GetJSONResp[Resp ApiResp](api RemoteApi, resp *http.Response) (*Resp, response.ErrorState) {
-	respJsonP := new(Resp)
-	respJson := *respJsonP
+func GetJSONResp[Resp any](api RemoteApi, resp *http.Response, Builder func(int, []byte, map[string]string) (*Resp, response.ErrorState)) (*Resp, response.ErrorState) {
 	responseData, err := io.ReadAll(resp.Body)
 	if err != nil {
 		if os.IsTimeout(err) {
@@ -177,20 +176,23 @@ func GetJSONResp[Resp ApiResp](api RemoteApi, resp *http.Response) (*Resp, respo
 		}
 		return nil, response.Error(http.StatusRequestTimeout, "API_UNABLE_TO_READ", api.Name, err).Input("GetResp.ReadAll")
 	}
-	respJson.SetStatus(resp.StatusCode)
-	err = json.Unmarshal(responseData, respJsonP)
-	if err != nil {
-		return nil, response.Error(resp.StatusCode, "API_OK_RESP_JSON", api.Name, err).Input(fmt.Sprintf("GetResp.Unmarshal:%s", string(responseData)))
-	}
 	headerMap := make(map[string]string, 0)
 	for key, header := range resp.Header {
 		headerMap[key] = header[0]
 	}
-	respJson.SetHeaders(headerMap)
-	return respJsonP, nil
+	if Builder != nil {
+		return Builder(resp.StatusCode, responseData, headerMap)
+	}
+
+	var jsonResp Resp
+	err = json.Unmarshal(responseData, &jsonResp)
+	if err != nil {
+		return nil, response.Error(http.StatusRequestTimeout, "API_UNABLE_PARSE_RESP", responseData, err).Input("GetResp.json.Unmarshal")
+	}
+	return &jsonResp, nil
 }
 
-func PrepareCall(c CallData) (*http.Request, response.ErrorState) {
+func PrepareCall[Resp any](c CallData[Resp]) (*http.Request, response.ErrorState) {
 	if timeOutString, ok := c.Headers["Time-Out"]; ok {
 		timeoutSeconds, _ := strconv.Atoi(timeOutString)
 		httpClient.Timeout = time.Duration(timeoutSeconds * int(time.Second))
@@ -236,7 +238,7 @@ func PrepareCall(c CallData) (*http.Request, response.ErrorState) {
 	return req, nil
 }
 
-func (c CallData) SetLogs(req *http.Request) *http.Request {
+func (c CallData[Resp]) SetLogs(req *http.Request) *http.Request {
 	trace := &httptrace.ClientTrace{
 		GotConn: func(connInfo httptrace.GotConnInfo) {
 			log.Println("Got Conn:", connInfo)
@@ -262,7 +264,7 @@ func (c CallData) SetLogs(req *http.Request) *http.Request {
 	return req
 }
 
-func ConsumeRest[Resp any](c CallData) (*Resp, *response.WsRemoteResponse, *CallResp, response.ErrorState) {
+func ConsumeRest[Resp any](c CallData[Resp]) (*Resp, *response.WsRemoteResponse, *CallResp, response.ErrorState) {
 	req, errPrepare := PrepareCall(c)
 	if errPrepare != nil {
 		return nil, nil, nil, errPrepare.Input(c)
@@ -291,7 +293,7 @@ func ConsumeRest[Resp any](c CallData) (*Resp, *response.WsRemoteResponse, *Call
 	return respJson, errResp, callResp, nil
 }
 
-func ConsumeRestJSON[Resp ApiResp](c *CallData) (*Resp, response.ErrorState) {
+func ConsumeRestJSON[Resp any](c *CallData[Resp]) (*Resp, response.ErrorState) {
 	req, errPrepare := PrepareCall(*c)
 	if errPrepare != nil {
 		return nil, errPrepare.Input(c)
@@ -309,7 +311,7 @@ func ConsumeRestJSON[Resp ApiResp](c *CallData) (*Resp, response.ErrorState) {
 	}
 	defer resp.Body.Close()
 
-	respJson, errParse := GetJSONResp[Resp](c.Api, resp)
+	respJson, errParse := GetJSONResp[Resp](c.Api, resp, c.Builder)
 	if errParse != nil {
 		return nil, errParse.Input(resp)
 	}

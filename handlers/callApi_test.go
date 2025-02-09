@@ -143,7 +143,7 @@ func (env *testCallRemoteEnv) handlerCallAPIJSON(method string, queryStack *[]st
 			w,
 			env.Interface,
 			method,
-			&libCallApi.RemoteCallParamData[any]{
+			&libCallApi.RemoteCallParamData[any, AnimeEpisodes]{
 				Api:        libCallApi.RemoteApi{Domain: "https://api.jikan.moe/v4/anime"},
 				QueryStack: queryStack,
 				Method:     "GET",
@@ -163,7 +163,7 @@ func TestCallAPIJSON(t *testing.T) {
 			Name:         "Step1",
 			Url:          "/",
 			DesiredError: "v4/anime@GET@false@false",
-			Request: libCallApi.RemoteCallParamData[any]{
+			Request: libCallApi.RemoteCallParamData[any, any]{
 				Api:    libCallApi.RemoteApi{Domain: "https://api.jikan.moe/v4/anime"},
 				Method: "GET",
 			},
@@ -175,7 +175,7 @@ func TestCallAPIJSON(t *testing.T) {
 			Name:         "Step2",
 			Url:          "/",
 			DesiredError: "v4/anime@GET@false@false",
-			Request: libCallApi.RemoteCallParamData[any]{
+			Request: libCallApi.RemoteCallParamData[any, any]{
 				Api:    libCallApi.RemoteApi{Domain: "https://api.jikan.moe/v4/anime"},
 				Method: "GET",
 			},
@@ -187,7 +187,7 @@ func TestCallAPIJSON(t *testing.T) {
 			Name:         "Step3",
 			Url:          "/",
 			DesiredError: "v4/anime@GET@false@false",
-			Request: libCallApi.RemoteCallParamData[any]{
+			Request: libCallApi.RemoteCallParamData[any, any]{
 				Api:    libCallApi.RemoteApi{Domain: "https://api.jikan.moe/v4/anime"},
 				Method: "GET",
 			},

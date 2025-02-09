@@ -65,6 +65,23 @@ func (c GinParser) CheckUrlParam(name string) (string, bool) {
 }
 
 func (c GinParser) AddCustomAttributes(attr slog.Attr) {
+	/*
+		idx := 0
+		for id := range attrs {
+			if attrs[id].Key == attr.Key {
+				idx = 1
+			}
+			if attrs[id].Key == fmt.Sprintf("%s_%d", attr.Key, idx) {
+				idx++
+			}
+		}
+		if idx != 0 {
+			attr.Key = fmt.Sprintf("%s_%d", attr.Key, idx)
+			c.Set(customAttributesCtxKey, append(attrs, attr))
+		} else {
+			c.Set(customAttributesCtxKey, append(attrs, attr))
+		}
+	*/
 	sloggin.AddCustomAttributes(c.Ctx, attr)
 }
 

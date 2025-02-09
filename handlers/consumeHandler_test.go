@@ -180,9 +180,9 @@ type testRemoteCallResp struct {
 	Result string `json:"result"`
 }
 
-type testConsumeHandlerType[Req any, Resp any] struct {
+type testConsumeHandlerType[Req, Resp any] struct {
 	Title           string
-	Params          libCallApi.RemoteCallParamData[Req]
+	Params          libCallApi.RemoteCallParamData[Req, Resp]
 	Path            string
 	Mode            libRequest.Type
 	VerifyHeader    bool
@@ -272,7 +272,7 @@ func TestConsumeHandler(t *testing.T) {
 		env.Interface,
 		&testConsumeHandlerType[testRemoteCallReq, handlers.WsResponse[testRemoteCallResp]]{
 			Title: "consume_handler",
-			Params: libCallApi.RemoteCallParamData[testRemoteCallReq]{
+			Params: libCallApi.RemoteCallParamData[testRemoteCallReq, handlers.WsResponse[testRemoteCallResp]]{
 				Headers: map[string]string{"H1": "a"},
 				Method:  "POST",
 			},

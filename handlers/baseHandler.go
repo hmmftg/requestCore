@@ -52,6 +52,7 @@ type HandlerRequest[Req any, Resp any] struct {
 	W        webFramework.WebFramework
 	Args     []any
 	RespSent bool
+	Builder  func(status int, rawResp []byte, headers map[string]string) (*Resp, error)
 }
 
 func BaseHandler[Req any, Resp any, Handler HandlerInterface[Req, Resp]](
@@ -78,6 +79,7 @@ func BaseHandler[Req any, Resp any, Handler HandlerInterface[Req, Resp]](
 
 		defer func() {
 			handler.Finalizer(trx)
+			webFramework.CollectLogs(w, CallApiLogEntry)
 			if r := recover(); r != nil {
 				if params.RecoveryHandler != nil {
 					params.RecoveryHandler(r)
@@ -103,7 +105,6 @@ func BaseHandler[Req any, Resp any, Handler HandlerInterface[Req, Resp]](
 				}
 				panic(r)
 			}
-
 		}()
 
 		if simulation {

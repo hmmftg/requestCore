@@ -312,9 +312,9 @@ func CallHandler[Req any, Resp any](
 	}
 }
 
-type ConsumeHandlerType[Req any, Resp libCallApi.ApiResp] struct {
+type ConsumeHandlerType[Req, Resp any] struct {
 	Title           string
-	Params          libCallApi.RemoteCallParamData[Req]
+	Params          libCallApi.RemoteCallParamData[Req, Resp]
 	Path            string
 	Mode            libRequest.Type
 	VerifyHeader    bool
@@ -350,7 +350,7 @@ func (h *ConsumeHandlerType[Req, Resp]) Initializer(req HandlerRequest[Req, Resp
 func (h *ConsumeHandlerType[Req, Resp]) Handler(req HandlerRequest[Req, Resp]) (Resp, response.ErrorState) {
 	headersMap := ExtractHeaders(req.W, h.Headers, nil)
 	resp, errCall := CallApiJSON[Req, Resp](req.W, req.Core, h.Title,
-		&libCallApi.RemoteCallParamData[Req]{
+		&libCallApi.RemoteCallParamData[Req, Resp]{
 			Api:         req.Core.Consumer().GetApi(h.Api),
 			Method:      h.Method,
 			Path:        h.Path,
@@ -359,6 +359,7 @@ func (h *ConsumeHandlerType[Req, Resp]) Handler(req HandlerRequest[Req, Resp]) (
 			ValidateTls: false,
 			EnableLog:   false,
 			Headers:     headersMap,
+			Builder:     req.Builder,
 		})
 	if errCall != nil {
 		return req.Response, errCall
@@ -372,7 +373,7 @@ func (h *ConsumeHandlerType[Req, Resp]) Simulation(req HandlerRequest[Req, Resp]
 
 func (h *ConsumeHandlerType[Req, Resp]) Finalizer(req HandlerRequest[Req, Resp]) {}
 
-func ConsumeHandler[Req any, Resp libCallApi.ApiResp](
+func ConsumeHandler[Req, Resp any](
 	core requestCore.RequestCoreInterface,
 	params *ConsumeHandlerType[Req, Resp],
 	simulation bool,
