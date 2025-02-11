@@ -91,7 +91,7 @@ func BaseHandler[Req any, Resp any, Handler HandlerInterface[Req, Resp]](
 				webFramework.CollectLogTags(w, params.LogTags[id])
 			}
 			for id := range params.LogArrays {
-				webFramework.CollectLogArrays(w, params.LogTags[id])
+				webFramework.CollectLogArrays(w, params.LogArrays[id])
 			}
 			if r := recover(); r != nil {
 				if params.RecoveryHandler != nil {
