@@ -33,30 +33,30 @@ func AddLogTag(w WebFramework, title string, log slog.Attr) {
 	addLog(w, name, log)
 }
 
-func collectLogs(w WebFramework, tag string, isObject bool) {
+func collectLogs(w WebFramework, tag, title string, isObject bool) {
 	v := w.Parser.GetLocal(tag)
 	if v == nil {
 		return
 	}
 	if arr, ok := v.([]slog.Attr); ok {
 		if isObject {
-			w.Parser.AddCustomAttributes(slog.Any(tag, arr))
+			w.Parser.AddCustomAttributes(slog.Any(title, arr))
 		} else {
 			for id := range arr {
 				w.Parser.AddCustomAttributes(arr[id])
 			}
 		}
 	} else {
-		slog.Error(fmt.Sprintf("log variable for %s is of wrong type %T", tag, arr), v)
+		slog.Error(fmt.Sprintf("log variable for %s is of wrong type %T", title, arr), v)
 	}
 }
 
 func CollectLogArrays(w WebFramework, title string) {
 	name := fmt.Sprintf(LogArrayNameFormat, title)
-	collectLogs(w, name, true)
+	collectLogs(w, name, title, true)
 }
 
 func CollectLogTags(w WebFramework, title string) {
 	name := fmt.Sprintf(LogTagNameFormat, title)
-	collectLogs(w, name, false)
+	collectLogs(w, name, title, false)
 }
