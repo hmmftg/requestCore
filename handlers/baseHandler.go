@@ -24,6 +24,7 @@ type HandlerParameters struct {
 	HasReceipt      bool
 	RecoveryHandler func(any)
 	FileResponse    bool
+	LogArrays       []string
 	LogTags         []string
 }
 
@@ -71,7 +72,9 @@ func BaseHandler[Req any, Resp any, Handler HandlerInterface[Req, Resp]](
 		} else {
 			w = libContext.InitContextNoAuditTrail(c)
 		}
-		webFramework.AddLog(w, webFramework.HandlerLogTag, slog.String("title", params.Title))
+		webFramework.AddLogTag(w, webFramework.HandlerLogTag, slog.String("title", params.Title))
+		webFramework.AddLogTag(w, webFramework.HandlerLogTag, slog.String("method", w.Parser.GetMethod()))
+		webFramework.AddLogTag(w, webFramework.HandlerLogTag, slog.String("path", w.Parser.GetPath()))
 		trx := HandlerRequest[Req, Resp]{
 			Title: params.Title,
 			Args:  args,
@@ -81,10 +84,14 @@ func BaseHandler[Req any, Resp any, Handler HandlerInterface[Req, Resp]](
 
 		defer func() {
 			handler.Finalizer(trx)
-			webFramework.CollectLogs(w, webFramework.HandlerLogTag)
-			webFramework.CollectLogs(w, CallApiLogEntry)
+			webFramework.CollectLogTags(w, webFramework.HandlerLogTag)
+			webFramework.CollectLogArrays(w, webFramework.HandlerLogTag)
+			webFramework.CollectLogArrays(w, CallApiLogEntry)
 			for id := range params.LogTags {
-				webFramework.CollectLogs(w, params.LogTags[id])
+				webFramework.CollectLogTags(w, params.LogTags[id])
+			}
+			for id := range params.LogArrays {
+				webFramework.CollectLogArrays(w, params.LogTags[id])
 			}
 			if r := recover(); r != nil {
 				if params.RecoveryHandler != nil {

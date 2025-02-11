@@ -37,6 +37,7 @@ func (h testHandlerType[Req, Resp]) Parameters() HandlerParameters {
 		nil,
 		false,
 		nil,
+		nil,
 	}
 }
 func (h testHandlerType[Req, Resp]) Initializer(req HandlerRequest[Req, Resp]) response.ErrorState {

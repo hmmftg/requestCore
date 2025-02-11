@@ -82,7 +82,7 @@ func (c CallArgs[Req, Resp]) Parameters() HandlerParameters {
 	if c.HasInitializer {
 		save = true
 	}
-	return HandlerParameters{c.Title, mode, false, save, c.Path, false, c.RecoveryHandler, false, nil}
+	return HandlerParameters{c.Title, mode, false, save, c.Path, false, c.RecoveryHandler, false, nil, nil}
 }
 
 const (
