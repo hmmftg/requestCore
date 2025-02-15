@@ -62,7 +62,7 @@ func AddServiceRegistrationLog(name string) {
 	if serviceRegistrationLogs == nil {
 		serviceRegistrationLogs = []any{}
 	}
-	serviceRegistrationLogs = append(serviceRegistrationLogs, name)
+	serviceRegistrationLogs = append(serviceRegistrationLogs, slog.String(name, "registered"))
 }
 
 func CollectServiceRegistrationLogs() {
