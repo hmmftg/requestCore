@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
 	"net/http"
 	"net/url"
 	"strings"
@@ -262,7 +261,7 @@ func CallHandler[Req any, Resp any](
 	headers []string,
 	core requestCore.RequestCoreInterface,
 ) any {
-	log.Println("Registering: ", title)
+	webFramework.AddServiceRegistrationLog(title)
 	return func(c context.Context) {
 		var w webFramework.WebFramework
 		if hasInitializer {

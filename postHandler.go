@@ -2,7 +2,6 @@ package requestCore
 
 import (
 	"context"
-	"log"
 	"net/http"
 	"net/url"
 
@@ -10,6 +9,7 @@ import (
 	"github.com/hmmftg/requestCore/libError"
 	"github.com/hmmftg/requestCore/libQuery"
 	"github.com/hmmftg/requestCore/libRequest"
+	"github.com/hmmftg/requestCore/webFramework"
 )
 
 func PostHandler[Req libQuery.RecordDataDml](title string,
@@ -18,7 +18,7 @@ func PostHandler[Req libQuery.RecordDataDml](title string,
 	finalizer func(request Req, c any),
 	args ...any,
 ) any {
-	log.Println("Registering: ", title)
+	webFramework.AddServiceRegistrationLog(title)
 	return func(c context.Context) {
 		w := libContext.InitContext(c)
 		code, desc, arrayErr, request, reqLog, err := libRequest.GetRequest[Req](w, true)

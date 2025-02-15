@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"reflect"
@@ -19,6 +20,7 @@ import (
 	"github.com/hmmftg/requestCore/libFiber"
 	"github.com/hmmftg/requestCore/libGin"
 	"github.com/hmmftg/requestCore/libQuery"
+	"github.com/hmmftg/requestCore/webFramework"
 	"gotest.tools/v3/assert"
 	"gotest.tools/v3/assert/cmp"
 )
@@ -26,6 +28,7 @@ import (
 // initializeTestServer creates a gin server,
 // if there was a middleware it will be handled by this function automaticly.
 func initializeTestServer(options *TestOptions) *gin.Engine {
+	webFramework.AddStartUpLog(slog.String("StartUp", "test app"))
 	if options.Silent {
 		log.SetOutput(io.Discard)
 		gin.SetMode(gin.ReleaseMode)
@@ -38,6 +41,9 @@ func initializeTestServer(options *TestOptions) *gin.Engine {
 	}
 
 	g.Any(options.Path, libGin.Gin(options.Handler))
+
+	webFramework.CollectServiceRegistrationLogs()
+	webFramework.CollectStartUpLogs()
 
 	return g
 }

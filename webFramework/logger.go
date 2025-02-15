@@ -1,7 +1,9 @@
 package webFramework
 
 import (
+	"context"
 	"fmt"
+	"log"
 	"log/slog"
 )
 
@@ -10,6 +12,9 @@ const (
 	LogArrayNameFormat string = "LOG_ARRAY_%s"
 	HandlerLogTag      string = "handler"
 )
+
+var startUpLogs []slog.Attr
+var serviceRegistrationLogs []any
 
 func addLog(w WebFramework, tag string, log slog.Attr) {
 	v := w.Parser.GetLocal(tag)
@@ -23,6 +28,7 @@ func addLog(w WebFramework, tag string, log slog.Attr) {
 		slog.Error(fmt.Sprintf("log variable for %s is of wrong type %T", tag, arr), v)
 	}
 }
+
 func AddLog(w WebFramework, title string, log slog.Attr) {
 	name := fmt.Sprintf(LogArrayNameFormat, title)
 	addLog(w, name, log)
@@ -31,6 +37,41 @@ func AddLog(w WebFramework, title string, log slog.Attr) {
 func AddLogTag(w WebFramework, title string, log slog.Attr) {
 	name := fmt.Sprintf(LogTagNameFormat, title)
 	addLog(w, name, log)
+}
+
+func AddStartUpLog(log slog.Attr) {
+	if startUpLogs == nil {
+		startUpLogs = []slog.Attr{}
+	}
+	startUpLogs = append(startUpLogs, log)
+}
+
+func AddStartUpLogTag(title string, log slog.Attr) {
+	if startUpLogs == nil {
+		startUpLogs = []slog.Attr{}
+	}
+	startUpLogs = append(startUpLogs, slog.Any(title, log))
+}
+
+func CollectStartUpLogs() {
+	slog.LogAttrs(context.Background(), slog.LevelInfo, "StartUp", startUpLogs...)
+	startUpLogs = []slog.Attr{}
+}
+
+func AddServiceRegistrationLog(name string) {
+	if serviceRegistrationLogs == nil {
+		serviceRegistrationLogs = []any{}
+	}
+	serviceRegistrationLogs = append(serviceRegistrationLogs, name)
+}
+
+func CollectServiceRegistrationLogs() {
+	if len(startUpLogs) == 0 {
+		log.Fatal("unable to log service lregistration logs, start-up logs are empty")
+	}
+	logAttr := slog.Group("Service Registration Logs", serviceRegistrationLogs...)
+	AddStartUpLog(logAttr)
+	serviceRegistrationLogs = []any{}
 }
 
 func collectLogs(w WebFramework, tag, title string, isObject bool) {

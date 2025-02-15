@@ -3,7 +3,6 @@ package requestCore
 import (
 	"context"
 	"fmt"
-	"log"
 	"net/http"
 	"net/url"
 	"strings"
@@ -21,7 +20,7 @@ func PutHandler[Req libQuery.RecordDataDml](title string,
 	finalizer func(request Req, c any),
 	args ...any,
 ) any {
-	log.Println("Registering: ", title)
+	webFramework.AddServiceRegistrationLog(title)
 	return func(c context.Context) {
 		w := libContext.InitContext(c)
 		id := w.Parser.GetUrlParam("id")
@@ -68,7 +67,7 @@ func DeleteHandler[Req webFramework.RecordData](title, delete, checkQuery string
 	core RequestCoreInterface,
 	hasInitializer bool, parser webFramework.FieldParser,
 ) any {
-	log.Println("Registering: ", title)
+	webFramework.AddServiceRegistrationLog(title)
 	return func(c context.Context) {
 		w := libContext.InitContext(c)
 		id := w.Parser.GetUrlParam("id")
@@ -122,7 +121,7 @@ func UpdateHandler[Req libQuery.Updatable](title string, hasReqLog bool,
 	finalizer func(request Req, c any),
 	args ...string,
 ) any {
-	log.Println("Registering: ", title)
+	webFramework.AddServiceRegistrationLog(title)
 	return func(c context.Context) {
 		w := libContext.InitContext(c)
 		params := make(map[string]string, 0)

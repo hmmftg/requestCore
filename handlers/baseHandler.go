@@ -3,7 +3,6 @@ package handlers
 import (
 	"context"
 	"fmt"
-	"log"
 	"log/slog"
 	"net/http"
 
@@ -64,7 +63,7 @@ func BaseHandler[Req any, Resp any, Handler HandlerInterface[Req, Resp]](
 	args ...any,
 ) any {
 	params := handler.Parameters()
-	log.Println("Registering: ", params.Title)
+	webFramework.AddServiceRegistrationLog(params.Title)
 	return func(c context.Context) {
 		var w webFramework.WebFramework
 		if params.SaveToRequest {

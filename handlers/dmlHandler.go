@@ -3,7 +3,6 @@ package handlers
 import (
 	"context"
 	"fmt"
-	"log"
 	"log/slog"
 	"net/http"
 	"net/url"
@@ -135,7 +134,7 @@ func DmlHandlerOld[Req libQuery.DmlModel](
 	mode libRequest.Type,
 	validateHeader bool,
 ) any {
-	log.Println("Registering: ", title)
+	webFramework.AddServiceRegistrationLog(title)
 	return func(c context.Context) {
 		defer func() {
 			w := libContext.InitContext(c)

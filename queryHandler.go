@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
 	"net/http"
 	"reflect"
 	"strings"
@@ -23,7 +22,7 @@ type Empty struct {
 func GetSingleRecordHandler[Req, Resp any](title, sql string,
 	core RequestCoreInterface,
 ) any {
-	log.Println("Registering: ", title)
+	webFramework.AddServiceRegistrationLog(title)
 	return func(c context.Context) {
 		w := libContext.InitContextNoAuditTrail(c)
 		id := w.Parser.GetUrlParam("id")
@@ -59,7 +58,7 @@ func GetSingleRecordHandler[Req, Resp any](title, sql string,
 func GetMapHandler[Req any, Resp webFramework.RecordData](title, sql string,
 	core RequestCoreInterface,
 	hasParam bool) any {
-	log.Println("Registering: ", title)
+	webFramework.AddServiceRegistrationLog(title)
 	return func(c context.Context) {
 		w := libContext.InitContextNoAuditTrail(c)
 		id := ""
@@ -112,7 +111,7 @@ func GetMapHandler[Req any, Resp webFramework.RecordData](title, sql string,
 func GetMapBySubHandler[Req any, Resp webFramework.RecordData](title, sql string,
 	core RequestCoreInterface,
 	hasParam bool) any {
-	log.Println("Registering: ", title)
+	webFramework.AddServiceRegistrationLog(title)
 	return func(c context.Context) {
 		w := libContext.InitContextNoAuditTrail(c)
 		id := ""
@@ -170,7 +169,7 @@ func GetMapBySubHandler[Req any, Resp webFramework.RecordData](title, sql string
 func GetQuery[Req any](title, sql string,
 	core RequestCoreInterface,
 	hasParam bool) any {
-	log.Println("Registering: ", title)
+	webFramework.AddServiceRegistrationLog(title)
 	return func(c context.Context) {
 		w := libContext.InitContextNoAuditTrail(c)
 		id := ""
@@ -218,7 +217,7 @@ func GetQuery[Req any](title, sql string,
 func GetQueryMap[Req any](title, sql string,
 	core RequestCoreInterface,
 	hasParam bool) any {
-	log.Println("Registering: ", title)
+	webFramework.AddServiceRegistrationLog(title)
 	return func(c context.Context) {
 		w := libContext.InitContextNoAuditTrail(c)
 		id := ""
@@ -283,7 +282,7 @@ func GetQueryMap[Req any](title, sql string,
 func GetQueryHandler[Req, Resp any](title, sql string,
 	core RequestCoreInterface,
 	args ...any) any {
-	log.Println("Registering: ", title)
+	webFramework.AddServiceRegistrationLog(title)
 	return func(c context.Context) {
 		w := libContext.InitContextNoAuditTrail(c)
 		code, desc, arrayErr, _, _, err := libRequest.GetRequest[Req](w, false)
@@ -319,7 +318,7 @@ func GetQueryFillable[Resp libQuery.QueryWithDeps](
 	core RequestCoreInterface,
 	args ...string,
 ) any {
-	log.Println("Registering: ", title)
+	webFramework.AddServiceRegistrationLog(title)
 	return func(c context.Context) {
 		w := libContext.InitContextNoAuditTrail(c)
 		params := []any{}
@@ -363,7 +362,7 @@ func GetAllMapHandler[Model MapHandler](title string,
 	core RequestCoreInterface,
 	respHandler response.ResponseHandler,
 	args ...any) any {
-	log.Println("Registering: ", title)
+	webFramework.AddServiceRegistrationLog(title)
 	return func(c context.Context) {
 		w := libContext.InitContextNoAuditTrail(c)
 		var model Model
@@ -406,7 +405,7 @@ func GetSingleRecord[Model GetHandler](title string,
 	core RequestCoreInterface,
 	respHandler response.ResponseHandler,
 	args ...any) any {
-	log.Println("Registering: ", title)
+	webFramework.AddServiceRegistrationLog(title)
 	return func(c context.Context) {
 		w := libContext.InitContextNoAuditTrail(c)
 		params := GetParams(w, args...)
@@ -428,7 +427,7 @@ func GetAll[Model GetHandler](title string,
 	core RequestCoreInterface,
 	respHandler response.ResponseHandler,
 	args ...any) any {
-	log.Println("Registering: ", title)
+	webFramework.AddServiceRegistrationLog(title)
 	return func(c context.Context) {
 		w := libContext.InitContextNoAuditTrail(c)
 		params := GetParams(w, args...)
@@ -459,7 +458,7 @@ func GetPage[Model GetPageHandler](title string,
 	core RequestCoreInterface,
 	respHandler response.ResponseHandler,
 	args ...any) any {
-	log.Println("Registering: ", title)
+	webFramework.AddServiceRegistrationLog(title)
 	return func(c context.Context) {
 		w := libContext.InitContextNoAuditTrail(c)
 		params := GetParams(w, args...)
@@ -484,7 +483,7 @@ func QueryHandler[Req libQuery.QueryRequest, Resp libQuery.QueryResult](
 	mode libRequest.Type,
 	validateHeader bool,
 ) any {
-	log.Println("Registering: ", title)
+	webFramework.AddServiceRegistrationLog(title)
 	return func(c context.Context) {
 		defer func() {
 			w := libContext.InitContextNoAuditTrail(c)
