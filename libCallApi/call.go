@@ -11,7 +11,7 @@ import (
 
 type CallParam *CallParamData
 type CallParamData struct {
-	httpClient  *http.Client
+	HttpClient  *http.Client
 	Parameters  map[string]any
 	Headers     map[string]string
 	Api         RemoteApi
@@ -39,7 +39,7 @@ func (r CallParamData) LogValue() slog.Value {
 }
 
 type RemoteCallParamData[Req, Resp any] struct {
-	httpClient  *http.Client
+	HttpClient  *http.Client
 	Parameters  map[string]any                                                                           `json:"-"`
 	Headers     map[string]string                                                                        `json:"-"`
 	Api         RemoteApi                                                                                `json:"api"`
@@ -95,7 +95,7 @@ func Call[RespType any](param CallParam) CallResult[RespType] {
 		EnableLog:  param.EnableLog,
 		Timeout:    param.Timeout,
 		Req:        param.JsonBody,
-		httpClient: param.httpClient,
+		httpClient: param.HttpClient,
 	}
 	resp, wsResp, callResp, err := ConsumeRest[RespType](callData)
 	return CallResult[RespType]{resp, wsResp, callResp, err}
@@ -121,7 +121,7 @@ func RemoteCall[Req, Resp any](param *RemoteCallParamData[Req, Resp]) (*Resp, re
 		Req:        param.JsonBody,
 		BodyType:   param.BodyType,
 		Builder:    param.Builder,
-		httpClient: param.httpClient,
+		httpClient: param.HttpClient,
 	}
 	return ConsumeRestJSON[Resp](&callData)
 }
