@@ -224,10 +224,13 @@ func TestCallJSON(t *testing.T) {
 	callParam := libCallApi.RemoteCallParamData[any, AnimeEpisodes]{
 		Api:        libCallApi.RemoteApi{Domain: "https://api.jikan.moe/v4/anime"},
 		QueryStack: &[]string{"1/episodes", "200/episodes", "300/episodes", "400/episodes"},
-		Builder: func(status int, rawResp []byte, headers map[string]string) (*AnimeEpisodes, error) {
+		Builder: func(status int, rawResp []byte, headers map[string]string) (*AnimeEpisodes, response.ErrorState) {
 			var resp AnimeEpisodes
 			err := json.Unmarshal(rawResp, &resp)
-			return &resp, err
+			if err != nil {
+				return nil, response.ToError("", "", err)
+			}
+			return &resp, nil
 		},
 	}
 	testCases := []TestCase{

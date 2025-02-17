@@ -37,19 +37,19 @@ func (r CallParamData) LogValue() slog.Value {
 }
 
 type RemoteCallParamData[Req, Resp any] struct {
-	Parameters  map[string]any
-	Headers     map[string]string
-	Api         RemoteApi
-	Timeout     time.Duration
-	Method      string
-	Path        string
-	Query       string
-	QueryStack  *[]string
-	ValidateTls bool
-	EnableLog   bool
-	JsonBody    Req
-	BodyType    RequestBodyType
-	Builder     func(status int, rawResp []byte, headers map[string]string) (*Resp, error) `json:"-"`
+	Parameters  map[string]any                                                                           `json:"-"`
+	Headers     map[string]string                                                                        `json:"-"`
+	Api         RemoteApi                                                                                `json:"api"`
+	Timeout     time.Duration                                                                            `json:"-"`
+	Method      string                                                                                   `json:"method"`
+	Path        string                                                                                   `json:"path"`
+	Query       string                                                                                   `json:"-"`
+	QueryStack  *[]string                                                                                `json:"-"`
+	ValidateTls bool                                                                                     `json:"-"`
+	EnableLog   bool                                                                                     `json:"-"`
+	JsonBody    Req                                                                                      `json:"body"`
+	BodyType    RequestBodyType                                                                          `json:"-"`
+	Builder     func(status int, rawResp []byte, headers map[string]string) (*Resp, response.ErrorState) `json:"-"`
 }
 
 func (r RemoteCallParamData[Req, Resp]) LogValue() slog.Value {
@@ -116,6 +116,7 @@ func RemoteCall[Req, Resp any](param *RemoteCallParamData[Req, Resp]) (*Resp, re
 		Timeout:   param.Timeout,
 		Req:       param.JsonBody,
 		BodyType:  param.BodyType,
+		Builder:   param.Builder,
 	}
 	return ConsumeRestJSON[Resp](&callData)
 }

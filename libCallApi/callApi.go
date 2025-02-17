@@ -300,7 +300,7 @@ func DefaultBuilderfunc[Resp any](status int, rawResp []byte, headers map[string
 	var resp Resp
 	err := json.Unmarshal(rawResp, &resp)
 	if err != nil {
-		return nil, response.Error(http.StatusBadRequest, "API_UNABLE_PARSE_RESP", string(rawResp), err).Input("GetResp.json.Unmarshal")
+		return nil, response.Error(http.StatusBadRequest, "API_UNABLE_PARSE_RESP", rawResp, err).Input("GetResp.json.Unmarshal")
 	}
 	return &resp, nil
 }

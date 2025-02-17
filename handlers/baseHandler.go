@@ -53,7 +53,7 @@ type HandlerRequest[Req any, Resp any] struct {
 	W        webFramework.WebFramework
 	Args     []any
 	RespSent bool
-	Builder  func(status int, rawResp []byte, headers map[string]string) (*Resp, error)
+	Builder  func(status int, rawResp []byte, headers map[string]string) (*Resp, response.ErrorState)
 }
 
 func BaseHandler[Req any, Resp any, Handler HandlerInterface[Req, Resp]](
