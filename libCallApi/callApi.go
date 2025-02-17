@@ -187,7 +187,7 @@ func GetJSONResp[Resp any](api RemoteApi, resp *http.Response, Builder func(int,
 	var jsonResp Resp
 	err = json.Unmarshal(responseData, &jsonResp)
 	if err != nil {
-		return nil, response.Error(http.StatusRequestTimeout, "API_UNABLE_PARSE_RESP", responseData, err).Input("GetResp.json.Unmarshal")
+		return nil, response.Error(http.StatusBadRequest, "API_UNABLE_PARSE_RESP", responseData, err).Input("GetResp.json.Unmarshal")
 	}
 	return &jsonResp, nil
 }
@@ -293,6 +293,18 @@ func ConsumeRest[Resp any](c CallData[Resp]) (*Resp, *response.WsRemoteResponse,
 	return respJson, errResp, callResp, nil
 }
 
+func DefaultBuilderfunc[Resp any](status int, rawResp []byte, headers map[string]string) (*Resp, response.ErrorState) {
+	if status != http.StatusOK {
+		return nil, response.Error(status, "API_RESP_NOK", rawResp, fmt.Errorf("request failed, status %d", status))
+	}
+	var resp Resp
+	err := json.Unmarshal(rawResp, &resp)
+	if err != nil {
+		return nil, response.Error(http.StatusBadRequest, "API_UNABLE_PARSE_RESP", string(rawResp), err).Input("GetResp.json.Unmarshal")
+	}
+	return &resp, nil
+}
+
 func ConsumeRestJSON[Resp any](c *CallData[Resp]) (*Resp, response.ErrorState) {
 	req, errPrepare := PrepareCall(*c)
 	if errPrepare != nil {
@@ -310,6 +322,10 @@ func ConsumeRestJSON[Resp any](c *CallData[Resp]) (*Resp, response.ErrorState) {
 		return nil, response.Error(http.StatusRequestTimeout, "API_UNABLE_TO_CALL", c, err).Input(fmt.Sprintf("ConsumeRest.ClientDo:%v", req))
 	}
 	defer resp.Body.Close()
+
+	if c.Builder == nil {
+		c.Builder = DefaultBuilderfunc[Resp]
+	}
 
 	respJson, errParse := GetJSONResp[Resp](c.Api, resp, c.Builder)
 	if errParse != nil {
