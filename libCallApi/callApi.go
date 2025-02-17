@@ -121,17 +121,18 @@ const (
 )
 
 type CallData[Resp any] struct {
-	Api       RemoteApi
-	Path      string
-	Method    string
-	Headers   map[string]string
-	Req       any
-	SslVerify bool
-	BodyType  RequestBodyType
-	Timeout   time.Duration
-	EnableLog bool
-	LogLevel  int
-	Builder   func(int, []byte, map[string]string) (*Resp, response.ErrorState)
+	httpClient *http.Client
+	Api        RemoteApi
+	Path       string
+	Method     string
+	Headers    map[string]string
+	Req        any
+	SslVerify  bool
+	BodyType   RequestBodyType
+	Timeout    time.Duration
+	EnableLog  bool
+	LogLevel   int
+	Builder    func(int, []byte, map[string]string) (*Resp, response.ErrorState)
 }
 
 type CallResp struct {
@@ -196,6 +197,10 @@ func PrepareCall[Resp any](c CallData[Resp]) (*http.Request, response.ErrorState
 	if timeOutString, ok := c.Headers["Time-Out"]; ok {
 		timeoutSeconds, _ := strconv.Atoi(timeOutString)
 		httpClient.Timeout = time.Duration(timeoutSeconds * int(time.Second))
+	} else if c.Timeout > 0 {
+		httpClient.Timeout = c.Timeout
+	} else {
+		httpClient.Timeout = defaultTimeOut
 	}
 	var buffer *bytes.Buffer
 	switch c.BodyType {
@@ -270,10 +275,15 @@ func ConsumeRest[Resp any](c CallData[Resp]) (*Resp, *response.WsRemoteResponse,
 		return nil, nil, nil, errPrepare.Input(c)
 	}
 
+	cl := httpClient
+	if c.httpClient != nil {
+		cl = c.httpClient
+	}
+
 	if c.EnableLog {
 		req = c.SetLogs(req)
 	}
-	resp, err := httpClient.Do(req)
+	resp, err := cl.Do(req)
 	if err != nil {
 		if os.IsTimeout(err) {
 			return nil, nil, nil, response.Error(http.StatusRequestTimeout, "API_CONNECT_TIMED_OUT", c, err).Input(fmt.Sprintf("ConsumeRest.ClientDo:%v", req))
@@ -311,10 +321,15 @@ func ConsumeRestJSON[Resp any](c *CallData[Resp]) (*Resp, response.ErrorState) {
 		return nil, errPrepare.Input(c)
 	}
 
+	cl := httpClient
+	if c.httpClient != nil {
+		cl = c.httpClient
+	}
+
 	if c.EnableLog {
 		req = c.SetLogs(req)
 	}
-	resp, err := httpClient.Do(req)
+	resp, err := cl.Do(req)
 	if err != nil {
 		if os.IsTimeout(err) {
 			return nil, response.Error(http.StatusRequestTimeout, "API_CONNECT_TIMED_OUT", c, err).Input(fmt.Sprintf("ConsumeRest.ClientDo:%v", req))

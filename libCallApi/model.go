@@ -27,8 +27,10 @@ type CallApiInterface interface {
 	ConsumeRestApi(requestJson []byte, apiName, path, contentType, method string, headers map[string]string) ([]byte, string, int, error)
 }
 
+const defaultTimeOut = 30 * time.Second
+
 var httpClient = &http.Client{
-	Timeout: 30 * time.Second,
+	Timeout: defaultTimeOut,
 	Transport: &http.Transport{
 		TLSClientConfig: &tls.Config{
 			InsecureSkipVerify: true,
