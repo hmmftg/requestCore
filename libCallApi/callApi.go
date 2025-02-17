@@ -194,13 +194,19 @@ func GetJSONResp[Resp any](api RemoteApi, resp *http.Response, Builder func(int,
 }
 
 func PrepareCall[Resp any](c CallData[Resp]) (*http.Request, response.ErrorState) {
+	var to time.Duration
 	if timeOutString, ok := c.Headers["Time-Out"]; ok {
 		timeoutSeconds, _ := strconv.Atoi(timeOutString)
-		httpClient.Timeout = time.Duration(timeoutSeconds * int(time.Second))
+		to = time.Duration(timeoutSeconds * int(time.Second))
 	} else if c.Timeout > 0 {
-		httpClient.Timeout = c.Timeout
+		to = c.Timeout
 	} else {
-		httpClient.Timeout = defaultTimeOut
+		to = defaultTimeOut
+	}
+	if c.httpClient == nil {
+		httpClient.Timeout = to
+	} else {
+		c.httpClient.Timeout = to
 	}
 	var buffer *bytes.Buffer
 	switch c.BodyType {
