@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"time"
 
 	"github.com/hmmftg/requestCore"
 	"github.com/hmmftg/requestCore/libContext"
@@ -65,6 +66,7 @@ func BaseHandler[Req any, Resp any, Handler HandlerInterface[Req, Resp]](
 	params := handler.Parameters()
 	webFramework.AddServiceRegistrationLog(params.Title)
 	return func(c context.Context) {
+		start := time.Now()
 		var w webFramework.WebFramework
 		if params.SaveToRequest {
 			w = libContext.InitContext(c)
@@ -82,6 +84,8 @@ func BaseHandler[Req any, Resp any, Handler HandlerInterface[Req, Resp]](
 		}
 
 		defer func() {
+			elapsed := time.Since(start)
+			webFramework.AddLogTag(w, webFramework.HandlerLogTag, slog.String("elapsed", elapsed.String()))
 			handler.Finalizer(trx)
 			webFramework.CollectLogTags(w, webFramework.HandlerLogTag)
 			webFramework.CollectLogArrays(w, webFramework.HandlerLogTag)

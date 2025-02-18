@@ -106,6 +106,8 @@ func (m WebHanlder) RespondWithAttachment(code, status int, message string, file
 func (m WebHanlder) respond(data response.RespData, abort bool, w webFramework.WebFramework) {
 	var resp response.WsResponse
 	resp.Status = data.Status
+
+	webFramework.AddLogTag(w, webFramework.HandlerLogTag, slog.Int("status", data.Code))
 	if data.Code == http.StatusOK {
 		resp.Description = m.MessageDesc[data.Message]
 		switch data.Type {
@@ -124,7 +126,18 @@ func (m WebHanlder) respond(data response.RespData, abort bool, w webFramework.W
 			}
 		}
 	} else {
-		resp.ErrorData = m.GetErrorsArray(data.Message, data)
+		errs := m.GetErrorsArray(data.Message, data)
+		if len(errs) == 1 {
+			webFramework.AddLogTag(w, webFramework.HandlerLogTag, slog.String("desc", errs[0].Code))
+			if strMsg, ok := errs[0].Description.(string); ok {
+				webFramework.AddLogTag(w, webFramework.HandlerLogTag, slog.String("message", strMsg))
+			} else {
+				webFramework.AddLogTag(w, webFramework.HandlerLogTag, slog.Any("message", errs[0].Description))
+			}
+		} else {
+			webFramework.AddLogTag(w, webFramework.HandlerLogTag, slog.Any("errorList", errs))
+		}
+		resp.ErrorData = errs
 
 		w.Parser.SetLocal("errorArray", resp.ErrorData)
 
