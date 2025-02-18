@@ -209,7 +209,6 @@ func Errors(status int, desc string, message any, err ErrorState) ErrorState {
 }
 
 func FormatErrorResp(errs error, trans ut.Translator) []ErrorResponse {
-	slog.Error("error resp", slog.Any("errors", errs))
 	err := errs.(validator.ValidationErrors)
 	errorResponses := make([]ErrorResponse, 0)
 	for _, validationError := range err {

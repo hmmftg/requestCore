@@ -33,7 +33,7 @@ func (m WebHanlder) HandleErrorState(err error, status int, message string, data
 
 func (m WebHanlder) errorState(w webFramework.WebFramework, err response.ErrorState, depth int) {
 	src := response.GetStack(depth+1, "requestCore/webHandler.go")
-	webFramework.AddLog(w, webFramework.HandlerLogTag,
+	webFramework.AddLogTag(w, webFramework.HandlerLogTag,
 		slog.Group("error-state",
 			slog.String("source", src),
 			slog.Any("error", err)))
