@@ -321,7 +321,7 @@ func QueryHandler[Row any, Resp []Row](
 	validateHeader, simulation bool,
 	recoveryHandler func(any),
 ) any {
-	return queryHandler[Row, Resp](title, key, path, queryMap,
+	return queryHandler[Row](title, key, path, queryMap,
 		core,
 		mode,
 		validateHeader, simulation,
@@ -336,7 +336,7 @@ func QueryHandlerWithCaching[Row any, Resp []Row](
 	recoveryHandler func(any),
 	caching *CachingArgs,
 ) any {
-	return queryHandler[Row, Resp](
+	return queryHandler[Row](
 		title, key, path, queryMap,
 		core, mode, validateHeader, simulation,
 		recoveryHandler, caching,

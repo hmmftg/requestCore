@@ -348,7 +348,7 @@ func ConsumeRestJSON[Resp any](c *CallData[Resp]) (*Resp, response.ErrorState) {
 		c.Builder = DefaultBuilderfunc[Resp]
 	}
 
-	respJson, errParse := GetJSONResp[Resp](c.Api, resp, c.Builder)
+	respJson, errParse := GetJSONResp(c.Api, resp, c.Builder)
 	if errParse != nil {
 		return nil, errParse.Input(resp)
 	}

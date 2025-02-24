@@ -3,11 +3,8 @@ package handlers_test
 import (
 	"encoding/json"
 	"net/http"
-	"strconv"
-	"strings"
 	"testing"
 
-	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/gin-gonic/gin"
 	"github.com/hmmftg/requestCore"
 	"github.com/hmmftg/requestCore/handlers"
@@ -97,9 +94,6 @@ func (env *testCallRemoteEnv) SetParams(params libParams.ParamInterface) {
 	env.Params = params
 }
 
-type testCallReq struct {
-}
-
 type githubRespOrg struct {
 	Login              string `json:"login"`
 	Id                 int    `json:"id"`
@@ -122,54 +116,6 @@ func ParseGithubRespJson(respBytes []byte, desc string, status int) (int, map[st
 		return http.StatusBadRequest, map[string]string{"desc": "PWC_CICO_0004", "message": err.Error()}, resp, err
 	}
 	return http.StatusOK, nil, resp, nil
-}
-
-func (env *testCallRemoteEnv) handler(url, method string, isJSON, hasQuery bool) any {
-	return handlers.CallRemoteWithRespParser[testCallReq, []githubRespOrg](
-		"call_remote_handler", url, "api", method, hasQuery, isJSON, true,
-		true,
-		libCallApi.TransmitRequestWithAuth,
-		env.Interface,
-		ParseGithubRespJson,
-		false,
-	)
-}
-
-func TestCallRemoteHandler(t *testing.T) {
-	testCases := []testingtools.TestCase{
-		{
-			Name:         "Valid",
-			Url:          "/",
-			DesiredError: "users/hadley/orgs@GET@false@false",
-			Status:       200,
-			CheckBody:    []string{"result", "login", "ggobi"},
-			Model:        testingtools.SampleRequestModelMock(t, func(mockDB sqlmock.Sqlmock) {}),
-		},
-	}
-
-	for id := range testCases {
-		env := testingtools.GetEnvWithDB[testCallRemoteEnv](
-			testCases[id].Model.DB,
-			testingtools.TestAPIList,
-		)
-		args := strings.Split(testCases[id].DesiredError, "@")
-		if len(args) != 4 {
-			t.Fatalf("invalid test declaration for url: %s\n", args)
-		}
-		isJ, _ := strconv.ParseBool(args[2])
-		isQ, _ := strconv.ParseBool(args[3])
-
-		testingtools.TestDB(
-			t,
-			&testCases[id],
-			&testingtools.TestOptions{
-				Path:    "/",
-				Name:    "check call remote handler",
-				Method:  "GET",
-				Handler: env.handler(args[0], args[1], isJ, isQ),
-				Silent:  true,
-			})
-	}
 }
 
 type testRemoteCallReq struct {
@@ -241,11 +187,7 @@ func testConsumeHandler[Req, Resp any](
 	params *testConsumeHandlerType[Req, handlers.WsResponse[testRemoteCallResp]],
 	simulation bool,
 ) any {
-	return handlers.BaseHandler[
-		Req,
-		handlers.WsResponse[testRemoteCallResp],
-		*testConsumeHandlerType[Req, handlers.WsResponse[testRemoteCallResp]],
-	](core, params, simulation)
+	return handlers.BaseHandler(core, params, simulation)
 }
 
 func TestConsumeHandler(t *testing.T) {

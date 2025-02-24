@@ -23,8 +23,6 @@ type RemoteApiModel struct {
 
 type CallApiInterface interface {
 	GetApi(apiName string) RemoteApi
-	ConsumeRestBasicAuthApi(requestJson []byte, apiName, path, contentType, method string, headers map[string]string) ([]byte, string, error)
-	ConsumeRestApi(requestJson []byte, apiName, path, contentType, method string, headers map[string]string) ([]byte, string, int, error)
 }
 
 const defaultTimeOut = 30 * time.Second

@@ -389,7 +389,7 @@ func TestCallJSON(t *testing.T) {
 	for id := range testCases {
 		t.Run(
 			testCases[id].Name, func(t *testing.T) {
-				result, err := libCallApi.RemoteCall[any, AnimeEpisodes](&callParam)
+				result, err := libCallApi.RemoteCall(&callParam)
 				assert.DeepEqual(t, err, testCases[id].Error)
 				assert.DeepEqual(t, result, testCases[id].Result)
 			},

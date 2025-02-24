@@ -85,7 +85,7 @@ func CallApiJSON[Req any, Resp any](
 	webFramework.AddLog(w, CallApiLogEntry, slog.Any(method, param))
 
 	param.BodyType = libCallApi.JSON
-	resp, err := libCallApi.RemoteCall[Req, Resp](param)
+	resp, err := libCallApi.RemoteCall(param)
 	if err != nil {
 		webFramework.AddLog(w, CallApiLogEntry, slog.Any(fmt.Sprintf("%s-error", method), err))
 		return *new(Resp), err
@@ -103,7 +103,7 @@ func CallApiForm[Req any, Resp any](
 	webFramework.AddLog(w, CallApiLogEntry, slog.Any(method, param))
 
 	param.BodyType = libCallApi.Form
-	resp, err := libCallApi.RemoteCall[Req, Resp](param)
+	resp, err := libCallApi.RemoteCall(param)
 	if err != nil {
 		webFramework.AddLog(w, CallApiLogEntry, slog.Any(fmt.Sprintf("%s-error", method), err))
 		return *new(Resp), err

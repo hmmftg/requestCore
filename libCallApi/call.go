@@ -38,21 +38,23 @@ func (r CallParamData) LogValue() slog.Value {
 	)
 }
 
+type BuilerFunc[Resp any] func(status int, rawResp []byte, headers map[string]string) (*Resp, response.ErrorState)
+
 type RemoteCallParamData[Req, Resp any] struct {
 	HttpClient  *http.Client
-	Parameters  map[string]any                                                                           `json:"-"`
-	Headers     map[string]string                                                                        `json:"-"`
-	Api         RemoteApi                                                                                `json:"api"`
-	Timeout     time.Duration                                                                            `json:"-"`
-	Method      string                                                                                   `json:"method"`
-	Path        string                                                                                   `json:"path"`
-	Query       string                                                                                   `json:"-"`
-	QueryStack  *[]string                                                                                `json:"-"`
-	ValidateTls bool                                                                                     `json:"-"`
-	EnableLog   bool                                                                                     `json:"-"`
-	JsonBody    Req                                                                                      `json:"body"`
-	BodyType    RequestBodyType                                                                          `json:"-"`
-	Builder     func(status int, rawResp []byte, headers map[string]string) (*Resp, response.ErrorState) `json:"-"`
+	Parameters  map[string]any    `json:"-"`
+	Headers     map[string]string `json:"-"`
+	Api         RemoteApi         `json:"api"`
+	Timeout     time.Duration     `json:"-"`
+	Method      string            `json:"method"`
+	Path        string            `json:"path"`
+	Query       string            `json:"-"`
+	QueryStack  *[]string         `json:"-"`
+	ValidateTls bool              `json:"-"`
+	EnableLog   bool              `json:"-"`
+	JsonBody    Req               `json:"body"`
+	BodyType    RequestBodyType   `json:"-"`
+	Builder     BuilerFunc[Resp]  `json:"-"`
 }
 
 func (r RemoteCallParamData[Req, Resp]) LogValue() slog.Value {
@@ -97,7 +99,7 @@ func Call[RespType any](param CallParam) CallResult[RespType] {
 		Req:        param.JsonBody,
 		httpClient: param.HttpClient,
 	}
-	resp, wsResp, callResp, err := ConsumeRest[RespType](callData)
+	resp, wsResp, callResp, err := ConsumeRest(callData)
 	return CallResult[RespType]{resp, wsResp, callResp, err}
 }
 
@@ -123,5 +125,5 @@ func RemoteCall[Req, Resp any](param *RemoteCallParamData[Req, Resp]) (*Resp, re
 		Builder:    param.Builder,
 		httpClient: param.HttpClient,
 	}
-	return ConsumeRestJSON[Resp](&callData)
+	return ConsumeRestJSON(&callData)
 }

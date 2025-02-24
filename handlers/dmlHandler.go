@@ -1,27 +1,16 @@
 package handlers
 
 import (
-	"context"
 	"fmt"
 	"log/slog"
 	"net/http"
-	"net/url"
 
 	"github.com/hmmftg/requestCore"
-	"github.com/hmmftg/requestCore/libContext"
-	"github.com/hmmftg/requestCore/libError"
 	"github.com/hmmftg/requestCore/libQuery"
 	"github.com/hmmftg/requestCore/libRequest"
 	"github.com/hmmftg/requestCore/response"
 	"github.com/hmmftg/requestCore/webFramework"
 )
-
-func Dml[Req libQuery.DmlModel](
-	title, key string,
-	core requestCore.RequestCoreInterface,
-) any {
-	return DmlHandlerOld[Req](title, key, core, libRequest.JSON, true)
-}
 
 func ExecDML(request libQuery.DmlModel, key, title string, w webFramework.WebFramework, core requestCore.RequestCoreInterface) (map[string]any, response.ErrorState) {
 	errPreControl := PreControlDML(request, key, title, w, core)
@@ -109,88 +98,9 @@ func (h DmlHandlerType[Req, Resp]) Finalizer(req HandlerRequest[Req, Resp]) {
 }
 
 func DmlHandler[Req libQuery.DmlModel](
-	title, key, path string,
 	core requestCore.RequestCoreInterface,
-	mode libRequest.Type,
-	validateHeader bool,
+	handler DmlHandlerType[Req, map[string]any],
 	simulation bool,
-	recoveryHandler func(any),
 ) any {
-	return BaseHandler[Req, map[string]any, DmlHandlerType[Req, map[string]any]](core,
-		DmlHandlerType[Req, map[string]any]{
-			Mode:            mode,
-			VerifyHeader:    validateHeader,
-			Title:           title,
-			Key:             key,
-			Path:            path,
-			RecoveryHandler: recoveryHandler,
-		},
-		simulation)
-}
-
-func DmlHandlerOld[Req libQuery.DmlModel](
-	title, key string,
-	core requestCore.RequestCoreInterface,
-	mode libRequest.Type,
-	validateHeader bool,
-) any {
-	webFramework.AddServiceRegistrationLog(title)
-	return func(c context.Context) {
-		defer func() {
-			w := libContext.InitContext(c)
-			if r := recover(); r != nil {
-				core.Responder().HandleErrorState(
-					libError.Join(r.(error), "error in Dml"),
-					http.StatusInternalServerError,
-					response.SYSTEM_FAULT,
-					response.SYSTEM_FAULT_DESC,
-					w)
-				panic(r)
-			}
-		}()
-		w := libContext.InitContext(c)
-		code, desc, arrayErr, request, reqLog, err := libRequest.Req[
-			Req, libRequest.RequestHeader,
-		](w, mode, validateHeader)
-		if err != nil {
-			core.Responder().HandleErrorState(err, code, desc, arrayErr, w)
-			return
-		}
-
-		w.Parser.SetLocal("reqLog", reqLog)
-		method := title
-		reqLog.Incoming = request
-		u, _ := url.Parse(w.Parser.GetPath())
-		code, result, err := core.RequestTools().Initialize(w, method, u.Path, reqLog)
-		if err != nil {
-			core.Responder().HandleErrorState(err, code, result["desc"], result["message"], w)
-			return
-		}
-
-		errPreControl := PreControlDML(request, key, title, w, core)
-		if errPreControl != nil {
-			core.Responder().HandleErrorState(
-				libError.Join(errPreControl, "PreControl"),
-				http.StatusBadRequest,
-				errPreControl.GetDescription(),
-				errPreControl.GetMessage(),
-				w)
-			return
-		}
-
-		resp, errExec := ExecuteDML(request, key, title, w, core)
-		if errExec != nil {
-			core.Responder().HandleErrorState(
-				libError.Join(errExec, "Execute"),
-				http.StatusInternalServerError,
-				errExec.GetDescription(),
-				errExec.GetMessage(),
-				w)
-			return
-		}
-
-		core.Responder().Respond(http.StatusOK, 0, "OK", resp, false, w)
-
-		FinalizeDML(request, key, title, w, core)
-	}
+	return BaseHandler(core, handler, simulation)
 }

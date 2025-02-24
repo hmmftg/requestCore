@@ -62,12 +62,15 @@ func (env *testDMLEnv) SetParams(params libParams.ParamInterface) {
 }
 
 func (env *testDMLEnv) handler() any {
-	return DmlHandler[testDMLReq]("dml_handler", DML1, "/",
-		env.Interface,
-		libRequest.JSON,
-		true,
-		false,
-		nil,
+	return DmlHandler(env.Interface,
+		DmlHandlerType[testDMLReq, map[string]any]{
+			"dml_handler",
+			"/",
+			libRequest.JSON,
+			true,
+			DML1,
+			nil,
+		}, false,
 	)
 }
 

@@ -79,7 +79,7 @@ func TestBaseHandler(t *testing.T) {
 		testingtools.DefaultAPIList,
 	)
 
-	handler := BaseHandler[testReq, testResp, testHandlerType[testReq, testResp]](
+	handler := BaseHandler(
 		env.Interface,
 		testHandlerType[testReq, testResp]{
 			Title:        "test",
