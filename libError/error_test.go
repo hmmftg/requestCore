@@ -100,7 +100,7 @@ func TestErrorSlogJson(t *testing.T) {
 		rLog := logger.With(slog.String("name", tst.Name), slog.Int("depth", tst.Depth))
 		err := fakeErrorCaller(tst.Name, tst.Depth, tst.Error, tst.Child)
 		result := err.Error()
-		rLog.LogAttrs(context.Background(), slog.LevelError, "result", err.SLog())
+		rLog.Log(context.Background(), slog.LevelError, "result", slog.Any("error", err))
 		if !strings.Contains(result, tst.DesiredSrc) {
 			t.Fatal(result, " does not contain ", tst.DesiredSrc)
 		}
@@ -118,7 +118,7 @@ func TestErrorSlogText(t *testing.T) {
 		rLog := logger.With(slog.String("name", tst.Name), slog.Int("depth", tst.Depth))
 		err := fakeErrorCaller(tst.Name, tst.Depth, tst.Error, tst.Child)
 		result := err.Error()
-		rLog.LogAttrs(context.Background(), slog.LevelError, "result", err.SLog())
+		rLog.Log(context.Background(), slog.LevelError, "result", slog.Any("error", err))
 		if !strings.Contains(result, tst.DesiredSrc) {
 			t.Fatal(result, " does not contain ", tst.DesiredSrc)
 		}

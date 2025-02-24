@@ -10,5 +10,5 @@ type Error interface {
 	Action() Action
 	Src() *Source
 	Format(*strings.Builder)
-	SLog() slog.Attr
+	LogValue() slog.Value
 }

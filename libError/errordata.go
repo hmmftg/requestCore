@@ -10,7 +10,7 @@ type ErrorData struct {
 	Time       time.Time
 	ActionData Action  `json:"action"`
 	Source     *Source `json:"source,omitempty"`
-	Child      Error   `json:"children"`
+	Child      Error   `json:"child"`
 }
 
 func (e ErrorData) Action() Action { return e.ActionData }
@@ -26,16 +26,20 @@ func (e ErrorData) Format(stack *strings.Builder) {
 	}
 }
 
-func (e ErrorData) SLog() slog.Attr {
-	attrs := []any{
-		slog.Time("time", e.Time),
-		e.ActionData.SLog(),
-	}
+// LogValue implements slog.LogValuer and returns a grouped value
+// with fields redacted. See https://pkg.go.dev/log/slog#LogValuer
+func (e ErrorData) LogValue() slog.Value {
+	var src slog.Attr
 	if e.Source != nil {
-		attrs = append(attrs, e.Source.SLog())
+		src = slog.Any("source", e.Source)
+	} else {
+		src = slog.Attr{}
 	}
-	if e.Child != nil {
-		attrs = append(attrs, slog.Group("child", e.Child.SLog()))
-	}
-	return slog.Group("error", attrs...)
+	return slog.GroupValue(
+		slog.Time("time", e.Time),
+		slog.String("desc", e.ActionData.Description),
+		slog.Any("action", e.ActionData),
+		src,
+		slog.Any("child", e.Child),
+	)
 }
