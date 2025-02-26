@@ -32,10 +32,19 @@ func Add(err Error, status status.StatusCode, desc string, message any) Error {
 }
 
 // creates new error object
-func New(status status.StatusCode, desc string, format string, a ...any) Error {
+func NewWithDescription(status status.StatusCode, desc string, format string, a ...any) Error {
 	return ErrorData{
 		Time:       time.Now(),
 		ActionData: action(status, desc, fmt.Sprintf(format, a...)),
+		Source:     getStack(),
+	}
+}
+
+// creates new error object
+func New(status status.StatusCode, desc string, msg any) Error {
+	return ErrorData{
+		Time:       time.Now(),
+		ActionData: action(status, desc, msg),
 		Source:     getStack(),
 	}
 }

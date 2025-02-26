@@ -46,12 +46,12 @@ func TestGinReq(t *testing.T) {
 		c.Request.Header.Add("User-Id", v.Header.GetUser())
 		w := libContext.InitContext(&c)
 
-		code, desc, arrErr, req, reqLog, err := Req[SampleBody, RequestHeader](w, JSON, true)
+		result, err := Req[SampleBody, RequestHeader](ParseParams{W: w, Mode: JSON, ValidateHeader: true})
 		if err != nil {
-			t.Fatal(code, desc, arrErr, req, reqLog, err)
+			t.Fatal(err.Error())
 		}
 
-		b, errJSON := json.Marshal(req)
+		b, errJSON := json.Marshal(result.Request)
 		if errJSON != nil {
 			t.Fatal(errJSON)
 		}
@@ -93,12 +93,12 @@ func TestFiberReq(t *testing.T) {
 		c.Request().Header.Add("Request-Id", v.Header.GetId())
 		w := libContext.InitContext(c)
 
-		code, desc, arrErr, req, reqLog, err := Req[SampleBody, RequestHeader](w, JSON, true)
+		result, err := Req[SampleBody, RequestHeader](ParseParams{W: w, Mode: JSON, ValidateHeader: true})
 		if err != nil {
-			t.Fatal(code, desc, arrErr, req, reqLog, err)
+			t.Fatal(err)
 		}
 
-		b, errJSON := json.Marshal(req)
+		b, errJSON := json.Marshal(result.Request)
 		if errJSON != nil {
 			t.Fatal(errJSON)
 		}

@@ -3,6 +3,7 @@ package libQuery
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"log/slog"
 
 	"github.com/hmmftg/requestCore/libError"
@@ -32,17 +33,18 @@ func (m QueryRunnerModel) Dml(ctx context.Context, moduleName, methodName, comma
 		return nil, libError.Join(err, "error in Dml->BeginTrx()")
 	}
 
-	defer tx.Rollback()
-
 	err = m.SetModifVariables(ctx, moduleName, methodName, tx)
 	if err != nil {
 		return nil, err
 	}
 
-	//result, err := tx.ExecContext(ctx, command, args...)
 	preparedArgs := PrepareArgs(args)
 	result, err := tx.ExecContext(ctx, command, preparedArgs...)
 	if err != nil {
+		errRB := tx.Rollback()
+		if errRB != nil {
+			err = errors.Join(errRB, err)
+		}
 		return nil, libError.Join(err, "error in Dml->Exec(%s,%s)=>%v", command, args, result)
 	}
 	err = tx.Commit()

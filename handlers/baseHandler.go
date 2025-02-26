@@ -4,12 +4,10 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
-	"net/http"
 	"time"
 
 	"github.com/hmmftg/requestCore"
 	"github.com/hmmftg/requestCore/libContext"
-	"github.com/hmmftg/requestCore/libError"
 	"github.com/hmmftg/requestCore/libRequest"
 	"github.com/hmmftg/requestCore/response"
 	"github.com/hmmftg/requestCore/webFramework"
@@ -36,13 +34,13 @@ type HandlerInterface[Req any, Resp any] interface {
 	//   and url path of handler
 	Parameters() HandlerParameters
 	// runs after validating request
-	Initializer(req HandlerRequest[Req, Resp]) response.ErrorState
+	Initializer(req HandlerRequest[Req, Resp]) error
 	// main handler runs after initialize
-	Handler(req HandlerRequest[Req, Resp]) (Resp, response.ErrorState)
+	Handler(req HandlerRequest[Req, Resp]) (Resp, error)
 	// runs after sending back response
 	Finalizer(req HandlerRequest[Req, Resp])
 	// handles simulation mode
-	Simulation(req HandlerRequest[Req, Resp]) (Resp, response.ErrorState)
+	Simulation(req HandlerRequest[Req, Resp]) (Resp, error)
 }
 
 type HandlerRequest[Req any, Resp any] struct {
@@ -54,7 +52,7 @@ type HandlerRequest[Req any, Resp any] struct {
 	W        webFramework.WebFramework
 	Args     []any
 	RespSent bool
-	Builder  func(status int, rawResp []byte, headers map[string]string) (*Resp, response.ErrorState)
+	Builder  func(status int, rawResp []byte, headers map[string]string) (*Resp, error)
 }
 
 func BaseHandler[Req any, Resp any, Handler HandlerInterface[Req, Resp]](
@@ -83,45 +81,7 @@ func BaseHandler[Req any, Resp any, Handler HandlerInterface[Req, Resp]](
 			W:     w,
 		}
 
-		defer func() {
-			elapsed := time.Since(start)
-			webFramework.AddLogTag(w, webFramework.HandlerLogTag, slog.String("elapsed", elapsed.String()))
-			handler.Finalizer(trx)
-			webFramework.CollectLogTags(w, webFramework.HandlerLogTag)
-			webFramework.CollectLogArrays(w, webFramework.HandlerLogTag)
-			webFramework.CollectLogArrays(w, CallApiLogEntry)
-			for id := range params.LogTags {
-				webFramework.CollectLogTags(w, params.LogTags[id])
-			}
-			for id := range params.LogArrays {
-				webFramework.CollectLogArrays(w, params.LogArrays[id])
-			}
-			if r := recover(); r != nil {
-				if params.RecoveryHandler != nil {
-					params.RecoveryHandler(r)
-				} else {
-					switch data := r.(type) {
-					case error:
-						core.Responder().Error(w,
-							response.Error(
-								http.StatusInternalServerError,
-								response.SYSTEM_FAULT,
-								response.SYSTEM_FAULT_DESC,
-								libError.Join(data, "error in %s", params.Title),
-							))
-					default:
-						core.Responder().Error(w,
-							response.Error(
-								http.StatusInternalServerError,
-								response.SYSTEM_FAULT,
-								response.SYSTEM_FAULT_DESC,
-								fmt.Errorf("error in %s=> %+v", params.Title, data),
-							))
-					}
-				}
-				panic(r)
-			}
-		}()
+		defer Recovery(start, w, handler, params, trx, core)
 
 		if simulation {
 			resp, header, errParse := libRequest.ParseRequest[Resp](
@@ -137,7 +97,7 @@ func BaseHandler[Req any, Resp any, Handler HandlerInterface[Req, Resp]](
 			trx.Response = *resp
 			trx.Header = header
 
-			var err response.ErrorState
+			var err error
 			trx.Response, err = handler.Simulation(trx)
 			if err != nil {
 				core.Responder().Error(trx.W, err)
@@ -147,7 +107,7 @@ func BaseHandler[Req any, Resp any, Handler HandlerInterface[Req, Resp]](
 			core.Responder().OK(trx.W, trx.Response)
 		}
 
-		var errParse response.ErrorState
+		var errParse error
 		trx.Request, trx.Header, errParse = libRequest.ParseRequest[Req](
 			trx.W,
 			params.Body,
@@ -175,7 +135,7 @@ func BaseHandler[Req any, Resp any, Handler HandlerInterface[Req, Resp]](
 			return
 		}
 
-		var err response.ErrorState
+		var err error
 		trx.Response, err = handler.Handler(trx)
 		webFramework.AddLog(w, webFramework.HandlerLogTag, slog.Any("main-handler", err))
 		if err != nil {

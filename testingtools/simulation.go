@@ -2,7 +2,6 @@ package testingtools
 
 import (
 	"context"
-	"net/http"
 
 	"github.com/gin-gonic/gin"
 	"github.com/hmmftg/requestCore"
@@ -12,12 +11,12 @@ import (
 
 func InitSimulationHandler[Req any](c context.Context, core requestCore.RequestCoreInterface) (*Req, error) {
 	w := libContext.InitContext(c)
-	code, desc, arrayErr, request, _, err := libRequest.GetRequest[Req](w, false)
+	result, err := libRequest.Req[Req, libRequest.RequestHeader](libRequest.ParseParams{W: w, ValidateHeader: false})
 	if err != nil {
-		core.Responder().HandleErrorState(err, code, desc, arrayErr, w)
+		core.Responder().Error(w, err)
 		return nil, err
 	}
-	return &request, nil
+	return &result.Request, nil
 }
 
 func GetSingleSimulationHandler[Req any](core requestCore.RequestCoreInterface) gin.HandlerFunc {
@@ -27,7 +26,7 @@ func GetSingleSimulationHandler[Req any](core requestCore.RequestCoreInterface) 
 		if err != nil {
 			return
 		}
-		core.Responder().Respond(http.StatusOK, 0, "OK", request, false, w)
+		core.Responder().OK(w, request)
 	}
 }
 
@@ -38,6 +37,6 @@ func GetAllSimulationHandler[Req any](core requestCore.RequestCoreInterface) gin
 		if err != nil {
 			return
 		}
-		core.Responder().Respond(http.StatusOK, 0, "OK", []Req{*request}, false, w)
+		core.Responder().OK(w, []Req{*request})
 	}
 }

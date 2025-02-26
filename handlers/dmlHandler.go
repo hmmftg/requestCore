@@ -1,18 +1,21 @@
 package handlers
 
 import (
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
 
 	"github.com/hmmftg/requestCore"
+	"github.com/hmmftg/requestCore/libError"
 	"github.com/hmmftg/requestCore/libQuery"
 	"github.com/hmmftg/requestCore/libRequest"
 	"github.com/hmmftg/requestCore/response"
+	"github.com/hmmftg/requestCore/status"
 	"github.com/hmmftg/requestCore/webFramework"
 )
 
-func ExecDML(request libQuery.DmlModel, key, title string, w webFramework.WebFramework, core requestCore.RequestCoreInterface) (map[string]any, response.ErrorState) {
+func ExecDML(request libQuery.DmlModel, key, title string, w webFramework.WebFramework, core requestCore.RequestCoreInterface) (map[string]any, error) {
 	errPreControl := PreControlDML(request, key, title, w, core)
 	if errPreControl != nil {
 		return nil, errPreControl
@@ -26,30 +29,31 @@ func ExecDML(request libQuery.DmlModel, key, title string, w webFramework.WebFra
 	return resp, nil
 }
 
-func PreControlDML(request libQuery.DmlModel, key, title string, w webFramework.WebFramework, core requestCore.RequestCoreInterface) response.ErrorState {
+func PreControlDML(request libQuery.DmlModel, key, title string, w webFramework.WebFramework, core requestCore.RequestCoreInterface) error {
 	preControl := request.PreControlCommands()
 	for _, command := range preControl[key] {
 		title := fmt.Sprintf("PreControl: %s", command.Name)
-		core.RequestTools().LogStart(w, title, "Execute")
 		_, errPreControl := command.ExecuteWithContext(
 			w.Parser, w.Ctx, title, fmt.Sprintf("%s.%s", "preControl", command.Name), core.GetDB())
 		if errPreControl != nil {
-			return response.Errors(http.StatusInternalServerError, errPreControl.GetDescription(), title, errPreControl)
+			if ok, errPreControl := response.Unwrap(errPreControl); ok {
+				return response.Errors(http.StatusInternalServerError, errPreControl.GetDescription(), title, errPreControl)
+			}
+			return response.ToError(errPreControl.Error(), title, errPreControl)
 		}
 	}
 	return nil
 }
 
-func ExecuteDML(request libQuery.DmlModel, key, title string, w webFramework.WebFramework, core requestCore.RequestCoreInterface) (map[string]any, response.ErrorState) {
+func ExecuteDML(request libQuery.DmlModel, key, title string, w webFramework.WebFramework, core requestCore.RequestCoreInterface) (map[string]any, error) {
 	dml := request.DmlCommands()
 	resp := map[string]any{}
 	for _, command := range dml[key] {
 		title := fmt.Sprintf("Insert: %s", command.Name)
-		core.RequestTools().LogStart(w, title, "Execute")
-		result, errInsert := command.ExecuteWithContext(
+		result, err := command.ExecuteWithContext(
 			w.Parser, w.Ctx, title, fmt.Sprintf("%s.%s", "dml", command.Name), core.GetDB())
-		if errInsert != nil {
-			return nil, response.Errors(http.StatusInternalServerError, errInsert.GetDescription(), title, errInsert)
+		if err != nil {
+			return nil, errors.Join(err, libError.NewWithDescription(status.InternalServerError, "ERROR_IN_EXECUTE_DML", "unable to execute dml command %s", title))
 		}
 		resp[command.Name] = result
 	}
@@ -81,14 +85,14 @@ type DmlHandlerType[Req libQuery.DmlModel, Resp map[string]any] struct {
 func (h DmlHandlerType[Req, Resp]) Parameters() HandlerParameters {
 	return HandlerParameters{h.Title, h.Mode, h.VerifyHeader, true, h.Path, false, h.RecoveryHandler, false, nil, nil}
 }
-func (h DmlHandlerType[Req, Resp]) Initializer(req HandlerRequest[Req, Resp]) response.ErrorState {
+func (h DmlHandlerType[Req, Resp]) Initializer(req HandlerRequest[Req, Resp]) error {
 	return PreControlDML(*req.Request, h.Key, req.Title, req.W, req.Core)
 }
-func (h DmlHandlerType[Req, Resp]) Handler(req HandlerRequest[Req, Resp]) (Resp, response.ErrorState) {
+func (h DmlHandlerType[Req, Resp]) Handler(req HandlerRequest[Req, Resp]) (Resp, error) {
 	resp, err := ExecuteDML(*req.Request, h.Key, req.Title, req.W, req.Core)
 	return resp, err
 }
-func (h DmlHandlerType[Req, Resp]) Simulation(req HandlerRequest[Req, Resp]) (Resp, response.ErrorState) {
+func (h DmlHandlerType[Req, Resp]) Simulation(req HandlerRequest[Req, Resp]) (Resp, error) {
 	return req.Response, nil
 }
 func (h DmlHandlerType[Req, Resp]) Finalizer(req HandlerRequest[Req, Resp]) {

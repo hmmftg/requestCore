@@ -1,16 +1,14 @@
 package libCrypto
 
-import "github.com/hmmftg/requestCore/response"
-
 type Sm interface {
 	SetKey(id, value string)
 	GetKey(id string) string
-	Cvv(pan, exp, cvvType string) (string, response.ErrorState)
-	Pvv(pan, pinBlock string) (string, response.ErrorState)
-	Offset(pan, pinBlock string) (string, response.ErrorState)
-	Mac(data string) (string, response.ErrorState)
-	Translate(pan, pinBlock, tpk2nd string) (string, response.ErrorState)
-	Crypt(data, mode string) (string, response.ErrorState)
+	Cvv(pan, exp, cvvType string) (string, error)
+	Pvv(pan, pinBlock string) (string, error)
+	Offset(pan, pinBlock string) (string, error)
+	Mac(data string) (string, error)
+	Translate(pan, pinBlock, tpk2nd string) (string, error)
+	Crypt(data, mode string) (string, error)
 }
 
 const (

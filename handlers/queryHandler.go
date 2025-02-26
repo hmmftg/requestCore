@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"errors"
 	"fmt"
 	"log"
 	"net/http"
@@ -10,9 +11,11 @@ import (
 	"time"
 
 	"github.com/hmmftg/requestCore"
+	"github.com/hmmftg/requestCore/libError"
 	"github.com/hmmftg/requestCore/libQuery"
 	"github.com/hmmftg/requestCore/libRequest"
 	"github.com/hmmftg/requestCore/response"
+	"github.com/hmmftg/requestCore/status"
 )
 
 type QueryResp[Resp any] struct {
@@ -21,21 +24,21 @@ type QueryResp[Resp any] struct {
 }
 
 type RowTranslator[Row, Resp any] interface {
-	Translate([]Row, HandlerRequest[Row, Resp]) (QueryResp[Resp], response.ErrorState)
-	TranslateWithPaginate([]Row, HandlerRequest[Row, Resp], libRequest.PaginationData) (QueryResp[Resp], response.ErrorState)
+	Translate([]Row, HandlerRequest[Row, Resp]) (QueryResp[Resp], error)
+	TranslateWithPaginate([]Row, HandlerRequest[Row, Resp], libRequest.PaginationData) (QueryResp[Resp], error)
 }
 
 type QuerySingleTransformer[Row any, Resp []Row] struct {
 }
 
-func (s QuerySingleTransformer[Row, Resp]) Translate(rows []Row, req HandlerRequest[Row, Resp]) (QueryResp[Resp], response.ErrorState) {
+func (s QuerySingleTransformer[Row, Resp]) Translate(rows []Row, req HandlerRequest[Row, Resp]) (QueryResp[Resp], error) {
 	return QueryResp[Resp]{
 		TotalRows: 1,
 		Resp:      Resp{rows[0]},
 	}, nil
 }
 
-func (s QuerySingleTransformer[Row, Resp]) TranslateWithPaginate(rows []Row, req HandlerRequest[Row, Resp], pd libRequest.PaginationData) (QueryResp[Resp], response.ErrorState) {
+func (s QuerySingleTransformer[Row, Resp]) TranslateWithPaginate(rows []Row, req HandlerRequest[Row, Resp], pd libRequest.PaginationData) (QueryResp[Resp], error) {
 	return QueryResp[Resp]{
 		TotalRows: 1,
 		Resp:      Resp{rows[0]},
@@ -45,14 +48,14 @@ func (s QuerySingleTransformer[Row, Resp]) TranslateWithPaginate(rows []Row, req
 type QueryAllTransformer[Row any, Resp []Row] struct {
 }
 
-func (s QueryAllTransformer[Row, Resp]) Translate(rows []Row, req HandlerRequest[Row, Resp]) (QueryResp[Resp], response.ErrorState) {
+func (s QueryAllTransformer[Row, Resp]) Translate(rows []Row, req HandlerRequest[Row, Resp]) (QueryResp[Resp], error) {
 	return QueryResp[Resp]{
 		TotalRows: len(rows),
 		Resp:      rows,
 	}, nil
 }
 
-func (s QueryAllTransformer[Row, Resp]) TranslateWithPaginate(rows []Row, req HandlerRequest[Row, Resp], pd libRequest.PaginationData) (QueryResp[Resp], response.ErrorState) {
+func (s QueryAllTransformer[Row, Resp]) TranslateWithPaginate(rows []Row, req HandlerRequest[Row, Resp], pd libRequest.PaginationData) (QueryResp[Resp], error) {
 	return QueryResp[Resp]{
 		TotalRows: len(rows),
 		Resp:      rows,
@@ -156,7 +159,7 @@ func (q QueryHandlerType[Row, Resp]) Parameters() HandlerParameters {
 	return HandlerParameters{q.Title, q.Mode, q.VerifyHeader, false, q.Path, false, q.RecoveryHandler, false, nil, nil}
 }
 
-func (q QueryHandlerType[Row, Resp]) Initializer(req HandlerRequest[Row, Resp]) response.ErrorState {
+func (q QueryHandlerType[Row, Resp]) Initializer(req HandlerRequest[Row, Resp]) error {
 	return nil
 }
 
@@ -181,21 +184,21 @@ func (q QueryHandlerType[Row, Resp]) CacheResult(args []any, rows []Row) {
 	q.CacheTime = time.Now()
 }
 
-func (q QueryHandlerType[Row, Resp]) Handler(req HandlerRequest[Row, Resp]) (Resp, response.ErrorState) {
+func (q QueryHandlerType[Row, Resp]) Handler(req HandlerRequest[Row, Resp]) (Resp, error) {
 	anyArgs := []any{}
 	for id := range q.Command.Args {
 		_, val, err := libQuery.GetFormTagValue(q.Command.Args[id], req.Request)
 		if err != nil {
-			return req.Response, response.Error(
-				http.StatusInternalServerError,
+			return req.Response, errors.Join(err, libError.NewWithDescription(
+				status.InternalServerError,
 				"COMMAND_ARGUMENT_ERROR",
-				q.Command,
-				err)
+				"command argument eror: %s", q.Command,
+			))
 		}
 		anyArgs = append(anyArgs, *val)
 	}
 	var rows []Row
-	var err response.ErrorState
+	var err error
 	if q.Cache {
 		rows = q.CheckCache(anyArgs)
 	}
@@ -214,9 +217,11 @@ func (q QueryHandlerType[Row, Resp]) Handler(req HandlerRequest[Row, Resp]) (Res
 			req.Core.GetDB(),
 			anyArgs...)
 		if err != nil {
-			if q.OnEmpty200 && err.GetStatus() == http.StatusBadRequest &&
-				err.GetDescription() == libQuery.NO_DATA_FOUND {
-				rows = []Row{}
+			if ok, errData := response.Unwrap(err); ok {
+				if q.OnEmpty200 && errData.GetStatus() == http.StatusBadRequest &&
+					errData.GetDescription() == libQuery.NO_DATA_FOUND {
+					rows = []Row{}
+				}
 			} else {
 				return req.Response, err
 			}
@@ -247,7 +252,7 @@ func (q QueryHandlerType[Row, Resp]) Handler(req HandlerRequest[Row, Resp]) (Res
 
 }
 
-func (q QueryHandlerType[Req, Resp]) Simulation(req HandlerRequest[Req, Resp]) (Resp, response.ErrorState) {
+func (q QueryHandlerType[Req, Resp]) Simulation(req HandlerRequest[Req, Resp]) (Resp, error) {
 	return req.Response, nil
 }
 

@@ -9,7 +9,6 @@ import (
 	"github.com/hmmftg/requestCore/libParams"
 	"github.com/hmmftg/requestCore/libQuery"
 	"github.com/hmmftg/requestCore/libRequest"
-	"github.com/hmmftg/requestCore/response"
 	"github.com/hmmftg/requestCore/testingtools"
 )
 
@@ -224,7 +223,7 @@ type testQueryResp struct {
 type testTransformer[Row testQueryReq, Resp []testQueryResp] struct {
 }
 
-func (s testTransformer[Row, Resp]) Translate(rows []testQueryReq, req HandlerRequest[Row, Resp]) (QueryResp[Resp], response.ErrorState) {
+func (s testTransformer[Row, Resp]) Translate(rows []testQueryReq, req HandlerRequest[Row, Resp]) (QueryResp[Resp], error) {
 	result := make([]testQueryResp, len(rows))
 	for id := range rows {
 		result[id] = testQueryResp{
@@ -237,7 +236,7 @@ func (s testTransformer[Row, Resp]) Translate(rows []testQueryReq, req HandlerRe
 	return QueryResp[Resp]{Resp: result, TotalRows: len(result)}, nil
 }
 
-func (s testTransformer[Row, Resp]) TranslateWithPaginate(rows []testQueryReq, req HandlerRequest[Row, Resp], pd libRequest.PaginationData) (QueryResp[Resp], response.ErrorState) {
+func (s testTransformer[Row, Resp]) TranslateWithPaginate(rows []testQueryReq, req HandlerRequest[Row, Resp], pd libRequest.PaginationData) (QueryResp[Resp], error) {
 	result := make([]testQueryResp, len(rows))
 	for id := range rows {
 		result[id] = testQueryResp{

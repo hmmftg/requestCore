@@ -1,12 +1,14 @@
 package handlers
 
 import (
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
 
 	"github.com/hmmftg/requestCore"
 	"github.com/hmmftg/requestCore/libCallApi"
+	"github.com/hmmftg/requestCore/libError"
 	"github.com/hmmftg/requestCore/response"
 	"github.com/hmmftg/requestCore/webFramework"
 )
@@ -36,14 +38,22 @@ func CallApiInternal[Resp any](
 	w webFramework.WebFramework,
 	core requestCore.RequestCoreInterface,
 	method string,
-	param libCallApi.CallParam) (*Resp, response.ErrorState) {
+	param libCallApi.CallParam) (*Resp, error) {
 	webFramework.AddLog(w, CallApiLogEntry, slog.Any(method, param))
 
 	resp1 := libCallApi.Call[Resp](param)
 
 	if resp1.Error != nil {
 		webFramework.AddLog(w, CallApiLogEntry, slog.Any(fmt.Sprintf("%s-error", method), resp1.Error))
-		return nil, response.Errors(http.StatusInternalServerError, "REMOTE_CALL_ERROR", param, resp1.Error)
+		if ok, err := response.Unwrap(resp1.Error); ok {
+			return nil, response.Errors(http.StatusInternalServerError, "REMOTE_CALL_ERROR", param, err)
+		}
+		return nil, errors.Join(resp1.Error,
+			libError.New(
+				http.StatusInternalServerError,
+				"REMOTE_CALL_ERROR",
+				param,
+			))
 	}
 	webFramework.AddLog(w, CallApiLogEntry, slog.Any(fmt.Sprintf("%s-resp", method), resp1))
 	if resp1.Status.Status != http.StatusOK {
@@ -56,7 +66,7 @@ func CallApi[Resp any](
 	w webFramework.WebFramework,
 	core requestCore.RequestCoreInterface,
 	method string,
-	param libCallApi.CallParam) (*Resp, response.ErrorState) {
+	param libCallApi.CallParam) (*Resp, error) {
 	result, err := CallApiInternal[WsResponse[Resp]](w, core, method, param)
 	if result == nil {
 		return nil, err
@@ -68,7 +78,7 @@ func CallApiWithReceipt[Resp any](
 	w webFramework.WebFramework,
 	core requestCore.RequestCoreInterface,
 	method string,
-	param libCallApi.CallParam) (*Resp, *response.Receipt, response.ErrorState) {
+	param libCallApi.CallParam) (*Resp, *response.Receipt, error) {
 	result, err := CallApiInternal[WsResponse[Resp]](w, core, method, param)
 	if result == nil {
 		return nil, nil, err
@@ -81,7 +91,7 @@ func CallApiJSON[Req any, Resp any](
 	core requestCore.RequestCoreInterface,
 	method string,
 	param *libCallApi.RemoteCallParamData[Req, Resp],
-) (Resp, response.ErrorState) {
+) (Resp, error) {
 	webFramework.AddLog(w, CallApiLogEntry, slog.Any(method, param))
 
 	param.BodyType = libCallApi.JSON
@@ -99,7 +109,7 @@ func CallApiForm[Req any, Resp any](
 	core requestCore.RequestCoreInterface,
 	method string,
 	param *libCallApi.RemoteCallParamData[Req, Resp],
-) (Resp, response.ErrorState) {
+) (Resp, error) {
 	webFramework.AddLog(w, CallApiLogEntry, slog.Any(method, param))
 
 	param.BodyType = libCallApi.Form
@@ -117,7 +127,14 @@ func callApiNoLog[Resp any](
 	resp1 := libCallApi.Call[Resp](param)
 
 	if resp1.Error != nil {
-		return nil, response.Errors(http.StatusInternalServerError, "REMOTE_CALL_ERROR", param, resp1.Error)
+		if ok, err := response.Unwrap(resp1.Error); ok {
+			return nil, response.Errors(http.StatusInternalServerError, "REMOTE_CALL_ERROR", param, err)
+		}
+		return nil, errors.Join(resp1.Error,
+			libError.New(
+				http.StatusInternalServerError, "REMOTE_CALL_ERROR",
+				param,
+			))
 	}
 	if resp1.Status.Status != http.StatusOK {
 		return nil, resp1.WsResp.ToErrorState().Input(param).SetStatus(resp1.Status.Status)

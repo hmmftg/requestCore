@@ -20,16 +20,10 @@ type RecordData interface {
 type HeaderInterface interface {
 	GetId() string
 	GetUser() string
-	GetBranch() string
-	GetBank() string
-	GetPerson() string
 	GetProgram() string
 	GetModule() string
 	GetMethod() string
 	SetUser(string)
-	SetBranch(string)
-	SetBank(string)
-	SetPerson(string)
 	SetProgram(string)
 	SetModule(string)
 	SetMethod(string)

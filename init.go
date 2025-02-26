@@ -1,6 +1,7 @@
 package requestCore
 
 import (
+	"errors"
 	"log"
 	"reflect"
 	"regexp"
@@ -12,7 +13,7 @@ import (
 	fa_translations "github.com/go-playground/validator/v10/translations/fa"
 	"github.com/hmmftg/requestCore/libError"
 	"github.com/hmmftg/requestCore/libRequest"
-	"github.com/hmmftg/requestCore/response"
+	"github.com/hmmftg/requestCore/status"
 	"github.com/hmmftg/requestCore/webFramework"
 )
 
@@ -79,11 +80,16 @@ func Init() (ut.Translator, *validator.Validate, error) {
 	return trans, Validate, nil
 }
 
-func InitReqLog(w webFramework.WebFramework, reqLog libRequest.RequestPtr, core RequestCoreInterface, method, path string) response.ErrorState {
+func InitReqLog(w webFramework.WebFramework, reqLog libRequest.RequestPtr, core RequestCoreInterface, method, path string) error {
 	w.Parser.SetLocal("reqLog", reqLog)
-	status, result, err := core.RequestTools().Initialize(w, method, path, reqLog)
+	stat, result, err := core.RequestTools().Initialize(w, method, path, reqLog)
 	if err != nil {
-		return response.Error(status, result["desc"], result["message"], err)
+		return errors.Join(err,
+			libError.New(
+				status.StatusCode(stat),
+				result["desc"],
+				result["message"],
+			))
 	}
 	return nil
 }

@@ -4,8 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"database/sql/driver"
-
-	"github.com/hmmftg/requestCore/response"
 )
 
 type QueryRunnerModel struct {
@@ -50,8 +48,6 @@ func Init(
 
 type QueryRunnerInterface interface {
 	NewStatement(command string) (*sql.Stmt, error)
-	QueryRunner(querySql string, args ...any) (int, []map[string]any, error)
-	QueryToStruct(querySql string, target any, args ...any) (int, any, error)
 	CallDbFunction(callString string, args ...any) (int, string, error)
 	GetModule() (string, string)
 	InsertRow(insert string, args ...any) (sql.Result, error)
@@ -83,7 +79,7 @@ type DmlCommand struct {
 	Command     string
 	Args        []any
 	Type        DmlCommandType
-	CustomError response.ErrorState
+	CustomError error
 }
 
 //go:generate enumer -type=QueryCommandType -json -output queryEnum.go

@@ -67,7 +67,7 @@ func TestOldQueryRunner(t *testing.T) {
 	},
 	}
 	for _, testCase := range testCases {
-		_, _, _, result, err := libQuery.CallSql[sampleOutput](testCase.Command, testCase.Model)
+		result, err := libQuery.GetQuery[sampleOutput](testCase.Command, testCase.Model)
 		if err != nil && testCase.Error == "" {
 			t.Fatal("unwanted error", err)
 		}

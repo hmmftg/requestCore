@@ -1,6 +1,7 @@
 package libRequest
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 	"time"
@@ -8,15 +9,21 @@ import (
 	"github.com/hmmftg/requestCore/libError"
 	"github.com/hmmftg/requestCore/libValidate"
 	"github.com/hmmftg/requestCore/response"
+	"github.com/hmmftg/requestCore/status"
 	"github.com/hmmftg/requestCore/webFramework"
 )
 
-func GetRequest[Q any](ctx webFramework.WebFramework, isJson bool) (int, string, []response.ErrorResponse, Q, RequestPtr, error) {
-	validateHeader := ctx.Parser.GetMethod() != "GET"
-	if isJson {
-		return Req[Q, RequestHeader](ctx, JSON, validateHeader)
+func GetRequest[Q any](w webFramework.WebFramework, isJson bool) (*ParseResult[Q], error) {
+	params := ParseParams{
+		W:              w,
+		ValidateHeader: w.Parser.GetMethod() != "GET",
 	}
-	return Req[Q, RequestHeader](ctx, Query, validateHeader)
+	if isJson {
+		params.Mode = JSON
+	} else {
+		params.Mode = Query
+	}
+	return Req[Q, RequestHeader](params)
 }
 
 //go:generate enumer -type=Type -json -output requestTypeEnum.go
@@ -43,115 +50,120 @@ type PaginationData struct {
 	Order   string `form:"_order" query:"_order" validate:"omitempty,oneof=asc desc"`
 }
 
-func parseRequest[Req any](w webFramework.WebFramework, mode Type, validateHeader bool, header webFramework.HeaderInterface, name string) (*Req, RequestPtr, response.ErrorState, []response.ErrorResponse) {
+const ErrorInGetRequest = "ERROR_IN_GET_REQUEST_%s"
+
+type ParseParams struct {
+	W              webFramework.WebFramework
+	Mode           Type
+	ValidateHeader bool
+	Header         webFramework.HeaderInterface
+	Name           string
+	StoreTags      []string
+	StoreHeaders   []string
+}
+
+func parseRequest[Req any](params ParseParams) (*ParseResult[Req], error) {
 	libValidate.Init()
 	var err error
 	var request Req
 
 	//Check Input
-	desc := "ERROR_IN_GET_REQUEST_"
-	switch mode {
+	var desc string
+	switch params.Mode {
 	case JSON:
-		err = w.Parser.GetBody(&request)
+		err = params.W.Parser.GetBody(&request)
 		if err != nil {
-			err = libError.Join(err, "%s[GetBody](fails)", name)
-			desc += "BODY"
+			desc = fmt.Sprintf(ErrorInGetRequest, "BODY")
+			err = libError.NewWithDescription(status.BadRequest, desc, "%s[GetBody](fails)", params.Name)
 		}
 	case JSONWithURI:
-		err = w.Parser.GetBody(&request)
+		err = params.W.Parser.GetBody(&request)
 		if err != nil {
-			err = libError.Join(err, "%s[GetBody](fails)", name)
-			desc += "BODY"
+			desc = fmt.Sprintf(ErrorInGetRequest, "BODY")
+			err = libError.NewWithDescription(status.BadRequest, desc, "%s[GetBody](fails)", params.Name)
 		}
-		errUri := w.Parser.GetUri(&request)
+		errUri := params.W.Parser.GetUri(&request)
 		if errUri != nil {
-			err = libError.Append(err, errUri, "%s[GetUri](fails)", name)
-			desc += "URI"
+			desc = fmt.Sprintf(ErrorInGetRequest, "URI")
+			err = libError.NewWithDescription(status.BadRequest, desc, "%s[GetUri](fails)", params.Name)
 		}
 	case Query:
-		err = w.Parser.GetUrlQuery(&request)
+		err = params.W.Parser.GetUrlQuery(&request)
 		if err != nil {
-			err = libError.Join(err, "%s[GetUrlQuery](fails)", name)
-			desc += "QUERY"
+			desc = fmt.Sprintf(ErrorInGetRequest, "QUERY")
+			err = libError.NewWithDescription(status.BadRequest, desc, "%s[GetUrlQuery](fails)", params.Name)
 		}
 	case QueryWithPagination:
 		var pagination PaginationData
-		err = w.Parser.GetUrlQuery(&pagination)
+		err = params.W.Parser.GetUrlQuery(&pagination)
 		if err != nil {
-			err = libError.Join(err, "%s[GetPaginationQuery](fails)", name)
-			desc += "PAGINATION"
+			desc = fmt.Sprintf(ErrorInGetRequest, "PAGINATION")
+			err = libError.NewWithDescription(status.BadRequest, desc, "%s[GetPaginationQuery](fails)", params.Name)
 		} else {
-			w.Parser.SetLocal(PaginationLocalTag, pagination)
+			params.W.Parser.SetLocal(PaginationLocalTag, pagination)
 		}
-		errQuery := w.Parser.GetUrlQuery(&request)
+		errQuery := params.W.Parser.GetUrlQuery(&request)
 		if errQuery != nil {
-			err = libError.Append(err, errQuery, "%s[GetUrlQuery](fails)", name)
-			desc += "QUERY"
+			desc = fmt.Sprintf(ErrorInGetRequest, "QUERY")
+			err = libError.NewWithDescription(status.BadRequest, desc, "%s[GetUrlQuery](fails)", params.Name)
 		}
 	case QueryWithURI:
-		err = w.Parser.GetUrlQuery(&request)
+		err = params.W.Parser.GetUrlQuery(&request)
 		if err != nil {
-			err = libError.Join(err, "%s[GetUrlQuery](fails)", name)
-			desc += "QUERY"
+			desc = fmt.Sprintf(ErrorInGetRequest, "QUERY")
+			err = libError.NewWithDescription(status.BadRequest, desc, "%s[GetUrlQuery](fails)", params.Name)
 		}
-		errUri := w.Parser.GetUri(&request)
+		errUri := params.W.Parser.GetUri(&request)
 		if errUri != nil {
-			err = libError.Append(err, errUri, "%s[GetUri](fails)", name)
-			desc += "URI"
+			desc = fmt.Sprintf(ErrorInGetRequest, "URI")
+			err = libError.NewWithDescription(status.BadRequest, desc, "%s[GetUri](fails)", params.Name)
 		}
 	case URI:
-		err = w.Parser.GetUri(&request)
+		err = params.W.Parser.GetUri(&request)
 		if err != nil {
-			err = libError.Join(err, "%s[GetUri](fails)", name)
-			desc += "URI"
+			desc = fmt.Sprintf(ErrorInGetRequest, "URI")
+			err = libError.NewWithDescription(status.BadRequest, desc, "%s[GetUri](fails)", params.Name)
 		}
 	case URIAndPagination:
 		var pagination PaginationData
-		err = w.Parser.GetUrlQuery(&pagination)
+		err = params.W.Parser.GetUrlQuery(&pagination)
 		if err != nil {
-			err = libError.Join(err, "%s[GetPaginationQuery](fails)", name)
-			desc += "PAGINATION"
+			desc = fmt.Sprintf(ErrorInGetRequest, "PAGINATION")
+			err = libError.NewWithDescription(status.BadRequest, desc, "%s[GetPaginationQuery](fails)", params.Name)
 		} else {
-			w.Parser.SetLocal(PaginationLocalTag, pagination)
+			params.W.Parser.SetLocal(PaginationLocalTag, pagination)
 		}
-		errUri := w.Parser.GetUri(&request)
+		errUri := params.W.Parser.GetUri(&request)
 		if errUri != nil {
-			err = libError.Append(err, errUri, "%s[GetUri](fails)", name)
-			desc += "URI"
+			desc = fmt.Sprintf(ErrorInGetRequest, "URI")
+			err = libError.NewWithDescription(status.BadRequest, desc, "%s[GetUri](fails)", params.Name)
 		}
 	default:
 		err = nil
 	}
 	if err != nil {
-		return nil, nil, response.Error(http.StatusBadRequest, desc, nil, err), nil
+		return nil, err
 	}
 
 	req := Request{
-		Header:   header,
-		Id:       header.GetId(),
+		Header:   params.Header,
+		Id:       params.Header.GetId(),
 		Time:     time.Now(),
 		Incoming: request, //string(requestJson),
-		UserId:   w.Parser.GetLocalString("userId"),
-		ActionId: w.Parser.GetLocalString("action"),
-		BranchId: w.Parser.GetLocalString("branchId"),
-		PersonId: w.Parser.GetLocalString("personId"),
-		BankId:   w.Parser.GetLocalString("bankCode"),
 	}
-	if len(header.GetBranch()) > 0 {
-		req.BranchId = header.GetBranch()
+	req.Tags = map[string]string{}
+	for id := range params.StoreTags {
+		req.Tags[params.StoreTags[id]] = params.W.Parser.GetLocalString(params.StoreTags[id])
 	}
-	if len(header.GetBank()) > 0 {
-		req.BankId = header.GetBank()
-	}
-	if len(header.GetPerson()) > 0 {
-		req.PersonId = header.GetPerson()
+	for id := range params.StoreHeaders {
+		req.Tags[params.StoreHeaders[id]] = params.W.Parser.GetHeaderValue(params.StoreHeaders[id])
 	}
 
 	errorResponses := []response.ErrorResponse{}
-	if validateHeader {
-		err, errValidate := libValidate.ValidateStruct(header)
+	if params.ValidateHeader {
+		err, errValidate := libValidate.ValidateStruct(params.Header)
 		if err != nil {
-			return nil, nil, response.Error(http.StatusInternalServerError, "INVALID_VALIDATION", nil, err), nil
+			return nil, errors.Join(libError.NewWithDescription(status.InternalServerError, "INVALID_HEADER_VALIDATION", "invalid header validation for %T", params.Header), err)
 		}
 		if errValidate != nil {
 			errorResponsesHeader := response.FormatErrorResp(errValidate, libValidate.GetTranslator())
@@ -159,10 +171,10 @@ func parseRequest[Req any](w webFramework.WebFramework, mode Type, validateHeade
 		}
 	}
 
-	if mode != NoBinding {
+	if params.Mode != NoBinding {
 		err, errValidate := libValidate.ValidateStruct(request)
 		if err != nil {
-			return nil, nil, response.Error(http.StatusInternalServerError, "INVALID_VALIDATION", nil, err), nil
+			return nil, errors.Join(libError.NewWithDescription(status.InternalServerError, "INVALID_VALIDATION", "invalid body validation for %T", request), err)
 		}
 		if errValidate != nil {
 			errorResponsesRequest := response.FormatErrorResp(errValidate, libValidate.GetTranslator())
@@ -170,17 +182,17 @@ func parseRequest[Req any](w webFramework.WebFramework, mode Type, validateHeade
 		}
 	}
 	if len(errorResponses) > 0 {
-		return nil, nil, response.Error(http.StatusBadRequest, "VALIDATION_FAILED", errorResponses, fmt.Errorf("%s[ValidateRequest](fails)", name)), errorResponses
+		return nil, errors.Join(libError.New(http.StatusBadRequest, "VALIDATION_FAILED", errorResponses))
 	}
 
-	return &request, &req, nil, nil
+	return &ParseResult[Req]{request, &req}, nil
 }
 
 func ParseRequest[Req any](
 	w webFramework.WebFramework,
 	mode Type,
 	validateHeader bool,
-) (*Req, *RequestHeader, response.ErrorState) {
+) (*Req, *RequestHeader, error) {
 	var header RequestHeader
 
 	const function = "ParseRequest"
@@ -188,74 +200,57 @@ func ParseRequest[Req any](
 	// bind the headers to data
 	err := w.Parser.GetHeader(&header)
 	if err != nil {
-		return nil, nil, response.Error(http.StatusBadRequest, "HEADER_ABSENT", nil, libError.Join(err, "GetRequest[GetHeader](%v)", w.Parser.GetHttpHeader())).Input(function)
+		return nil, nil, errors.Join(err,
+			libError.NewWithDescription(
+				status.BadRequest,
+				"HEADER_ABSENT",
+				"header absent in %s.GetRequest[GetHeader](%v)", function, w.Parser.GetHttpHeader()))
 	}
 
-	request, req, errParse, _ := parseRequest[Req](w, mode, validateHeader, &header, function)
-	if errParse != nil {
-		return nil, nil, errParse
+	params := ParseParams{
+		W:              w,
+		Mode:           mode,
+		ValidateHeader: validateHeader,
+		Header:         &header,
+		Name:           function,
+	}
+	result, err := parseRequest[Req](params)
+	if err != nil {
+		return nil, nil, err
 	}
 
-	req.Incoming = request
+	result.RequestPtr.Incoming = result.Request
 
-	w.Parser.SetLocal("reqLog", req)
+	w.Parser.SetLocal("reqLog", result.RequestPtr)
 
-	return request, &header, nil
+	return &result.Request, &header, nil
+}
+
+type ParseResult[Req any] struct {
+	Request    Req
+	RequestPtr RequestPtr
 }
 
 func Req[Req any, Header any, PT interface {
 	webFramework.HeaderInterface
 	*Header
-}](w webFramework.WebFramework, mode Type, validateHeader bool) (int, string, []response.ErrorResponse, Req, RequestPtr, response.ErrorState) {
+}](params ParseParams) (*ParseResult[Req], error) {
 	const function = "Req"
 
 	// bind the headers to data
 	header := new(Header)
 	headerPtr := PT(header)
-	errHeader := w.Parser.GetHeader(headerPtr)
-	if errHeader != nil {
-		return http.StatusBadRequest, "HEADER_ABSENT", nil, *new(Req), nil, response.ToErrorState(libError.Join(errHeader, "%s[GetHeader](%v)", function, w.Parser.GetHttpHeader()))
-	}
-
-	request, req, errParse, errArray := parseRequest[Req](w, mode, validateHeader, headerPtr, function)
-	if errParse != nil {
-		return errParse.GetStatus(), errParse.GetDescription(), errArray, *new(Req), req, errParse
-	}
-
-	return http.StatusOK, "OK", nil, *request, req, nil
-}
-
-func GetEmptyRequest(ctx webFramework.WebFramework) (int, string, []response.ErrorResponse, RequestPtr, error) {
-	var req Request
-	// bind the headers to data
-	var header RequestHeader
-	err := ctx.Parser.GetHeader(&header)
+	err := params.W.Parser.GetHeader(headerPtr)
 	if err != nil {
-		return http.StatusBadRequest, "HEADER_ABSENT", nil, &req, err
+		return nil, errors.Join(err, libError.NewWithDescription(http.StatusBadRequest, "HEADER_ABSENT", "%s[GetHeader](%v)", function, params.W.Parser.GetHttpHeader()))
 	}
 
-	req = Request{
-		Header:   &header,
-		Id:       header.RequestId,
-		Time:     time.Now(),
-		Incoming: nil,
-		UserId:   ctx.Parser.GetLocalString("userId"),
-		ActionId: ctx.Parser.GetLocalString("action"),
-		BranchId: ctx.Parser.GetLocalString("branchId"),
-		BankId:   ctx.Parser.GetLocalString("bankCode"),
+	params.Header = headerPtr
+
+	result, err := parseRequest[Req](params)
+	if err != nil {
+		return nil, err
 	}
 
-	if ctx.Parser.GetMethod() != "GET" {
-		libValidate.Init()
-		err, errValidate := libValidate.ValidateStruct(header)
-		if err != nil {
-			return http.StatusInternalServerError, "INVALID_VALIDATION", nil, nil, err
-		}
-		if errValidate != nil {
-			errorResponses := response.FormatErrorResp(errValidate, libValidate.GetTranslator())
-			return http.StatusBadRequest, "Header Validation Failed", errorResponses, &req, errValidate
-		}
-	}
-
-	return http.StatusOK, "OK", nil, &req, nil
+	return result, nil
 }

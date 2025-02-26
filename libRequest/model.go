@@ -5,7 +5,6 @@ import (
 	"time"
 
 	"github.com/hmmftg/requestCore/libQuery"
-	"github.com/hmmftg/requestCore/response"
 	"github.com/hmmftg/requestCore/webFramework"
 )
 
@@ -25,16 +24,12 @@ type LoggerInterface interface {
 }
 
 type RequestInterface interface {
-	Initialize(c webFramework.WebFramework, method, url string, req RequestPtr, args ...any) (int, map[string]string, response.ErrorState)
-	InitRequest(c webFramework.WebFramework, method, url string) response.ErrorState
-	InitializeNoLog(c webFramework.WebFramework, method, url string, req RequestPtr, args ...any) (int, map[string]string, response.ErrorState)
-	AddRequestLog(method, log string, req RequestPtr)
-	LogEnd(method, log string, req RequestPtr)
-	AddRequestEvent(c webFramework.WebFramework, branch, method, log string, req RequestPtr)
-	LogStart(c webFramework.WebFramework, method, log string) RequestPtr
-	InsertRequest(request RequestPtr) response.ErrorState
-	CheckDuplicateRequest(request RequestPtr) response.ErrorState
-	UpdateRequestWithContext(ctx context.Context, request RequestPtr) response.ErrorState
+	Initialize(c webFramework.WebFramework, method, url string, req RequestPtr, args ...any) (int, map[string]string, error)
+	InitRequest(c webFramework.WebFramework, method, url string) error
+	InitializeNoLog(c webFramework.WebFramework, method, url string, req RequestPtr, args ...any) (int, map[string]string, error)
+	InsertRequest(request RequestPtr) error
+	CheckDuplicateRequest(request RequestPtr) error
+	UpdateRequestWithContext(ctx context.Context, request RequestPtr) error
 }
 
 type LogData struct {
@@ -46,11 +41,9 @@ type LogData struct {
 }
 
 type EventData struct {
-	Time     time.Time `json:"dt"`
-	ActionId string    `json:"action_id"`
-	BranchId string    `json:"branch_id"`
-	UserId   string    `json:"user_id"`
-	Logs     []LogData `json:"logs"`
+	Time time.Time         `json:"dt"`
+	Tags map[string]string `json:"tags"`
+	Logs []LogData         `json:"logs"`
 }
 
 type RequestHeader struct {
@@ -115,22 +108,14 @@ func (r *RequestHeader) SetPerson(person string) {
 type RequestPtr *Request
 
 type Request struct {
-	Header     webFramework.HeaderInterface `json:"header"`
-	Id         string                       `json:"id"`
-	RequestId  string                       `json:"request_id"`
-	Time       time.Time                    `json:"dt"`
-	Incoming   any                          `json:"incoming"`
-	NationalId string                       `json:"national_id"`
-	UrlPath    string                       `json:"url_path"`
-	ServiceId  string                       `json:"service_id"`
-	ActionId   string                       `json:"action_id"`
-	BankId     string                       `json:"bank_id"`
-	BranchId   string                       `json:"branch_id"`
-	PersonId   string                       `json:"person_id"`
-	UserId     string                       `json:"user_id"`
-	Req        string                       `json:"req"`
-	Resp       string                       `json:"resp"`
-	Outgoing   any                          `json:"outgoing"`
-	Result     string                       `json:"result"`
-	Events     []EventData                  `json:"events"`
+	Header    webFramework.HeaderInterface `json:"header"`
+	Id        string                       `json:"id"`
+	RequestId string                       `json:"request_id"`
+	Time      time.Time                    `json:"dt"`
+	Incoming  any                          `json:"incoming"`
+	Req       string                       `json:"req"`
+	Resp      string                       `json:"resp"`
+	Outgoing  any                          `json:"outgoing"`
+	Tags      map[string]string            `json:"tags"`
+	Result    string                       `json:"result"`
 }

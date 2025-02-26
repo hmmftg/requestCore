@@ -12,7 +12,6 @@ import (
 	"github.com/hmmftg/requestCore/libContext"
 	"github.com/hmmftg/requestCore/libParams"
 	"github.com/hmmftg/requestCore/libRequest"
-	"github.com/hmmftg/requestCore/response"
 	"github.com/hmmftg/requestCore/testingtools"
 	"gotest.tools/v3/assert"
 )
@@ -155,12 +154,12 @@ func (h testConsumeHandlerType[Req, Resp]) Parameters() handlers.HandlerParamete
 		nil,
 	}
 }
-func (h testConsumeHandlerType[Req, Resp]) Initializer(req handlers.HandlerRequest[Req, handlers.WsResponse[testRemoteCallResp]]) response.ErrorState {
+func (h testConsumeHandlerType[Req, Resp]) Initializer(req handlers.HandlerRequest[Req, handlers.WsResponse[testRemoteCallResp]]) error {
 	return nil
 }
 func (h testConsumeHandlerType[Req, Resp]) Handler(
 	req handlers.HandlerRequest[Req, handlers.WsResponse[testRemoteCallResp]],
-) (handlers.WsResponse[testRemoteCallResp], response.ErrorState) {
+) (handlers.WsResponse[testRemoteCallResp], error) {
 	ws := handlers.WsResponse[testRemoteCallResp]{
 		Result: testRemoteCallResp{
 			Result: "a",
@@ -170,7 +169,7 @@ func (h testConsumeHandlerType[Req, Resp]) Handler(
 }
 func (h testConsumeHandlerType[Req, Resp]) Simulation(
 	req handlers.HandlerRequest[Req, handlers.WsResponse[testRemoteCallResp]],
-) (handlers.WsResponse[testRemoteCallResp], response.ErrorState) {
+) (handlers.WsResponse[testRemoteCallResp], error) {
 	ws := handlers.WsResponse[testRemoteCallResp]{
 		Result: testRemoteCallResp{
 			Result: "a",

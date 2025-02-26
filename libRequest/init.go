@@ -1,24 +1,27 @@
 package libRequest
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 
 	"github.com/hmmftg/requestCore/libError"
 	"github.com/hmmftg/requestCore/response"
+	"github.com/hmmftg/requestCore/status"
 	"github.com/hmmftg/requestCore/webFramework"
 )
 
-func (m RequestModel) Initialize(w webFramework.WebFramework, method, url string, req RequestPtr, args ...any) (int, map[string]string, response.ErrorState) {
+func (m RequestModel) Initialize(w webFramework.WebFramework, method, url string, req RequestPtr, args ...any) (int, map[string]string, error) {
 	err := m.CheckDuplicateRequest(req)
 	if err != nil {
-		src := err.GetInput().(string)
-		if src == "DB" {
-			return http.StatusBadRequest, map[string]string{"desc": "PWC_REGISTER", "message": "unable to CheckDuplicateRequest"}, err
+		if ok, err := response.Unwrap(err); ok {
+			src := err.GetInput().(string)
+			if src == "DB" {
+				return http.StatusBadRequest, map[string]string{"desc": "PWC_REGISTER", "message": "unable to CheckDuplicateRequest"}, err
+			}
 		}
 		return http.StatusBadRequest, map[string]string{"desc": "DUPLICATE_REQUEST", "message": "Duplicate Request"}, err
 	}
-	m.AddRequestEvent(w, req.BranchId, method, "start", req)
 	prg, mdl := m.QueryInterface.GetModule()
 	req.Header.SetProgram(prg)
 	req.Header.SetModule(mdl)
@@ -36,32 +39,31 @@ func (m RequestModel) Initialize(w webFramework.WebFramework, method, url string
 	return http.StatusOK, map[string]string{"path": path}, nil
 }
 
-func (m RequestModel) InitializeNoLog(c webFramework.WebFramework, method, url string, req RequestPtr, args ...any) (int, map[string]string, response.ErrorState) {
-	m.AddRequestEvent(c, req.BranchId, method, "start", req)
+func (m RequestModel) InitializeNoLog(w webFramework.WebFramework, method, url string, req RequestPtr, args ...any) (int, map[string]string, error) {
 	var params []any
 	for _, arg := range args {
-		params = append(params, c.Parser.GetUrlParam(arg.(string)))
+		params = append(params, w.Parser.GetUrlParam(arg.(string)))
 	}
 	path := fmt.Sprintf(url, params...)
 	return http.StatusOK, map[string]string{"path": path}, nil
 }
 
-func (m RequestModel) InitRequest(w webFramework.WebFramework, method, url string) response.ErrorState {
+func (m RequestModel) InitRequest(w webFramework.WebFramework, method, url string) error {
 	reqL := w.Parser.GetLocal("reqLog")
 	req := reqL.(RequestPtr)
 	err := m.CheckDuplicateRequest(req)
 	if err != nil {
-		src := err.GetInput().(string)
-		if src == "DB" {
-			return err
+		if ok, err := response.Unwrap(err); ok {
+			src := err.GetInput().(string)
+			if src == "DB" {
+				return err
+			}
 		}
-		return response.Error(
-			http.StatusBadRequest,
+		return errors.Join(err, libError.NewWithDescription(
+			status.BadRequest,
 			"DUPLICATE_REQUEST",
-			"Duplicate Request",
-			libError.Join(err, "InitRequest(CheckDuplicateRequest)"))
+			"dupicate request"))
 	}
-	m.AddRequestEvent(w, req.BranchId, method, "start", req)
 	prg, mdl := m.QueryInterface.GetModule()
 	req.Header.SetProgram(prg)
 	req.Header.SetModule(mdl)
@@ -69,11 +71,10 @@ func (m RequestModel) InitRequest(w webFramework.WebFramework, method, url strin
 	req.Header.SetMethod(method)
 	err = m.InsertRequestWithContext(w.Ctx, req)
 	if err != nil {
-		return response.Error(
-			http.StatusServiceUnavailable,
+		return errors.Join(err, libError.NewWithDescription(
+			status.InternalServerError,
 			"PWC_REGISTER",
-			"Unable To Register Request",
-			libError.Join(err, "InitRequest(InsertRequest)"))
+			"unable To Register Request"))
 	}
 	return nil
 }

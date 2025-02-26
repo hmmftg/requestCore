@@ -38,7 +38,7 @@ func (r CallParamData) LogValue() slog.Value {
 	)
 }
 
-type BuilerFunc[Resp any] func(status int, rawResp []byte, headers map[string]string) (*Resp, response.ErrorState)
+type BuilerFunc[Resp any] func(status int, rawResp []byte, headers map[string]string) (*Resp, error)
 
 type RemoteCallParamData[Req, Resp any] struct {
 	HttpClient  *http.Client
@@ -76,7 +76,7 @@ type CallResult[RespType any] struct {
 	Resp   *RespType
 	WsResp *response.WsRemoteResponse
 	Status *CallResp
-	Error  response.ErrorState
+	Error  error
 }
 
 func Call[RespType any](param CallParam) CallResult[RespType] {
@@ -103,7 +103,7 @@ func Call[RespType any](param CallParam) CallResult[RespType] {
 	return CallResult[RespType]{resp, wsResp, callResp, err}
 }
 
-func RemoteCall[Req, Resp any](param *RemoteCallParamData[Req, Resp]) (*Resp, response.ErrorState) {
+func RemoteCall[Req, Resp any](param *RemoteCallParamData[Req, Resp]) (*Resp, error) {
 	if param.QueryStack != nil && len(*param.QueryStack) > 0 {
 		param.Query = (*param.QueryStack)[0]
 		if len(*param.QueryStack) > 1 {

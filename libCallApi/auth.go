@@ -88,7 +88,7 @@ func (api *RemoteApi) handleToken(w webFramework.WebFramework) libError.Error {
 
 func (api *RemoteApi) Authenticate(w webFramework.WebFramework) libError.Error {
 	if api.TokenCacheLock == nil {
-		return libError.New(status.InternalServerError, "TOKEN_CACHE_NOT_INITIALIZED", "token cache lock of api %s is null", api.Name)
+		return libError.NewWithDescription(status.InternalServerError, "TOKEN_CACHE_NOT_INITIALIZED", "token cache lock of api %s is null", api.Name)
 	}
 	if api.TokenCache.AccessToken == nil {
 		err := api.handleToken(w)

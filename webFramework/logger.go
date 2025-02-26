@@ -11,6 +11,7 @@ const (
 	LogTagNameFormat   string = "LOG_TAG_%s"
 	LogArrayNameFormat string = "LOG_ARRAY_%s"
 	HandlerLogTag      string = "handler"
+	ErrorListLogTag    string = "errors"
 )
 
 var startUpLogs []slog.Attr

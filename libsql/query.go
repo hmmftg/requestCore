@@ -10,7 +10,7 @@ import (
 	"github.com/blockloop/scan/v2"
 )
 
-func Query[Result any](db *sql.DB, querySql string, args ...any) ([]Result, response.ErrorState) {
+func Query[Result any](db *sql.DB, querySql string, args ...any) ([]Result, error) {
 	errPing := db.Ping()
 	if errPing != nil {
 		slog.Error("error in ping", slog.Any("error", errPing))

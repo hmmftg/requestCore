@@ -139,7 +139,7 @@ func (env *testCallRemoteEnv) handlerCallAPIJSON(method string, queryStack *[]st
 			return
 		}
 		req.QueryStack = queryStack
-		result, errCall := handlers.CallApiJSON[any, AnimeEpisodes](
+		result, errCall := handlers.CallApiJSON(
 			w,
 			env.Interface,
 			method,

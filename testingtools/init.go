@@ -15,6 +15,7 @@ import (
 	"github.com/hmmftg/requestCore/libParams"
 	"github.com/hmmftg/requestCore/libQuery"
 	"github.com/hmmftg/requestCore/libRequest"
+	"github.com/hmmftg/requestCore/response"
 )
 
 type Params struct {
@@ -82,10 +83,9 @@ func InitTesting(t *testing.T,
 	return requestCore.RequestCoreModel{
 		QueryInterface:   queryRunner,
 		RequestInterface: requestHandler,
-		RespHandler: requestCore.WebHanlder{
-			ErrorDesc:        wsParams.ErrorDesc,
-			MessageDesc:      wsParams.MessageDesc,
-			RequestInterface: requestHandler,
+		RespHandler: response.WebHanlder{
+			ErrorDesc:   wsParams.ErrorDesc,
+			MessageDesc: wsParams.MessageDesc,
 		},
 		RemoteApiInterface: libCallApi.RemoteApiModel{
 			RemoteApiList: wsParams.RemoteApis,
@@ -167,10 +167,9 @@ func InitTestingWithDB(
 	return requestCore.RequestCoreModel{
 		QueryInterface:   queryRunner,
 		RequestInterface: requestHandler,
-		RespHandler: requestCore.WebHanlder{
-			ErrorDesc:        wsParams.ErrorDesc,
-			MessageDesc:      wsParams.MessageDesc,
-			RequestInterface: requestHandler,
+		RespHandler: response.WebHanlder{
+			ErrorDesc:   wsParams.ErrorDesc,
+			MessageDesc: wsParams.MessageDesc,
 		},
 		RemoteApiInterface: libCallApi.RemoteApiModel{
 			RemoteApiList: wsParams.RemoteApis,

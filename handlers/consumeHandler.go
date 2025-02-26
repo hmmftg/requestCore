@@ -7,8 +7,8 @@ import (
 
 	"github.com/hmmftg/requestCore"
 	"github.com/hmmftg/requestCore/libCallApi"
+	"github.com/hmmftg/requestCore/libError"
 	"github.com/hmmftg/requestCore/libRequest"
-	"github.com/hmmftg/requestCore/response"
 	"github.com/hmmftg/requestCore/webFramework"
 )
 
@@ -68,7 +68,7 @@ const (
 	FinalPath  = "finalPath"
 )
 
-func (c CallArgs[Req, Resp]) Initializer(req HandlerRequest[Req, Resp]) response.ErrorState {
+func (c CallArgs[Req, Resp]) Initializer(req HandlerRequest[Req, Resp]) error {
 	if c.ForwardAuth {
 		c.Headers = append(c.Headers, "Authorization")
 	}
@@ -87,15 +87,14 @@ func (c CallArgs[Req, Resp]) Initializer(req HandlerRequest[Req, Resp]) response
 	req.W.Parser.SetLocal(FinalPath, finalPath)
 	return nil
 }
-func (c CallArgs[Req, Resp]) Handler(req HandlerRequest[Req, Resp]) (Resp, response.ErrorState) {
+func (c CallArgs[Req, Resp]) Handler(req HandlerRequest[Req, Resp]) (Resp, error) {
 	finalPath := req.W.Parser.GetLocalString(FinalPath)
 	headers, ok := req.W.Parser.GetLocal(HeadersMap).(map[string]string)
 	if !ok {
-		return req.Response, response.Error(
+		return req.Response, libError.NewWithDescription(
 			http.StatusInternalServerError,
 			"BAD_LOCAL_HEADERS",
-			req.W.Parser.GetLocal(HeadersMap),
-			fmt.Errorf("wront data type: %T", req.W.Parser.GetLocal(HeadersMap)))
+			"unable to get headers, wrong data type: %T", req.W.Parser.GetLocal(HeadersMap))
 	}
 
 	resp, err := libCallApi.RemoteCall(
@@ -112,7 +111,7 @@ func (c CallArgs[Req, Resp]) Handler(req HandlerRequest[Req, Resp]) (Resp, respo
 	}
 	return *resp, nil
 }
-func (c CallArgs[Req, Resp]) Simulation(req HandlerRequest[Req, Resp]) (Resp, response.ErrorState) {
+func (c CallArgs[Req, Resp]) Simulation(req HandlerRequest[Req, Resp]) (Resp, error) {
 	return req.Response, nil
 }
 func (c CallArgs[Req, Resp]) Finalizer(req HandlerRequest[Req, Resp]) {}
@@ -141,7 +140,6 @@ func InitPostRequest(
 	reqLog libRequest.RequestPtr,
 	method, url string,
 	checkDuplicate func(libRequest.Request) error,
-	addEvent func(webFramework.WebFramework, string, string, string, libRequest.RequestPtr),
 	insertRequest func(libRequest.Request) error,
 	args ...any,
 ) (int, map[string]string, error) {
@@ -149,7 +147,6 @@ func InitPostRequest(
 	if err != nil {
 		return http.StatusBadRequest, map[string]string{"desc": "DUPLICATE_REQUEST", "message": "Duplicate Request"}, err
 	}
-	addEvent(w, reqLog.BranchId, method, "start", reqLog)
 	err = insertRequest(*reqLog)
 	if err != nil {
 		return http.StatusServiceUnavailable, map[string]string{"desc": "PWC_REGISTER", "message": "Unable To Register Request"}, err
@@ -189,7 +186,7 @@ func (h *ConsumeHandlerType[Req, Resp]) Parameters() HandlerParameters {
 	}
 }
 
-func (h *ConsumeHandlerType[Req, Resp]) Initializer(req HandlerRequest[Req, Resp]) response.ErrorState {
+func (h *ConsumeHandlerType[Req, Resp]) Initializer(req HandlerRequest[Req, Resp]) error {
 	for _, value := range req.W.Parser.GetUrlParams() {
 		//normalized := strings.ReplaceAll(param.Value, "*", "/")
 		h.Path += "/" + value //normalized
@@ -197,7 +194,7 @@ func (h *ConsumeHandlerType[Req, Resp]) Initializer(req HandlerRequest[Req, Resp
 	return nil
 }
 
-func (h *ConsumeHandlerType[Req, Resp]) Handler(req HandlerRequest[Req, Resp]) (Resp, response.ErrorState) {
+func (h *ConsumeHandlerType[Req, Resp]) Handler(req HandlerRequest[Req, Resp]) (Resp, error) {
 	headersMap := ExtractHeaders(req.W, h.Headers, nil)
 	resp, errCall := CallApiJSON(req.W, req.Core, h.Title,
 		&libCallApi.RemoteCallParamData[Req, Resp]{
@@ -217,7 +214,7 @@ func (h *ConsumeHandlerType[Req, Resp]) Handler(req HandlerRequest[Req, Resp]) (
 	return resp, nil
 }
 
-func (h *ConsumeHandlerType[Req, Resp]) Simulation(req HandlerRequest[Req, Resp]) (Resp, response.ErrorState) {
+func (h *ConsumeHandlerType[Req, Resp]) Simulation(req HandlerRequest[Req, Resp]) (Resp, error) {
 	return req.Response, nil
 }
 

@@ -6,7 +6,6 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/hmmftg/requestCore/libRequest"
-	"github.com/hmmftg/requestCore/response"
 	"github.com/hmmftg/requestCore/testingtools"
 )
 
@@ -40,16 +39,16 @@ func (h testHandlerType[Req, Resp]) Parameters() HandlerParameters {
 		nil,
 	}
 }
-func (h testHandlerType[Req, Resp]) Initializer(req HandlerRequest[Req, Resp]) response.ErrorState {
+func (h testHandlerType[Req, Resp]) Initializer(req HandlerRequest[Req, Resp]) error {
 	log.Println("Initializer")
 	return nil
 }
-func (h testHandlerType[Req, Resp]) Handler(req HandlerRequest[Req, Resp]) (Resp, response.ErrorState) {
+func (h testHandlerType[Req, Resp]) Handler(req HandlerRequest[Req, Resp]) (Resp, error) {
 	log.Println("Handler")
 	result := testResp{Result: "a"}
 	return Resp(result), nil
 }
-func (h testHandlerType[Req, Resp]) Simulation(req HandlerRequest[Req, Resp]) (Resp, response.ErrorState) {
+func (h testHandlerType[Req, Resp]) Simulation(req HandlerRequest[Req, Resp]) (Resp, error) {
 	log.Println("Simulation")
 	result := testResp{Result: "a"}
 	return Resp(result), nil

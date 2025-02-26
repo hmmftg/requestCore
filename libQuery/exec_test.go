@@ -142,9 +142,11 @@ func TestExecuteWithContext(t *testing.T) {
 			t.Fatal("error wanted", testCase.Error, "got", err)
 		}
 		if err != nil {
-			assert.Equal(t, err.GetDescription(), testCase.Error.GetDescription())
-			assert.Equal(t, err.GetStatus(), testCase.Error.GetStatus())
-			assert.Equal(t, err.GetMessage(), testCase.Error.GetMessage())
+			if ok, err := response.Unwrap(err); ok {
+				assert.Equal(t, err.GetDescription(), testCase.Error.GetDescription())
+				assert.Equal(t, err.GetStatus(), testCase.Error.GetStatus())
+				assert.Equal(t, err.GetMessage(), testCase.Error.GetMessage())
+			}
 		}
 	}
 }

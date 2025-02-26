@@ -7,7 +7,6 @@ import (
 
 	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/hmmftg/requestCore/libsql"
-	"github.com/hmmftg/requestCore/response"
 	"github.com/hmmftg/requestCore/testingtools"
 	"gotest.tools/v3/assert"
 )
@@ -24,7 +23,7 @@ func TestQuery(t *testing.T) {
 		Query   string
 		Args    []any
 		Results []result
-		Error   response.ErrorState
+		Error   error
 	}
 	tm := time.Date(1, 2, 3, 4, 5, 6, 0, time.Local)
 	testCases := []testCase{{
