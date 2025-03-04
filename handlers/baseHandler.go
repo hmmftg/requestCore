@@ -71,9 +71,7 @@ func BaseHandler[Req any, Resp any, Handler HandlerInterface[Req, Resp]](
 		} else {
 			w = libContext.InitContextNoAuditTrail(c)
 		}
-		webFramework.AddLogTag(w, webFramework.HandlerLogTag, slog.String("title", params.Title))
-		webFramework.AddLogTag(w, webFramework.HandlerLogTag, slog.String("method", w.Parser.GetMethod()))
-		webFramework.AddLogTag(w, webFramework.HandlerLogTag, slog.String("path", w.Parser.GetPath()))
+		libContext.AddWebLogs(w, params.Title)
 		trx := HandlerRequest[Req, Resp]{
 			Title: params.Title,
 			Args:  args,
