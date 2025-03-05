@@ -20,5 +20,7 @@ func AddWebLogs(w webFramework.WebFramework, title string) func(time.Time, int) 
 		elapsed := time.Since(start)
 		webFramework.AddLogTag(w, webFramework.HandlerLogTag, slog.String("elapsed", elapsed.String()))
 		webFramework.AddLogTag(w, webFramework.HandlerLogTag, slog.Int("status", status))
+		webFramework.CollectLogTags(w, webFramework.HandlerLogTag)
+		webFramework.CollectLogArrays(w, webFramework.HandlerLogTag)
 	}
 }
