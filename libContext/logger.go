@@ -24,3 +24,15 @@ func AddWebLogs(w webFramework.WebFramework, title, tag string) func(time.Time, 
 		webFramework.CollectLogArrays(w, tag)
 	}
 }
+
+func AddMiddlewareLogs(w webFramework.WebFramework, title, tag string) func(time.Time, int) {
+	webFramework.AddLog(w, tag, slog.String("title", title))
+	webFramework.AddLog(w, tag, slog.String("method", w.Parser.GetMethod()))
+	webFramework.AddLog(w, tag, slog.String("path", w.Parser.GetPath()))
+	return func(start time.Time, status int) {
+		elapsed := time.Since(start)
+		webFramework.AddLog(w, tag, slog.String("elapsed", elapsed.String()))
+		webFramework.AddLog(w, tag, slog.Int("status", status))
+		webFramework.CollectLogArrays(w, tag)
+	}
+}
