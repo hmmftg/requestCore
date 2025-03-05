@@ -8,7 +8,7 @@ import (
 )
 
 func AddWebHandlerLogs(c any, title string) func(time.Time, int) {
-	w := InitContext(c)
+	w := InitContextNoAuditTrail(c)
 	return AddWebLogs(w, title)
 }
 
