@@ -207,9 +207,10 @@ func ParseQueryResult(result map[string]any, t reflect.Type, v reflect.Value) {
 func ParseMap[Target any](input map[string]any) (*Target, error) {
 	result := new(Target)
 	config := &mapstructure.DecoderConfig{
-		Metadata: nil,
-		Result:   result,
-		TagName:  "db",
+		WeaklyTypedInput: true,
+		Metadata:         nil,
+		Result:           result,
+		TagName:          "db",
 	}
 
 	decoder, err := mapstructure.NewDecoder(config)
