@@ -1,9 +1,6 @@
 package requestCore
 
 import (
-	"github.com/hmmftg/requestCore/libCallApi"
-	"github.com/hmmftg/requestCore/libCrypto"
-	"github.com/hmmftg/requestCore/libDictionary"
 	"github.com/hmmftg/requestCore/libParams"
 	"github.com/hmmftg/requestCore/libQuery"
 	"github.com/hmmftg/requestCore/libRequest"
@@ -11,21 +8,15 @@ import (
 )
 
 type RequestCoreModel struct {
-	RequestInterface   libRequest.RequestInterface
-	QueryInterface     libQuery.QueryRunnerInterface
-	RemoteApiInterface libCallApi.CallApiInterface
-	RespHandler        response.ResponseHandler
-	Dict               libDictionary.DictionaryInterface
-	ParamMap           libParams.ParamsInterface
-	CryptoSm           libCrypto.Sm
+	RequestInterface libRequest.RequestInterface
+	QueryInterface   libQuery.QueryRunnerInterface
+	RespHandler      response.ResponseHandler
+	ParamMap         libParams.ParamInterface
 }
 
 type RequestCoreInterface interface {
 	GetDB() libQuery.QueryRunnerInterface
 	RequestTools() libRequest.RequestInterface
-	Consumer() libCallApi.CallApiInterface
 	Responder() response.ResponseHandler
-	Dictionary() libDictionary.DictionaryInterface
-	Params() libParams.ParamsInterface
-	Sm() libCrypto.Sm
+	Params() libParams.ParamInterface
 }

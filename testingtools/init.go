@@ -2,43 +2,23 @@ package testingtools
 
 import (
 	"database/sql"
-	"image"
 	"os"
 	"path/filepath"
 	"testing"
 
 	"github.com/DATA-DOG/go-sqlmock"
-	"github.com/hmmftg/image/font/opentype"
 	"github.com/hmmftg/requestCore"
 	"github.com/hmmftg/requestCore/libCallApi"
-	"github.com/hmmftg/requestCore/libDictionary"
 	"github.com/hmmftg/requestCore/libParams"
 	"github.com/hmmftg/requestCore/libQuery"
 	"github.com/hmmftg/requestCore/libRequest"
 	"github.com/hmmftg/requestCore/response"
 )
 
-type Params struct {
-	Roles       map[string]string
-	Params      map[string]string
-	ErrorDesc   map[string]string
-	MessageDesc map[string]string
-	AccessRoles map[string]string
-	RemoteApis  map[string]libCallApi.RemoteApi
+type TestingParams struct {
 }
 
-func (p Params) GetFonts() map[string]opentype.Font {
-	return nil
-}
-func (p Params) GetImages() map[string]image.Image {
-	return nil
-}
-func (p Params) GetRoles() map[string]string {
-	return p.Roles
-}
-func (p Params) GetParams() map[string]string {
-	return p.Params
-}
+const Default = "default"
 
 // columns are prefixed with "o" since we used sqlstruct to generate them
 func InitTesting(t *testing.T,
@@ -49,8 +29,12 @@ func InitTesting(t *testing.T,
 	csv string,
 	module string,
 ) (requestCore.RequestCoreModel, libParams.ParamInterface) {
-	wsParams := Params{
-		ErrorDesc:  errDesc,
+	wsParams := libParams.ApplicationParams[TestingParams]{
+		Constants: map[string]libParams.Constants{
+			Default: libParams.Constants{
+				ErrorDesc: errDesc,
+			},
+		},
 		RemoteApis: remoteApis,
 	}
 
@@ -84,15 +68,10 @@ func InitTesting(t *testing.T,
 		QueryInterface:   queryRunner,
 		RequestInterface: requestHandler,
 		RespHandler: response.WebHanlder{
-			ErrorDesc:   wsParams.ErrorDesc,
-			MessageDesc: wsParams.MessageDesc,
+			ErrorDesc:   wsParams.Constants[Default].ErrorDesc,
+			MessageDesc: wsParams.Constants[Default].MessageDesc,
 		},
-		RemoteApiInterface: libCallApi.RemoteApiModel{
-			RemoteApiList: wsParams.RemoteApis,
-		},
-		Dict: libDictionary.DictionaryModel{
-			MessageDesc: wsParams.MessageDesc,
-		},
+		ParamMap: wsParams,
 	}, wsParams
 }
 
@@ -146,9 +125,13 @@ func InitTestingWithDB(
 	errDesc map[string]string,
 	remoteApis map[string]libCallApi.RemoteApi,
 	db *sql.DB,
-) (requestCore.RequestCoreModel, Params) {
-	wsParams := Params{
-		ErrorDesc:  errDesc,
+) (requestCore.RequestCoreModel, libParams.ApplicationParams[TestingParams]) {
+	wsParams := libParams.ApplicationParams[TestingParams]{
+		Constants: map[string]libParams.Constants{
+			Default: libParams.Constants{
+				ErrorDesc: errDesc,
+			},
+		},
 		RemoteApis: remoteApis,
 	}
 
@@ -168,14 +151,9 @@ func InitTestingWithDB(
 		QueryInterface:   queryRunner,
 		RequestInterface: requestHandler,
 		RespHandler: response.WebHanlder{
-			ErrorDesc:   wsParams.ErrorDesc,
-			MessageDesc: wsParams.MessageDesc,
+			ErrorDesc:   wsParams.Constants[Default].ErrorDesc,
+			MessageDesc: wsParams.Constants[Default].MessageDesc,
 		},
-		RemoteApiInterface: libCallApi.RemoteApiModel{
-			RemoteApiList: wsParams.RemoteApis,
-		},
-		Dict: libDictionary.DictionaryModel{
-			MessageDesc: wsParams.MessageDesc,
-		},
+		ParamMap: wsParams,
 	}, wsParams
 }

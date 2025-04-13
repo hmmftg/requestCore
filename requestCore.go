@@ -1,9 +1,6 @@
 package requestCore
 
 import (
-	"github.com/hmmftg/requestCore/libCallApi"
-	"github.com/hmmftg/requestCore/libCrypto"
-	"github.com/hmmftg/requestCore/libDictionary"
 	"github.com/hmmftg/requestCore/libParams"
 	"github.com/hmmftg/requestCore/libQuery"
 	"github.com/hmmftg/requestCore/libRequest"
@@ -18,22 +15,10 @@ func (m RequestCoreModel) RequestTools() libRequest.RequestInterface {
 	return m.RequestInterface
 }
 
-func (m RequestCoreModel) Consumer() libCallApi.CallApiInterface {
-	return m.RemoteApiInterface
-}
-
 func (m RequestCoreModel) Responder() response.ResponseHandler {
 	return m.RespHandler
 }
 
-func (m RequestCoreModel) Dictionary() libDictionary.DictionaryInterface {
-	return m.Dict
-}
-
-func (m RequestCoreModel) Params() libParams.ParamsInterface {
+func (m RequestCoreModel) Params() libParams.ParamInterface {
 	return m.ParamMap
-}
-
-func (m RequestCoreModel) Sm() libCrypto.Sm {
-	return m.CryptoSm
 }
