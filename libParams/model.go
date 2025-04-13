@@ -33,36 +33,24 @@ type ParamInterface interface {
 	GetDB(name string) *DbParams
 	GetSecurityModule(name string) *SecurityModule
 	GetRemoteApi(name string) *libCallApi.RemoteApi
-	GetParamGroup(name string) *ParametersMap
-	GetSecureParamGroup(name string) *SecureParametersMap
+	GetParam(group, name string) *string
+	GetSecureParam(group, name string) *SecurityParam
 	GetConstants(name string) *Constants
 	GetSpecificParams(name string) any
 }
 
-func (m ApplicationParams[SpecialParams]) GetNetwork(name string) *NetworkParams {
-	return GetValueFromMap(name, m.Network)
-}
-func (m ApplicationParams[SpecialParams]) GetLogging() LogParams {
-	return m.Logging
-}
-func (m ApplicationParams[SpecialParams]) GetDB(name string) *DbParams {
-	return GetValueFromMap(name, m.DB)
-}
-func (m ApplicationParams[SpecialParams]) GetSecurityModule(name string) *SecurityModule {
-	return GetValueFromMap(name, m.SecurityModule)
-}
 func (m ApplicationParams[SpecialParams]) GetRemoteApi(name string) *libCallApi.RemoteApi {
 	return GetValueFromMap(name, m.RemoteApis)
 }
-func (m ApplicationParams[SpecialParams]) GetParamGroup(name string) *ParametersMap {
-	return GetValueFromMap(name, m.ParameterGroups)
+
+func (m ApplicationParams[SpecialParams]) GetParam(group, name string) *string {
+	gr := GetValueFromMap(group, m.ParameterGroups)
+	if gr == nil {
+		return nil
+	}
+	return GetValueFromMap(name, gr.Params)
 }
-func (m ApplicationParams[SpecialParams]) GetSecureParamGroup(name string) *SecureParametersMap {
-	return GetValueFromMap(name, m.SecureParameterGroups)
-}
-func (m ApplicationParams[SpecialParams]) GetConstants(name string) *Constants {
-	return GetValueFromMap(name, m.Constants)
-}
+
 func (m ApplicationParams[SpecialParams]) GetSpecificParams(name string) any {
 	return m.Specific
 }

@@ -28,6 +28,10 @@ type LogParams struct {
 	Splunk      *SplunkParams `yaml:"splunkParams"`
 }
 
+func (m ApplicationParams[SpecialParams]) GetLogging() LogParams {
+	return m.Logging
+}
+
 func LogRotate(logger *lumberjack.Logger) {
 	// ticker := time.NewTicker(time.Second * 1)
 	ticker := time.NewTicker(time.Hour)

@@ -10,3 +10,7 @@ type NetworkParams struct {
 	TlsKey  string `yaml:"tlsKey"`
 	TlsCert string `yaml:"tlsCert"`
 }
+
+func (m ApplicationParams[SpecialParams]) GetNetwork(name string) *NetworkParams {
+	return GetValueFromMap(name, m.Network)
+}
