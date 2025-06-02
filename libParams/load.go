@@ -20,6 +20,18 @@ func Load[T any](path string) (*ApplicationParams[T], error) {
 	return &paramData, nil
 }
 
+func ParsePrams[T any](paramFile string, keys [][]byte) (*ApplicationParams[T], error) {
+	wsParams, err := Load[T](paramFile)
+	if err != nil {
+		return nil, err
+	}
+	wsParams, err = DecryptParams(keys[0], keys[1], wsParams)
+	if err != nil {
+		return nil, err
+	}
+	return wsParams, nil
+}
+
 func Write[T any](params *ApplicationParams[T], path string) error {
 	paramData, err := yaml.Marshal(&params)
 	if err != nil {

@@ -130,7 +130,7 @@ func DecryptParams[T any](keyByte, ivByte []byte, params *ApplicationParams[T]) 
 		for id := range params.SecureParameterGroups[group].SecureParams {
 			current := params.SecureParameterGroups[group].SecureParams[id]
 			if current.IsPlain {
-				return nil, fmt.Errorf("security field %s is plain", id)
+				return nil, fmt.Errorf("security field %s=>%s is plain", group, id)
 			}
 			result, err := Decrypt(
 				key, iv, id,
@@ -144,15 +144,25 @@ func DecryptParams[T any](keyByte, ivByte []byte, params *ApplicationParams[T]) 
 			case "remote-api":
 				api := params.RemoteApis[tags[1]]
 				switch tags[2] {
+				case "grant-type":
+					api.AuthData.GrantType = current.Value
+				case "user":
+					api.AuthData.User = current.Value
 				case "password":
 					api.AuthData.Password = current.Value
+				case "client-id":
+					api.AuthData.ClientID = current.Value
 				case "client-secret":
 					api.AuthData.ClientSecret = current.Value
+				case "auth-url":
+					api.AuthData.AuthURI = current.Value
 				}
 				params.RemoteApis[tags[1]] = api
 			case "security-module-param":
 				if tags[3] == "password" {
 					params.SecurityModule[tags[1]].Params[tags[2]+"-pass"] = current.Value
+				} else {
+					params.SecurityModule[tags[1]].Params[tags[2]] = current.Value
 				}
 			default:
 				params.ParameterGroups[group].Params[id] = params.SecureParameterGroups[group].SecureParams[id].Value

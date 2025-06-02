@@ -31,6 +31,7 @@ type ParamInterface interface {
 	GetNetwork(name string) *NetworkParams
 	GetLogging() LogParams
 	GetDB(name string) *DbParams
+	SetDB(name string, db *DbParams)
 	GetSecurityModule(name string) *SecurityModule
 	GetRemoteApi(name string) *libCallApi.RemoteApi
 	GetParam(group, name string) *string

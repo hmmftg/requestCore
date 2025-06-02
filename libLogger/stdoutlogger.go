@@ -1,34 +1,28 @@
-package logger
+package libLogger
 
 import (
 	"fmt"
 	"log"
+	"os"
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/hmmftg/requestCore/libLogger"
 	"github.com/hmmftg/requestCore/libParams"
-
-	//cSpell: ignore natefinch
-	"gopkg.in/natefinch/lumberjack.v2"
 )
 
-func ConfigGinLogger(params libLogger.LoggerInterface) gin.LoggerConfig {
-	logger := lumberjack.Logger{
-		Filename: params.GetLogPath(),
-		MaxSize:  params.GetLogSize(), // megabytes
-		//MaxBackups: 3, keep all
-		//MaxAge:     28,   //days, keep all
-		Compress:  params.GetLogCompress(), // disabled by default
-		LocalTime: true,
-	}
+type StdoutLogger struct {
+}
 
-	libParams.LogRotate(&logger)
+func (logger StdoutLogger) Write(p []byte) (n int, err error) {
+	return os.Stdout.WriteString(string(p))
+}
 
-	log.SetOutput(&logger)
+func (logger StdoutLogger) Config(wsParams libParams.ParamInterface) gin.LoggerConfig {
+	log.SetOutput(logger)
+	log.Printf("Logger Configured %T \n", logger)
 	return gin.LoggerConfig{
-		Output:    &logger,
-		SkipPaths: params.GetSkipPaths(),
+		Output:    logger,
+		SkipPaths: wsParams.GetLogging().SkipPaths,
 		Formatter: func(param gin.LogFormatterParams) string {
 			var statusColor, methodColor, resetColor string
 			if param.IsOutputColor() {
@@ -41,7 +35,7 @@ func ConfigGinLogger(params libLogger.LoggerInterface) gin.LoggerConfig {
 				param.Latency = param.Latency.Truncate(time.Second)
 			}
 			return fmt.Sprintf("[%s] %v |%s %3d %s| %13v | %15s |%s %-7s %s %#v\n%s",
-				params.GetHeaderName(),
+				wsParams.GetLogging().LogHeader,
 				param.TimeStamp.Format("2006/01/02 - 15:04:05"),
 				statusColor, param.StatusCode, resetColor,
 				param.Latency,

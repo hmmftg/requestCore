@@ -5,12 +5,12 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/logger"
+	"github.com/hmmftg/requestCore/libLogger"
 	"github.com/hmmftg/requestCore/libParams"
-	"github.com/hmmftg/requestCore/libRequest"
 	"gopkg.in/natefinch/lumberjack.v2"
 )
 
-func ConfigFiberLogger(params libRequest.LoggerInterface) logger.Config {
+func ConfigFiberLogger(params libLogger.LoggerInterface) logger.Config {
 	logWriter := lumberjack.Logger{
 		Filename: params.GetLogPath(),
 		MaxSize:  params.GetLogSize(), // megabytes

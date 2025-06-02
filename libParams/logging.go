@@ -28,6 +28,22 @@ type LogParams struct {
 	Splunk      *SplunkParams `yaml:"splunkParams"`
 }
 
+func (l LogParams) GetLogPath() string {
+	return l.LogPath
+}
+func (l LogParams) GetLogSize() int {
+	return l.LogSize
+}
+func (l LogParams) GetLogCompress() bool {
+	return l.LogCompress
+}
+func (l LogParams) GetSkipPaths() []string {
+	return l.SkipPaths
+}
+func (l LogParams) GetHeaderName() string {
+	return l.LogHeader
+}
+
 func (m ApplicationParams[SpecialParams]) GetLogging() LogParams {
 	return m.Logging
 }
