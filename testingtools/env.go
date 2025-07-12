@@ -23,7 +23,6 @@ func PrepareEnvWithDB(env TestingEnv, db *sql.DB) {
 		DefaultAPIList(),
 		db,
 	)
-	wsParams.AccessRoles = DefaultAccessRoles()
 	env.SetInterface(model)
 	env.SetParams(&wsParams)
 }
@@ -50,7 +49,6 @@ func GetEnvWithDB[Env any, PT interface {
 		defaultAPIList(),
 		db,
 	)
-	wsParams.AccessRoles = DefaultAccessRoles()
 	env := PT(new(Env))
 	env.SetInterface(model)
 	env.SetParams(&wsParams)

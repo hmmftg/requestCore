@@ -116,6 +116,11 @@ func Filterate[Row any](paginationData libRequest.PaginationData, data []Row, fi
 	result := slices.Clone(data)
 	for id := range filterList {
 		split := strings.Split(filterList[id], " ")
+		if len(split) != 4 {
+			for i := len(split); i < 4; i++ {
+				split = append(split, " ")
+			}
+		}
 		result = slices.DeleteFunc(
 			result,
 			filterFunc(

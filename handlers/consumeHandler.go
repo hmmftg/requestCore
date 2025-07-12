@@ -74,7 +74,7 @@ func (c CallArgs[Req, Resp]) Initializer(req HandlerRequest[Req, Resp]) error {
 	}
 	headersMap := ExtractHeaders(req.W, c.Headers, c.Locals)
 	if !c.ForwardAuth {
-		remoteApi := req.Core.Consumer().GetApi(c.Api)
+		remoteApi := req.Core.Params().GetRemoteApi(c.Api)
 		headersMap["Authorization"] = "Basic " + libCallApi.BasicAuth(remoteApi.AuthData.User, remoteApi.AuthData.Password)
 	}
 	req.W.Parser.SetLocal(HeadersMap, headersMap)
@@ -101,7 +101,7 @@ func (c CallArgs[Req, Resp]) Handler(req HandlerRequest[Req, Resp]) (Resp, error
 		&libCallApi.RemoteCallParamData[Req, Resp]{
 			Headers:  headers,
 			JsonBody: *req.Request,
-			Api:      req.Core.Consumer().GetApi(c.Api),
+			Api:      *req.Core.Params().GetRemoteApi(c.Api),
 			Method:   c.Method,
 			Path:     finalPath,
 		},
@@ -134,7 +134,6 @@ func CallRemoteWithRespParser[Req any, Resp any](
 	return BaseHandler(core, callArgs, simulation, args)
 }
 
-// initializer func(c webFramework.WebFramework, method, url string, reqLog libRequest.RequestPtr, args ...any) (int, map[string]string, error),
 func InitPostRequest(
 	w webFramework.WebFramework,
 	reqLog libRequest.RequestPtr,
@@ -149,7 +148,7 @@ func InitPostRequest(
 	}
 	err = insertRequest(*reqLog)
 	if err != nil {
-		return http.StatusServiceUnavailable, map[string]string{"desc": "PWC_REGISTER", "message": "Unable To Register Request"}, err
+		return http.StatusServiceUnavailable, map[string]string{"desc": "UNABLE_TO_REGISTER", "message": "Unable To Register Request"}, err
 	}
 	var params []any
 	for _, arg := range args {
@@ -198,7 +197,7 @@ func (h *ConsumeHandlerType[Req, Resp]) Handler(req HandlerRequest[Req, Resp]) (
 	headersMap := ExtractHeaders(req.W, h.Headers, nil)
 	resp, errCall := CallApiJSON(req.W, req.Core, h.Title,
 		&libCallApi.RemoteCallParamData[Req, Resp]{
-			Api:         req.Core.Consumer().GetApi(h.Api),
+			Api:         *req.Core.Params().GetRemoteApi(h.Api),
 			Method:      h.Method,
 			Path:        h.Path,
 			Query:       h.Query,
