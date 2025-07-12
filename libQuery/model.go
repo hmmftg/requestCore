@@ -55,6 +55,7 @@ type QueryRunnerInterface interface {
 	SetVariableCommand() string
 	//Used in mock db for test
 	Close()
+	GetDbMode() DBMode
 }
 
 type DmlModel interface {
@@ -77,25 +78,59 @@ type DmlCommandType int
 type DmlCommand struct {
 	Name        string
 	Command     string
+	CommandMap  map[DBMode]string
 	Args        []any
 	Type        DmlCommandType
 	CustomError error
+}
+
+func (d DmlCommand) GetCommand(mode DBMode) string {
+	query := d.Command
+	if len(d.CommandMap) > 0 && len(d.CommandMap[mode]) > 0 {
+		query = d.CommandMap[mode]
+	}
+	return query
+}
+
+func (d DmlCommand) GetArgs() []any {
+	return d.Args
+}
+
+func (d DmlCommand) GetType() int {
+	return int(d.Type)
 }
 
 //go:generate enumer -type=QueryCommandType -json -output queryEnum.go
 type QueryCommandType int
 
 type QueryCommand struct {
-	Name    string
-	Command string
-	Type    QueryCommandType
-	Args    []string
+	Name       string
+	Command    string
+	CommandMap map[DBMode]string
+	Type       QueryCommandType
+	Args       []any
+}
+
+func (q QueryCommand) GetCommand(mode DBMode) string {
+	query := q.Command
+	if len(q.CommandMap) > 0 && len(q.CommandMap[mode]) > 0 {
+		query = q.CommandMap[mode]
+	}
+	return query
+}
+
+func (q QueryCommand) GetArgs() []any {
+	return q.Args
+}
+
+func (q QueryCommand) GetType() int {
+	return int(q.Type)
 }
 
 func (q QueryCommand) GetDriverArgs(req any) []driver.Value {
 	args := []driver.Value{}
 	for id := range q.Args {
-		_, val, err := GetFormTagValue(q.Args[id], req)
+		_, val, err := GetFormTagValue(q.Args[id].(string), req)
 		if err != nil {
 			return nil
 		}

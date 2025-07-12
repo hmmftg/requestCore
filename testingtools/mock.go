@@ -136,6 +136,7 @@ func SampleMockDB(t *testing.T, mockList func(sqlmock.Sqlmock)) *sql.DB {
 
 func SampleQueryMock(t *testing.T, mockList func(sqlmock.Sqlmock)) libQuery.QueryRunnerModel {
 	return libQuery.QueryRunnerModel{
-		DB: SampleMockDB(t, mockList),
+		DB:   SampleMockDB(t, mockList),
+		Mode: libQuery.MockDB,
 	}
 }

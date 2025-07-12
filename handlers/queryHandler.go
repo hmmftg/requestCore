@@ -68,6 +68,7 @@ type QueryHandlerType[Row, Resp any] struct {
 	Mode            libRequest.Type
 	VerifyHeader    bool
 	Key             string
+	DbMode          libQuery.DBMode
 	Command         libQuery.QueryCommand
 	Translator      RowTranslator[Row, Resp]
 	RecoveryHandler func(any)
@@ -187,7 +188,7 @@ func (q QueryHandlerType[Row, Resp]) CacheResult(args []any, rows []Row) {
 func (q QueryHandlerType[Row, Resp]) Handler(req HandlerRequest[Row, Resp]) (Resp, error) {
 	anyArgs := []any{}
 	for id := range q.Command.Args {
-		_, val, err := libQuery.GetFormTagValue(q.Command.Args[id], req.Request)
+		_, val, err := libQuery.GetFormTagValue(q.Command.Args[id].(string), req.Request)
 		if err != nil {
 			return req.Response, errors.Join(err, libError.NewWithDescription(
 				status.InternalServerError,
@@ -204,6 +205,10 @@ func (q QueryHandlerType[Row, Resp]) Handler(req HandlerRequest[Row, Resp]) (Res
 	}
 	if rows == nil {
 		command := q.Command.Command
+		if len(q.Command.CommandMap) > 0 && len(q.Command.CommandMap[q.DbMode]) > 0 {
+			command = q.Command.CommandMap[q.DbMode]
+		}
+
 		if q.PaginateCommand != nil {
 			if q.Mode == libRequest.QueryWithPagination || q.Mode == libRequest.URIAndPagination {
 				pgData, ok := req.W.Parser.GetLocal(libRequest.PaginationLocalTag).(libRequest.PaginationData)
@@ -281,6 +286,7 @@ func queryHandler[Row any, Resp []Row](
 	validateHeader, simulation bool,
 	recoveryHandler func(any),
 	caching *CachingArgs,
+	dbMode libQuery.DBMode,
 ) any {
 	command := queryMap[key]
 	var handler QueryHandlerType[Row, Resp]
@@ -295,6 +301,7 @@ func queryHandler[Row any, Resp []Row](
 			Path:            path,
 			Translator:      QuerySingleTransformer[Row, Resp]{},
 			RecoveryHandler: recoveryHandler,
+			DbMode:          dbMode,
 		}
 	case libQuery.QueryAll:
 		handler = QueryHandlerType[Row, Resp]{
@@ -306,6 +313,7 @@ func queryHandler[Row any, Resp []Row](
 			Path:            path,
 			Translator:      QueryAllTransformer[Row, Resp]{},
 			RecoveryHandler: recoveryHandler,
+			DbMode:          dbMode,
 		}
 	default:
 		log.Fatalln("invalid command type", command.Type)
@@ -330,7 +338,7 @@ func QueryHandler[Row any, Resp []Row](
 		core,
 		mode,
 		validateHeader, simulation,
-		recoveryHandler, nil)
+		recoveryHandler, nil, core.GetDB().GetDbMode())
 }
 
 func QueryHandlerWithCaching[Row any, Resp []Row](
@@ -344,7 +352,7 @@ func QueryHandlerWithCaching[Row any, Resp []Row](
 	return queryHandler[Row](
 		title, key, path, queryMap,
 		core, mode, validateHeader, simulation,
-		recoveryHandler, caching,
+		recoveryHandler, caching, core.GetDB().GetDbMode(),
 	)
 }
 

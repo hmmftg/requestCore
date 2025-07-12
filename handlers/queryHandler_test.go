@@ -40,9 +40,15 @@ const (
 	Query1   = "query1"
 	Query2   = "query2"
 	Query3   = "query3"
+	Query4   = "query4"
+	Query5   = "query5"
+	Query6   = "query6"
 	Command1 = "command1"
 	Command2 = "command2"
 	Command3 = "command3"
+	Command4 = "command4"
+	Command5 = "command5"
+	Command6 = "command6"
 )
 
 var (
@@ -61,7 +67,35 @@ var (
 			Name:    "q3",
 			Command: Command3,
 			Type:    libQuery.QuerySingle,
-			Args:    []string{"id", "p2"},
+			Args:    []any{"id", "p2"},
+		},
+		Query4: {
+			Name:    "q4",
+			Command: Command4,
+			Type:    libQuery.QuerySingle,
+			CommandMap: map[libQuery.DBMode]string{
+				libQuery.MockDB: Command4,
+				libQuery.Oracle: Command1,
+			},
+		},
+		Query5: {
+			Name:    "q5",
+			Command: Command5,
+			Type:    libQuery.QueryAll,
+			CommandMap: map[libQuery.DBMode]string{
+				libQuery.MockDB: Command5,
+				libQuery.Oracle: Command2,
+			},
+		},
+		Query6: {
+			Name:    "q6",
+			Command: Command6,
+			Type:    libQuery.QuerySingle,
+			Args:    []any{"id", "p2"},
+			CommandMap: map[libQuery.DBMode]string{
+				libQuery.MockDB: Command6,
+				libQuery.Oracle: Command3,
+			},
 		},
 	}
 )
@@ -394,6 +428,153 @@ func TestQueryHandlerWithTransform(t *testing.T) {
 				Name:    "check query with args handler",
 				Method:  "GET",
 				Handler: env.handlerWithTransform(),
+				Silent:  true,
+			})
+	}
+}
+
+func (env *testQueryEnv) handlerMultiDb() any {
+	return QueryHandler[testQueryReq](
+		"query_handler_multi_db",
+		Query4,
+		"/",
+		QueryMap,
+		env.Interface,
+		libRequest.Query,
+		true,
+		false,
+		nil,
+	)
+}
+
+func TestQueryHandlerMultiDb(t *testing.T) {
+	testCases := []testingtools.TestCase{
+		{
+			Name:      "Valid",
+			Url:       "/?id=1",
+			Status:    200,
+			CheckBody: []string{`"result":[`, `{"id":"4","data":"5"}`},
+			Model: testingtools.SampleQueryMock(t, func(mockDB sqlmock.Sqlmock) {
+				mockDB.ExpectPrepare(Command4).
+					ExpectQuery().WillReturnRows(
+					sqlmock.NewRows([]string{"ID", "DATA"}).
+						AddRow("4", "5"))
+			}),
+		},
+	}
+
+	for id := range testCases {
+		env := testingtools.GetEnvWithDB[testQueryEnv](
+			testCases[id].Model.DB,
+			testingtools.DefaultAPIList)
+
+		testingtools.TestDB(
+			t,
+			&testCases[id],
+			&testingtools.TestOptions{
+				Path:    "/",
+				Name:    "check query handler",
+				Method:  "GET",
+				Handler: env.handlerMultiDb(),
+				Silent:  true,
+			})
+	}
+}
+
+func (env *testQueryEnv) handlerAllMultiDb() any {
+	return QueryHandler[testQueryReq](
+		"queryAll_handler_all_multi_db",
+		Query5,
+		"/",
+		QueryMap,
+		env.Interface,
+		libRequest.Query,
+		true,
+		false,
+		nil,
+	)
+}
+
+func TestQueryAllHandlerMultiDb(t *testing.T) {
+	testCases := []testingtools.TestCase{
+		{
+			Name:      "Valid",
+			Url:       "/?id=1",
+			Status:    200,
+			CheckBody: []string{`"result":[`, `{"id":"5","data":"6"}`, `{"id":"7","data":"8"}`},
+			Model: testingtools.SampleQueryMock(t, func(mockDB sqlmock.Sqlmock) {
+				mockDB.ExpectPrepare(Command5).
+					ExpectQuery().WillReturnRows(
+					sqlmock.NewRows([]string{"ID", "DATA"}).
+						AddRow("5", "6").
+						AddRow("7", "8"))
+			}),
+		},
+	}
+
+	for id := range testCases {
+		env := testingtools.GetEnvWithDB[testQueryEnv](
+			testCases[id].Model.DB,
+			testingtools.DefaultAPIList)
+
+		testingtools.TestDB(
+			t,
+			&testCases[id],
+			&testingtools.TestOptions{
+				Path:    "/",
+				Name:    "check query all multi db handler",
+				Method:  "GET",
+				Handler: env.handlerAllMultiDb(),
+				Silent:  true,
+			})
+	}
+}
+
+func (env *testQueryEnv) handlerWithArgsMultiDb() any {
+	return QueryHandler[testQueryReq](
+		"query_handler_with_args_multi_db",
+		Query6,
+		"/",
+		QueryMap,
+		env.Interface,
+		libRequest.Query,
+		true,
+		false,
+		nil,
+	)
+}
+
+func TestQueryHandlerWithArgsMultiDb(t *testing.T) {
+	testCases := []testingtools.TestCase{
+		{
+			Name:      "Valid",
+			Url:       "/?id=1&p2=3",
+			Status:    200,
+			CheckBody: []string{`"result":[`, `{"id":"6","data":"7"}`},
+			Model: testingtools.SampleQueryMock(t, func(mockDB sqlmock.Sqlmock) {
+				mockDB.ExpectPrepare(Command6).
+					ExpectQuery().
+					WithArgs(QueryMap[Query6].GetDriverArgs(testQueryReq{ID: "1", P2: "3"})...).
+					WillReturnRows(
+						sqlmock.NewRows([]string{"ID", "DATA"}).
+							AddRow("6", "7"))
+			}),
+		},
+	}
+
+	for id := range testCases {
+		env := testingtools.GetEnvWithDB[testQueryEnv](
+			testCases[id].Model.DB,
+			testingtools.DefaultAPIList)
+
+		testingtools.TestDB(
+			t,
+			&testCases[id],
+			&testingtools.TestOptions{
+				Path:    "/",
+				Name:    "check query with args multi db handler",
+				Method:  "GET",
+				Handler: env.handlerWithArgsMultiDb(),
 				Silent:  true,
 			})
 	}

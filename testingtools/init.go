@@ -156,6 +156,7 @@ func InitTestingWithDB(
 		DB:          db,
 		ProgramName: filepath.Base(os.Args[0]),
 		ModuleName:  "",
+		Mode:        libQuery.MockDB,
 	}
 	requestHandler := libRequest.RequestModel{
 		QueryInterface: queryRunner,

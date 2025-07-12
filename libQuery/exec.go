@@ -121,7 +121,7 @@ func GetOutArgs(parser webFramework.RequestParser, args ...any) map[string]strin
 func (command DmlCommand) ExecuteWithContext(parser webFramework.RequestParser, w context.Context, moduleName, methodName string, core QueryRunnerInterface) (any, error) {
 	switch command.Type {
 	case QueryCheckExists:
-		result, err := GetQuery[QueryData](command.Command, core, GetLocalArgs(parser, command.Args)...)
+		result, err := Query[QueryData](command, core, GetLocalArgs(parser, command.Args)...)
 		if err != nil {
 			if command.CustomError != nil {
 				return nil, command.CustomError
@@ -133,7 +133,7 @@ func (command DmlCommand) ExecuteWithContext(parser webFramework.RequestParser, 
 		}
 		return result, nil
 	case QueryCheckNotExists:
-		_, err := GetQuery[QueryData](command.Command, core, GetLocalArgs(parser, command.Args)...)
+		_, err := Query[QueryData](command, core, GetLocalArgs(parser, command.Args)...)
 		if err != nil {
 			if ok, err := libError.Unwrap(err); ok && err.Action().Description == NO_DATA_FOUND {
 				return nil, nil
@@ -142,7 +142,7 @@ func (command DmlCommand) ExecuteWithContext(parser webFramework.RequestParser, 
 		}
 		return nil, response.ToError(DUPLICATE_FOUND, DUPLICATE_FOUND_DESC, fmt.Errorf("CheckNotExists: %s=> %s", command.Name, DUPLICATE_FOUND))
 	case Insert:
-		resp, err := core.Dml(w, moduleName, methodName, command.Command, GetLocalArgs(parser, command.Args)...)
+		resp, err := core.Dml(w, moduleName, methodName, command.GetCommand(core.GetDbMode()), GetLocalArgs(parser, command.Args)...)
 		if err != nil {
 			if command.CustomError != nil {
 				return nil, command.CustomError
@@ -152,7 +152,7 @@ func (command DmlCommand) ExecuteWithContext(parser webFramework.RequestParser, 
 		outValues := GetOutArgs(parser, command.Args...)
 		return GetDmlResult(resp, outValues), nil
 	case Update:
-		resp, err := core.Dml(w, moduleName, methodName, command.Command, GetLocalArgs(parser, command.Args)...)
+		resp, err := core.Dml(w, moduleName, methodName, command.GetCommand(core.GetDbMode()), GetLocalArgs(parser, command.Args)...)
 		if err != nil {
 			if command.CustomError != nil {
 				return nil, command.CustomError
@@ -162,7 +162,7 @@ func (command DmlCommand) ExecuteWithContext(parser webFramework.RequestParser, 
 		outValues := GetOutArgs(parser, command.Args...)
 		return GetDmlResult(resp, outValues), nil
 	case Delete:
-		resp, err := core.Dml(w, moduleName, methodName, command.Command, GetLocalArgs(parser, command.Args)...)
+		resp, err := core.Dml(w, moduleName, methodName, command.GetCommand(core.GetDbMode()), GetLocalArgs(parser, command.Args)...)
 		if err != nil {
 			if command.CustomError != nil {
 				return nil, command.CustomError

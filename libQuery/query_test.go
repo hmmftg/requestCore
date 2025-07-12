@@ -39,7 +39,7 @@ type sampleOutput struct {
 func (s sampleOutput) GetID() string { return "" }
 func (s sampleOutput) GetValue() any { return "" }
 
-func TestOldQueryRunner(t *testing.T) {
+func TestVeryOldQueryRunner(t *testing.T) {
 	type TestCase struct {
 		Name    string
 		Model   libQuery.QueryRunnerInterface
@@ -81,7 +81,7 @@ func TestOldQueryRunner(t *testing.T) {
 	}
 }
 
-func TestQueryRunner(t *testing.T) {
+func TestOldQueryRunner(t *testing.T) {
 	type TestCase struct {
 		Name    string
 		Model   libQuery.QueryRunnerInterface
@@ -109,7 +109,49 @@ func TestQueryRunner(t *testing.T) {
 	},
 	}
 	for _, testCase := range testCases {
-		result, err := libQuery.Query[sampleOutput](testCase.Model, testCase.Command)
+		result, err := libQuery.QueryOld[sampleOutput](testCase.Model, testCase.Command)
+		if err != nil && testCase.Error == "" {
+			t.Fatal("unwanted error", err)
+		}
+		if err == nil && testCase.Error != "" {
+			t.Fatal("error wanted", testCase.Error, "got", err)
+		}
+		assert.DeepEqual(t, result, testCase.Result)
+		if err != nil {
+			assert.Equal(t, err.Error(), testCase.Error)
+		}
+	}
+}
+
+func TestQueryRunner(t *testing.T) {
+	type TestCase struct {
+		Name    string
+		Model   libQuery.QueryRunnerInterface
+		Command libQuery.QueryCommand
+		Result  []sampleOutput
+		Error   string
+	}
+	cols := []string{"string", "bool", "time", "int64", "float64"}
+	tm := time.Now()
+	testCases := []TestCase{{
+		Name:    "Valid Query",
+		Command: libQuery.QueryCommand{Command: "query", Type: libQuery.QuerySingle},
+		Model:   getQueryMock(nil, cols, "a", true, tm, 10, 12.1),
+		Result:  []sampleOutput{{String: "a", Bool: true, Int64: 10, Float64: 12.1, Time: tm}},
+	}, {
+		Name:    "Query On Some Fields",
+		Command: libQuery.QueryCommand{Command: "query", Type: libQuery.QuerySingle},
+		Model:   getQueryMock(nil, []string{"string", "bool"}, "a", true),
+		Result:  []sampleOutput{{String: "a", Bool: true}},
+	}, {
+		Name:    "Replace float64 with int64",
+		Command: libQuery.QueryCommand{Command: "query", Type: libQuery.QuerySingle},
+		Model:   getQueryMock(nil, []string{"string", "float64"}, "a", 10),
+		Result:  []sampleOutput{{String: "a", Float64: 10}},
+	},
+	}
+	for _, testCase := range testCases {
+		result, err := libQuery.Query[sampleOutput](testCase.Command, testCase.Model)
 		if err != nil && testCase.Error == "" {
 			t.Fatal("unwanted error", err)
 		}

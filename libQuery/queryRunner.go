@@ -18,6 +18,10 @@ func (m QueryRunnerModel) GetModule() (string, string) {
 	return m.ModuleName, m.ProgramName
 }
 
+func (m QueryRunnerModel) GetDbMode() DBMode {
+	return m.Mode
+}
+
 const (
 	PREPARE_ERROR = -1
 	QUERY_ERROR   = -2
@@ -186,6 +190,48 @@ func GetQuery[R any](query string, core QueryRunnerInterface, args ...any) ([]R,
 	return rows, nil
 }
 
+type CommandInterface interface {
+	GetCommand(DBMode) string
+	GetArgs() []any
+	GetType() int
+}
+
+func Query[R any](command CommandInterface, core QueryRunnerInterface, args ...any) ([]R, error) {
+	if command.GetType() == int(QueryMap) {
+		return nil, libError.NewWithDescription(status.BadRequest, DB_READ_ERROR, "unsupported command type")
+	}
+	query := command.GetCommand(core.GetDbMode())
+	//Query
+	rows, err := QueryToStruct[R](core, query, args...)
+	if err != nil {
+		return nil, errors.Join(
+			err,
+			libError.NewWithDescription(status.InternalServerError, DB_READ_ERROR, "unable to execute query"),
+		)
+	}
+	switch command.GetType() {
+	case int(QuerySingle):
+		if len(rows) == 0 {
+			return nil, libError.NewWithDescription(
+				http.StatusBadRequest,
+				NO_DATA_FOUND,
+				"no data found: %s,%v", query, args,
+			)
+		}
+		if len(rows) > 1 {
+			return nil, libError.NewWithDescription(
+				http.StatusBadRequest,
+				DUPLICATE_FOUND,
+				"duplicate data found: %s,%v,%v", query, args, rows,
+			)
+		}
+		return rows, nil
+	case int(QueryAll):
+		return rows, nil
+	}
+	return nil, nil
+}
+
 const (
 	QuerySingle QueryCommandType = iota
 	QueryAll
@@ -193,8 +239,12 @@ const (
 	Transforms
 )
 
-func Query[Result QueryResult](core QueryRunnerInterface, command QueryCommand, args ...any) (any, error) {
-	result, err := GetQuery[Result](command.Command, core, args...)
+func QueryOld[Result QueryResult](core QueryRunnerInterface, command QueryCommand, args ...any) (any, error) {
+	sqlCommand := command.Command
+	if len(command.CommandMap) > 0 && len(command.CommandMap[core.GetDbMode()]) > 0 {
+		sqlCommand = command.CommandMap[core.GetDbMode()]
+	}
+	result, err := GetQuery[Result](sqlCommand, core, args...)
 	if err != nil {
 		if ok, err := libError.Unwrap(err); ok {
 			if err.Action().Description == NO_DATA_FOUND {
