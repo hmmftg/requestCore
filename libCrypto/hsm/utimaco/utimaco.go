@@ -293,6 +293,9 @@ func (config *Utimaco) GetKey(id string) string {
 func (config *Utimaco) Mac(data string) (string, error) {
 	return "0000000000000000", nil
 }
+func (config *Utimaco) Cvv2Padding(data string) (string, error) {
+	return "0000000000000000", nil
+}
 func (config *Utimaco) Translate(pan, pinBlock, tpk2nd string) (string, error) {
 	return pinBlock, nil
 }

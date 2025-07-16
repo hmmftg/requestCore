@@ -2,8 +2,10 @@ package ssm
 
 import (
 	"encoding/hex"
+	"fmt"
 	"math/rand"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/hmmftg/requestCore/libCrypto"
@@ -15,6 +17,7 @@ type Ssm struct {
 	Cvk  string
 	Pvk  string
 	Tpk  string
+	Csd  string
 	Pvki string
 }
 
@@ -56,6 +59,8 @@ func (s *Ssm) SetKey(id, value string) {
 		s.Pvk = value
 	case "Tpk":
 		s.Tpk = value
+	case "Csd":
+		s.Csd = value
 	}
 }
 func (s *Ssm) GetKey(id string) string {
@@ -66,6 +71,8 @@ func (s *Ssm) GetKey(id string) string {
 		return s.Pvk
 	case "Tpk":
 		return s.Tpk
+	case "Csd":
+		return s.Csd
 	}
 	return ""
 }
@@ -140,6 +147,13 @@ func (s *Ssm) Crypt(data, mode string) (string, error) {
 		result, err = EncryptDesHex(data, s.Tpk)
 	}
 	return result, err
+}
+
+func (s *Ssm) Cvv2Padding(cvv2 string) (string, error) {
+	tspHex := fmt.Sprintf("%X%s", cvv2, strings.Repeat("30", 16-len(cvv2)))
+
+	//log.Println(tspHex)
+	return EncryptDesHex(tspHex, s.Csd)
 }
 
 func (s *Ssm) PinBlockDecode(pan, pinBlock string) (string, error) {

@@ -11,6 +11,7 @@ func TestPinBlock(t *testing.T) {
 		Tpk: "HBwcHBwcHBwcHBwcHBwcHA==",
 		Pvk: "QEYQEBUjYYNSVwQ0hjgQUg==",
 		Cvk: "c3VRCJiAc2EBEAE3RZFUQA==",
+		Csd: "HBwcHBwcHBwcHBwcHBwcHA==",
 	}
 	resp, err := sm.PinBlock("1111111111111111", "1111")
 	want := "3BB2D96604C3D1D7"
@@ -50,5 +51,11 @@ func TestPinBlock(t *testing.T) {
 	want = "666"
 	if err != nil || resp != want {
 		t.Fatalf(`Cvv(pan,exp) = %s, %v, want: %s`, resp, err, want)
+	}
+
+	resp, err = sm.Cvv2Padding("1234")
+	want = "D2CBF605E0978213585220B9B7D1BFC4"
+	if err != nil || resp != want {
+		t.Fatalf(`CvvPadding(cvv2) = %s, %v, want: %s`, resp, err, want)
 	}
 }
