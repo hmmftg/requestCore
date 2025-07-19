@@ -4,6 +4,7 @@ type Sm interface {
 	SetKey(id, value string)
 	GetKey(id string) string
 	Cvv(pan, exp, cvvType string) (string, error)
+	Cvv2Padding(cvv2 string) (string, error)
 	Pvv(pan, pinBlock string) (string, error)
 	Offset(pan, pinBlock string) (string, error)
 	Mac(data string) (string, error)
