@@ -8,11 +8,11 @@ import (
 	"strings"
 )
 
-const _QueryCommandTypeName = "QuerySingleQueryAllQueryMap"
+const _QueryCommandTypeName = "QuerySingleQueryAllQueryMapTransforms"
 
-var _QueryCommandTypeIndex = [...]uint8{0, 11, 19, 27}
+var _QueryCommandTypeIndex = [...]uint8{0, 11, 19, 27, 37}
 
-const _QueryCommandTypeLowerName = "querysinglequeryallquerymap"
+const _QueryCommandTypeLowerName = "querysinglequeryallquerymaptransforms"
 
 func (i QueryCommandType) String() string {
 	if i < 0 || i >= QueryCommandType(len(_QueryCommandTypeIndex)-1) {
@@ -28,9 +28,10 @@ func _QueryCommandTypeNoOp() {
 	_ = x[QuerySingle-(0)]
 	_ = x[QueryAll-(1)]
 	_ = x[QueryMap-(2)]
+	_ = x[Transforms-(3)]
 }
 
-var _QueryCommandTypeValues = []QueryCommandType{QuerySingle, QueryAll, QueryMap}
+var _QueryCommandTypeValues = []QueryCommandType{QuerySingle, QueryAll, QueryMap, Transforms}
 
 var _QueryCommandTypeNameToValueMap = map[string]QueryCommandType{
 	_QueryCommandTypeName[0:11]:       QuerySingle,
@@ -39,12 +40,15 @@ var _QueryCommandTypeNameToValueMap = map[string]QueryCommandType{
 	_QueryCommandTypeLowerName[11:19]: QueryAll,
 	_QueryCommandTypeName[19:27]:      QueryMap,
 	_QueryCommandTypeLowerName[19:27]: QueryMap,
+	_QueryCommandTypeName[27:37]:      Transforms,
+	_QueryCommandTypeLowerName[27:37]: Transforms,
 }
 
 var _QueryCommandTypeNames = []string{
 	_QueryCommandTypeName[0:11],
 	_QueryCommandTypeName[11:19],
 	_QueryCommandTypeName[19:27],
+	_QueryCommandTypeName[27:37],
 }
 
 // QueryCommandTypeString retrieves an enum value from the enum constants string name.

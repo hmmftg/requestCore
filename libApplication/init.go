@@ -65,6 +65,9 @@ func InitializeApp[T any](app Application[T]) {
 	flag.Parse()
 
 	wsParams, err := libParams.ParsePrams[T](*paramFile, app.GetKeys())
+	if err != nil {
+		log.Fatal("InitializeApp: ParsePrams=>", err)
+	}
 
 	InitDataBases(wsParams, app.GetDbList())
 

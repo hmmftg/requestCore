@@ -8,11 +8,11 @@ import (
 	"strings"
 )
 
-const _DBModeName = "OraclePostgresSqlLiteMockDB"
+const _DBModeName = "OraclePostgresSqliteMockDBMySql"
 
-var _DBModeIndex = [...]uint8{0, 6, 14, 21, 27}
+var _DBModeIndex = [...]uint8{0, 6, 14, 20, 26, 31}
 
-const _DBModeLowerName = "oraclepostgressqllitemockdb"
+const _DBModeLowerName = "oraclepostgressqlitemockdbmysql"
 
 func (i DBMode) String() string {
 	if i < 0 || i >= DBMode(len(_DBModeIndex)-1) {
@@ -27,28 +27,32 @@ func _DBModeNoOp() {
 	var x [1]struct{}
 	_ = x[Oracle-(0)]
 	_ = x[Postgres-(1)]
-	_ = x[SqlLite-(2)]
+	_ = x[Sqlite-(2)]
 	_ = x[MockDB-(3)]
+	_ = x[MySql-(4)]
 }
 
-var _DBModeValues = []DBMode{Oracle, Postgres, SqlLite, MockDB}
+var _DBModeValues = []DBMode{Oracle, Postgres, Sqlite, MockDB, MySql}
 
 var _DBModeNameToValueMap = map[string]DBMode{
 	_DBModeName[0:6]:        Oracle,
 	_DBModeLowerName[0:6]:   Oracle,
 	_DBModeName[6:14]:       Postgres,
 	_DBModeLowerName[6:14]:  Postgres,
-	_DBModeName[14:21]:      SqlLite,
-	_DBModeLowerName[14:21]: SqlLite,
-	_DBModeName[21:27]:      MockDB,
-	_DBModeLowerName[21:27]: MockDB,
+	_DBModeName[14:20]:      Sqlite,
+	_DBModeLowerName[14:20]: Sqlite,
+	_DBModeName[20:26]:      MockDB,
+	_DBModeLowerName[20:26]: MockDB,
+	_DBModeName[26:31]:      MySql,
+	_DBModeLowerName[26:31]: MySql,
 }
 
 var _DBModeNames = []string{
 	_DBModeName[0:6],
 	_DBModeName[6:14],
-	_DBModeName[14:21],
-	_DBModeName[21:27],
+	_DBModeName[14:20],
+	_DBModeName[20:26],
+	_DBModeName[26:31],
 }
 
 // DBModeString retrieves an enum value from the enum constants string name.
