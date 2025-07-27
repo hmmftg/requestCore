@@ -31,7 +31,7 @@ func InitTesting(t *testing.T,
 ) (requestCore.RequestCoreModel, libParams.ParamInterface) {
 	wsParams := libParams.ApplicationParams[TestingParams]{
 		Constants: map[string]libParams.Constants{
-			Default: libParams.Constants{
+			Default: {
 				ErrorDesc: errDesc,
 			},
 		},
@@ -128,7 +128,7 @@ func InitTestingWithDB(
 ) (requestCore.RequestCoreModel, libParams.ApplicationParams[TestingParams]) {
 	wsParams := libParams.ApplicationParams[TestingParams]{
 		Constants: map[string]libParams.Constants{
-			Default: libParams.Constants{
+			Default: {
 				ErrorDesc: errDesc,
 			},
 		},
@@ -150,6 +150,7 @@ func InitTestingWithDB(
 
 	return requestCore.RequestCoreModel{
 		QueryInterface:   queryRunner,
+		OrmInterface:     nil,
 		RequestInterface: requestHandler,
 		RespHandler: response.WebHanlder{
 			ErrorDesc:   wsParams.Constants[Default].ErrorDesc,

@@ -20,8 +20,9 @@ type DBMode int
 const (
 	Oracle DBMode = iota
 	Postgres
-	SqlLite
+	Sqlite
 	MockDB
+	MySql
 )
 
 func Init(
