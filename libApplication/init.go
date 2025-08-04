@@ -116,7 +116,9 @@ func InitializeApp[T any](app Application[T]) {
 		nil,
 		root,
 	)
-	webFramework.CollectServiceRegistrationLogs()
+	if wsParams.Logging.UseSlog {
+		webFramework.CollectServiceRegistrationLogs()
+	}
 
 	if app.HasSwagger() {
 		engine.GET(fmt.Sprintf("%s/%s/swagger/*any", app.BasePath(), app.Name()),
