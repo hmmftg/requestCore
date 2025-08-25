@@ -52,8 +52,15 @@ type Application[T any] interface {
 const NoRequest = "no_req"
 const LogRequest = "log_req"
 
+type App[T any] struct {
+	Instance Application[T]
+	Params   *libParams.ApplicationParams[T]
+	Engine   *gin.Engine
+	Model    requestCore.RequestCoreInterface
+}
+
 //nolint:lll
-func InitializeApp[T any](app Application[T]) {
+func InitializeApp[T any](app Application[T]) *App[T] {
 	var err error
 	log.Printf("%s Version:\t %s\n", app.Title(), app.Version())
 	paramName := os.Getenv("PARAM_NAME")
@@ -132,5 +139,9 @@ func InitializeApp[T any](app Application[T]) {
 		})
 	}
 
-	Listen(wsParams.GetNetwork(app.Name()), engine)
+	return &App[T]{app, wsParams, engine, model}
+}
+
+func StartApp[T any](app App[T]) {
+	Listen(app.Params.GetNetwork(app.Instance.Name()), app.Engine)
 }

@@ -4,6 +4,12 @@ import (
 	"database/sql"
 	"log"
 
+	"github.com/glebarez/sqlite"
+	oracle "github.com/godoes/gorm-oracle"
+	"gorm.io/driver/mysql"
+	"gorm.io/driver/postgres"
+	"gorm.io/gorm"
+
 	"github.com/hmmftg/requestCore/libParams"
 )
 
@@ -19,6 +25,23 @@ func InitDB(dbParams *libParams.DbParams) {
 	}
 
 	dbParams.Db = db
+
+	var orm *gorm.DB
+
+	switch dbParams.DataBaseType {
+	case "sqlite":
+		orm, err = gorm.Open(sqlite.Open(dbParams.DataBaseAddress.Value), &gorm.Config{})
+	case "mysql":
+		orm, err = gorm.Open(mysql.Open(dbParams.DataBaseAddress.Value), &gorm.Config{})
+	case "postgres":
+		orm, err = gorm.Open(postgres.Open(dbParams.DataBaseAddress.Value), &gorm.Config{})
+	case "oracle":
+		orm, err = gorm.Open(oracle.Open(dbParams.DataBaseAddress.Value), &gorm.Config{})
+	default:
+		log.Fatal("Unsupported database type")
+	}
+
+	dbParams.Orm = orm
 }
 
 func InitDataBases(params libParams.ParamInterface, dbNames []string) {
