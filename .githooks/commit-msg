@@ -1,0 +1,74 @@
+#!/bin/bash
+
+# Git commit message hook for conventional commits validation
+# This hook validates commit messages to ensure they follow conventional commit format
+
+# Colors for output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+NC='\033[0m' # No Color
+
+# Get the commit message
+commit_msg=$(cat "$1")
+
+# Conventional commit pattern
+conventional_pattern="^(feat|fix|docs|style|refactor|perf|test|chore|build|ci|revert)(\(.+\))?: .+"
+
+# Check if commit message matches conventional commit format
+if echo "$commit_msg" | grep -qE "$conventional_pattern"; then
+    echo -e "${GREEN}✓${NC} Commit message follows conventional commit format"
+    
+    # Check for breaking changes
+    if echo "$commit_msg" | grep -qiE "(breaking|!|BREAKING)"; then
+        echo -e "${YELLOW}⚠${NC} Breaking change detected - this will trigger a major version bump"
+    fi
+    
+    # Show version bump type
+    if echo "$commit_msg" | grep -qiE "^feat|^feature|^add"; then
+        echo -e "${GREEN}ℹ${NC} This commit will trigger a minor version bump"
+    elif echo "$commit_msg" | grep -qiE "^fix|^bug|^patch|^docs|^style|^refactor|^perf|^test|^chore"; then
+        echo -e "${GREEN}ℹ${NC} This commit will trigger a patch version bump"
+    fi
+    
+    exit 0
+else
+    echo -e "${RED}✗${NC} Commit message does not follow conventional commit format"
+    echo ""
+    echo "Conventional commit format:"
+    echo "  <type>[optional scope]: <description>"
+    echo ""
+    echo "Supported types:"
+    echo "  feat:     New features (minor version bump)"
+    echo "  fix:      Bug fixes (patch version bump)"
+    echo "  docs:     Documentation changes (patch version bump)"
+    echo "  style:    Code style changes (patch version bump)"
+    echo "  refactor: Code refactoring (patch version bump)"
+    echo "  perf:     Performance improvements (patch version bump)"
+    echo "  test:     Adding or updating tests (patch version bump)"
+    echo "  chore:    Maintenance tasks (patch version bump)"
+    echo "  build:    Build system changes (patch version bump)"
+    echo "  ci:       CI/CD changes (patch version bump)"
+    echo "  revert:   Reverting changes (patch version bump)"
+    echo ""
+    echo "Examples:"
+    echo "  feat: add user authentication"
+    echo "  fix: resolve memory leak in database connection"
+    echo "  docs: update API documentation"
+    echo "  feat!: change API response format (breaking change)"
+    echo ""
+    echo "Your commit message:"
+    echo "  $commit_msg"
+    echo ""
+    
+    # Ask if user wants to continue anyway
+    read -p "Do you want to continue with this commit message? (y/N): " -n 1 -r
+    echo
+    if [[ $REPLY =~ ^[Yy]$ ]]; then
+        echo -e "${YELLOW}⚠${NC} Proceeding with non-conventional commit message"
+        exit 0
+    else
+        echo -e "${RED}✗${NC} Commit aborted"
+        exit 1
+    fi
+fi

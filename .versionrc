@@ -1,0 +1,22 @@
+{
+  "version": "0.16.6",
+  "conventionalCommits": true,
+  "commitTypes": {
+    "major": ["breaking", "!", "BREAKING"],
+    "minor": ["feat", "feature", "add"],
+    "patch": ["fix", "bug", "patch", "docs", "style", "refactor", "perf", "test", "chore", "build", "ci"]
+  },
+  "releaseNotes": {
+    "enabled": true,
+    "template": "## Changes in this release\n\n### Commits since {previousVersion}:\n{commits}\n\n### Version Bump Type\n- **{bumpType}** version increment"
+  },
+  "git": {
+    "tagPrefix": "v",
+    "commitMessageTemplate": "chore: release {version}"
+  },
+  "github": {
+    "release": true,
+    "draft": false,
+    "prerelease": false
+  }
+}

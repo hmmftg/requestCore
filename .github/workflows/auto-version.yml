@@ -1,0 +1,161 @@
+name: Automatic Semantic Versioning
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+    types: [closed]
+
+jobs:
+  auto-version:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' || (github.event_name == 'pull_request' && github.event.pull_request.merged == true)
+    
+    permissions:
+      contents: write
+      pull-requests: write
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Configure Git
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+      
+      - name: Get latest tag
+        id: get_tag
+        run: |
+          # Get the latest tag, default to v0.0.0 if no tags exist
+          LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
+          echo "latest_tag=$LATEST_TAG" >> $GITHUB_OUTPUT
+          echo "Latest tag: $LATEST_TAG"
+      
+      - name: Determine version bump
+        id: version_bump
+        run: |
+          # Get commit messages since last tag
+          LATEST_TAG="${{ steps.get_tag.outputs.latest_tag }}"
+          COMMITS=$(git log --pretty=format:"%s" ${LATEST_TAG}..HEAD)
+          
+          echo "Commits since $LATEST_TAG:"
+          echo "$COMMITS"
+          
+          # Determine version bump based on conventional commits
+          MAJOR_BUMP=false
+          MINOR_BUMP=false
+          PATCH_BUMP=false
+          
+          # Check for breaking changes
+          if echo "$COMMITS" | grep -qiE "(breaking|!|BREAKING)"; then
+            MAJOR_BUMP=true
+            echo "Major version bump detected (breaking changes)"
+          # Check for new features
+          elif echo "$COMMITS" | grep -qiE "^feat|^feature|^add"; then
+            MINOR_BUMP=true
+            echo "Minor version bump detected (new features)"
+          # Check for fixes, docs, refactor, etc.
+          elif echo "$COMMITS" | grep -qiE "^fix|^bug|^patch|^docs|^style|^refactor|^perf|^test|^chore"; then
+            PATCH_BUMP=true
+            echo "Patch version bump detected (fixes/improvements)"
+          else
+            # Default to patch for any other changes
+            PATCH_BUMP=true
+            echo "Default patch version bump"
+          fi
+          
+          echo "major_bump=$MAJOR_BUMP" >> $GITHUB_OUTPUT
+          echo "minor_bump=$MINOR_BUMP" >> $GITHUB_OUTPUT
+          echo "patch_bump=$PATCH_BUMP" >> $GITHUB_OUTPUT
+      
+      - name: Calculate new version
+        id: new_version
+        run: |
+          LATEST_TAG="${{ steps.get_tag.outputs.latest_tag }}"
+          
+          # Remove 'v' prefix and split version
+          VERSION=${LATEST_TAG#v}
+          IFS='.' read -r MAJOR MINOR PATCH <<< "$VERSION"
+          
+          # Increment version based on bump type
+          if [ "${{ steps.version_bump.outputs.major_bump }}" = "true" ]; then
+            MAJOR=$((MAJOR + 1))
+            MINOR=0
+            PATCH=0
+          elif [ "${{ steps.version_bump.outputs.minor_bump }}" = "true" ]; then
+            MINOR=$((MINOR + 1))
+            PATCH=0
+          elif [ "${{ steps.version_bump.outputs.patch_bump }}" = "true" ]; then
+            PATCH=$((PATCH + 1))
+          fi
+          
+          NEW_VERSION="v${MAJOR}.${MINOR}.${PATCH}"
+          echo "new_version=$NEW_VERSION" >> $GITHUB_OUTPUT
+          echo "New version: $NEW_VERSION"
+      
+      - name: Create and push tag
+        if: steps.new_version.outputs.new_version != steps.get_tag.outputs.latest_tag
+        run: |
+          NEW_VERSION="${{ steps.new_version.outputs.new_version }}"
+          
+          # Create the tag
+          git tag -a "$NEW_VERSION" -m "Release $NEW_VERSION"
+          
+          # Push the tag
+          git push origin "$NEW_VERSION"
+          
+          echo "Created and pushed tag: $NEW_VERSION"
+      
+      - name: Create Release
+        if: steps.new_version.outputs.new_version != steps.get_tag.outputs.latest_tag
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ steps.new_version.outputs.new_version }}
+          release_name: Release ${{ steps.new_version.outputs.new_version }}
+          body: |
+            ## Changes in this release
+            
+            ### Commits since ${{ steps.get_tag.outputs.latest_tag }}:
+            ```bash
+            ${{ github.event.head_commit.message }}
+            ```
+            
+            ### Version Bump Type
+            - **${{ steps.version_bump.outputs.major_bump == 'true' && 'Major' || steps.version_bump.outputs.minor_bump == 'true' && 'Minor' || 'Patch' }}** version increment
+            
+            ### Full commit log:
+            ```bash
+            $(git log --pretty=format:"%h - %s (%an, %ar)" ${{ steps.get_tag.outputs.latest_tag }}..HEAD)
+            ```
+          draft: false
+          prerelease: false
+      
+      - name: Update go.mod version
+        if: steps.new_version.outputs.new_version != steps.get_tag.outputs.latest_tag
+        run: |
+          NEW_VERSION="${{ steps.new_version.outputs.new_version }}"
+          
+          # Update version in go.mod if there's a version comment
+          if grep -q "// version:" go.mod; then
+            sed -i "s|// version:.*|// version: $NEW_VERSION|" go.mod
+            git add go.mod
+            git commit -m "chore: update version to $NEW_VERSION" || echo "No changes to commit"
+            git push origin main || echo "Nothing to push"
+          fi
+      
+      - name: Summary
+        run: |
+          echo "## Versioning Summary" >> $GITHUB_STEP_SUMMARY
+          echo "- **Previous version:** ${{ steps.get_tag.outputs.latest_tag }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **New version:** ${{ steps.new_version.outputs.new_version }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Bump type:** ${{ steps.version_bump.outputs.major_bump == 'true' && 'Major' || steps.version_bump.outputs.minor_bump == 'true' && 'Minor' || 'Patch' }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Tag created:** ${{ steps.new_version.outputs.new_version != steps.get_tag.outputs.latest_tag && 'Yes' || 'No (no changes)' }}" >> $GITHUB_STEP_SUMMARY
