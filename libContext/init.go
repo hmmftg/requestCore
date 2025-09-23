@@ -4,12 +4,14 @@ import (
 	"context"
 	"log"
 	"log/slog"
+	"net/http"
 	"testing"
 
 	"github.com/gin-gonic/gin"
 	"github.com/gofiber/fiber/v2"
 	"github.com/hmmftg/requestCore/libFiber"
 	"github.com/hmmftg/requestCore/libGin"
+	"github.com/hmmftg/requestCore/libNetHttp"
 	"github.com/hmmftg/requestCore/libQuery"
 	"github.com/hmmftg/requestCore/response"
 	"github.com/hmmftg/requestCore/webFramework"
@@ -20,6 +22,7 @@ const (
 	WebFrameworkKey = libQuery.ContextKey("webFramework")
 	Gin             = "gin"
 	Fiber           = "fiber"
+	NetHttp         = "nethttp"
 	Testing         = "testing"
 	UserIdHeader    = "User-Id"
 	UserIdLocal     = "userId"
@@ -82,4 +85,35 @@ func initContext(c any, unknownUser bool) webFramework.WebFramework {
 
 func InitContextWithHandler(c context.Context, handler response.ResponseHandler) webFramework.WebFramework {
 	return InitContext(c)
+}
+
+// InitNetHttpContext initializes context for net/http framework
+func InitNetHttpContext(r *http.Request, w http.ResponseWriter, unknownUser bool) webFramework.WebFramework {
+	wf := webFramework.WebFramework{}
+
+	// Create net/http parser
+	netHttpCtx := libNetHttp.InitContext(r, w)
+
+	// Set unknown user if needed
+	if unknownUser {
+		netHttpCtx.SetLocal(UserIdLocal, UnknownUser)
+	}
+
+	// Set framework context
+	wf.Ctx = context.WithValue(r.Context(), WebFrameworkKey, NetHttp)
+	wf.Parser = netHttpCtx
+
+	// Extract user ID
+	userId := wf.Parser.GetHeaderValue(UserIdHeader)
+	if len(userId) == 0 {
+		userId = wf.Parser.GetLocalString(UserIdLocal)
+	}
+	if len(userId) == 0 {
+		stack := response.GetStack(1, "libContext/init.go")
+		webFramework.AddLog(wf, webFramework.HandlerLogTag,
+			slog.Group("unable to find userId in header and locals => audit trail will fail", slog.String("title", stack)))
+	}
+	wf.Ctx = context.WithValue(wf.Ctx, libQuery.ContextKey(libQuery.USER), userId)
+
+	return wf
 }
