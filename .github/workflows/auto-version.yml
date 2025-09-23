@@ -1,9 +1,6 @@
 name: Automatic Semantic Versioning
 
 on:
-  push:
-    branches:
-      - main
   pull_request:
     branches:
       - main
@@ -12,7 +9,7 @@ on:
 jobs:
   auto-version:
     runs-on: ubuntu-latest
-    if: github.event_name == 'push' || (github.event_name == 'pull_request' && github.event.pull_request.merged == true)
+    if: github.event.pull_request.merged == true
     
     permissions:
       contents: write
