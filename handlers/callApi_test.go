@@ -13,25 +13,20 @@ import (
 	"github.com/hmmftg/requestCore/testingtools"
 )
 
-type Data struct {
-	URL   string `json:"url"`
-	Title string `json:"title"`
-}
-type Pagination struct {
-	LastVisiblePage int  `json:"last_visible_page"`
-	HasNextPage     bool `json:"has_next_page"`
-}
-type AnimeEpisodes struct {
-	Data       []Data     `json:"data"`
-	Pagination Pagination `json:"pagination"`
+type SimpleTestData struct {
+	ID    int    `json:"id"`
+	Name  string `json:"name"`
+	Value string `json:"value"`
 }
 
-func (s AnimeEpisodes) SetStatus(a int) {
-
+type SimpleTestResponse struct {
+	Data   []SimpleTestData `json:"data"`
+	Status string           `json:"status"`
+	Count  int              `json:"count"`
 }
-func (s AnimeEpisodes) SetHeaders(a map[string]string) {
 
-}
+func (s SimpleTestResponse) SetStatus(a int)                {}
+func (s SimpleTestResponse) SetHeaders(a map[string]string) {}
 
 func (env *testCallRemoteEnv) handlerCallAPI(method string, queryStack *[]string) any {
 	return func(c context.Context) {
@@ -43,7 +38,7 @@ func (env *testCallRemoteEnv) handlerCallAPI(method string, queryStack *[]string
 			return
 		}
 		req.QueryStack = queryStack
-		result, errCall := handlers.CallApiInternal[AnimeEpisodes](w, env.Interface, method, req)
+		result, errCall := handlers.CallApiInternal[SimpleTestResponse](w, env.Interface, method, req)
 		if errCall != nil {
 			env.Interface.Responder().Error(w, errCall)
 			return
@@ -54,42 +49,49 @@ func (env *testCallRemoteEnv) handlerCallAPI(method string, queryStack *[]string
 }
 
 func TestCallAPI(t *testing.T) {
-	queryStack := []string{"1/episodes", "200/episodes", "300/episodes", "400/episodes"}
+	// Create fake API server
+	fakeServer := libCallApi.NewFakeAPIServer()
+	defer fakeServer.Close()
+
+	queryStack := []string{"test1", "test2", "test3"}
 	testCases := []testingtools.TestCase{
 		{
 			Name:         "Step1",
 			Url:          "/",
-			DesiredError: "v4/anime@GET@false@false",
+			DesiredError: "api@GET@false@false",
 			Request: libCallApi.CallParamData{
-				Api:    libCallApi.RemoteApi{Domain: "https://api.jikan.moe/v4/anime"},
+				Api:    libCallApi.RemoteApi{Domain: fakeServer.URL() + "/api"},
 				Method: "GET",
+				Path:   "/",
 			},
 			Status:    200,
-			CheckBody: []string{"https://myanimelist.net/anime/1/Cowboy_Bebop/episode/1", "Asteroid Blues"},
+			CheckBody: []string{"Test Item 1", "Value 1"},
 			Model:     testingtools.SampleRequestModelMock(t, func(mockDB sqlmock.Sqlmock) {}),
 		},
 		{
 			Name:         "Step2",
 			Url:          "/",
-			DesiredError: "v4/anime@GET@false@false",
+			DesiredError: "api@GET@false@false",
 			Request: libCallApi.CallParamData{
-				Api:    libCallApi.RemoteApi{Domain: "https://api.jikan.moe/v4/anime"},
+				Api:    libCallApi.RemoteApi{Domain: fakeServer.URL() + "/api"},
 				Method: "GET",
+				Path:   "/",
 			},
 			Status:    200,
-			CheckBody: []string{"Meeting at Full Speed − Is the Angel Male or Female?"},
+			CheckBody: []string{"Test Item 3", "Value 3"},
 			Model:     testingtools.SampleRequestModelMock(t, func(mockDB sqlmock.Sqlmock) {}),
 		},
 		{
 			Name:         "Step3",
 			Url:          "/",
-			DesiredError: "v4/anime@GET@false@false",
+			DesiredError: "api@GET@false@false",
 			Request: libCallApi.CallParamData{
-				Api:    libCallApi.RemoteApi{Domain: "https://api.jikan.moe/v4/anime"},
+				Api:    libCallApi.RemoteApi{Domain: fakeServer.URL() + "/api"},
 				Method: "GET",
+				Path:   "/",
 			},
 			Status:    200,
-			CheckBody: []string{"Transmigration"},
+			CheckBody: []string{"Test Item 5", "Value 5"},
 			Model:     testingtools.SampleRequestModelMock(t, func(mockDB sqlmock.Sqlmock) {}),
 		},
 		/*{
@@ -129,7 +131,7 @@ func TestCallAPI(t *testing.T) {
 	}
 }
 
-func (env *testCallRemoteEnv) handlerCallAPIJSON(method string, queryStack *[]string) any {
+func (env *testCallRemoteEnv) handlerCallAPIJSON(method string, queryStack *[]string, fakeServer *libCallApi.FakeAPIServer) any {
 	return func(c context.Context) {
 		w := libContext.InitContextNoAuditTrail(c)
 		req, _, err := libRequest.ParseRequest[libCallApi.CallParamData](
@@ -143,10 +145,11 @@ func (env *testCallRemoteEnv) handlerCallAPIJSON(method string, queryStack *[]st
 			w,
 			env.Interface,
 			method,
-			&libCallApi.RemoteCallParamData[any, AnimeEpisodes]{
-				Api:        libCallApi.RemoteApi{Domain: "https://api.jikan.moe/v4/anime"},
+			&libCallApi.RemoteCallParamData[any, SimpleTestResponse]{
+				Api:        libCallApi.RemoteApi{Domain: fakeServer.URL() + "/api"},
 				QueryStack: queryStack,
 				Method:     "GET",
+				Path:       "/",
 			},
 		)
 		if errCall != nil {
@@ -158,41 +161,48 @@ func (env *testCallRemoteEnv) handlerCallAPIJSON(method string, queryStack *[]st
 	}
 }
 func TestCallAPIJSON(t *testing.T) {
+	// Create fake API server
+	fakeServer := libCallApi.NewFakeAPIServer()
+	defer fakeServer.Close()
+
 	testCases := []testingtools.TestCase{
 		{
 			Name:         "Step1",
 			Url:          "/",
-			DesiredError: "v4/anime@GET@false@false",
+			DesiredError: "api@GET@false@false",
 			Request: libCallApi.RemoteCallParamData[any, any]{
-				Api:    libCallApi.RemoteApi{Domain: "https://api.jikan.moe/v4/anime"},
+				Api:    libCallApi.RemoteApi{Domain: fakeServer.URL() + "/api"},
 				Method: "GET",
+				Path:   "/",
 			},
 			Status:    200,
-			CheckBody: []string{"https://myanimelist.net/anime/1/Cowboy_Bebop/episode/1", "Asteroid Blues"},
+			CheckBody: []string{"Test Item 1", "Value 1"},
 			Model:     testingtools.SampleRequestModelMock(t, func(mockDB sqlmock.Sqlmock) {}),
 		},
 		{
 			Name:         "Step2",
 			Url:          "/",
-			DesiredError: "v4/anime@GET@false@false",
+			DesiredError: "api@GET@false@false",
 			Request: libCallApi.RemoteCallParamData[any, any]{
-				Api:    libCallApi.RemoteApi{Domain: "https://api.jikan.moe/v4/anime"},
+				Api:    libCallApi.RemoteApi{Domain: fakeServer.URL() + "/api"},
 				Method: "GET",
+				Path:   "/",
 			},
 			Status:    200,
-			CheckBody: []string{"Meeting at Full Speed − Is the Angel Male or Female?"},
+			CheckBody: []string{"Test Item 3", "Value 3"},
 			Model:     testingtools.SampleRequestModelMock(t, func(mockDB sqlmock.Sqlmock) {}),
 		},
 		{
 			Name:         "Step3",
 			Url:          "/",
-			DesiredError: "v4/anime@GET@false@false",
+			DesiredError: "api@GET@false@false",
 			Request: libCallApi.RemoteCallParamData[any, any]{
-				Api:    libCallApi.RemoteApi{Domain: "https://api.jikan.moe/v4/anime"},
+				Api:    libCallApi.RemoteApi{Domain: fakeServer.URL() + "/api"},
 				Method: "GET",
+				Path:   "/",
 			},
 			Status:    200,
-			CheckBody: []string{"Transmigration"},
+			CheckBody: []string{"Test Item 5", "Value 5"},
 			Model:     testingtools.SampleRequestModelMock(t, func(mockDB sqlmock.Sqlmock) {}),
 		},
 		/*{
@@ -209,7 +219,7 @@ func TestCallAPIJSON(t *testing.T) {
 		},*/
 	}
 
-	queryStack := []string{"1/episodes", "200/episodes", "300/episodes", "400/episodes"}
+	queryStack := []string{"test1", "test2", "test3"}
 	for id := range testCases {
 		env := testingtools.GetEnvWithDB[testCallRemoteEnv](
 			testCases[id].Model.DB,
@@ -227,7 +237,7 @@ func TestCallAPIJSON(t *testing.T) {
 				Path:    "/",
 				Name:    "check call api",
 				Method:  "GET",
-				Handler: env.handlerCallAPIJSON("", &queryStack),
+				Handler: env.handlerCallAPIJSON("", &queryStack, fakeServer),
 				Silent:  true,
 			})
 	}
