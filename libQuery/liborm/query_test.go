@@ -3,27 +3,28 @@ package liborm_test
 import (
 	"testing"
 
-	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/hmmftg/requestCore/libQuery"
 	"github.com/hmmftg/requestCore/libQuery/liborm"
-	"gorm.io/driver/postgres"
+	"github.com/hmmftg/requestCore/libQuery/mockdb"
 	"gorm.io/gorm"
 )
 
+// SimpleTestStruct represents a simplified test structure
+type SimpleTestStruct struct {
+	ID    int    `db:"id"`
+	Name  string `db:"name"`
+	Value string `db:"value"`
+}
+
+func (s SimpleTestStruct) GetID() string { return "" }
+func (s SimpleTestStruct) GetValue() any { return "" }
+
 func TestGetQuery(t *testing.T) {
-	db, mock, err := sqlmock.New()
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer db.Close()
+	helper := mockdb.NewMockDBHelper(t)
+	defer helper.Close()
 
-	gormDB, err := gorm.Open(postgres.New(postgres.Config{Conn: db, DriverName: "postgres"}), &gorm.Config{})
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	mock.ExpectQuery("SELECT \\* FROM table").
-		WillReturnRows(sqlmock.NewRows([]string{"column"}).AddRow("value"))
+	// Set up mock query expectation
+	helper.ExpectQuery("SELECT \\* FROM table", []string{"id", "name", "value"}, 1, "test", "value")
 
 	type args struct {
 		query string
@@ -38,7 +39,7 @@ func TestGetQuery(t *testing.T) {
 			name: "test get query",
 			args: args{
 				query: "SELECT * FROM table",
-				core:  &liborm.OrmModel{DB: gormDB},
+				core:  helper.GetOrmModel(),
 			},
 			wantErr: false,
 		},
@@ -46,7 +47,7 @@ func TestGetQuery(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, err := liborm.GetQuery[interface{}](tt.args.query, tt.args.core)
+			_, err := liborm.GetQuery[SimpleTestStruct](tt.args.query, tt.args.core)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("GetQuery() error = %v, wantErr %v", err, tt.wantErr)
 			}
@@ -55,28 +56,15 @@ func TestGetQuery(t *testing.T) {
 }
 
 func TestQueryToStruct(t *testing.T) {
-	db, mock, err := sqlmock.New()
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer db.Close()
+	helper := mockdb.NewMockDBHelper(t)
+	defer helper.Close()
 
-	gormDB, err := gorm.Open(postgres.New(postgres.Config{Conn: db, DriverName: "postgres"}), &gorm.Config{})
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	mock.ExpectQuery("SELECT \\* FROM table").
-		WillReturnRows(sqlmock.NewRows([]string{"column"}).AddRow("value"))
-	type Sample struct {
-		Column string
-	}
+	// Set up mock query expectation
+	helper.ExpectQuery("SELECT \\* FROM table", []string{"id", "name", "value"}, 1, "test", "value")
 
 	type args struct {
-		q      *gorm.DB
-		query  string
-		args   []any
-		target *Sample
+		db    *gorm.DB
+		query string
 	}
 	tests := []struct {
 		name    string
@@ -86,20 +74,16 @@ func TestQueryToStruct(t *testing.T) {
 		{
 			name: "test query to struct",
 			args: args{
-				q:      gormDB,
-				query:  "SELECT * FROM table",
-				target: &Sample{},
+				db:    helper.DB,
+				query: "SELECT * FROM table",
 			},
 			wantErr: false,
 		},
 	}
 
-	type sample struct {
-	}
-
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, err := liborm.QueryToStruct[sample](tt.args.q, tt.args.query, tt.args.args...)
+			_, err := liborm.QueryToStruct[SimpleTestStruct](tt.args.db, tt.args.query)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("QueryToStruct() error = %v, wantErr %v", err, tt.wantErr)
 			}
@@ -108,19 +92,11 @@ func TestQueryToStruct(t *testing.T) {
 }
 
 func TestQuery(t *testing.T) {
-	db, mock, err := sqlmock.New()
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer db.Close()
+	helper := mockdb.NewMockDBHelper(t)
+	defer helper.Close()
 
-	gormDB, err := gorm.Open(postgres.New(postgres.Config{Conn: db, DriverName: "postgres"}), &gorm.Config{})
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	mock.ExpectQuery("SELECT \\* FROM table").
-		WillReturnRows(sqlmock.NewRows([]string{"column"}).AddRow("value"))
+	// Set up mock query expectation
+	helper.ExpectQuery("SELECT \\* FROM table", []string{"id", "name", "value"}, 1, "test", "value")
 
 	type args struct {
 		command libQuery.CommandInterface
@@ -139,7 +115,7 @@ func TestQuery(t *testing.T) {
 					Command: "SELECT * FROM table",
 					Type:    libQuery.QuerySingle,
 				},
-				core: &liborm.OrmModel{DB: gormDB},
+				core: helper.GetOrmModel(),
 			},
 			wantErr: false,
 		},
@@ -147,7 +123,7 @@ func TestQuery(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, err := liborm.Query[interface{}](tt.args.command, tt.args.core)
+			_, err := liborm.Query[SimpleTestStruct](tt.args.command, tt.args.core)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Query() error = %v, wantErr %v", err, tt.wantErr)
 			}

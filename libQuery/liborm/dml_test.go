@@ -4,27 +4,18 @@ import (
 	"context"
 	"testing"
 
-	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/hmmftg/requestCore/libQuery"
 	"github.com/hmmftg/requestCore/libQuery/liborm"
-	"gorm.io/driver/postgres"
+	"github.com/hmmftg/requestCore/libQuery/mockdb"
 	"gorm.io/gorm"
 )
 
 func TestSetVariable(t *testing.T) {
-	db, mock, err := sqlmock.New()
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer db.Close()
+	helper := mockdb.NewMockDBHelper(t)
+	defer helper.Close()
 
-	gormDB, err := gorm.Open(postgres.New(postgres.Config{Conn: db, DriverName: "postgres"}), &gorm.Config{})
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	mock.ExpectExec("SELECT set_config\\$\\$1,\\$2, true\\$;").
-		WillReturnResult(sqlmock.NewResult(1, 1))
+	// Set up mock expectations for set_config query - use flexible matching
+	helper.ExpectExecFlexible()
 
 	type args struct {
 		ctx     context.Context
@@ -42,7 +33,7 @@ func TestSetVariable(t *testing.T) {
 			name: "test set variable",
 			args: args{
 				ctx:     context.Background(),
-				tx:      gormDB,
+				tx:      helper.DB,
 				command: "SELECT set_config($1,$2,true);",
 				key:     "application_name",
 				value:   "test",
@@ -62,16 +53,8 @@ func TestSetVariable(t *testing.T) {
 }
 
 func TestInit(t *testing.T) {
-	db, _, err := sqlmock.New()
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer db.Close()
-
-	gormDB, err := gorm.Open(postgres.New(postgres.Config{Conn: db, DriverName: "postgres"}), &gorm.Config{})
-	if err != nil {
-		t.Fatal(err)
-	}
+	helper := mockdb.NewMockDBHelper(t)
+	defer helper.Close()
 
 	type args struct {
 		DB          *gorm.DB
@@ -87,7 +70,7 @@ func TestInit(t *testing.T) {
 		{
 			name: "test init",
 			args: args{
-				DB:          gormDB,
+				DB:          helper.DB,
 				ProgramName: "test",
 				ModuleName:  "test",
 				mode:        libQuery.Oracle,
@@ -107,22 +90,19 @@ func TestInit(t *testing.T) {
 }
 
 func TestSetModifVariables(t *testing.T) {
-	db, mock, err := sqlmock.New()
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer db.Close()
+	helper := mockdb.NewMockDBHelper(t)
+	defer helper.Close()
 
-	gormDB, err := gorm.Open(postgres.New(postgres.Config{Conn: db, DriverName: "postgres"}), &gorm.Config{})
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	mock.ExpectExec("SELECT set_config\\$\\$1,\\$2, true\\$;").
-		WillReturnResult(sqlmock.NewResult(1, 1))
+	// Set up mock expectations for set_config query - use flexible matching
+	// Expect 4 exec calls for APP, USER, MODULE, METHOD
+	helper.ExpectExecFlexible() // APP
+	helper.ExpectExecFlexible() // USER
+	helper.ExpectExecFlexible() // MODULE
+	helper.ExpectExecFlexible() // METHOD
 
 	type args struct {
 		ctx        context.Context
+		ormModel   *liborm.OrmModel
 		moduleName string
 		methodName string
 		tx         *gorm.DB
@@ -136,9 +116,10 @@ func TestSetModifVariables(t *testing.T) {
 			name: "test set modification variables",
 			args: args{
 				ctx:        context.Background(),
+				ormModel:   helper.GetOrmModel(),
 				moduleName: "test",
 				methodName: "test",
-				tx:         gormDB,
+				tx:         helper.DB,
 			},
 			wantErr: false,
 		},
@@ -146,7 +127,7 @@ func TestSetModifVariables(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := (&liborm.OrmModel{DB: gormDB}).SetModifVariables(tt.args.ctx, tt.args.moduleName, tt.args.methodName, tt.args.tx)
+			err := tt.args.ormModel.SetModifVariables(tt.args.ctx, tt.args.moduleName, tt.args.methodName, tt.args.tx)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("SetModifVariables() error = %v, wantErr %v", err, tt.wantErr)
 			}
@@ -155,19 +136,18 @@ func TestSetModifVariables(t *testing.T) {
 }
 
 func TestDml(t *testing.T) {
-	db, mock, err := sqlmock.New()
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer db.Close()
+	helper := mockdb.NewMockDBHelper(t)
+	defer helper.Close()
 
-	gormDB, err := gorm.Open(postgres.New(postgres.Config{Conn: db, DriverName: "postgres"}), &gorm.Config{})
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	mock.ExpectExec("INSERT INTO table $name$ VALUES $\\?$").
-		WillReturnResult(sqlmock.NewResult(1, 1))
+	// Set up transaction expectations
+	helper.ExpectBegin()
+	// Expect multiple exec calls for SetModifVariables (4 calls) + 1 for the actual DML
+	helper.ExpectExecFlexible()                                         // APP
+	helper.ExpectExecFlexible()                                         // USER
+	helper.ExpectExecFlexible()                                         // MODULE
+	helper.ExpectExecFlexible()                                         // METHOD
+	helper.ExpectExec("INSERT INTO table \\(name\\) VALUES \\(\\$1\\)") // Actual DML
+	helper.ExpectCommit()
 
 	type args struct {
 		ctx        context.Context
@@ -196,7 +176,7 @@ func TestDml(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, err := (&liborm.OrmModel{DB: gormDB}).Dml(tt.args.ctx, tt.args.moduleName, tt.args.methodName, tt.args.command, tt.args.args...)
+			_, err := helper.GetOrmModel().Dml(tt.args.ctx, tt.args.moduleName, tt.args.methodName, tt.args.command, tt.args.args...)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Dml() error = %v, wantErr %v", err, tt.wantErr)
 			}
