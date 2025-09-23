@@ -14,6 +14,7 @@ import (
 	"github.com/hmmftg/requestCore/libCallApi"
 	"github.com/hmmftg/requestCore/libParams"
 	"github.com/hmmftg/requestCore/libQuery"
+	"github.com/hmmftg/requestCore/libRequest"
 )
 
 type CustomMockConverter struct{}
@@ -81,15 +82,31 @@ func (CustomMockConverter) ConvertValue(v interface{}) (driver.Value, error) {
 	}
 }
 
-// Map converts a Header to a map.
+// Map converts a Header to a map with dynamic header support
 func (h Header) Map() map[string][]string {
 	headerMap := map[string][]string{
 		"Request-Id": {"0123456789"},
-		"Branch-Id":  {"12345"},
-		"Person-Id":  {"123456"},
 		"User-Id":    {"testuser"},
 	}
 
+	// Add dynamic headers from configuration
+	if config := libRequest.GetGlobalHeaderConfig(); config != nil {
+		// Add optional headers with default values
+		for _, headerConfig := range config.OptionalHeaders {
+			if headerConfig.DefaultValue != "" {
+				headerMap[headerConfig.HeaderName] = []string{headerConfig.DefaultValue}
+			}
+		}
+
+		// Add custom headers with default values
+		for _, headerConfig := range config.CustomHeaders {
+			if headerConfig.DefaultValue != "" {
+				headerMap[headerConfig.HeaderName] = []string{headerConfig.DefaultValue}
+			}
+		}
+	}
+
+	// Override with explicitly set headers
 	for _, m := range h {
 		headerMap[m.Key] = []string{m.Value}
 	}
@@ -97,13 +114,30 @@ func (h Header) Map() map[string][]string {
 	return headerMap
 }
 
-// setHeaders sets given headers,
-// if there are no given headers it set's some default headers.
+// setHeaders sets given headers with dynamic header support
 func (header Header) setHeaders(r *http.Request) {
+	// Set core headers
 	r.Header.Add("Request-Id", "0123456789")
-	r.Header.Add("Branch-Id", "12345")
-	r.Header.Add("Person-Id", "123456")
 	r.Header.Add("User-Id", "testuser")
+
+	// Add dynamic headers from configuration
+	if config := libRequest.GetGlobalHeaderConfig(); config != nil {
+		// Add optional headers with default values
+		for _, headerConfig := range config.OptionalHeaders {
+			if headerConfig.DefaultValue != "" {
+				r.Header.Add(headerConfig.HeaderName, headerConfig.DefaultValue)
+			}
+		}
+
+		// Add custom headers with default values
+		for _, headerConfig := range config.CustomHeaders {
+			if headerConfig.DefaultValue != "" {
+				r.Header.Add(headerConfig.HeaderName, headerConfig.DefaultValue)
+			}
+		}
+	}
+
+	// Override with explicitly set headers
 	for _, h := range header {
 		r.Header.Add(h.Key, h.Value)
 	}
