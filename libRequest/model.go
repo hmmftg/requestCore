@@ -6,6 +6,7 @@ import (
 
 	"github.com/hmmftg/requestCore/libQuery"
 	"github.com/hmmftg/requestCore/webFramework"
+	"go.opentelemetry.io/otel/trace"
 )
 
 type RequestModel struct {
@@ -110,4 +111,33 @@ type Request struct {
 	Outgoing  any                          `json:"outgoing"`
 	Tags      map[string]string            `json:"tags"`
 	Result    string                       `json:"result"`
+	// Tracing fields
+	TraceID string `json:"trace_id"`
+	SpanID  string `json:"span_id"`
+	Sampled bool   `json:"sampled"`
+}
+
+// Tracing methods for Request
+func (r *Request) SetTraceContext(spanCtx trace.SpanContext) {
+	r.TraceID = spanCtx.TraceID().String()
+	r.SpanID = spanCtx.SpanID().String()
+	r.Sampled = spanCtx.IsSampled()
+}
+
+func (r *Request) GetTraceContext() trace.SpanContext {
+	if r.TraceID == "" || r.SpanID == "" {
+		return trace.SpanContext{}
+	}
+
+	traceID, _ := trace.TraceIDFromHex(r.TraceID)
+	spanID, _ := trace.SpanIDFromHex(r.SpanID)
+
+	return trace.NewSpanContext(trace.SpanContextConfig{
+		TraceID: traceID,
+		SpanID:  spanID,
+	})
+}
+
+func (r *Request) HasTraceContext() bool {
+	return r.TraceID != "" && r.SpanID != ""
 }

@@ -83,7 +83,20 @@ type DmlHandlerType[Req libQuery.DmlModel, Resp map[string]any] struct {
 }
 
 func (h DmlHandlerType[Req, Resp]) Parameters() HandlerParameters {
-	return HandlerParameters{h.Title, h.Mode, h.VerifyHeader, true, h.Path, false, h.RecoveryHandler, false, nil, nil}
+	return HandlerParameters{
+		Title:           h.Title,
+		Body:            h.Mode,
+		ValidateHeader:  h.VerifyHeader,
+		SaveToRequest:   true,
+		Path:            h.Path,
+		HasReceipt:      false,
+		RecoveryHandler: h.RecoveryHandler,
+		FileResponse:    false,
+		LogArrays:       nil,
+		LogTags:         nil,
+		EnableTracing:   false,
+		TracingSpanName: "",
+	}
 }
 func (h DmlHandlerType[Req, Resp]) Initializer(req HandlerRequest[Req, Resp]) error {
 	return PreControlDML(*req.Request, h.Key, req.Title, req.W, req.Core)

@@ -60,7 +60,20 @@ func (c CallArgs[Req, Resp]) Parameters() HandlerParameters {
 	if c.HasInitializer {
 		save = true
 	}
-	return HandlerParameters{c.Title, mode, false, save, c.Path, false, c.RecoveryHandler, false, nil, nil}
+	return HandlerParameters{
+		Title:           c.Title,
+		Body:            mode,
+		ValidateHeader:  false,
+		SaveToRequest:   save,
+		Path:            c.Path,
+		HasReceipt:      false,
+		RecoveryHandler: c.RecoveryHandler,
+		FileResponse:    false,
+		LogArrays:       nil,
+		LogTags:         nil,
+		EnableTracing:   false,
+		TracingSpanName: "",
+	}
 }
 
 const (
@@ -182,6 +195,11 @@ func (h *ConsumeHandlerType[Req, Resp]) Parameters() HandlerParameters {
 		Path:            h.Path,
 		HasReceipt:      h.HasReceipt,
 		RecoveryHandler: h.RecoveryHandler,
+		FileResponse:    false,
+		LogArrays:       nil,
+		LogTags:         nil,
+		EnableTracing:   false,
+		TracingSpanName: "",
 	}
 }
 

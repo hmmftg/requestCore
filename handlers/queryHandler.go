@@ -162,7 +162,20 @@ func Paginate[Row any](paginationData libRequest.PaginationData, data []Row, les
 }
 
 func (q QueryHandlerType[Row, Resp]) Parameters() HandlerParameters {
-	return HandlerParameters{q.Title, q.Mode, q.VerifyHeader, false, q.Path, false, q.RecoveryHandler, false, nil, nil}
+	return HandlerParameters{
+		Title:           q.Title,
+		Body:            q.Mode,
+		ValidateHeader:  q.VerifyHeader,
+		SaveToRequest:   false,
+		Path:            q.Path,
+		HasReceipt:      false,
+		RecoveryHandler: q.RecoveryHandler,
+		FileResponse:    false,
+		LogArrays:       nil,
+		LogTags:         nil,
+		EnableTracing:   false,
+		TracingSpanName: "",
+	}
 }
 
 func (q QueryHandlerType[Row, Resp]) Initializer(req HandlerRequest[Row, Resp]) error {

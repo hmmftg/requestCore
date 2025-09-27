@@ -16,6 +16,8 @@ import (
 	"github.com/hmmftg/requestCore/response"
 	"github.com/hmmftg/requestCore/webFramework"
 	"github.com/valyala/fasthttp"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 )
 
 const (
@@ -39,6 +41,8 @@ func InitContextNoAuditTrail(c any) webFramework.WebFramework {
 }
 func initContext(c any, unknownUser bool) webFramework.WebFramework {
 	w := webFramework.WebFramework{}
+	var span trace.Span
+
 	switch ctx := c.(type) {
 	case *gin.Context:
 		if unknownUser {
@@ -46,12 +50,16 @@ func initContext(c any, unknownUser bool) webFramework.WebFramework {
 		}
 		w.Ctx = context.WithValue(ctx, WebFrameworkKey, Gin)
 		w.Parser = libGin.InitContext(c)
+		// Extract trace context from Gin context
+		span = trace.SpanFromContext(ctx)
 	case *fiber.Ctx:
 		if unknownUser {
 			ctx.Locals(UserIdLocal, UnknownUser)
 		}
 		w.Ctx = context.WithValue(ctx.Context(), WebFrameworkKey, Fiber)
 		w.Parser = libFiber.InitContext(ctx)
+		// Extract trace context from Fiber context
+		span = trace.SpanFromContext(ctx.Context())
 	case *fasthttp.RequestCtx:
 		fiberCtx, ok := ctx.UserValue(libFiber.FiberCtxKey).(*fiber.Ctx)
 		if !ok {
@@ -63,13 +71,21 @@ func initContext(c any, unknownUser bool) webFramework.WebFramework {
 		}
 		w.Ctx = context.WithValue(ctx, WebFrameworkKey, Fiber)
 		w.Parser = libFiber.InitContext(fiberCtx)
+		// Extract trace context from Fiber context
+		span = trace.SpanFromContext(fiberCtx.Context())
 	case *testing.T:
 		w.Ctx = context.WithValue(context.Background(), WebFrameworkKey, Testing)
 		w.Parser = initTestContext(ctx)
+		// No tracing in test context
+		span = nil
 	default:
 		stack := response.GetStack(1, "libContext/init.go")
 		log.Fatalf("error in InitContext: unknown webFramework %T, Stack: %s", ctx, stack)
 	}
+
+	// Set span in WebFramework
+	w.Span = span
+
 	userId := w.Parser.GetHeaderValue(UserIdHeader)
 	if len(userId) == 0 {
 		userId = w.Parser.GetLocalString(UserIdLocal)
@@ -80,6 +96,15 @@ func initContext(c any, unknownUser bool) webFramework.WebFramework {
 			slog.Group("unable to find userId in header and locals => audit trail will fail", slog.String("title", stack)))
 	}
 	w.Ctx = context.WithValue(w.Ctx, libQuery.ContextKey(libQuery.USER), userId)
+
+	// Add tracing attributes if span is available
+	if span != nil && span.IsRecording() {
+		span.SetAttributes(
+			attribute.String("user.id", userId),
+			attribute.String("framework", getFrameworkName(c)),
+		)
+	}
+
 	return w
 }
 
@@ -103,6 +128,10 @@ func InitNetHttpContext(r *http.Request, w http.ResponseWriter, unknownUser bool
 	wf.Ctx = context.WithValue(r.Context(), WebFrameworkKey, NetHttp)
 	wf.Parser = netHttpCtx
 
+	// Extract trace context from request
+	span := trace.SpanFromContext(r.Context())
+	wf.Span = span
+
 	// Extract user ID
 	userId := wf.Parser.GetHeaderValue(UserIdHeader)
 	if len(userId) == 0 {
@@ -115,5 +144,29 @@ func InitNetHttpContext(r *http.Request, w http.ResponseWriter, unknownUser bool
 	}
 	wf.Ctx = context.WithValue(wf.Ctx, libQuery.ContextKey(libQuery.USER), userId)
 
+	// Add tracing attributes if span is available
+	if span != nil && span.IsRecording() {
+		span.SetAttributes(
+			attribute.String("user.id", userId),
+			attribute.String("framework", NetHttp),
+		)
+	}
+
 	return wf
+}
+
+// getFrameworkName returns the framework name for tracing
+func getFrameworkName(c any) string {
+	switch c.(type) {
+	case *gin.Context:
+		return Gin
+	case *fiber.Ctx:
+		return Fiber
+	case *fasthttp.RequestCtx:
+		return Fiber
+	case *testing.T:
+		return Testing
+	default:
+		return "unknown"
+	}
 }

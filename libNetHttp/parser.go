@@ -1,6 +1,7 @@
 package libNetHttp
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -11,6 +12,8 @@ import (
 
 	"github.com/hmmftg/requestCore/libQuery"
 	"github.com/hmmftg/requestCore/webFramework"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 )
 
 func InitContext(r *http.Request, w http.ResponseWriter) NetHttpParser {
@@ -334,4 +337,57 @@ func (c NetHttpParser) ServeFile(name string) {
 // ServeContent serves content
 func (c NetHttpParser) ServeContent(name string, modtime time.Time, content io.ReadSeeker) {
 	http.ServeContent(c.Response, c.Request, name, modtime, content)
+}
+
+// Tracing methods for NetHttpParser
+func (c NetHttpParser) GetTraceContext() trace.SpanContext {
+	span := trace.SpanFromContext(c.Request.Context())
+	return span.SpanContext()
+}
+
+func (c NetHttpParser) SetTraceContext(spanCtx trace.SpanContext) {
+	// This is a no-op for net/http as trace context is handled by the context
+}
+
+func (c NetHttpParser) StartSpan(name string, opts ...trace.SpanStartOption) (context.Context, trace.Span) {
+	span := trace.SpanFromContext(c.Request.Context())
+	return c.Request.Context(), span
+}
+
+func (c NetHttpParser) AddSpanAttribute(key, value string) {
+	span := trace.SpanFromContext(c.Request.Context())
+	if span.IsRecording() {
+		span.SetAttributes(attribute.String(key, value))
+	}
+}
+
+func (c NetHttpParser) AddSpanAttributes(attrs map[string]string) {
+	span := trace.SpanFromContext(c.Request.Context())
+	if span.IsRecording() {
+		for k, v := range attrs {
+			span.SetAttributes(attribute.String(k, v))
+		}
+	}
+}
+
+func (c NetHttpParser) AddSpanEvent(name string, attrs map[string]string) {
+	span := trace.SpanFromContext(c.Request.Context())
+	if span.IsRecording() {
+		var eventAttrs []attribute.KeyValue
+		for k, v := range attrs {
+			eventAttrs = append(eventAttrs, attribute.String(k, v))
+		}
+		span.AddEvent(name, trace.WithAttributes(eventAttrs...))
+	}
+}
+
+func (c NetHttpParser) RecordSpanError(err error, attrs map[string]string) {
+	span := trace.SpanFromContext(c.Request.Context())
+	if span.IsRecording() {
+		var eventAttrs []attribute.KeyValue
+		for k, v := range attrs {
+			eventAttrs = append(eventAttrs, attribute.String(k, v))
+		}
+		span.RecordError(err, trace.WithAttributes(eventAttrs...))
+	}
 }

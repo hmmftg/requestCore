@@ -10,6 +10,8 @@ import (
 
 	"github.com/gin-gonic/gin"
 	sloggin "github.com/samber/slog-gin"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 )
 
 func InitContext(c any) GinParser {
@@ -167,5 +169,58 @@ func (c GinParser) FileAttachment(path, fileName string) {
 func Gin(handler any) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		handler.(func(c context.Context))(c)
+	}
+}
+
+// Tracing methods for GinParser
+func (c GinParser) GetTraceContext() trace.SpanContext {
+	span := trace.SpanFromContext(c.Ctx.Request.Context())
+	return span.SpanContext()
+}
+
+func (c GinParser) SetTraceContext(spanCtx trace.SpanContext) {
+	// This is a no-op for Gin as trace context is handled by the context
+}
+
+func (c GinParser) StartSpan(name string, opts ...trace.SpanStartOption) (context.Context, trace.Span) {
+	span := trace.SpanFromContext(c.Ctx.Request.Context())
+	return c.Ctx.Request.Context(), span
+}
+
+func (c GinParser) AddSpanAttribute(key, value string) {
+	span := trace.SpanFromContext(c.Ctx.Request.Context())
+	if span.IsRecording() {
+		span.SetAttributes(attribute.String(key, value))
+	}
+}
+
+func (c GinParser) AddSpanAttributes(attrs map[string]string) {
+	span := trace.SpanFromContext(c.Ctx.Request.Context())
+	if span.IsRecording() {
+		for k, v := range attrs {
+			span.SetAttributes(attribute.String(k, v))
+		}
+	}
+}
+
+func (c GinParser) AddSpanEvent(name string, attrs map[string]string) {
+	span := trace.SpanFromContext(c.Ctx.Request.Context())
+	if span.IsRecording() {
+		var eventAttrs []attribute.KeyValue
+		for k, v := range attrs {
+			eventAttrs = append(eventAttrs, attribute.String(k, v))
+		}
+		span.AddEvent(name, trace.WithAttributes(eventAttrs...))
+	}
+}
+
+func (c GinParser) RecordSpanError(err error, attrs map[string]string) {
+	span := trace.SpanFromContext(c.Ctx.Request.Context())
+	if span.IsRecording() {
+		var eventAttrs []attribute.KeyValue
+		for k, v := range attrs {
+			eventAttrs = append(eventAttrs, attribute.String(k, v))
+		}
+		span.RecordError(err, trace.WithAttributes(eventAttrs...))
 	}
 }

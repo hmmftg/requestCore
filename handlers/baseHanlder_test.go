@@ -27,16 +27,18 @@ type testHandlerType[Req testReq, Resp testResp] struct {
 
 func (h testHandlerType[Req, Resp]) Parameters() HandlerParameters {
 	return HandlerParameters{
-		h.Title,
-		h.Mode,
-		h.VerifyHeader,
-		h.SaveRequest,
-		h.Path,
-		false,
-		nil,
-		false,
-		nil,
-		nil,
+		Title:           h.Title,
+		Body:            h.Mode,
+		ValidateHeader:  h.VerifyHeader,
+		SaveToRequest:   h.SaveRequest,
+		Path:            h.Path,
+		HasReceipt:      false,
+		RecoveryHandler: nil,
+		FileResponse:    false,
+		LogArrays:       nil,
+		LogTags:         nil,
+		EnableTracing:   false,
+		TracingSpanName: "",
 	}
 }
 func (h testHandlerType[Req, Resp]) Initializer(req HandlerRequest[Req, Resp]) error {

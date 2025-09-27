@@ -11,6 +11,8 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 	slogfiber "github.com/samber/slog-fiber"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 )
 
 func InitContext(c *fiber.Ctx) FiberParser {
@@ -178,4 +180,57 @@ func ExtendMap(mp map[string]string) map[string][]string {
 		newMap[key] = []string{val}
 	}
 	return newMap
+}
+
+// Tracing methods for FiberParser
+func (c FiberParser) GetTraceContext() trace.SpanContext {
+	span := trace.SpanFromContext(c.Ctx.UserContext())
+	return span.SpanContext()
+}
+
+func (c FiberParser) SetTraceContext(spanCtx trace.SpanContext) {
+	// This is a no-op for Fiber as trace context is handled by the context
+}
+
+func (c FiberParser) StartSpan(name string, opts ...trace.SpanStartOption) (context.Context, trace.Span) {
+	span := trace.SpanFromContext(c.Ctx.UserContext())
+	return c.Ctx.UserContext(), span
+}
+
+func (c FiberParser) AddSpanAttribute(key, value string) {
+	span := trace.SpanFromContext(c.Ctx.UserContext())
+	if span.IsRecording() {
+		span.SetAttributes(attribute.String(key, value))
+	}
+}
+
+func (c FiberParser) AddSpanAttributes(attrs map[string]string) {
+	span := trace.SpanFromContext(c.Ctx.UserContext())
+	if span.IsRecording() {
+		for k, v := range attrs {
+			span.SetAttributes(attribute.String(k, v))
+		}
+	}
+}
+
+func (c FiberParser) AddSpanEvent(name string, attrs map[string]string) {
+	span := trace.SpanFromContext(c.Ctx.UserContext())
+	if span.IsRecording() {
+		var eventAttrs []attribute.KeyValue
+		for k, v := range attrs {
+			eventAttrs = append(eventAttrs, attribute.String(k, v))
+		}
+		span.AddEvent(name, trace.WithAttributes(eventAttrs...))
+	}
+}
+
+func (c FiberParser) RecordSpanError(err error, attrs map[string]string) {
+	span := trace.SpanFromContext(c.Ctx.UserContext())
+	if span.IsRecording() {
+		var eventAttrs []attribute.KeyValue
+		for k, v := range attrs {
+			eventAttrs = append(eventAttrs, attribute.String(k, v))
+		}
+		span.RecordError(err, trace.WithAttributes(eventAttrs...))
+	}
 }

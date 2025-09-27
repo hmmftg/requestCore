@@ -4,6 +4,9 @@ import (
 	"context"
 	"log/slog"
 	"net/http"
+
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 )
 
 type RecordData interface {
@@ -60,6 +63,14 @@ type RequestParser interface {
 	SaveFile(formTagName, path string) error
 	FileAttachment(path, fileName string)
 	AddCustomAttributes(attr slog.Attr)
+	// Tracing methods
+	GetTraceContext() trace.SpanContext
+	SetTraceContext(spanCtx trace.SpanContext)
+	StartSpan(name string, opts ...trace.SpanStartOption) (context.Context, trace.Span)
+	AddSpanAttribute(key, value string)
+	AddSpanAttributes(attrs map[string]string)
+	AddSpanEvent(name string, attrs map[string]string)
+	RecordSpanError(err error, attrs map[string]string)
 }
 
 type RequestHandler interface {
@@ -68,7 +79,61 @@ type RequestHandler interface {
 }
 
 type WebFramework struct {
-	Ctx context.Context
+	Ctx     context.Context
+	Span    trace.Span
 	//Handler response.ResponseHandler
 	Parser RequestParser
+}
+
+// Tracing methods for WebFramework
+func (w *WebFramework) GetTraceContext() trace.SpanContext {
+	if w.Span != nil {
+		return w.Span.SpanContext()
+	}
+	return trace.SpanContext{}
+}
+
+func (w *WebFramework) SetSpan(span trace.Span) {
+	w.Span = span
+}
+
+func (w *WebFramework) StartSpan(name string, opts ...trace.SpanStartOption) (context.Context, trace.Span) {
+	if w.Parser != nil {
+		return w.Parser.StartSpan(name, opts...)
+	}
+	return w.Ctx, nil
+}
+
+func (w *WebFramework) AddSpanAttribute(key, value string) {
+	if w.Span != nil && w.Span.IsRecording() {
+		w.Span.SetAttributes(attribute.String(key, value))
+	}
+}
+
+func (w *WebFramework) AddSpanAttributes(attrs map[string]string) {
+	if w.Span != nil && w.Span.IsRecording() {
+		for k, v := range attrs {
+			w.Span.SetAttributes(attribute.String(k, v))
+		}
+	}
+}
+
+func (w *WebFramework) AddSpanEvent(name string, attrs map[string]string) {
+	if w.Span != nil && w.Span.IsRecording() {
+		var eventAttrs []attribute.KeyValue
+		for k, v := range attrs {
+			eventAttrs = append(eventAttrs, attribute.String(k, v))
+		}
+		w.Span.AddEvent(name, trace.WithAttributes(eventAttrs...))
+	}
+}
+
+func (w *WebFramework) RecordSpanError(err error, attrs map[string]string) {
+	if w.Span != nil && w.Span.IsRecording() {
+		var eventAttrs []attribute.KeyValue
+		for k, v := range attrs {
+			eventAttrs = append(eventAttrs, attribute.String(k, v))
+		}
+		w.Span.RecordError(err, trace.WithAttributes(eventAttrs...))
+	}
 }

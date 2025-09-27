@@ -9,8 +9,11 @@ import (
 	"github.com/hmmftg/requestCore"
 	"github.com/hmmftg/requestCore/libContext"
 	"github.com/hmmftg/requestCore/libRequest"
+	"github.com/hmmftg/requestCore/libTracing"
 	"github.com/hmmftg/requestCore/response"
 	"github.com/hmmftg/requestCore/webFramework"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 )
 
 type HandlerParameters struct {
@@ -24,6 +27,9 @@ type HandlerParameters struct {
 	FileResponse    bool
 	LogArrays       []string
 	LogTags         []string
+	// Tracing parameters
+	EnableTracing   bool
+	TracingSpanName string
 }
 
 type HandlerInterface[Req any, Resp any] interface {
@@ -53,6 +59,53 @@ type HandlerRequest[Req any, Resp any] struct {
 	Args     []any
 	RespSent bool
 	Builder  func(status int, rawResp []byte, headers map[string]string) (*Resp, error)
+	// Tracing fields
+	Span     trace.Span
+	SpanCtx  context.Context
+}
+
+// Tracing methods for HandlerRequest
+func (hr *HandlerRequest[Req, Resp]) AddSpanAttribute(key, value string) {
+	if hr.Span != nil && hr.Span.IsRecording() {
+		hr.Span.SetAttributes(attribute.String(key, value))
+	}
+}
+
+func (hr *HandlerRequest[Req, Resp]) AddSpanAttributes(attrs map[string]string) {
+	if hr.Span != nil && hr.Span.IsRecording() {
+		for k, v := range attrs {
+			hr.Span.SetAttributes(attribute.String(k, v))
+		}
+	}
+}
+
+func (hr *HandlerRequest[Req, Resp]) AddSpanEvent(name string, attrs map[string]string) {
+	if hr.Span != nil && hr.Span.IsRecording() {
+		var eventAttrs []attribute.KeyValue
+		for k, v := range attrs {
+			eventAttrs = append(eventAttrs, attribute.String(k, v))
+		}
+		hr.Span.AddEvent(name, trace.WithAttributes(eventAttrs...))
+	}
+}
+
+func (hr *HandlerRequest[Req, Resp]) RecordSpanError(err error, attrs map[string]string) {
+	if hr.Span != nil && hr.Span.IsRecording() {
+		var eventAttrs []attribute.KeyValue
+		for k, v := range attrs {
+			eventAttrs = append(eventAttrs, attribute.String(k, v))
+		}
+		hr.Span.RecordError(err, trace.WithAttributes(eventAttrs...))
+	}
+}
+
+func (hr *HandlerRequest[Req, Resp]) StartChildSpan(name string, attrs map[string]string) (context.Context, trace.Span) {
+	if hr.SpanCtx == nil {
+		hr.SpanCtx = context.Background()
+	}
+	
+	tm := libTracing.GetGlobalTracingManager()
+	return tm.StartSpanWithAttributes(hr.SpanCtx, name, attrs)
 }
 
 func BaseHandler[Req any, Resp any, Handler HandlerInterface[Req, Resp]](
@@ -72,14 +125,50 @@ func BaseHandler[Req any, Resp any, Handler HandlerInterface[Req, Resp]](
 			w = libContext.InitContextNoAuditTrail(c)
 		}
 		libContext.AddWebLogs(w, params.Title, webFramework.HandlerLogTag)
+		
+		// Initialize tracing if enabled
+		var span trace.Span
+		var spanCtx context.Context
+		if params.EnableTracing {
+			spanName := params.TracingSpanName
+			if spanName == "" {
+				spanName = params.Title
+			}
+			
+			tm := libTracing.GetGlobalTracingManager()
+			spanCtx, span = tm.StartSpanWithAttributes(w.Ctx, spanName, map[string]string{
+				"handler.title": params.Title,
+				"handler.path":  params.Path,
+			})
+			
+			// Add handler attributes
+			if span != nil && span.IsRecording() {
+				span.SetAttributes(
+					attribute.String("handler.title", params.Title),
+					attribute.String("handler.path", params.Path),
+					attribute.Bool("handler.validate_header", params.ValidateHeader),
+					attribute.Bool("handler.save_to_request", params.SaveToRequest),
+				)
+			}
+		}
+		
 		trx := HandlerRequest[Req, Resp]{
-			Title: params.Title,
-			Args:  args,
-			Core:  core,
-			W:     w,
+			Title:   params.Title,
+			Args:    args,
+			Core:    core,
+			W:       w,
+			Span:    span,
+			SpanCtx: spanCtx,
 		}
 
 		defer Recovery(start, w, handler, params, trx, core)
+		
+		// Ensure span is ended
+		defer func() {
+			if span != nil {
+				span.End()
+			}
+		}()
 
 		if simulation {
 			resp, header, errParse := libRequest.ParseRequest[Resp](

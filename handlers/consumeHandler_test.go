@@ -142,16 +142,18 @@ type testConsumeHandlerType[Req, Resp any] struct {
 
 func (h testConsumeHandlerType[Req, Resp]) Parameters() handlers.HandlerParameters {
 	return handlers.HandlerParameters{
-		h.Title,
-		h.Mode,
-		h.VerifyHeader,
-		h.SaveToRequest,
-		h.Path,
-		false,
-		nil,
-		false,
-		nil,
-		nil,
+		Title:           h.Title,
+		Body:            h.Mode,
+		ValidateHeader:  h.VerifyHeader,
+		SaveToRequest:   h.SaveToRequest,
+		Path:            h.Path,
+		HasReceipt:      false,
+		RecoveryHandler: nil,
+		FileResponse:    false,
+		LogArrays:       nil,
+		LogTags:         nil,
+		EnableTracing:   false,
+		TracingSpanName: "",
 	}
 }
 func (h testConsumeHandlerType[Req, Resp]) Initializer(req handlers.HandlerRequest[Req, handlers.WsResponse[testRemoteCallResp]]) error {

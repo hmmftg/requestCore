@@ -1,6 +1,7 @@
 package libContext
 
 import (
+	"context"
 	"log/slog"
 	"net/http"
 	"os"
@@ -9,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/hmmftg/requestCore/webFramework"
+	"go.opentelemetry.io/otel/trace"
 )
 
 type TestingParser struct {
@@ -183,4 +185,33 @@ func (c TestingParser) SaveFile(
 
 func (c TestingParser) FileAttachment(path, fileName string) {
 	// c.FileAttachment(path, fileName)
+}
+
+// Tracing methods for TestingParser
+func (t TestingParser) GetTraceContext() trace.SpanContext {
+	return trace.SpanContext{}
+}
+
+func (t TestingParser) SetTraceContext(spanCtx trace.SpanContext) {
+	// No-op for testing
+}
+
+func (t TestingParser) StartSpan(name string, opts ...trace.SpanStartOption) (context.Context, trace.Span) {
+	return context.Background(), nil
+}
+
+func (t TestingParser) AddSpanAttribute(key, value string) {
+	// No-op for testing
+}
+
+func (t TestingParser) AddSpanAttributes(attrs map[string]string) {
+	// No-op for testing
+}
+
+func (t TestingParser) AddSpanEvent(name string, attrs map[string]string) {
+	// No-op for testing
+}
+
+func (t TestingParser) RecordSpanError(err error, attrs map[string]string) {
+	// No-op for testing
 }

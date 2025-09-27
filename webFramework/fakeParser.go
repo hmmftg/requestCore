@@ -2,9 +2,12 @@
 package webFramework
 
 import (
+	"context"
 	"fmt"
 	"log/slog"
 	"net/http"
+
+	"go.opentelemetry.io/otel/trace"
 )
 
 type FakeParser struct {
@@ -144,4 +147,33 @@ func (c FakeParser) SaveFile(
 
 func (c FakeParser) FileAttachment(path, fileName string) {
 	c.FileAttachment(path, fileName)
+}
+
+// Tracing methods for TestingParser
+func (c FakeParser) GetTraceContext() trace.SpanContext {
+	return trace.SpanContext{}
+}
+
+func (c FakeParser) SetTraceContext(spanCtx trace.SpanContext) {
+	// No-op for testing
+}
+
+func (c FakeParser) StartSpan(name string, opts ...trace.SpanStartOption) (context.Context, trace.Span) {
+	return context.Background(), trace.SpanFromContext(context.Background())
+}
+
+func (c FakeParser) AddSpanAttribute(key, value string) {
+	// No-op for testing
+}
+
+func (c FakeParser) AddSpanAttributes(attrs map[string]string) {
+	// No-op for testing
+}
+
+func (c FakeParser) AddSpanEvent(name string, attrs map[string]string) {
+	// No-op for testing
+}
+
+func (c FakeParser) RecordSpanError(err error, attrs map[string]string) {
+	// No-op for testing
 }
