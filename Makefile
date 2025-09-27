@@ -1,7 +1,7 @@
 # Makefile for requestCore project
 # Provides convenient commands for version management and development
 
-.PHONY: help version-current version-next version-bump version-release version-check version-validate test build clean
+.PHONY: help version major minor patch version-current version-next version-check version-validate test build clean
 
 # Default target
 help:
@@ -9,12 +9,16 @@ help:
 	@echo "================================"
 	@echo ""
 	@echo "Version Management:"
-	@echo "  version-current     Show current version"
-	@echo "  version-next TYPE   Show next version (major|minor|patch)"
-	@echo "  version-bump TYPE   Bump version and create tag"
-	@echo "  version-release TYPE Create release with version bump"
-	@echo "  version-check       Check if version needs bumping"
-	@echo "  version-validate    Validate commit messages"
+	@echo "  version major      Bump major version (1.0.0 -> 2.0.0)"
+	@echo "  version minor      Bump minor version (1.0.0 -> 1.1.0)"
+	@echo "  version patch      Bump patch version (1.0.0 -> 1.0.1)"
+	@echo "  major              Alias for 'version major'"
+	@echo "  minor              Alias for 'version minor'"
+	@echo "  patch              Alias for 'version patch'"
+	@echo "  version-current    Show current version"
+	@echo "  version-next TYPE  Show next version (major|minor|patch)"
+	@echo "  version-check      Check if version needs bumping"
+	@echo "  version-validate   Validate commit messages"
 	@echo ""
 	@echo "Development:"
 	@echo "  test               Run tests"
@@ -22,14 +26,36 @@ help:
 	@echo "  clean              Clean build artifacts"
 	@echo ""
 	@echo "Examples:"
+	@echo "  make version minor"
+	@echo "  make minor"
+	@echo "  make patch"
 	@echo "  make version-current"
-	@echo "  make version-next minor"
-	@echo "  make version-bump patch"
-	@echo "  make version-release major"
 
 # Version management commands
+version:
+	@if [ -z "$(filter major minor patch,$(MAKECMDGOALS))" ]; then \
+		echo "Usage: make version <major|minor|patch>"; \
+		echo "Or use aliases: make major, make minor, make patch"; \
+		exit 1; \
+	fi
+
+major:
+	@./scripts/version.sh bump major
+
+minor:
+	@./scripts/version.sh bump minor
+
+patch:
+	@./scripts/version.sh bump patch
+
 version-current:
 	@./scripts/version.sh current
+
+version-check:
+	@./scripts/version.sh check
+
+version-validate:
+	@./scripts/version.sh validate
 
 version-next:
 	@if [ -z "$(TYPE)" ]; then \
@@ -37,26 +63,6 @@ version-next:
 		exit 1; \
 	fi
 	@./scripts/version.sh next $(TYPE)
-
-version-bump:
-	@if [ -z "$(TYPE)" ]; then \
-		echo "Usage: make version-bump TYPE=<major|minor|patch>"; \
-		exit 1; \
-	fi
-	@./scripts/version.sh bump $(TYPE)
-
-version-release:
-	@if [ -z "$(TYPE)" ]; then \
-		echo "Usage: make version-release TYPE=<major|minor|patch>"; \
-		exit 1; \
-	fi
-	@./scripts/version.sh release $(TYPE)
-
-version-check:
-	@./scripts/version.sh check
-
-version-validate:
-	@./scripts/version.sh validate
 
 # Development commands
 test:
