@@ -26,6 +26,8 @@ func Recovery[Req any, Resp any, Handler HandlerInterface[Req, Resp]](
 	handler.Finalizer(trx)
 	webFramework.CollectLogTags(w, webFramework.HandlerLogTag)
 	webFramework.CollectLogArrays(w, webFramework.HandlerLogTag)
+	webFramework.CollectLogTags(w, webFramework.ErrorListLogTag)
+	webFramework.CollectLogArrays(w, webFramework.ErrorListLogTag)
 	webFramework.CollectLogArrays(w, CallApiLogEntry)
 	for id := range params.LogTags {
 		webFramework.CollectLogTags(w, params.LogTags[id])
