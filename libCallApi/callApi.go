@@ -299,9 +299,9 @@ func ConsumeRest[Resp any](c CallData[Resp]) (*Resp, *response.WsRemoteResponse,
 	resp, err := cl.Do(req)
 	if err != nil {
 		if os.IsTimeout(err) {
-			return nil, nil, nil, errors.Join(err, libError.NewWithDescription(http.StatusRequestTimeout, "API_CONNECT_TIMED_OUT", "error in ConsumeRest.ClientDo:%v", req))
+			return nil, nil, nil, errors.Join(err, libError.NewWithDescription(http.StatusRequestTimeout, "API_CONNECT_TIMED_OUT", "error in ConsumeRest.ClientDo: %s %s", req.Method, req.RequestURI))
 		}
-		return nil, nil, nil, errors.Join(err, libError.NewWithDescription(http.StatusRequestTimeout, "API_UNABLE_TO_CALL", "error in ConsumeRest.ClientDo:%v", req))
+		return nil, nil, nil, errors.Join(err, libError.NewWithDescription(http.StatusRequestTimeout, "API_UNABLE_TO_CALL", "error in ConsumeRest.ClientDo: %s %s", req.Method, req.RequestURI))
 	}
 	defer resp.Body.Close()
 
@@ -351,9 +351,9 @@ func ConsumeRestJSON[Resp any](c *CallData[Resp]) (*Resp, error) {
 	resp, err := cl.Do(req)
 	if err != nil {
 		if os.IsTimeout(err) {
-			return nil, errors.Join(err, libError.NewWithDescription(http.StatusRequestTimeout, "API_CONNECT_TIMED_OUT", "error in ConsumeRest.ClientDo:%v", req))
+			return nil, errors.Join(err, libError.NewWithDescription(http.StatusRequestTimeout, "API_CONNECT_TIMED_OUT", "error in ConsumeRest.ClientDo: %s %s", req.Method, req.RequestURI))
 		}
-		return nil, errors.Join(err, libError.NewWithDescription(http.StatusRequestTimeout, "API_UNABLE_TO_CALL", "error in ConsumeRest.ClientDo:%v", req))
+		return nil, errors.Join(err, libError.NewWithDescription(http.StatusRequestTimeout, "API_UNABLE_TO_CALL", "error in ConsumeRest.ClientDo: %s %s", req.Method, req.RequestURI))
 	}
 	defer resp.Body.Close()
 
