@@ -2,6 +2,7 @@ package response
 
 import (
 	"errors"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"strings"
@@ -36,7 +37,7 @@ func getList(err error) []error {
 func (m WebHanlder) errorhandler(w webFramework.WebFramework, err error) {
 	array := getList(err)
 	for id := range array {
-		webFramework.AddLogTag(w, webFramework.ErrorListLogTag, slog.Any(array[id].Error(), array[id]))
+		webFramework.AddLogTag(w, webFramework.ErrorListLogTag, slog.Any(fmt.Sprintf("error-%d", id), array[id]))
 	}
 	if newError := getError[libError.ErrorData](err); newError != nil {
 		m.Respond(newError.ActionData.Status.Int(), 1, newError.ActionData.Description, newError.ActionData.Message, true, w)
@@ -47,7 +48,7 @@ func (m WebHanlder) errorhandler(w webFramework.WebFramework, err error) {
 		return
 	}
 
-	webFramework.AddLogTag(w, webFramework.ErrorListLogTag, slog.Any(err.Error(), err))
+	webFramework.AddLogTag(w, webFramework.ErrorListLogTag, slog.Any("error", err))
 	desc := err.Error()
 	desc = strings.ToUpper(desc)
 	desc = strings.ReplaceAll(desc, " ", "")

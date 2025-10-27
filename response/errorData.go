@@ -33,13 +33,11 @@ func (e ErrorData) LogValue() slog.Value {
 		children = append(children, slog.Any(e.childs[id].GetDescription(), e.childs[id]))
 	}
 	return slog.GroupValue(
-		slog.Group("error",
-			slog.Int("status", e.Status),
-			slog.String("desc", e.Description),
-			slog.Any("message", e.Message),
-			slog.Any("source", e.source),
-			slog.Group("children", children...),
-		),
+		slog.Int("status", e.Status),
+		slog.String("desc", e.Description),
+		slog.Any("message", e.Message),
+		slog.Any("source", e.source),
+		slog.Group("children", children...),
 	)
 }
 
