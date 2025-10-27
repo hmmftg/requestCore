@@ -36,10 +36,12 @@ func (e ErrorData) LogValue() slog.Value {
 		src = slog.Attr{}
 	}
 	return slog.GroupValue(
-		slog.Time("time", e.Time),
-		slog.String("desc", e.ActionData.Description),
-		slog.Any("action", e.ActionData),
-		src,
-		slog.Any("child", e.Child),
+		slog.Group("error",
+			slog.Time("time", e.Time),
+			slog.String("desc", e.ActionData.Description),
+			slog.Any("action", e.ActionData),
+			src,
+			slog.Any("child", e.Child),
+		),
 	)
 }
