@@ -9,6 +9,7 @@ import (
 
 	ut "github.com/go-playground/universal-translator"
 	"github.com/go-playground/validator/v10"
+	"github.com/hmmftg/requestCore/libValidate"
 )
 
 type ErrorResponse struct {
@@ -116,35 +117,27 @@ func FormatErrorResp(errs error, trans ut.Translator) []ErrorResponse {
 		parent = parent[:len(parent)-1]
 
 		validationtag := strings.Split(validationError.Tag(), "=")
+		tagName := validationtag[0]
 
-		switch validationtag[0] {
-		case "required", "required_unless", "required_if":
-			errorResp.Code = "REQUIRED-FIELD"
-		case "padded_ip":
-			fallthrough
-		case "startswith":
-			fallthrough
-		case "alphanum":
-			fallthrough
-		case "oneof":
-			fallthrough
-		case "numeric":
-			fallthrough
-		case "len":
-			fallthrough
-		case "min":
-			fallthrough
-		case "max":
-			errorResp.Code = "INVALID-INPUT-DATA"
-		default:
-			parent += validationError.Tag()
-			errorResp.Code = "INVALID-INPUT-DATA"
-		}
+		// Get error code from libValidate registry
+		errorResp.Code = libValidate.GetErrorCode(tagName)
+
+		// Check if it's a custom validator
+		isCustomValidator := libValidate.IsCustomValidator(tagName)
+
 		// complicated tag
 		if len(validationtag) > 1 {
 			errorResp.Description = fmt.Sprintf("%s فیلد %s اجباری میباشد", parent, validationError.Field())
 		} else {
-			errorResp.Description = parent + " " + validationError.Translate(trans)
+			translatedMsg := validationError.Translate(trans)
+			if isCustomValidator {
+				// Custom validator: use translation directly without parent prefix
+				// The translation already contains the field name and proper message
+				errorResp.Description = translatedMsg
+			} else {
+				// Known validators: keep existing behavior with parent prefix
+				errorResp.Description = parent + " " + translatedMsg
+			}
 		}
 		errorResponses = append(errorResponses, errorResp)
 	}
