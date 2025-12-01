@@ -34,6 +34,9 @@ type TokenCache struct {
 }
 
 func (t TokenCache) Expired() bool {
+	if t.AccessToken == nil {
+		return true
+	}
 	return time.Now().After(t.AccessToken.TimeTaken.Add(t.AccessToken.ValidUntil))
 }
 
@@ -73,6 +76,11 @@ func (api RemoteApi) GetAuthHeader() (string, error) {
 func (api *RemoteApi) handleToken(w webFramework.WebFramework) libError.Error {
 	api.TokenCacheLock.Lock()
 	defer api.TokenCacheLock.Unlock()
+
+	if api.TokenCache.AccessToken != nil && !api.TokenCache.Expired() {
+		// another thread handles login before us
+		return nil
+	}
 
 	api.TokenCache.AccessToken = nil
 	api.TokenCache.RefreshToken = nil
