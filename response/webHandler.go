@@ -37,7 +37,7 @@ func getList(err error) []error {
 func (m WebHanlder) errorhandler(w webFramework.WebFramework, err error) {
 	array := getList(err)
 	for id := range array {
-		webFramework.AddLogTag(w, webFramework.ErrorListLogTag, slog.Any(fmt.Sprintf("error-%d", id), array[id]))
+		webFramework.AddLogTag(w, webFramework.ErrorListLogTag, slog.String(fmt.Sprintf("error-%d", id), array[id].Error()))
 	}
 	if newError := getError[libError.ErrorData](err); newError != nil {
 		m.Respond(newError.ActionData.Status.Int(), 1, newError.ActionData.Description, newError.ActionData.Message, true, w)
@@ -48,7 +48,7 @@ func (m WebHanlder) errorhandler(w webFramework.WebFramework, err error) {
 		return
 	}
 
-	webFramework.AddLogTag(w, webFramework.ErrorListLogTag, slog.Any("error", err))
+	webFramework.AddLogTag(w, webFramework.ErrorListLogTag, slog.String("error", err.Error()))
 	desc := err.Error()
 	desc = strings.ToUpper(desc)
 	desc = strings.ReplaceAll(desc, " ", "")
