@@ -130,11 +130,6 @@ func GetErrorsArrayWithMap(incomingDesc string, data any, errDescList map[string
 		errorResponses = make([]ErrorResponse, 0)
 		var errorResp ErrorResponse
 		if strings.Contains(desc, "-") {
-			if respData.JSON != nil { //error already translated
-				errorResp.Code = desc
-				errorResp.Description = respData.JSON
-				return append(errorResponses, errorResp)
-			}
 			desc = strings.ReplaceAll(desc, "-", "_")
 		}
 		errorResp.Code, errorResp.Description = GetDescFromCode(desc, respData.JSON, errDescList)
