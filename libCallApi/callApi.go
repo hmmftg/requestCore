@@ -2,6 +2,7 @@ package libCallApi
 
 import (
 	"bytes"
+	"context"
 	"encoding/base64"
 	"encoding/json"
 	"encoding/xml"
@@ -136,6 +137,7 @@ type CallData[Resp any] struct {
 	EnableLog  bool
 	LogLevel   int
 	Builder    func(int, []byte, map[string]string) (*Resp, error)
+	Context    context.Context // Context for distributed tracing and request cancellation
 }
 
 type CallResp struct {
@@ -232,9 +234,14 @@ func PrepareCall[Resp any](c CallData[Resp]) (*http.Request, error) {
 	if buffer == nil {
 		return nil, libError.NewWithDescription(http.StatusInternalServerError, "Generate Request Failed", "error in PrepareCall: type is not defined %d", c.BodyType)
 	}
-	req, err := http.NewRequest(c.Method, c.Api.Domain+"/"+c.Path, buffer)
+	// Use context from CallData if provided, otherwise use context.Background()
+	ctx := c.Context
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	req, err := http.NewRequestWithContext(ctx, c.Method, c.Api.Domain+"/"+c.Path, buffer)
 	if err != nil {
-		return nil, errors.Join(err, libError.NewWithDescription(http.StatusInternalServerError, "Generate Request Failed", "error in PrepareCall.NewRequest M=%s,Url:%s,json:%s", c.Method, c.Api.Domain+"/"+c.Path, buffer.String()))
+		return nil, errors.Join(err, libError.NewWithDescription(http.StatusInternalServerError, "Generate Request Failed", "error in PrepareCall.NewRequestWithContext M=%s,Url:%s,json:%s", c.Method, c.Api.Domain+"/"+c.Path, buffer.String()))
 	}
 	if _, ok := c.Headers["Authorization"]; !ok {
 		req.SetBasicAuth(c.Api.AuthData.User, c.Api.AuthData.Password)

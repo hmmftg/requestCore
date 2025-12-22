@@ -1,6 +1,7 @@
 package libCallApi
 
 import (
+	"context"
 	"log/slog"
 	"maps"
 	"net/http"
@@ -55,6 +56,7 @@ type RemoteCallParamData[Req, Resp any] struct {
 	JsonBody    Req               `json:"body"`
 	BodyType    RequestBodyType   `json:"-"`
 	Builder     BuilerFunc[Resp]  `json:"-"`
+	Context     context.Context   `json:"-"` // Context for distributed tracing and request cancellation
 }
 
 func (r RemoteCallParamData[Req, Resp]) LogValue() slog.Value {
@@ -123,6 +125,7 @@ func RemoteCall[Req, Resp any](param *RemoteCallParamData[Req, Resp]) (*Resp, er
 		Req:        param.JsonBody,
 		BodyType:   param.BodyType,
 		Builder:    param.Builder,
+		Context:    param.Context, // Pass context for distributed tracing
 		httpClient: param.HttpClient,
 	}
 	return ConsumeRestJSON(&callData)
