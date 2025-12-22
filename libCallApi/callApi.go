@@ -20,6 +20,8 @@ import (
 	"github.com/hmmftg/requestCore/libError"
 	"github.com/hmmftg/requestCore/response"
 	"github.com/hmmftg/requestCore/status"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/propagation"
 )
 
 func (m RemoteApiModel) ConsumeRestBasicAuthApi(requestJson []byte, apiName, path, contentType, method string, headers map[string]string) ([]byte, string, error) {
@@ -243,6 +245,14 @@ func PrepareCall[Resp any](c CallData[Resp]) (*http.Request, error) {
 	if err != nil {
 		return nil, errors.Join(err, libError.NewWithDescription(http.StatusInternalServerError, "Generate Request Failed", "error in PrepareCall.NewRequestWithContext M=%s,Url:%s,json:%s", c.Method, c.Api.Domain+"/"+c.Path, buffer.String()))
 	}
+
+	// Explicitly inject trace context into headers for distributed tracing
+	// This ensures trace context is propagated even if otelhttp.NewTransport doesn't extract it correctly
+	propagator := otel.GetTextMapPropagator()
+	if propagator != nil {
+		propagator.Inject(ctx, propagation.HeaderCarrier(req.Header))
+	}
+
 	if _, ok := c.Headers["Authorization"]; !ok {
 		req.SetBasicAuth(c.Api.AuthData.User, c.Api.AuthData.Password)
 	}
