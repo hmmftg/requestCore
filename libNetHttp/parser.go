@@ -391,3 +391,13 @@ func (c NetHttpParser) RecordSpanError(err error, attrs map[string]string) {
 		span.RecordError(err, trace.WithAttributes(eventAttrs...))
 	}
 }
+
+// GetContext returns the context from the HTTP request
+func (c NetHttpParser) GetContext() context.Context {
+	return c.Request.Context()
+}
+
+// SetContext updates the context in the HTTP request
+func (c NetHttpParser) SetContext(ctx context.Context) {
+	c.Request = c.Request.WithContext(ctx)
+}

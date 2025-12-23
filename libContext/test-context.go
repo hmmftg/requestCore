@@ -215,3 +215,13 @@ func (t TestingParser) AddSpanEvent(name string, attrs map[string]string) {
 func (t TestingParser) RecordSpanError(err error, attrs map[string]string) {
 	// No-op for testing
 }
+
+// GetContext returns a background context for testing
+func (t TestingParser) GetContext() context.Context {
+	return context.Background()
+}
+
+// SetContext is a no-op for testing
+func (t TestingParser) SetContext(ctx context.Context) {
+	// No-op for testing
+}
