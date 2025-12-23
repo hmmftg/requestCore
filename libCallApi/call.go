@@ -24,6 +24,7 @@ type CallParamData struct {
 	ValidateTls bool
 	EnableLog   bool
 	JsonBody    any
+	Context     context.Context `json:"-"` // Context for distributed tracing and request cancellation
 }
 
 func (r CallParamData) LogValue() slog.Value {
@@ -99,6 +100,7 @@ func Call[RespType any](param CallParam) CallResult[RespType] {
 		EnableLog:  param.EnableLog,
 		Timeout:    param.Timeout,
 		Req:        param.JsonBody,
+		Context:    param.Context, // Pass context for distributed tracing
 		httpClient: param.HttpClient,
 	}
 	resp, wsResp, callResp, err := ConsumeRest(callData)
