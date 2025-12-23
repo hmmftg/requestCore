@@ -71,6 +71,9 @@ type RequestParser interface {
 	AddSpanAttributes(attrs map[string]string)
 	AddSpanEvent(name string, attrs map[string]string)
 	RecordSpanError(err error, attrs map[string]string)
+	// Context management for tracing
+	GetContext() context.Context
+	SetContext(context.Context)
 }
 
 type RequestHandler interface {

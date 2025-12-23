@@ -60,8 +60,8 @@ type HandlerRequest[Req any, Resp any] struct {
 	RespSent bool
 	Builder  func(status int, rawResp []byte, headers map[string]string) (*Resp, error)
 	// Tracing fields
-	Span     trace.Span
-	SpanCtx  context.Context
+	Span    trace.Span
+	SpanCtx context.Context
 }
 
 // Tracing methods for HandlerRequest
@@ -108,6 +108,11 @@ func (hr *HandlerRequest[Req, Resp]) StartChildSpan(name string, attrs map[strin
 	return tm.StartSpanWithAttributes(hr.SpanCtx, name, attrs)
 }
 
+// GetParser returns the RequestParser from WebFramework for tracing
+func (hr HandlerRequest[Req, Resp]) GetParser() webFramework.RequestParser {
+	return hr.W.Parser
+}
+
 func BaseHandler[Req any, Resp any, Handler HandlerInterface[Req, Resp]](
 	core requestCore.RequestCoreInterface,
 	handler Handler,
@@ -125,7 +130,7 @@ func BaseHandler[Req any, Resp any, Handler HandlerInterface[Req, Resp]](
 			w = libContext.InitContextNoAuditTrail(c)
 		}
 		libContext.AddWebLogs(w, params.Title, webFramework.HandlerLogTag)
-		
+
 		// Initialize tracing if enabled
 		var span trace.Span
 		var spanCtx context.Context
@@ -134,13 +139,13 @@ func BaseHandler[Req any, Resp any, Handler HandlerInterface[Req, Resp]](
 			if spanName == "" {
 				spanName = params.Title
 			}
-			
+
 			tm := libTracing.GetGlobalTracingManager()
 			spanCtx, span = tm.StartSpanWithAttributes(w.Ctx, spanName, map[string]string{
 				"handler.title": params.Title,
 				"handler.path":  params.Path,
 			})
-			
+
 			// Add handler attributes
 			if span != nil && span.IsRecording() {
 				span.SetAttributes(
@@ -151,7 +156,7 @@ func BaseHandler[Req any, Resp any, Handler HandlerInterface[Req, Resp]](
 				)
 			}
 		}
-		
+
 		trx := HandlerRequest[Req, Resp]{
 			Title:   params.Title,
 			Args:    args,
@@ -162,7 +167,7 @@ func BaseHandler[Req any, Resp any, Handler HandlerInterface[Req, Resp]](
 		}
 
 		defer Recovery(start, w, handler, params, trx, core)
-		
+
 		// Ensure span is ended
 		defer func() {
 			if span != nil {
@@ -185,7 +190,7 @@ func BaseHandler[Req any, Resp any, Handler HandlerInterface[Req, Resp]](
 			trx.Header = header
 
 			var err error
-			trx.Response, err = handler.Simulation(trx)
+			trx.Response, err = libTracing.TraceFunc(handler.Simulation, trx)
 			if err != nil {
 				core.Responder().Error(trx.W, err)
 				return
@@ -215,7 +220,8 @@ func BaseHandler[Req any, Resp any, Handler HandlerInterface[Req, Resp]](
 			w.Parser.SetLocal("reqLog", nil)
 		}
 
-		errInit := handler.Initializer(trx)
+		var errInit error
+		errInit = libTracing.TraceError(handler.Initializer, trx)
 		webFramework.AddLog(w, webFramework.HandlerLogTag, slog.Any("initialize", errInit))
 		if errInit != nil {
 			core.Responder().Error(trx.W, errInit)
@@ -223,7 +229,7 @@ func BaseHandler[Req any, Resp any, Handler HandlerInterface[Req, Resp]](
 		}
 
 		var err error
-		trx.Response, err = handler.Handler(trx)
+		trx.Response, err = libTracing.TraceFunc(handler.Handler, trx)
 		webFramework.AddLog(w, webFramework.HandlerLogTag, slog.Any("main-handler", err))
 		if err != nil {
 			core.Responder().Error(trx.W, err)

@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/hmmftg/requestCore/response"
+	"github.com/hmmftg/requestCore/webFramework"
 )
 
 type CallParam *CallParamData
@@ -24,7 +25,7 @@ type CallParamData struct {
 	ValidateTls bool
 	EnableLog   bool
 	JsonBody    any
-	Context     context.Context `json:"-"` // Context for distributed tracing and request cancellation
+	Parser      webFramework.RequestParser `json:"-"` // Parser for distributed tracing and request cancellation
 }
 
 func (r CallParamData) LogValue() slog.Value {
@@ -44,24 +45,27 @@ type BuilerFunc[Resp any] func(status int, rawResp []byte, headers map[string]st
 
 type RemoteCallParamData[Req, Resp any] struct {
 	HttpClient  *http.Client
-	Parameters  map[string]any    `json:"-"`
-	Headers     map[string]string `json:"-"`
-	Api         RemoteApi         `json:"api"`
-	Timeout     time.Duration     `json:"-"`
-	Method      string            `json:"method"`
-	Path        string            `json:"path"`
-	Query       string            `json:"-"`
-	QueryStack  *[]string         `json:"-"`
-	ValidateTls bool              `json:"-"`
-	EnableLog   bool              `json:"-"`
-	JsonBody    Req               `json:"body"`
-	BodyType    RequestBodyType   `json:"-"`
-	Builder     BuilerFunc[Resp]  `json:"-"`
-	Context     context.Context   `json:"-"` // Context for distributed tracing and request cancellation
+	Parameters  map[string]any             `json:"-"`
+	Headers     map[string]string          `json:"-"`
+	Api         RemoteApi                  `json:"api"`
+	Timeout     time.Duration              `json:"-"`
+	Method      string                     `json:"method"`
+	Path        string                     `json:"path"`
+	Query       string                     `json:"-"`
+	QueryStack  *[]string                  `json:"-"`
+	ValidateTls bool                       `json:"-"`
+	EnableLog   bool                       `json:"-"`
+	JsonBody    Req                        `json:"body"`
+	BodyType    RequestBodyType            `json:"-"`
+	Builder     BuilerFunc[Resp]           `json:"-"`
+	Parser      webFramework.RequestParser `json:"-"` // Parser for distributed tracing and request cancellation
 }
 
 func (r RemoteCallParamData[Req, Resp]) LogValue() slog.Value {
 	headers := maps.Clone(r.Headers)
+	if headers == nil {
+		headers = map[string]string{}
+	}
 	headers["Authorization"] = "[masked]"
 	return slog.GroupValue(
 		slog.String("api", r.Api.Name),
@@ -91,6 +95,13 @@ func Call[RespType any](param CallParam) CallResult[RespType] {
 			*param.QueryStack = nil
 		}
 	}
+
+	// Prepare context for distributed tracing / cancellation
+	ctx := context.Background()
+	if param.Parser != nil {
+		ctx = param.Parser.GetContext()
+	}
+
 	callData := CallData[RespType]{
 		Api:        param.Api,
 		Path:       param.Path + param.Query,
@@ -100,9 +111,11 @@ func Call[RespType any](param CallParam) CallResult[RespType] {
 		EnableLog:  param.EnableLog,
 		Timeout:    param.Timeout,
 		Req:        param.JsonBody,
-		Context:    param.Context, // Pass context for distributed tracing
+		Context:    ctx,
+		LogValue:   (*CallParamData)(param).LogValue(),
 		httpClient: param.HttpClient,
 	}
+
 	resp, wsResp, callResp, err := ConsumeRest(callData)
 	return CallResult[RespType]{resp, wsResp, callResp, err}
 }
@@ -116,6 +129,13 @@ func RemoteCall[Req, Resp any](param *RemoteCallParamData[Req, Resp]) (*Resp, er
 			*param.QueryStack = nil
 		}
 	}
+
+	// Prepare context for distributed tracing / cancellation
+	ctx := context.Background()
+	if param.Parser != nil {
+		ctx = param.Parser.GetContext()
+	}
+
 	callData := CallData[Resp]{
 		Api:        param.Api,
 		Path:       param.Path + param.Query,
@@ -127,8 +147,10 @@ func RemoteCall[Req, Resp any](param *RemoteCallParamData[Req, Resp]) (*Resp, er
 		Req:        param.JsonBody,
 		BodyType:   param.BodyType,
 		Builder:    param.Builder,
-		Context:    param.Context, // Pass context for distributed tracing
+		Context:    ctx,
+		LogValue:   param.LogValue(),
 		httpClient: param.HttpClient,
 	}
+
 	return ConsumeRestJSON(&callData)
 }

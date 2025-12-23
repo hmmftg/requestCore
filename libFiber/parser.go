@@ -234,3 +234,13 @@ func (c FiberParser) RecordSpanError(err error, attrs map[string]string) {
 		span.RecordError(err, trace.WithAttributes(eventAttrs...))
 	}
 }
+
+// GetContext returns the context from the Fiber context
+func (c FiberParser) GetContext() context.Context {
+	return c.Ctx.UserContext()
+}
+
+// SetContext updates the context in the Fiber context
+func (c FiberParser) SetContext(ctx context.Context) {
+	c.Ctx.SetUserContext(ctx)
+}
