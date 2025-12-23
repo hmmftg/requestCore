@@ -1,6 +1,6 @@
 module github.com/hmmftg/requestCore
 
-// version: v0.21.0
+// version: v0.22.0
 go 1.24.0
 
 toolchain go1.24.6
