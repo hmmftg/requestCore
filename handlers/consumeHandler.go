@@ -117,6 +117,7 @@ func (c CallArgs[Req, Resp]) Handler(req HandlerRequest[Req, Resp]) (Resp, error
 			Api:      *req.Core.Params().GetRemoteApi(c.Api),
 			Method:   c.Method,
 			Path:     finalPath,
+			Context:  req.W.Ctx, // Pass context for distributed tracing
 		},
 	)
 	if err != nil {
@@ -224,6 +225,7 @@ func (h *ConsumeHandlerType[Req, Resp]) Handler(req HandlerRequest[Req, Resp]) (
 			EnableLog:   false,
 			Headers:     headersMap,
 			Builder:     req.Builder,
+			Context:     req.W.Ctx, // Pass context for distributed tracing
 		})
 	if errCall != nil {
 		return req.Response, errCall
