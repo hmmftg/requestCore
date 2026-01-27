@@ -9,6 +9,7 @@ import (
 	"github.com/hmmftg/requestCore"
 	"github.com/hmmftg/requestCore/libError"
 	"github.com/hmmftg/requestCore/libLogger"
+	"github.com/hmmftg/requestCore/libTracing"
 	"github.com/hmmftg/requestCore/response"
 	"github.com/hmmftg/requestCore/status"
 	"github.com/hmmftg/requestCore/webFramework"
@@ -28,7 +29,7 @@ func Recovery[Req any, Resp any, Handler HandlerInterface[Req, Resp]](
 		w.Parser.SetLocal(libLogger.SlogRequestBody, trx.Response)
 	}
 	webFramework.AddLogTag(w, webFramework.HandlerLogTag, slog.String("elapsed", elapsed.String()))
-	handler.Finalizer(trx)
+	libTracing.TraceVoid(handler.Finalizer, trx)
 	webFramework.CollectLogTags(w, webFramework.HandlerLogTag)
 	webFramework.CollectLogArrays(w, webFramework.HandlerLogTag)
 	webFramework.CollectLogTags(w, webFramework.ErrorListLogTag)

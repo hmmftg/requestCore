@@ -1,5 +1,7 @@
 package libCallApi
 
+//lint:file-ignore SA4006 gopls/staticcheck false-positive in this file (span-related diagnostics)
+
 import (
 	"bytes"
 	"context"
@@ -10,6 +12,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"log/slog"
 	"net/http"
 	"net/http/httptrace"
 	"os"
@@ -18,10 +21,13 @@ import (
 
 	"github.com/google/go-querystring/query"
 	"github.com/hmmftg/requestCore/libError"
+	"github.com/hmmftg/requestCore/libTracing"
 	"github.com/hmmftg/requestCore/response"
 	"github.com/hmmftg/requestCore/status"
 	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/propagation"
+	"go.opentelemetry.io/otel/trace"
 )
 
 func (m RemoteApiModel) ConsumeRestBasicAuthApi(requestJson []byte, apiName, path, contentType, method string, headers map[string]string) ([]byte, string, error) {
@@ -140,6 +146,8 @@ type CallData[Resp any] struct {
 	LogLevel   int
 	Builder    func(int, []byte, map[string]string) (*Resp, error)
 	Context    context.Context // Context for distributed tracing and request cancellation
+	// LogValue is optional and used only for tracing attributes (derived from the caller's LogValue()).
+	LogValue slog.Value
 }
 
 type CallResp struct {
@@ -313,8 +321,38 @@ func ConsumeRest[Resp any](c CallData[Resp]) (*Resp, *response.WsRemoteResponse,
 	if c.EnableLog {
 		req = c.SetLogs(req)
 	}
-	resp, err := cl.Do(req)
+
+	// Distributed tracing / cancellation context
+	ctx := c.Context
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	spanName, spanAttrs := libTracing.HTTPClientSpanNameAndAttrs(
+		c.Api.Name,
+		c.Api.Domain,
+		c.Method,
+		c.Path,
+		c.Timeout,
+		c.SslVerify,
+	)
+	for k, v := range libTracing.SpanAttrsFromSlogValue("call", c.LogValue) {
+		spanAttrs[k] = v
+	}
+
+	startTime := time.Now()
+
+	// Ensure propagation by running request with the span context.
+	resp, err, traceCtx := libTracing.TraceFuncWithSpanName(ctx, spanName, spanAttrs, func(spanCtx context.Context) (*http.Response, error) {
+		return cl.Do(req.WithContext(spanCtx))
+	})
 	if err != nil {
+		// Record connection/network errors
+		if span := trace.SpanFromContext(traceCtx); span.IsRecording() {
+			libTracing.RecordError(traceCtx, err, map[string]string{
+				"error.type": "http_client_error",
+			})
+			span.SetStatus(codes.Error, "HTTP request failed")
+		}
 		if os.IsTimeout(err) {
 			return nil, nil, nil, errors.Join(err, libError.NewWithDescription(http.StatusRequestTimeout, "API_CONNECT_TIMED_OUT", "error in ConsumeRest.ClientDo: %s %s", req.Method, req.RequestURI))
 		}
@@ -322,11 +360,35 @@ func ConsumeRest[Resp any](c CallData[Resp]) (*Resp, *response.WsRemoteResponse,
 	}
 	defer resp.Body.Close()
 
+	// Add HTTP response attributes to span
+	if span := trace.SpanFromContext(traceCtx); span.IsRecording() {
+		duration := time.Since(startTime)
+		libTracing.AddSpanAttributes(traceCtx, map[string]string{
+			"http.status_code":      fmt.Sprintf("%d", resp.StatusCode),
+			"http.response.size":    fmt.Sprintf("%d", resp.ContentLength),
+			"http.request.duration": duration.String(),
+		})
+
+		// Set span status based on HTTP status code
+		if resp.StatusCode >= 200 && resp.StatusCode < 300 {
+			span.SetStatus(codes.Ok, "")
+		} else if resp.StatusCode >= 400 {
+			span.SetStatus(codes.Error, fmt.Sprintf("HTTP %d", resp.StatusCode))
+		}
+	}
+
 	var respJson *Resp
 	var errResp *response.WsRemoteResponse
 
 	respJson, errResp, callResp, err := GetResp[Resp, response.WsRemoteResponse](c.Api, resp)
 	if err != nil {
+		// Record parsing/response errors
+		if span := trace.SpanFromContext(traceCtx); span.IsRecording() {
+			libTracing.RecordError(traceCtx, err, map[string]string{
+				"error.type":       "response_parsing_error",
+				"http.status_code": fmt.Sprintf("%d", resp.StatusCode),
+			})
+		}
 		if ok, errPrepare := response.Unwrap(err); ok {
 			return nil, nil, nil, errPrepare.Input(resp)
 		}
@@ -365,8 +427,37 @@ func ConsumeRestJSON[Resp any](c *CallData[Resp]) (*Resp, error) {
 	if c.EnableLog {
 		req = c.SetLogs(req)
 	}
-	resp, err := cl.Do(req)
+
+	// Distributed tracing / cancellation context
+	ctx := c.Context
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	spanName, spanAttrs := libTracing.HTTPClientSpanNameAndAttrs(
+		c.Api.Name,
+		c.Api.Domain,
+		c.Method,
+		c.Path,
+		c.Timeout,
+		c.SslVerify,
+	)
+	for k, v := range libTracing.SpanAttrsFromSlogValue("call", c.LogValue) {
+		spanAttrs[k] = v
+	}
+	startTime := time.Now()
+
+	// Ensure propagation by running request with the span context.
+	resp, err, traceCtx := libTracing.TraceFuncWithSpanName(ctx, spanName, spanAttrs, func(spanCtx context.Context) (*http.Response, error) {
+		return cl.Do(req.WithContext(spanCtx))
+	})
 	if err != nil {
+		// Record connection/network errors
+		if span := trace.SpanFromContext(traceCtx); span.IsRecording() {
+			libTracing.RecordError(traceCtx, err, map[string]string{
+				"error.type": "http_client_error",
+			})
+			span.SetStatus(codes.Error, "HTTP request failed")
+		}
 		if os.IsTimeout(err) {
 			return nil, errors.Join(err, libError.NewWithDescription(http.StatusRequestTimeout, "API_CONNECT_TIMED_OUT", "error in ConsumeRest.ClientDo: %s %s", req.Method, req.RequestURI))
 		}
@@ -374,12 +465,38 @@ func ConsumeRestJSON[Resp any](c *CallData[Resp]) (*Resp, error) {
 	}
 	defer resp.Body.Close()
 
+	// Add HTTP response attributes to span
+	if span := trace.SpanFromContext(traceCtx); span.IsRecording() {
+		duration := time.Since(startTime)
+		libTracing.AddSpanAttributes(traceCtx, map[string]string{
+			"http.status_code":      fmt.Sprintf("%d", resp.StatusCode),
+			"http.response.size":    fmt.Sprintf("%d", resp.ContentLength),
+			"http.request.duration": duration.String(),
+		})
+
+		// Set span status based on HTTP status code
+		if resp.StatusCode >= 200 && resp.StatusCode < 300 {
+			span.SetStatus(codes.Ok, "")
+		} else if resp.StatusCode >= 400 && resp.StatusCode < 500 {
+			span.SetStatus(codes.Error, fmt.Sprintf("HTTP %d", resp.StatusCode))
+		} else if resp.StatusCode >= 500 {
+			span.SetStatus(codes.Error, fmt.Sprintf("HTTP %d", resp.StatusCode))
+		}
+	}
+
 	if c.Builder == nil {
 		c.Builder = DefaultBuilderfunc[Resp]
 	}
 
 	respJson, err := GetJSONResp(c.Api, resp, c.Builder)
 	if err != nil {
+		// Record parsing/response errors
+		if span := trace.SpanFromContext(traceCtx); span.IsRecording() {
+			libTracing.RecordError(traceCtx, err, map[string]string{
+				"error.type":       "response_parsing_error",
+				"http.status_code": fmt.Sprintf("%d", resp.StatusCode),
+			})
+		}
 		if ok, errPrepare := response.Unwrap(err); ok {
 			return nil, errPrepare.Input(c)
 		}

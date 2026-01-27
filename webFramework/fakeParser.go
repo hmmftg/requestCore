@@ -177,3 +177,13 @@ func (c FakeParser) AddSpanEvent(name string, attrs map[string]string) {
 func (c FakeParser) RecordSpanError(err error, attrs map[string]string) {
 	// No-op for testing
 }
+
+// GetContext returns a background context for testing
+func (c FakeParser) GetContext() context.Context {
+	return context.Background()
+}
+
+// SetContext is a no-op for testing
+func (c FakeParser) SetContext(ctx context.Context) {
+	// No-op for testing
+}

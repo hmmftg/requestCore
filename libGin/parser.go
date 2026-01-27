@@ -224,3 +224,13 @@ func (c GinParser) RecordSpanError(err error, attrs map[string]string) {
 		span.RecordError(err, trace.WithAttributes(eventAttrs...))
 	}
 }
+
+// GetContext returns the context from the Gin request
+func (c GinParser) GetContext() context.Context {
+	return c.Ctx.Request.Context()
+}
+
+// SetContext updates the context in the Gin request
+func (c GinParser) SetContext(ctx context.Context) {
+	c.Ctx.Request = c.Ctx.Request.WithContext(ctx)
+}
