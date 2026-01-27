@@ -62,8 +62,6 @@ type HandlerRequest[Req any, Resp any] struct {
 	// Tracing fields
 	Span    trace.Span
 	SpanCtx context.Context
-	Span    trace.Span
-	SpanCtx context.Context
 }
 
 // Tracing methods for HandlerRequest
