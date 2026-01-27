@@ -4,7 +4,6 @@ import (
 	"database/sql"
 	"log"
 
-	"github.com/glebarez/sqlite"
 	oracle "github.com/godoes/gorm-oracle"
 	"gorm.io/driver/mysql"
 	"gorm.io/driver/postgres"
@@ -29,8 +28,6 @@ func InitDB(dbParams *libParams.DbParams) {
 	var orm *gorm.DB
 
 	switch dbParams.DataBaseType {
-	case "sqlite":
-		orm, err = gorm.Open(sqlite.Open(dbParams.DataBaseAddress.Value), &gorm.Config{})
 	case "mysql":
 		orm, err = gorm.Open(mysql.Open(dbParams.DataBaseAddress.Value), &gorm.Config{})
 	case "postgres":

@@ -23,7 +23,6 @@ import (
 	"github.com/hmmftg/requestCore/webFramework"
 	"github.com/swaggo/swag/v2"
 
-	_ "github.com/glebarez/go-sqlite"
 	_ "github.com/lib/pq"
 	_ "github.com/sijms/go-ora/v2"
 )

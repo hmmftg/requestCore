@@ -4,6 +4,11 @@ import (
 	"log/slog"
 )
 
+const (
+	SlogRequestBody  = "slog.request.body"
+	SlogResponseBody = "slog.response.body"
+)
+
 type JsonLogger struct {
 	logger *slog.Logger
 }

@@ -9,11 +9,11 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/hmmftg/requestCore/libGin"
 	"github.com/hmmftg/requestCore/libLogger/splunk"
 	"github.com/hmmftg/requestCore/libParams"
 	"github.com/hmmftg/requestCore/webFramework"
 	slogformatter "github.com/samber/slog-formatter"
-	sloggin "github.com/samber/slog-gin"
 )
 
 func InitSlogGin(wsParams libParams.ParamInterface, app *gin.Engine) {
@@ -60,17 +60,17 @@ func InitSlogGin(wsParams libParams.ParamInterface, app *gin.Engine) {
 	) //.WithGroup("http")
 	slog.SetDefault(logger)
 
-	config := sloggin.Config{
+	config := libGin.Config{
 		WithRequestBody:    true,
 		WithResponseBody:   true,
 		WithRequestHeader:  true,
 		WithResponseHeader: true,
-		Filters: []sloggin.Filter{
-			sloggin.IgnorePath(wsParams.GetLogging().SkipPaths...),
+		Filters: []libGin.Filter{
+			libGin.IgnorePath(wsParams.GetLogging().SkipPaths...),
 		},
 	}
 
 	// Add the sloggin middleware to all routes.
 	// The middleware will log all requests attributes.
-	app.Use(sloggin.NewWithConfig(logger, config))
+	app.Use(libGin.NewWithConfig(logger, config))
 }
