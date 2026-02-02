@@ -8,6 +8,7 @@ import (
 
 	"github.com/hmmftg/requestCore"
 	"github.com/hmmftg/requestCore/libContext"
+	"github.com/hmmftg/requestCore/libLogger"
 	"github.com/hmmftg/requestCore/libRequest"
 	"github.com/hmmftg/requestCore/libTracing"
 	"github.com/hmmftg/requestCore/response"
@@ -210,6 +211,7 @@ func BaseHandler[Req any, Resp any, Handler HandlerInterface[Req, Resp]](
 			core.Responder().Error(trx.W, errParse)
 			return
 		}
+		w.Parser.SetLocal(libLogger.SlogRequestBody, trx.Request)
 		webFramework.AddLog(w, webFramework.HandlerLogTag, slog.Any("request", trx.Request))
 
 		if params.SaveToRequest {

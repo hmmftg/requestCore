@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"net/http"
 
+	"github.com/hmmftg/requestCore/libLogger"
 	"github.com/hmmftg/requestCore/libQuery"
 	"github.com/hmmftg/requestCore/webFramework"
 
@@ -127,6 +128,7 @@ func (c GinParser) GetHttpHeader() http.Header {
 }
 
 func (c GinParser) SendJSONRespBody(status int, resp any) error {
+	c.SetLocal(libLogger.SlogResponseBody, resp)
 	c.Ctx.JSON(status, resp)
 	return nil
 }

@@ -8,7 +8,6 @@ import (
 
 	"github.com/hmmftg/requestCore"
 	"github.com/hmmftg/requestCore/libError"
-	"github.com/hmmftg/requestCore/libLogger"
 	"github.com/hmmftg/requestCore/libTracing"
 	"github.com/hmmftg/requestCore/response"
 	"github.com/hmmftg/requestCore/status"
@@ -24,10 +23,6 @@ func Recovery[Req any, Resp any, Handler HandlerInterface[Req, Resp]](
 	core requestCore.RequestCoreInterface,
 ) {
 	elapsed := time.Since(start)
-	w.Parser.SetLocal(libLogger.SlogRequestBody, trx.Request)
-	if trx.RespSent {
-		w.Parser.SetLocal(libLogger.SlogRequestBody, trx.Response)
-	}
 	webFramework.AddLogTag(w, webFramework.HandlerLogTag, slog.String("elapsed", elapsed.String()))
 	libTracing.TraceVoid(handler.Finalizer, trx)
 	webFramework.CollectLogTags(w, webFramework.HandlerLogTag)
