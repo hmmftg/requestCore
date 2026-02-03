@@ -1,6 +1,10 @@
 package response
 
-import "github.com/hmmftg/requestCore/webFramework"
+import (
+	"log/slog"
+
+	"github.com/hmmftg/requestCore/webFramework"
+)
 
 type ResponseHandler interface {
 	OK(w webFramework.WebFramework, resp any)
@@ -58,4 +62,19 @@ type DbResponse struct {
 	Description string `json:"description"`
 	Result      any    `json:"result"`
 	ErrorCode   string `json:"error_code,omitempty"`
+}
+
+func (r WsResponse) LogValue() slog.Value {
+	if r.Status == 0 {
+		return slog.GroupValue(
+			slog.Int("status", r.Status),
+			slog.String("description", r.Description),
+			slog.Any("result", r.Result),
+		)
+	}
+	return slog.GroupValue(
+		slog.Int("status", r.Status),
+		slog.String("description", r.Description),
+		slog.Any("errorData", r.ErrorData),
+	)
 }
