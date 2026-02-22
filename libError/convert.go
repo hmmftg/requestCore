@@ -18,7 +18,7 @@ func Convert(err error, status status.StatusCode, desc string, message any) Erro
 }
 
 func action(status status.StatusCode, desc string, message any) Action {
-	return Action{status, desc, message}
+	return Action{Status: status, Description: desc, Message: message}
 }
 
 // wraps child error with parent status code and desc

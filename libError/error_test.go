@@ -71,7 +71,7 @@ var testCases = []TestCase{
 					),
 					status.NotFound, "third", nil,
 				),
-				status.BadRequest, "second", libError.Action{12, "ee", nil},
+				status.BadRequest, "second", libError.Action{Status: 12, Description: "ee", Message: nil},
 			),
 			status.InternalServerError, "first", "dd",
 		),

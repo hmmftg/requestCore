@@ -40,11 +40,24 @@ func (m WebHanlder) errorhandler(w webFramework.WebFramework, err error) {
 		webFramework.AddLogTag(w, webFramework.ErrorListLogTag, slog.String(fmt.Sprintf("error-%d", id), array[id].Error()))
 	}
 	if newError := getError[libError.ErrorData](err); newError != nil {
-		m.Respond(newError.ActionData.Status.Int(), 1, newError.ActionData.Description, newError.ActionData.Message, true, w)
+		// Do not pass Action.Message to response. Use PublicDescription when set; otherwise description from ErrorDesc/safe fallback.
+		if newError.ActionData.PublicDescription != "" {
+			errs := []ErrorResponse{{
+				Code:        newError.ActionData.Description,
+				Description: SanitizeForClient(newError.ActionData.PublicDescription, MaxDescriptionLength),
+			}}
+			m.respond(RespData{
+				Code: newError.ActionData.Status.Int(), Status: 1, Message: newError.ActionData.Description,
+				Type: JsonWithReceipt, PreBuiltErrors: &errs,
+			}, true, w)
+			return
+		}
+		m.Respond(newError.ActionData.Status.Int(), 1, newError.ActionData.Description, nil, true, w)
 		return
 	}
 	if oldError := getError[ErrorData](err); oldError != nil {
-		m.Respond(oldError.Status, 1, oldError.Description, oldError.Message, true, w)
+		// Do not pass Message to response — only code; description from ErrorDesc/safe fallback.
+		m.Respond(oldError.Status, 1, oldError.Description, nil, true, w)
 		return
 	}
 
@@ -52,7 +65,8 @@ func (m WebHanlder) errorhandler(w webFramework.WebFramework, err error) {
 	desc := err.Error()
 	desc = strings.ToUpper(desc)
 	desc = strings.ReplaceAll(desc, " ", "")
-	m.Respond(http.StatusInternalServerError, 1, desc, err, true, w)
+	// Do not pass raw err to response; use code only so description is resolved from ErrorDesc/safe fallback.
+	m.Respond(http.StatusInternalServerError, 1, desc, nil, true, w)
 }
 
 func (m WebHanlder) Error(w webFramework.WebFramework, err error) {
@@ -127,14 +141,15 @@ func (m WebHanlder) respond(data RespData, abort bool, w webFramework.WebFramewo
 			}
 		}
 	} else {
-		errs := m.GetErrorsArray(data.Message, data)
+		var errs []ErrorResponse
+		if data.PreBuiltErrors != nil {
+			errs = *data.PreBuiltErrors
+		} else {
+			errs = m.GetErrorsArray(data.Message, data)
+		}
 		if len(errs) == 1 {
 			webFramework.AddLogTag(w, webFramework.HandlerLogTag, slog.String("desc", errs[0].Code))
-			if strMsg, ok := errs[0].Description.(string); ok {
-				webFramework.AddLogTag(w, webFramework.HandlerLogTag, slog.String("message", strMsg))
-			} else {
-				webFramework.AddLogTag(w, webFramework.HandlerLogTag, slog.Any("message", errs[0].Description))
-			}
+			webFramework.AddLogTag(w, webFramework.HandlerLogTag, slog.String("message", errs[0].Description))
 		} else {
 			webFramework.AddLogTag(w, webFramework.HandlerLogTag, slog.Any("errorList", errs))
 		}

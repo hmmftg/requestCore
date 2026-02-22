@@ -9,10 +9,14 @@ import (
 	"github.com/hmmftg/requestCore/status"
 )
 
+// Action holds error action data. Description is the public code (e.g. API_OK_RESP_JSON).
+// PublicDescription, when non-empty, is used as the client-visible description; otherwise
+// the response layer resolves description from ErrorDesc/safe fallback. Message is internal-only (logs/tracing).
 type Action struct {
-	Status      status.StatusCode `json:"status"`
-	Description string            `json:"description"`
-	Message     any               `json:"message"`
+	Status             status.StatusCode `json:"status"`
+	Description        string            `json:"description"`         // public code
+	PublicDescription  string            `json:"publicDescription"` // optional client-visible description
+	Message            any               `json:"message"`            // internal only, never sent to client
 }
 
 var matchFirstCap = regexp.MustCompile("(.)([A-Z][a-z]+)")

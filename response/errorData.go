@@ -111,7 +111,7 @@ func GetErrorsArray(message string, data any) []ErrorResponse {
 		errorResponses = make([]ErrorResponse, 0)
 		var errorResp ErrorResponse
 		errorResp.Code = message
-		errorResp.Description = data
+		errorResp.Description = SanitizeForClient(data, MaxDescriptionLength)
 		errorResponses = append(errorResponses, errorResp)
 	}
 	return errorResponses

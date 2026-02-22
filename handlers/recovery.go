@@ -40,6 +40,8 @@ func Recovery[Req any, Resp any, Handler HandlerInterface[Req, Resp]](
 		if params.RecoveryHandler != nil {
 			params.RecoveryHandler(r)
 		} else {
+			// Log full panic value for debugging; client only sees SYSTEM_FAULT localized text.
+			slog.Error("panic recovered", slog.String("handler", params.Title), slog.Any("panic", r))
 			switch data := r.(type) {
 			case error:
 				core.Responder().Error(w,
@@ -47,7 +49,7 @@ func Recovery[Req any, Resp any, Handler HandlerInterface[Req, Resp]](
 						libError.NewWithDescription(
 							status.InternalServerError,
 							response.SYSTEM_FAULT,
-							"error in %s",
+							"panic in %s",
 							params.Title,
 						)))
 			default:
@@ -55,7 +57,8 @@ func Recovery[Req any, Resp any, Handler HandlerInterface[Req, Resp]](
 					libError.NewWithDescription(
 						http.StatusInternalServerError,
 						response.SYSTEM_FAULT,
-						"error in %s=> %+v", params.Title, data),
+						"panic in %s",
+						params.Title),
 				)
 			}
 		}

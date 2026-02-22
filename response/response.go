@@ -33,9 +33,8 @@ func ParseRemoteRespJson(respBytes []byte, desc string, status int) (int, map[st
 	}
 	if status != http.StatusOK {
 		if len(resp.ErrorData) > 0 {
-			errorDesc := resp.ErrorData[0] //.(ErrorResponse)
-			errorMessage := errorDesc.Description.(string)
-			return status, map[string]string{"desc": errorDesc.Code, "message": errorMessage}, resp, errors.New(errorMessage)
+			errorDesc := resp.ErrorData[0]
+			return status, map[string]string{"desc": errorDesc.Code, "message": errorDesc.Description}, resp, errors.New(errorDesc.Description)
 		}
 		return status, map[string]string{"desc": "Remote Resp", "message": resp.Description}, resp, errors.New(resp.Description)
 	}
@@ -50,8 +49,8 @@ func ParseWsRemoteResp(respBytes []byte, desc string, status int) (int, map[stri
 	}
 	if status != http.StatusOK {
 		if len(resp.ErrorData) > 0 {
-			errorDesc := strings.ReplaceAll(resp.ErrorData[0].Code, "-", "_") //.(ErrorResponse)
-			errorMessage := resp.ErrorData[0].Description.(string)
+			errorDesc := strings.ReplaceAll(resp.ErrorData[0].Code, "-", "_")
+			errorMessage := resp.ErrorData[0].Description
 			return status, map[string]string{"desc": errorDesc, "message": errorMessage}, resp, errors.New(errorMessage)
 		}
 		return status, map[string]string{"desc": "Remote Resp", "message": resp.Description}, resp, errors.New(resp.Description)
@@ -59,13 +58,19 @@ func ParseWsRemoteResp(respBytes []byte, desc string, status int) (int, map[stri
 	return http.StatusOK, nil, resp, nil
 }
 
-func GetDescFromCode(code string, data any, errDescList map[string]string) (string, any) {
+// GetDescFromCode returns (code, description) for API response. When code is not in errDescList,
+// it returns a safe fallback (SYSTEM_FAULT + localized text) and never exposes raw data.
+func GetDescFromCode(code string, data any, errDescList map[string]string) (string, string) {
+	safeFallbackDesc := SYSTEM_FAULT_DESC
+	if d, ok := errDescList[SYSTEM_FAULT]; ok {
+		safeFallbackDesc = d
+	}
 	if strings.Contains(code, "#") {
-		code := code
-		if strings.Contains(code, "-") {
-			code = strings.ReplaceAll(code, "-", "_")
+		codeNorm := code
+		if strings.Contains(codeNorm, "-") {
+			codeNorm = strings.ReplaceAll(codeNorm, "-", "_")
 		}
-		messageParts := strings.Split(code, "#")
+		messageParts := strings.Split(codeNorm, "#")
 		if descInDb, ok := errDescList[messageParts[0]]; ok {
 			descParts := strings.Split(descInDb, "$")
 			incomingDesc := messageParts[0]
@@ -78,12 +83,12 @@ func GetDescFromCode(code string, data any, errDescList map[string]string) (stri
 				desc += descParts[i] + messageParts[j]
 				j++
 			}
-			return strings.ReplaceAll(incomingDesc, "_", "-"), desc
+			return strings.ReplaceAll(incomingDesc, "_", "-"), SanitizeForClient(desc, MaxDescriptionLength)
 		}
-		return strings.ReplaceAll(code, "_", "-"), data
+		return strings.ReplaceAll(codeNorm, "_", "-"), safeFallbackDesc
 	}
 	if desc, ok := errDescList[code]; ok {
-		return strings.ReplaceAll(code, "_", "-"), desc
+		return strings.ReplaceAll(code, "_", "-"), SanitizeForClient(desc, MaxDescriptionLength)
 	}
-	return code, data
+	return strings.ReplaceAll(code, "_", "-"), safeFallbackDesc
 }

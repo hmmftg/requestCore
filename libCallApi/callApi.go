@@ -5,7 +5,9 @@ package libCallApi
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
 	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"encoding/xml"
 	"errors"
@@ -124,6 +126,28 @@ func (m RemoteApiModel) ConsumeRestApi(requestJson []byte, apiName, path, conten
 	return responseData, resp.Status, resp.StatusCode, nil
 }
 
+// responseBodySummary returns a safe summary for error messages (no raw body). Optional hash helps support correlate with logs.
+func responseBodySummary(body []byte, statusCode int) string {
+	if len(body) == 0 {
+		return fmt.Sprintf("size=0 status=%d", statusCode)
+	}
+	h := sha256.Sum256(body)
+	return fmt.Sprintf("size=%d status=%d hash=%s", len(body), statusCode, hex.EncodeToString(h[:])[:8])
+}
+
+const maxLogBodyBytes = 500
+
+func logResponseBodyForDebug(apiName, label string, body []byte) {
+	if len(body) == 0 {
+		return
+	}
+	preview := string(body)
+	if len(preview) > maxLogBodyBytes {
+		preview = preview[:maxLogBodyBytes] + "... truncated"
+	}
+	slog.Debug("response body for debug", slog.String("api", apiName), slog.String("label", label), slog.String("body", preview))
+}
+
 type RequestBodyType int
 
 const (
@@ -170,12 +194,14 @@ func GetResp[Resp any, Error any](api RemoteApi, resp *http.Response) (*Resp, *E
 	case http.StatusOK:
 		err = json.Unmarshal(responseData, &respJson)
 		if err != nil {
-			return nil, nil, nil, errors.Join(err, libError.NewWithDescription(http.StatusInternalServerError, "API_OK_RESP_JSON", "error in %s GetResp.Unmarshal:%s", api.Name, string(responseData)))
+			logResponseBodyForDebug(api.Name, "API_OK_RESP_JSON", responseData)
+			return nil, nil, nil, errors.Join(err, libError.NewWithDescription(http.StatusInternalServerError, "API_OK_RESP_JSON", "error in %s GetResp.Unmarshal: %s", api.Name, responseBodySummary(responseData, resp.StatusCode)))
 		}
 	default:
 		err = json.Unmarshal(responseData, &errJson)
 		if err != nil {
-			return nil, nil, nil, errors.Join(err, libError.NewWithDescription(status.StatusCode(resp.StatusCode), "API_NOK_RESP_JSON", "error in %s GetResp.Unmarshal:%s", api.Name, string(responseData)))
+			logResponseBodyForDebug(api.Name, "API_NOK_RESP_JSON", responseData)
+			return nil, nil, nil, errors.Join(err, libError.NewWithDescription(status.StatusCode(resp.StatusCode), "API_NOK_RESP_JSON", "error in %s GetResp.Unmarshal: %s", api.Name, responseBodySummary(responseData, resp.StatusCode)))
 		}
 	}
 	headerMap := make(map[string]string, 0)
@@ -204,7 +230,8 @@ func GetJSONResp[Resp any](api RemoteApi, resp *http.Response, Builder func(int,
 	var jsonResp Resp
 	err = json.Unmarshal(responseData, &jsonResp)
 	if err != nil {
-		return nil, errors.Join(err, libError.NewWithDescription(http.StatusBadRequest, "API_UNABLE_PARSE_RESP", "error in GetResp.json.Unmarshal: %s", responseData))
+		logResponseBodyForDebug(api.Name, "API_UNABLE_PARSE_RESP", responseData)
+		return nil, errors.Join(err, libError.NewWithDescription(http.StatusBadRequest, "API_UNABLE_PARSE_RESP", "error in GetResp.json.Unmarshal: %s", responseBodySummary(responseData, resp.StatusCode)))
 	}
 	return &jsonResp, nil
 }
@@ -405,7 +432,8 @@ func DefaultBuilderfunc[Resp any](stat int, rawResp []byte, headers map[string]s
 	var resp Resp
 	err := json.Unmarshal(rawResp, &resp)
 	if err != nil {
-		return nil, errors.Join(err, libError.NewWithDescription(http.StatusBadRequest, "API_UNABLE_PARSE_RESP", "error in GetResp.json.Unmarshal: %s", rawResp))
+		slog.Debug("DefaultBuilderfunc unmarshal failed", slog.String("body_summary", responseBodySummary(rawResp, stat)))
+		return nil, errors.Join(err, libError.NewWithDescription(http.StatusBadRequest, "API_UNABLE_PARSE_RESP", "error in GetResp.json.Unmarshal: %s", responseBodySummary(rawResp, stat)))
 	}
 	return &resp, nil
 }

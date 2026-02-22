@@ -103,7 +103,8 @@ func TestDMLHandler(t *testing.T) {
 			Url:       "/",
 			Request:   testDMLReq{ID: "1"},
 			Status:    500,
-			CheckBody: []string{"errors", "PreControl: pre1"},
+			// Safe error response: internal message (PreControl: pre1) no longer exposed; expect errors and safe description
+			CheckBody: []string{"errors", "description"},
 			Model: testingtools.SampleRequestModelMock(t, func(mockDB sqlmock.Sqlmock) {
 				mockDB.ExpectPrepare(Pre1).ExpectQuery().WillReturnError(errors.New("error pre1"))
 			}),

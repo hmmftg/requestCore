@@ -1,3 +1,11 @@
+// Package response provides HTTP response and error handling for requestCore.
+//
+// Safe error response (for consuming repos):
+//   - Do not put string(rawResp) or full upstream response bodies in libError descriptions;
+//     use size/status/hash and log details separately (see libCallApi).
+//   - Do not use %+v on whole response structs in error messages that can become client-visible.
+//   - Use only codes from a fixed catalog and ensure they are seeded/localized (e.g. SYSTEM_FAULT, API_*);
+//     avoid dynamic values as public error codes.
 package response
 
 import (
@@ -14,7 +22,7 @@ import (
 
 type ErrorResponse struct {
 	Code        string `json:"code"`
-	Description any    `json:"description"`
+	Description string `json:"description"`
 }
 
 func (e WsRemoteResponse) ToErrorState() ErrorState {
