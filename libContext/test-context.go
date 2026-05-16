@@ -7,6 +7,7 @@ import (
 	"os"
 	"reflect"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/hmmftg/requestCore/webFramework"
@@ -23,8 +24,8 @@ type TestingParser struct {
 	HttpHeader               http.Header
 	Body, UrlQuery           any
 	BodyError, UrlQueryError error
-	Headers                  map[string]any
-	Locals                   map[string]any
+	Headers                  *sync.Map
+	Locals                   *sync.Map
 	UrlParams                map[string]string
 	Args                     map[string]string
 	NextError                error
@@ -38,18 +39,18 @@ const (
 	LocalEnvKey  = "l"
 )
 
-func parseEnv(t *testing.T, key string) map[string]any {
+func parseEnv(t *testing.T, key string) *sync.Map {
 	rawEnv := os.Getenv(key)
 	valueList := strings.Split(rawEnv, "@")
-	result := make(map[string]any, 0)
+	result := sync.Map{}
 	for _, h := range valueList {
 		pair := strings.Split(h, "#")
 		if len(pair) == 1 {
 			t.Fatalf("bad environment: %s\n", pair)
 		}
-		result[pair[0]] = pair[1]
+		result.Store(pair[0], pair[1])
 	}
-	return result
+	return &result
 }
 
 func initTestContext(t *testing.T) TestingParser {
@@ -79,10 +80,15 @@ func (t TestingParser) GetHeader(target webFramework.HeaderInterface) error {
 	return t.HeaderError
 }
 func (t TestingParser) GetHeaderValue(name string) string {
-	head, ok := t.Headers[name].(string)
+	storage, ok := t.Headers.Load(name)
 	if !ok {
-		t.Root.Fatalf("wrong header[%s] type:%T\n", name, t.Headers[name])
+		t.Root.Fatalf("wrong header[%s]\n", name)
 	}
+	head, ok := storage.(string)
+	if !ok {
+		t.Root.Fatalf("wrong header[%s] type:%T\n", name, storage)
+	}
+
 	return head
 }
 func (t TestingParser) GetHttpHeader() http.Header {
@@ -104,12 +110,16 @@ func (t TestingParser) GetRawUrlQuery() string {
 	return t.RawQuery
 }
 func (t TestingParser) GetLocal(name string) any {
-	return t.Locals[name]
+	storage, ok := t.Locals.Load(name)
+	if !ok {
+		t.Root.Fatalf("wrong local[%s]\n", name)
+	}
+	return storage
 }
 func (t TestingParser) GetLocalString(name string) string {
-	loc, ok := t.Locals[name].(string)
+	loc, ok := t.GetLocal(name).(string)
 	if !ok {
-		t.Root.Fatalf("wrong local[%s] type:%T\n", name, t.Locals[name])
+		t.Root.Fatalf("wrong local[%s]\n", name)
 	}
 	return loc
 }
@@ -119,15 +129,16 @@ const (
 )
 
 func (t TestingParser) AddCustomAttributes(attr slog.Attr) {
-	v, ok := t.Locals[customAttributesCtxKey]
+	v, ok := t.Locals.Load(customAttributesCtxKey)
 	if !ok {
-		t.Locals[customAttributesCtxKey] = []slog.Attr{attr}
+		t.Locals.Store(customAttributesCtxKey, []slog.Attr{attr})
 		return
 	}
 
 	switch attrs := v.(type) {
 	case []slog.Attr:
-		t.Locals[customAttributesCtxKey] = append(attrs, attr)
+		attrs = append(attrs, attr)
+		t.Locals.Store(customAttributesCtxKey, attrs)
 	}
 }
 
@@ -142,13 +153,13 @@ func (t TestingParser) CheckUrlParam(name string) (string, bool) {
 	return param, ok
 }
 func (t TestingParser) SetLocal(name string, value any) {
-	t.Locals[name] = value
+	t.Locals.Store(name, value)
 }
 func (t TestingParser) SetReqHeader(name string, value string) {
-	t.Headers[name] = value
+	t.Headers.Store(name, value)
 }
 func (t TestingParser) SetRespHeader(name string, value string) {
-	t.Headers[name] = value
+	t.Headers.Store(name, value)
 }
 func (t TestingParser) GetArgs(args ...any) map[string]string {
 	return t.Args
