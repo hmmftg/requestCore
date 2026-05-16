@@ -177,7 +177,7 @@ func (h *HeaderConfigLoader) ValidateConfig() error {
 }
 
 // validateHeaderConfig validates a single header configuration
-func (h *HeaderConfigLoader) validateHeaderConfig(key string, config HeaderConfig) error {
+func (h *HeaderConfigLoader) validateHeaderConfig(_ string, config HeaderConfig) error {
 	if config.HeaderName == "" {
 		return fmt.Errorf("header name cannot be empty")
 	}

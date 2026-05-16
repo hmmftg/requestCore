@@ -82,7 +82,7 @@ func (t TestingParser) GetHeader(target webFramework.HeaderInterface) error {
 func (t TestingParser) GetHeaderValue(name string) string {
 	storage, ok := t.Headers.Load(name)
 	if !ok {
-		t.Root.Fatalf("wrong header[%s]\n", name)
+		return ""
 	}
 	head, ok := storage.(string)
 	if !ok {
@@ -112,14 +112,18 @@ func (t TestingParser) GetRawUrlQuery() string {
 func (t TestingParser) GetLocal(name string) any {
 	storage, ok := t.Locals.Load(name)
 	if !ok {
-		t.Root.Fatalf("wrong local[%s]\n", name)
+		return nil
 	}
 	return storage
 }
 func (t TestingParser) GetLocalString(name string) string {
-	loc, ok := t.GetLocal(name).(string)
+	storage := t.GetLocal(name)
+	if storage == nil {
+		return ""
+	}
+	loc, ok := storage.(string)
 	if !ok {
-		t.Root.Fatalf("wrong local[%s]\n", name)
+		t.Root.Fatalf("wrong local[%s] type:%T\n", name, storage)
 	}
 	return loc
 }
