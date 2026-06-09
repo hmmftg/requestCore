@@ -370,6 +370,3 @@ Suggested areas for contribution:
 See `LICENSE` for license information.
 
 ---
-2. a **more enterprise-style README**
-3. a **README with real code examples** based on the exported APIs
-4. a **comparison section vs Kratos / Gin / Fiber / composable stack**
