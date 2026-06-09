@@ -370,12 +370,6 @@ Suggested areas for contribution:
 See `LICENSE` for license information.
 
 ---
-
-## A note on usage
-
-This README is intentionally written to reflect the repository’s actual structure and verified responsibilities. If you want, I can also generate:
-
-1. a **shorter, polished GitHub README**
 2. a **more enterprise-style README**
 3. a **README with real code examples** based on the exported APIs
 4. a **comparison section vs Kratos / Gin / Fiber / composable stack**
