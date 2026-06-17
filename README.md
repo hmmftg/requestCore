@@ -245,6 +245,27 @@ Input validation helpers.
 ### `libCallApi`
 Utilities for calling external APIs and handling auth/multi-call scenarios.
 
+Remote APIs can authenticate with OAuth2 (`client_credentials`, `refresh_token`, optional `password` grant) or fall back to BasicAuth when `grant-type` is not configured.
+
+Example `param.yaml`:
+
+```yaml
+remoteApis:
+  partner-api:
+    domain: https://api.partner.com
+    name: partner-api
+    auth:
+      grant-type: client_credentials
+      auth-uri: https://auth.partner.com/oauth/token
+      client-id: partner-client
+```
+
+Secure values (existing pattern):
+
+- `remote-api#partner-api#client-secret`
+- `remote-api#partner-api#client-id`
+- `remote-api#partner-api#auth-uri` (alias: `auth-url`)
+
 ### `libCrypto`
 Cryptographic and security primitives.
 

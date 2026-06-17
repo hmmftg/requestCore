@@ -37,11 +37,17 @@ func (m RemoteApiModel) ConsumeRestBasicAuthApi(requestJson []byte, apiName, pat
 		timeoutSeconds, _ := strconv.Atoi(timeOutString)
 		httpClient.Timeout = time.Duration(timeoutSeconds * int(time.Second))
 	}
-	req, err := http.NewRequest(method, m.RemoteApiList[apiName].Domain+"/"+path, bytes.NewBuffer(requestJson))
+	api := m.RemoteApiList[apiName]
+	if headers == nil {
+		headers = make(map[string]string)
+	}
+	if err := (&api).EnsureAuthorization(context.Background(), headers); err != nil {
+		return nil, "AUTH_FAILED", err
+	}
+	req, err := http.NewRequest(method, api.Domain+"/"+path, bytes.NewBuffer(requestJson))
 	if err != nil {
 		return nil, "Generate Request Failed", err
 	}
-	req.SetBasicAuth(m.RemoteApiList[apiName].AuthData.User, m.RemoteApiList[apiName].AuthData.Password)
 	req.Header.Add("Content-Type", contentType)
 	for header, value := range headers {
 		req.Header.Add(header, value)
@@ -85,12 +91,16 @@ func (m RemoteApiModel) ConsumeRestApi(requestJson []byte, apiName, path, conten
 		timeoutSeconds, _ := strconv.Atoi(timeOutString)
 		httpClient.Timeout = time.Duration(timeoutSeconds * int(time.Second))
 	}
-	req, err := http.NewRequest(method, m.RemoteApiList[apiName].Domain+"/"+path, bytes.NewBuffer(requestJson))
+	api := m.RemoteApiList[apiName]
+	if headers == nil {
+		headers = make(map[string]string)
+	}
+	if err := (&api).EnsureAuthorization(context.Background(), headers); err != nil {
+		return nil, "AUTH_FAILED", http.StatusInternalServerError, err
+	}
+	req, err := http.NewRequest(method, api.Domain+"/"+path, bytes.NewBuffer(requestJson))
 	if err != nil {
 		return nil, "Generate Request Failed", http.StatusInternalServerError, err
-	}
-	if _, ok := headers["Authorization"]; !ok {
-		req.SetBasicAuth(m.RemoteApiList[apiName].AuthData.User, m.RemoteApiList[apiName].AuthData.Password)
 	}
 	req.Header.Add("Content-Type", contentType)
 	for header, value := range headers {
@@ -288,8 +298,11 @@ func PrepareCall[Resp any](c CallData[Resp]) (*http.Request, error) {
 		propagator.Inject(ctx, propagation.HeaderCarrier(req.Header))
 	}
 
-	if _, ok := c.Headers["Authorization"]; !ok {
-		req.SetBasicAuth(c.Api.AuthData.User, c.Api.AuthData.Password)
+	if c.Headers == nil {
+		c.Headers = make(map[string]string)
+	}
+	if err := c.Api.EnsureAuthorization(ctx, c.Headers); err != nil {
+		return nil, err
 	}
 	switch c.BodyType {
 	case JSON:
