@@ -113,6 +113,13 @@ func InitializeApp[T any](app Application[T]) *App[T] {
 		cache, lock := libCallApi.InitTokenCache()
 		api.TokenCache = cache
 		api.TokenCacheLock = lock
+		if api.AuthData.GrantType != "" {
+			auth, err := libCallApi.NewOAuth2AuthFromAuthData(api.AuthData, libCallApi.NewTokenHTTPClient())
+			if err != nil {
+				log.Fatal("InitializeApp: OAuth2 auth for ", id, "=>", err)
+			}
+			api.Auth = auth
+		}
 		wsParams.RemoteApis[id] = api
 	}
 

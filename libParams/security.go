@@ -154,7 +154,7 @@ func DecryptParams[T any](keyByte, ivByte []byte, params *ApplicationParams[T]) 
 					api.AuthData.ClientID = current.Value
 				case "client-secret":
 					api.AuthData.ClientSecret = current.Value
-				case "auth-url":
+				case "auth-url", "auth-uri":
 					api.AuthData.AuthURI = current.Value
 				}
 				params.RemoteApis[tags[1]] = api
