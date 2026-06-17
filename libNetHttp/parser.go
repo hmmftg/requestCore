@@ -17,12 +17,16 @@ import (
 )
 
 func InitContext(r *http.Request, w http.ResponseWriter) NetHttpParser {
-	return NetHttpParser{
+	parser := NetHttpParser{
 		Request:  r,
 		Response: w,
 		Locals:   make(map[string]any),
 		Params:   make(map[string]string),
 	}
+	for key, value := range URLParamsFromRequest(r) {
+		parser.Params[key] = value
+	}
+	return parser
 }
 
 func (c NetHttpParser) GetMethod() string {

@@ -44,6 +44,14 @@ func initContext(c any, unknownUser bool) webFramework.WebFramework {
 	var span trace.Span
 
 	switch ctx := c.(type) {
+	case context.Context:
+		req, okReq := libNetHttp.RequestFromContext(ctx)
+		writer, okWriter := libNetHttp.ResponseWriterFromContext(ctx)
+		if okReq && okWriter {
+			return InitNetHttpContext(req, writer, unknownUser)
+		}
+		stack := response.GetStack(1, "libContext/init.go")
+		log.Fatalf("error in InitContext: context missing net/http request/response data %T, Stack: %s", ctx, stack)
 	case *gin.Context:
 		if unknownUser {
 			ctx.Set(UserIdLocal, UnknownUser)
