@@ -13,6 +13,28 @@ type ContextInitiator interface {
 	Respond(int, int, string, any, bool, webFramework.WebFramework)
 }
 
+type contextKey string
+
+const (
+	requestKey contextKey = "nethttp.request"
+	writerKey  contextKey = "nethttp.writer"
+)
+
+func WithRequestResponse(ctx context.Context, r *http.Request, w http.ResponseWriter) context.Context {
+	ctx = context.WithValue(ctx, requestKey, r)
+	return context.WithValue(ctx, writerKey, w)
+}
+
+func RequestFromContext(ctx context.Context) (*http.Request, bool) {
+	req, ok := ctx.Value(requestKey).(*http.Request)
+	return req, ok
+}
+
+func ResponseWriterFromContext(ctx context.Context) (http.ResponseWriter, bool) {
+	writer, ok := ctx.Value(writerKey).(http.ResponseWriter)
+	return writer, ok
+}
+
 func NetHttpErrorHandler(path, title string, handler ContextInitiator) http.HandlerFunc {
 	log.Println("ErrorHandler: ", path, title)
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -49,7 +71,7 @@ func NetHttpHandler(handler any) http.HandlerFunc {
 		// Convert the handler to work with net/http context
 		// The handler expects a context.Context, so we pass the request context
 		if handlerFunc, ok := handler.(func(context.Context)); ok {
-			handlerFunc(r.Context())
+			handlerFunc(WithRequestResponse(r.Context(), r, w))
 		} else {
 			// If it's not the expected type, log an error
 			log.Printf("Invalid handler type: %T", handler)

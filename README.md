@@ -284,6 +284,56 @@ This makes the library suitable for heterogeneous environments and for testing w
 
 ---
 
+## Canonical setup: chi + net/http + sqlc + pgx/stdlib
+
+For low-risk adoption, use `sqlc` in `database/sql` mode and connect PostgreSQL with pgx stdlib.
+
+### 1) sqlc configuration
+
+```yaml
+version: "2"
+sql:
+  - schema: "db/schema.sql"
+    queries: "db/query.sql"
+    engine: "postgresql"
+    gen:
+      go:
+        package: "db"
+        out: "internal/db"
+        sql_package: "database/sql"
+```
+
+### 2) Open DB with pgx stdlib
+
+```go
+import (
+	"database/sql"
+
+	_ "github.com/jackc/pgx/v5/stdlib"
+)
+
+db, err := sql.Open("pgx", "postgres://user:pass@localhost:5432/appdb?sslmode=disable")
+if err != nil {
+	panic(err)
+}
+defer db.Close()
+```
+
+### 3) Use chi route params with requestCore net/http parser
+
+```go
+router := chi.NewRouter()
+router.Get("/users/{id}", func(w http.ResponseWriter, r *http.Request) {
+	parser := libChi.InitParser(r, w)
+	id := parser.GetUrlParam("id")
+	_ = parser.SendJSONRespBody(http.StatusOK, map[string]string{"id": id})
+})
+```
+
+This path keeps compatibility with the current `database/sql`-oriented query layer and enables incremental adoption.
+
+---
+
 ## Testing
 
 The repository includes a strong testing story:
@@ -295,6 +345,32 @@ The repository includes a strong testing story:
 - testing context support
 
 This allows request handling, query execution, and framework adapters to be tested independently.
+
+---
+
+## Optional advanced path: pgx-native sqlc mode
+
+If you need `sqlc` generated code for `pgx/v5` native interfaces (instead of `database/sql`), treat it as a separate compatibility track:
+
+- keep current `QueryRunnerInterface` (`database/sql`) for backward compatibility
+- add a parallel pgx-native runner contract and adapter implementation
+- maintain parity tests for both backends:
+  - query behavior and error mapping
+  - DML behavior
+  - tracing/logging hooks
+
+Suggested parity matrix:
+
+| Capability | database/sql backend | pgx-native backend |
+|---|---|---|
+| Single-row query mapping | required | required |
+| Multi-row query mapping | required | required |
+| DML affected rows handling | required | required |
+| Duplicate / no-data error mapping | required | required |
+| Request-scoped tracing attributes | required | required |
+| Existing handlers compatibility | required | required |
+
+This minimizes risk for existing users while allowing pgx-native optimization where needed.
 
 ---
 
