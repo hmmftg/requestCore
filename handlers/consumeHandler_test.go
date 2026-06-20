@@ -131,7 +131,6 @@ type testConsumeHandlerType[Req, Resp any] struct {
 	Path            string
 	Mode            libRequest.Type
 	VerifyHeader    bool
-	SaveToRequest   bool
 	HasReceipt      bool
 	Headers         []string
 	Api             string
@@ -140,12 +139,12 @@ type testConsumeHandlerType[Req, Resp any] struct {
 	RecoveryHandler func(any)
 }
 
-func (h testConsumeHandlerType[Req, Resp]) Parameters() handlers.HandlerParameters {
-	return handlers.HandlerParameters{
+func (h testConsumeHandlerType[Req, Resp]) Parameters() handlers.HandlerParameters[Req, Resp] {
+	return handlers.HandlerParameters[Req, Resp]{
 		Title:           h.Title,
 		Body:            h.Mode,
 		ValidateHeader:  h.VerifyHeader,
-		SaveToRequest:   h.SaveToRequest,
+		Persistence:     nil,
 		Path:            h.Path,
 		HasReceipt:      false,
 		RecoveryHandler: nil,
@@ -222,10 +221,9 @@ func TestConsumeHandler(t *testing.T) {
 				Method:  "POST",
 			},
 			Api:           "simulation",
-			Path:          "users",
-			Mode:          libRequest.JSON,
-			VerifyHeader:  false,
-			SaveToRequest: false,
+			Path:         "users",
+			Mode:         libRequest.JSON,
+			VerifyHeader: false,
 		},
 		false,
 	)

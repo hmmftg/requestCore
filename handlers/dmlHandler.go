@@ -82,12 +82,12 @@ type DmlHandlerType[Req libQuery.DmlModel, Resp map[string]any] struct {
 	RecoveryHandler func(any)
 }
 
-func (h DmlHandlerType[Req, Resp]) Parameters() HandlerParameters {
-	return HandlerParameters{
+func (h DmlHandlerType[Req, Resp]) Parameters() HandlerParameters[Req, Resp] {
+	return HandlerParameters[Req, Resp]{
 		Title:           h.Title,
 		Body:            h.Mode,
 		ValidateHeader:  h.VerifyHeader,
-		SaveToRequest:   true,
+		Persistence:     nil,
 		Path:            h.Path,
 		HasReceipt:      false,
 		RecoveryHandler: h.RecoveryHandler,

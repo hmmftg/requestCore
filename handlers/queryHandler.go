@@ -161,12 +161,12 @@ func Paginate[Row any](paginationData libRequest.PaginationData, data []Row, les
 	return result[start:end]
 }
 
-func (q QueryHandlerType[Row, Resp]) Parameters() HandlerParameters {
-	return HandlerParameters{
+func (q QueryHandlerType[Row, Resp]) Parameters() HandlerParameters[Row, Resp] {
+	return HandlerParameters[Row, Resp]{
 		Title:           q.Title,
 		Body:            q.Mode,
 		ValidateHeader:  q.VerifyHeader,
-		SaveToRequest:   false,
+		Persistence:     nil,
 		Path:            q.Path,
 		HasReceipt:      false,
 		RecoveryHandler: q.RecoveryHandler,

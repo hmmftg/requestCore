@@ -17,17 +17,17 @@ import (
 	"go.opentelemetry.io/otel/trace"
 )
 
-type HandlerParameters struct {
+type HandlerParameters[Req, Resp any] struct {
 	Title           string
 	Body            libRequest.Type
 	ValidateHeader  bool
-	SaveToRequest   bool
 	Path            string
 	HasReceipt      bool
 	RecoveryHandler func(any)
 	FileResponse    bool
 	LogArrays       []string
 	LogTags         []string
+	Persistence     RequestPersister[Req, Resp]
 	// Tracing parameters
 	EnableTracing   bool
 	TracingSpanName string
@@ -37,9 +37,9 @@ type HandlerInterface[Req any, Resp any] interface {
 	// returns handler title
 	//   Request Bodymode
 	//   and validate header option
-	//   and save to request table option
+	//   and optional request persistence
 	//   and url path of handler
-	Parameters() HandlerParameters
+	Parameters() HandlerParameters[Req, Resp]
 	// runs after validating request
 	Initializer(req HandlerRequest[Req, Resp]) error
 	// main handler runs after initialize
@@ -124,8 +124,9 @@ func BaseHandler[Req any, Resp any, Handler HandlerInterface[Req, Resp]](
 	webFramework.AddServiceRegistrationLog(params.Title)
 	return func(c context.Context) {
 		start := time.Now()
+		var requestInserted bool
 		var w webFramework.WebFramework
-		if params.SaveToRequest {
+		if params.Persistence != nil {
 			w = libContext.InitContext(c)
 		} else {
 			w = libContext.InitContextNoAuditTrail(c)
@@ -153,7 +154,7 @@ func BaseHandler[Req any, Resp any, Handler HandlerInterface[Req, Resp]](
 					attribute.String("handler.title", params.Title),
 					attribute.String("handler.path", params.Path),
 					attribute.Bool("handler.validate_header", params.ValidateHeader),
-					attribute.Bool("handler.save_to_request", params.SaveToRequest),
+					attribute.Bool("handler.has_persistence", params.Persistence != nil),
 				)
 			}
 		}
@@ -168,7 +169,7 @@ func BaseHandler[Req any, Resp any, Handler HandlerInterface[Req, Resp]](
 		}
 
 		defer func() {
-			Recovery(start, w, handler, params, trx, core)
+			Recovery(start, w, handler, params, &trx, core, requestInserted)
 		}()
 
 		// Ensure span is ended
@@ -214,14 +215,12 @@ func BaseHandler[Req any, Resp any, Handler HandlerInterface[Req, Resp]](
 		w.Parser.SetLocal(libLogger.SlogRequestBody, trx.Request)
 		webFramework.AddLog(w, webFramework.HandlerLogTag, slog.Any("request", trx.Request))
 
-		if params.SaveToRequest {
-			errInitRequest := core.RequestTools().InitRequest(trx.W, params.Title, params.Path)
-			if errInitRequest != nil {
-				core.Responder().Error(trx.W, errInitRequest)
+		if params.Persistence != nil {
+			if errInsert := params.Persistence.Insert(params.Path, &trx); errInsert != nil {
+				core.Responder().Error(trx.W, errInsert)
 				return
 			}
-		} else {
-			w.Parser.SetLocal("reqLog", nil)
+			requestInserted = true
 		}
 
 		var errInit error

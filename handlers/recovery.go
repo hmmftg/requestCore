@@ -18,13 +18,14 @@ func Recovery[Req any, Resp any, Handler HandlerInterface[Req, Resp]](
 	start time.Time,
 	w webFramework.WebFramework,
 	handler Handler,
-	params HandlerParameters,
-	trx HandlerRequest[Req, Resp],
+	params HandlerParameters[Req, Resp],
+	trx *HandlerRequest[Req, Resp],
 	core requestCore.RequestCoreInterface,
+	requestInserted bool,
 ) {
 	elapsed := time.Since(start)
 	webFramework.AddLogTag(w, webFramework.HandlerLogTag, slog.String("elapsed", elapsed.String()))
-	libTracing.TraceVoid(handler.Finalizer, trx)
+	libTracing.TraceVoid(handler.Finalizer, *trx)
 	webFramework.CollectLogTags(w, webFramework.HandlerLogTag)
 	webFramework.CollectLogArrays(w, webFramework.HandlerLogTag)
 	webFramework.CollectLogTags(w, webFramework.ErrorListLogTag)
@@ -35,6 +36,14 @@ func Recovery[Req any, Resp any, Handler HandlerInterface[Req, Resp]](
 	}
 	for id := range params.LogArrays {
 		webFramework.CollectLogArrays(w, params.LogArrays[id])
+	}
+	if params.Persistence != nil && requestInserted {
+		if errUpdate := params.Persistence.Update(params.Path, trx); errUpdate != nil {
+			slog.Error("request persistence update failed",
+				slog.String("handler", params.Title),
+				slog.String("path", params.Path),
+				slog.Any("error", errUpdate))
+		}
 	}
 	if r := recover(); r != nil {
 		if params.RecoveryHandler != nil {
