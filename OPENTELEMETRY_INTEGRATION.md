@@ -260,12 +260,12 @@ import (
 
 type UserHandler struct{}
 
-func (h UserHandler) Parameters() handlers.HandlerParameters {
-    return handlers.HandlerParameters{
+func (h UserHandler) Parameters() handlers.HandlerParameters[GetUserRequest, GetUserResponse] {
+    return handlers.HandlerParameters[GetUserRequest, GetUserResponse]{
         Title:           "GetUser",
         Body:            libRequest.JSON,
         ValidateHeader:  true,
-        SaveToRequest:   true,
+        Persistence:     myRequestPersister{}, // optional; nil disables persistence
         Path:            "/users/:id",
         EnableTracing:   true,  // Enable tracing for this handler
         TracingSpanName: "get_user_handler",

@@ -37,6 +37,7 @@ handlers/
 ├── dmlHandler.go
 ├── ormQueryHandler.go
 ├── pagination.go
+├── persistence.go
 ├── queryHandler.go
 ├── recovery.go
 └── *_test.go
@@ -312,6 +313,47 @@ Handlers are designed to work with the repository’s observability stack:
 - framework-aware context propagation
 
 This allows consistent visibility across request pipelines.
+
+---
+
+# Request persistence (optional)
+
+Handlers support optional request/result persistence via `RequestPersister[Req, Resp]` on generic `HandlerParameters[Req, Resp]`.
+
+When `Persistence` is `nil` (default for built-in query/DML/call handlers), no insert or update runs. When set, the framework calls:
+
+1. `Insert(path, req)` after parse — failure aborts the request
+2. `Update(path, req)` in `Recovery` after `Finalizer` and log collection — best-effort; errors are logged only and not retried
+
+```go
+type RequestPersister[Req, Resp any] interface {
+    Insert(path string, req *HandlerRequest[Req, Resp]) error
+    Update(path string, req *HandlerRequest[Req, Resp]) error
+}
+```
+
+There is no built-in persister in this package. Consumers implement `RequestPersister` when they need audit storage, for example delegating to `libRequest`:
+
+```go
+type ServiceRequestPersister[Req, Resp any] struct{}
+
+func (ServiceRequestPersister[Req, Resp]) Insert(path string, req *handlers.HandlerRequest[Req, Resp]) error {
+    return req.Core.RequestTools().InitRequest(req.W, req.Title, path)
+}
+
+func (ServiceRequestPersister[Req, Resp]) Update(path string, req *handlers.HandlerRequest[Req, Resp]) error {
+    reqLogLocal := req.W.Parser.GetLocal("reqLog")
+    reqLog, ok := reqLogLocal.(libRequest.RequestPtr)
+    if !ok || reqLog == nil {
+        return nil
+    }
+    reqLog.Outgoing = req.Response
+    // map errors from req.W.Parser.GetLocal("errorArray") as needed
+    return req.Core.RequestTools().UpdateRequestWithContext(req.W.Ctx, reqLog)
+}
+```
+
+SQL and table shape for the service-tier `request` table live in application setup (`libApplication/env.go`), not in handlers.
 
 ---
 

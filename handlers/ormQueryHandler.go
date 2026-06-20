@@ -34,12 +34,12 @@ type OrmHandlerType[Row, Resp any] struct {
 	OnEmpty200      bool
 }
 
-func (q OrmHandlerType[Row, Resp]) Parameters() HandlerParameters {
-	return HandlerParameters{
+func (q OrmHandlerType[Row, Resp]) Parameters() HandlerParameters[Row, Resp] {
+	return HandlerParameters[Row, Resp]{
 		Title:           q.Title,
 		Body:            q.Mode,
 		ValidateHeader:  q.VerifyHeader,
-		SaveToRequest:   false,
+		Persistence:     nil,
 		Path:            q.Path,
 		HasReceipt:      false,
 		RecoveryHandler: q.RecoveryHandler,

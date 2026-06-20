@@ -49,22 +49,18 @@ type CallArgs[Req any, Resp any] struct {
 	RecoveryHandler       func(any)
 }
 
-func (c CallArgs[Req, Resp]) Parameters() HandlerParameters {
+func (c CallArgs[Req, Resp]) Parameters() HandlerParameters[Req, Resp] {
 	var mode libRequest.Type
 	if c.IsJson {
 		mode = libRequest.JSON
 	} else {
 		mode = libRequest.Query
 	}
-	save := false
-	if c.HasInitializer {
-		save = true
-	}
-	return HandlerParameters{
+	return HandlerParameters[Req, Resp]{
 		Title:           c.Title,
 		Body:            mode,
 		ValidateHeader:  false,
-		SaveToRequest:   save,
+		Persistence:     nil,
 		Path:            c.Path,
 		HasReceipt:      false,
 		RecoveryHandler: c.RecoveryHandler,
@@ -178,7 +174,6 @@ type ConsumeHandlerType[Req, Resp any] struct {
 	Path            string
 	Mode            libRequest.Type
 	VerifyHeader    bool
-	SaveToRequest   bool
 	HasReceipt      bool
 	Headers         []string
 	Api             string
@@ -187,12 +182,12 @@ type ConsumeHandlerType[Req, Resp any] struct {
 	RecoveryHandler func(any)
 }
 
-func (h *ConsumeHandlerType[Req, Resp]) Parameters() HandlerParameters {
-	return HandlerParameters{
+func (h *ConsumeHandlerType[Req, Resp]) Parameters() HandlerParameters[Req, Resp] {
+	return HandlerParameters[Req, Resp]{
 		Title:           h.Title,
 		Body:            h.Mode,
 		ValidateHeader:  h.VerifyHeader,
-		SaveToRequest:   h.SaveToRequest,
+		Persistence:     nil,
 		Path:            h.Path,
 		HasReceipt:      h.HasReceipt,
 		RecoveryHandler: h.RecoveryHandler,

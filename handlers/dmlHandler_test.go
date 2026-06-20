@@ -74,15 +74,6 @@ func (env *testDMLEnv) handler() any {
 	)
 }
 
-func beforeDMLMocks(mockDB sqlmock.Sqlmock) {
-	var anyS testingtools.AnyString
-	mockDB.ExpectBegin()
-	mockDB.ExpectExec("").WithArgs(anyS, anyS).WillReturnResult(driver.RowsAffected(1))
-	mockDB.ExpectExec("").WithArgs(anyS, anyS).WillReturnResult(driver.RowsAffected(1))
-	mockDB.ExpectExec("").WithArgs(anyS, anyS).WillReturnResult(driver.RowsAffected(1))
-	mockDB.ExpectExec("").WithArgs(anyS, anyS).WillReturnResult(driver.RowsAffected(1))
-}
-
 func TestDMLHandler(t *testing.T) {
 	testCases := []testingtools.TestCase{
 		{
@@ -91,9 +82,14 @@ func TestDMLHandler(t *testing.T) {
 			Request:   testDMLReq{ID: "1"},
 			Status:    200,
 			CheckBody: []string{Ins1, "rowsAffected", `:1`},
-			Model: testingtools.SampleRequestModelMock(t, func(mockDB sqlmock.Sqlmock) {
+			Model: testingtools.SampleQueryMock(t, func(mockDB sqlmock.Sqlmock) {
 				mockDB.ExpectPrepare(Pre1).ExpectQuery().WillReturnRows(sqlmock.NewRows([]string{"result", "key", "value"}))
-				beforeDMLMocks(mockDB)
+				var anyS testingtools.AnyString
+				mockDB.ExpectBegin()
+				mockDB.ExpectExec("").WithArgs(anyS, anyS).WillReturnResult(driver.RowsAffected(1))
+				mockDB.ExpectExec("").WithArgs(anyS, anyS).WillReturnResult(driver.RowsAffected(1))
+				mockDB.ExpectExec("").WithArgs(anyS, anyS).WillReturnResult(driver.RowsAffected(1))
+				mockDB.ExpectExec("").WithArgs(anyS, anyS).WillReturnResult(driver.RowsAffected(1))
 				mockDB.ExpectExec(Ins1).WillReturnResult(driver.RowsAffected(1))
 				mockDB.ExpectCommit()
 			}),
@@ -105,7 +101,7 @@ func TestDMLHandler(t *testing.T) {
 			Status:    500,
 			// Safe error response: internal message (PreControl: pre1) no longer exposed; expect errors and safe description
 			CheckBody: []string{"errors", "description"},
-			Model: testingtools.SampleRequestModelMock(t, func(mockDB sqlmock.Sqlmock) {
+			Model: testingtools.SampleQueryMock(t, func(mockDB sqlmock.Sqlmock) {
 				mockDB.ExpectPrepare(Pre1).ExpectQuery().WillReturnError(errors.New("error pre1"))
 			}),
 		},
