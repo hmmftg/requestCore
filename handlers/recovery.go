@@ -22,9 +22,39 @@ func Recovery[Req any, Resp any, Handler HandlerInterface[Req, Resp]](
 	trx *HandlerRequest[Req, Resp],
 	core requestCore.RequestCoreInterface,
 	requestInserted bool,
+	panicVal any,
 ) {
+
 	elapsed := time.Since(start)
+	trx.Duration = elapsed
 	webFramework.AddLogTag(w, webFramework.HandlerLogTag, slog.String("elapsed", elapsed.String()))
+
+	var panicErr error
+	if panicVal != nil {
+		if params.RecoveryHandler != nil {
+			params.RecoveryHandler(panicVal)
+		} else {
+			slog.Error("panic recovered", slog.String("handler", params.Title), slog.Any("panic", panicVal))
+			switch data := panicVal.(type) {
+			case error:
+				panicErr = errors.Join(data,
+					libError.NewWithDescription(
+						status.InternalServerError,
+						response.SYSTEM_FAULT,
+						"panic in %s",
+						params.Title,
+					))
+			default:
+				panicErr = libError.NewWithDescription(
+					http.StatusInternalServerError,
+					response.SYSTEM_FAULT,
+					"panic in %s",
+					params.Title)
+			}
+			trx.SetOutcome(panicErr, http.StatusInternalServerError)
+		}
+	}
+
 	libTracing.TraceVoid(handler.Finalizer, *trx)
 	webFramework.CollectLogTags(w, webFramework.HandlerLogTag)
 	webFramework.CollectLogArrays(w, webFramework.HandlerLogTag)
@@ -45,32 +75,10 @@ func Recovery[Req any, Resp any, Handler HandlerInterface[Req, Resp]](
 				slog.Any("error", errUpdate))
 		}
 	}
-	if r := recover(); r != nil {
-		if params.RecoveryHandler != nil {
-			params.RecoveryHandler(r)
-		} else {
-			// Log full panic value for debugging; client only sees SYSTEM_FAULT localized text.
-			slog.Error("panic recovered", slog.String("handler", params.Title), slog.Any("panic", r))
-			switch data := r.(type) {
-			case error:
-				core.Responder().Error(w,
-					errors.Join(data,
-						libError.NewWithDescription(
-							status.InternalServerError,
-							response.SYSTEM_FAULT,
-							"panic in %s",
-							params.Title,
-						)))
-			default:
-				core.Responder().Error(w,
-					libError.NewWithDescription(
-						http.StatusInternalServerError,
-						response.SYSTEM_FAULT,
-						"panic in %s",
-						params.Title),
-				)
-			}
+	if panicVal != nil {
+		if panicErr != nil {
+			core.Responder().Error(w, panicErr)
 		}
-		panic(r)
+		panic(panicVal)
 	}
 }

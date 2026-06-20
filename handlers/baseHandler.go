@@ -50,6 +50,11 @@ type HandlerInterface[Req any, Resp any] interface {
 	Simulation(req HandlerRequest[Req, Resp]) (Resp, error)
 }
 
+type HandlerOutcome struct {
+	Error      error
+	HTTPStatus int
+}
+
 type HandlerRequest[Req any, Resp any] struct {
 	Title    string
 	Core     requestCore.RequestCoreInterface
@@ -60,9 +65,16 @@ type HandlerRequest[Req any, Resp any] struct {
 	Args     []any
 	RespSent bool
 	Builder  func(status int, rawResp []byte, headers map[string]string) (*Resp, error)
+	Outcome  HandlerOutcome
+	Duration time.Duration
 	// Tracing fields
 	Span    trace.Span
 	SpanCtx context.Context
+}
+
+func (trx *HandlerRequest[Req, Resp]) SetOutcome(err error, httpStatus int) {
+	trx.Outcome.Error = err
+	trx.Outcome.HTTPStatus = httpStatus
 }
 
 // Tracing methods for HandlerRequest
@@ -112,6 +124,29 @@ func (hr *HandlerRequest[Req, Resp]) StartChildSpan(name string, attrs map[strin
 // GetParser returns the RequestParser from WebFramework for tracing
 func (hr HandlerRequest[Req, Resp]) GetParser() webFramework.RequestParser {
 	return hr.W.Parser
+}
+
+func respondError[Req, Resp any](core requestCore.RequestCoreInterface, trx *HandlerRequest[Req, Resp], err error) {
+	core.Responder().Error(trx.W, err)
+	trx.SetOutcome(err, response.LastHTTPStatus(trx.W))
+}
+
+func respondOK[Req, Resp any](core requestCore.RequestCoreInterface, trx *HandlerRequest[Req, Resp], resp Resp) {
+	core.Responder().OK(trx.W, resp)
+	trx.SetOutcome(nil, response.LastHTTPStatus(trx.W))
+	trx.RespSent = true
+}
+
+func respondOKWithReceipt[Req, Resp any](core requestCore.RequestCoreInterface, trx *HandlerRequest[Req, Resp], resp Resp, receipt *response.Receipt) {
+	core.Responder().OKWithReceipt(trx.W, resp, receipt)
+	trx.SetOutcome(nil, response.LastHTTPStatus(trx.W))
+	trx.RespSent = true
+}
+
+func respondOKWithAttachment[Req, Resp any](core requestCore.RequestCoreInterface, trx *HandlerRequest[Req, Resp], attachment *response.FileResponse) {
+	core.Responder().OKWithAttachment(trx.W, attachment)
+	trx.SetOutcome(nil, response.LastHTTPStatus(trx.W))
+	trx.RespSent = true
 }
 
 func BaseHandler[Req any, Resp any, Handler HandlerInterface[Req, Resp]](
@@ -169,7 +204,7 @@ func BaseHandler[Req any, Resp any, Handler HandlerInterface[Req, Resp]](
 		}
 
 		defer func() {
-			Recovery(start, w, handler, params, &trx, core, requestInserted)
+			Recovery(start, w, handler, params, &trx, core, requestInserted, recover())
 		}()
 
 		// Ensure span is ended
@@ -186,7 +221,7 @@ func BaseHandler[Req any, Resp any, Handler HandlerInterface[Req, Resp]](
 				params.ValidateHeader,
 			)
 			if errParse != nil {
-				core.Responder().Error(trx.W, errParse)
+				respondError(core, &trx, errParse)
 				return
 			}
 
@@ -196,11 +231,12 @@ func BaseHandler[Req any, Resp any, Handler HandlerInterface[Req, Resp]](
 			var err error
 			trx.Response, err = libTracing.TraceFunc(handler.Simulation, trx)
 			if err != nil {
-				core.Responder().Error(trx.W, err)
+				respondError(core, &trx, err)
 				return
 			}
 
-			core.Responder().OK(trx.W, trx.Response)
+			respondOK(core, &trx, trx.Response)
+			return
 		}
 
 		var errParse error
@@ -209,7 +245,7 @@ func BaseHandler[Req any, Resp any, Handler HandlerInterface[Req, Resp]](
 			params.Body,
 			params.ValidateHeader)
 		if errParse != nil {
-			core.Responder().Error(trx.W, errParse)
+			respondError(core, &trx, errParse)
 			return
 		}
 		w.Parser.SetLocal(libLogger.SlogRequestBody, trx.Request)
@@ -217,7 +253,7 @@ func BaseHandler[Req any, Resp any, Handler HandlerInterface[Req, Resp]](
 
 		if params.Persistence != nil {
 			if errInsert := params.Persistence.Insert(params.Path, &trx); errInsert != nil {
-				core.Responder().Error(trx.W, errInsert)
+				respondError(core, &trx, errInsert)
 				return
 			}
 			requestInserted = true
@@ -227,7 +263,7 @@ func BaseHandler[Req any, Resp any, Handler HandlerInterface[Req, Resp]](
 		errInit = libTracing.TraceError(handler.Initializer, trx)
 		webFramework.AddLog(w, webFramework.HandlerLogTag, slog.Any("initialize", errInit))
 		if errInit != nil {
-			core.Responder().Error(trx.W, errInit)
+			respondError(core, &trx, errInit)
 			return
 		}
 
@@ -235,7 +271,7 @@ func BaseHandler[Req any, Resp any, Handler HandlerInterface[Req, Resp]](
 		trx.Response, err = libTracing.TraceFunc(handler.Handler, trx)
 		webFramework.AddLog(w, webFramework.HandlerLogTag, slog.Any("main-handler", err))
 		if err != nil {
-			core.Responder().Error(trx.W, err)
+			respondError(core, &trx, err)
 			return
 		}
 		webFramework.AddLog(w, webFramework.HandlerLogTag, slog.Any("response", trx.Response))
@@ -244,8 +280,7 @@ func BaseHandler[Req any, Resp any, Handler HandlerInterface[Req, Resp]](
 			if receipt != nil {
 				rc, ok := receipt.(*response.Receipt)
 				if ok {
-					core.Responder().OKWithReceipt(trx.W, trx.Response, rc)
-					trx.RespSent = true
+					respondOKWithReceipt(core, &trx, trx.Response, rc)
 				} else {
 					slog.Error("registered as handler with receipt, but receipt local was", slog.Any("receipt", fmt.Sprintf("%t", receipt)))
 				}
@@ -259,8 +294,7 @@ func BaseHandler[Req any, Resp any, Handler HandlerInterface[Req, Resp]](
 			if attachment != nil {
 				rc, ok := attachment.(*response.FileResponse)
 				if ok {
-					core.Responder().OKWithAttachment(trx.W, rc)
-					trx.RespSent = true
+					respondOKWithAttachment(core, &trx, rc)
 				} else {
 					slog.Error("registered as handler with attachment, but attachment local was", slog.Any("receipt", fmt.Sprintf("%t", attachment)))
 				}
@@ -270,8 +304,7 @@ func BaseHandler[Req any, Resp any, Handler HandlerInterface[Req, Resp]](
 		}
 
 		if !trx.RespSent {
-			core.Responder().OK(trx.W, trx.Response)
-			trx.RespSent = true
+			respondOK(core, &trx, trx.Response)
 		}
 	}
 }

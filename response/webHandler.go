@@ -11,9 +11,21 @@ import (
 	"github.com/hmmftg/requestCore/webFramework"
 )
 
+const LastHTTPStatusLocal = "response.http_status"
+
 type WebHanlder struct {
 	MessageDesc map[string]string
 	ErrorDesc   map[string]string
+}
+
+// LastHTTPStatus returns the HTTP status code recorded by the most recent respond call.
+func LastHTTPStatus(w webFramework.WebFramework) int {
+	if v := w.Parser.GetLocal(LastHTTPStatusLocal); v != nil {
+		if code, ok := v.(int); ok {
+			return code
+		}
+	}
+	return 0
 }
 
 func getError[Result error](err error) *Result {
@@ -122,6 +134,7 @@ func (m WebHanlder) respond(data RespData, abort bool, w webFramework.WebFramewo
 	var resp WsResponse
 	resp.Status = data.Status
 
+	w.Parser.SetLocal(LastHTTPStatusLocal, data.Code)
 	webFramework.AddLogTag(w, webFramework.HandlerLogTag, slog.Int("status", data.Code))
 	if data.Code == http.StatusOK {
 		resp.Description = m.MessageDesc[data.Message]

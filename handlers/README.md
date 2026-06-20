@@ -332,13 +332,64 @@ type RequestPersister[Req, Resp any] interface {
 }
 ```
 
-There is no built-in persister in this package. Consumers implement `RequestPersister` when they need audit storage, for example delegating to `libRequest`:
+### Handler outcome fields
+
+After the response is sent (or after a panic is captured in `Recovery`), `Update` receives a `HandlerRequest` with populated outcome metadata:
+
+```go
+type HandlerOutcome struct {
+    Error      error // nil on success; set on handler/init/parse/insert errors and panics
+    HTTPStatus int   // HTTP status sent or intended (500 on panic); 0 if no response was sent
+}
+
+type HandlerRequest[Req, Resp any] struct {
+    ...
+    Outcome  HandlerOutcome
+    Duration time.Duration // elapsed handler time, set in Recovery
+    RespSent bool
+}
+```
+
+`HTTPStatus` is recorded by the response layer (`response.LastHTTPStatusLocal`) after `Responder().OK` / `Responder().Error`, so it reflects the status actually emitted — not a duplicate mapping in handlers. On panic, `Recovery` sets `HTTPStatus` to `500` before `Update` runs.
+
+Use `trx.Outcome.Error` with `libError.Unwrap` to build persistence outcome without reading parser locals such as `errorArray`.
+
+### Record ID handoff
+
+Use a shared local key instead of per-domain names (`shahkar_request_id`, `card_issue_id`, etc.):
+
+```go
+handlers.SetPersistedRecordID(req.W, recordID) // any type: int64, string UUID, etc.
+id, ok := handlers.GetPersistedRecordID(req.W)
+```
+
+### FuncPersister
+
+For tests or thin adapters, implement persistence with function fields:
+
+```go
+p := handlers.FuncPersister[MyReq, MyResp]{
+    InsertFn: func(path string, req *handlers.HandlerRequest[MyReq, MyResp]) error { ... },
+    UpdateFn: func(path string, req *handlers.HandlerRequest[MyReq, MyResp]) error { ... },
+}
+```
+
+Nil function fields are no-ops. Use `Persistence: nil` when no persistence is needed.
+
+### Example service persister
+
+Consumers implement `RequestPersister` when they need audit storage, for example delegating to `libRequest`:
 
 ```go
 type ServiceRequestPersister[Req, Resp any] struct{}
 
 func (ServiceRequestPersister[Req, Resp]) Insert(path string, req *handlers.HandlerRequest[Req, Resp]) error {
-    return req.Core.RequestTools().InitRequest(req.W, req.Title, path)
+    err := req.Core.RequestTools().InitRequest(req.W, req.Title, path)
+    if err != nil {
+        return err
+    }
+    handlers.SetPersistedRecordID(req.W, req.W.Parser.GetLocal("reqLog").(libRequest.RequestPtr).GetId())
+    return nil
 }
 
 func (ServiceRequestPersister[Req, Resp]) Update(path string, req *handlers.HandlerRequest[Req, Resp]) error {
@@ -348,7 +399,11 @@ func (ServiceRequestPersister[Req, Resp]) Update(path string, req *handlers.Hand
         return nil
     }
     reqLog.Outgoing = req.Response
-    // map errors from req.W.Parser.GetLocal("errorArray") as needed
+    if req.Outcome.Error != nil {
+        if ok, errData := libError.Unwrap(req.Outcome.Error); ok {
+            _ = errData // map code/status into your storage model
+        }
+    }
     return req.Core.RequestTools().UpdateRequestWithContext(req.W.Ctx, reqLog)
 }
 ```
@@ -363,6 +418,7 @@ The handlers package includes test coverage through files such as:
 
 ```text
 baseHanlder_test.go
+persistence_test.go
 callApi_test.go
 consumeHandler_test.go
 dmlHandler_test.go
