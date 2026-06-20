@@ -7,6 +7,7 @@ import (
 
 	"github.com/hmmftg/requestCore/libError"
 	"github.com/hmmftg/requestCore/status"
+	"github.com/hmmftg/requestCore/webFramework"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/clientcredentials"
 )
@@ -21,12 +22,12 @@ type OAuth2Auth struct {
 	httpClient *http.Client
 }
 
-func (a OAuth2Auth) Login(ctx context.Context) (*TokenCache, libError.Error) {
+func (a OAuth2Auth) Login(w webFramework.WebFramework) (*TokenCache, libError.Error) {
 	switch a.grantType {
 	case GrantTypeClientCredentials:
-		return a.loginClientCredentials(ctx)
+		return a.loginClientCredentials(w)
 	case GrantTypePassword:
-		return a.loginPassword(ctx)
+		return a.loginPassword(w)
 	default:
 		return nil, libError.NewWithDescription(
 			status.InternalServerError,
@@ -37,7 +38,7 @@ func (a OAuth2Auth) Login(ctx context.Context) (*TokenCache, libError.Error) {
 	}
 }
 
-func (a OAuth2Auth) Refresh(ctx context.Context, refreshToken string) (*TokenCache, libError.Error) {
+func (a OAuth2Auth) Refresh(w webFramework.WebFramework, refreshToken string) (*TokenCache, libError.Error) {
 	if refreshToken == "" {
 		return nil, libError.NewWithDescription(
 			status.InternalServerError,
@@ -45,7 +46,7 @@ func (a OAuth2Auth) Refresh(ctx context.Context, refreshToken string) (*TokenCac
 			"empty refresh token",
 		)
 	}
-	ctx = a.withHTTPClient(ctx)
+	ctx := a.withHTTPClient(w)
 	ts := a.cfg.TokenSource(ctx, &oauth2.Token{RefreshToken: refreshToken})
 	tok, err := ts.Token()
 	if err != nil {
@@ -59,13 +60,13 @@ func (a OAuth2Auth) Refresh(ctx context.Context, refreshToken string) (*TokenCac
 	return oauth2TokenToCache(tok), nil
 }
 
-func (a OAuth2Auth) loginClientCredentials(ctx context.Context) (*TokenCache, libError.Error) {
+func (a OAuth2Auth) loginClientCredentials(w webFramework.WebFramework) (*TokenCache, libError.Error) {
 	cc := &clientcredentials.Config{
 		ClientID:     a.cfg.ClientID,
 		ClientSecret: a.cfg.ClientSecret,
 		TokenURL:     a.cfg.Endpoint.TokenURL,
 	}
-	ctx = a.withHTTPClient(ctx)
+	ctx := a.withHTTPClient(w)
 	tok, err := cc.Token(ctx)
 	if err != nil {
 		return nil, libError.NewWithDescription(
@@ -78,8 +79,8 @@ func (a OAuth2Auth) loginClientCredentials(ctx context.Context) (*TokenCache, li
 	return oauth2TokenToCache(tok), nil
 }
 
-func (a OAuth2Auth) loginPassword(ctx context.Context) (*TokenCache, libError.Error) {
-	ctx = a.withHTTPClient(ctx)
+func (a OAuth2Auth) loginPassword(w webFramework.WebFramework) (*TokenCache, libError.Error) {
+	ctx := a.withHTTPClient(w)
 	tok, err := a.cfg.PasswordCredentialsToken(ctx, a.user, a.password)
 	if err != nil {
 		return nil, libError.NewWithDescription(
@@ -92,11 +93,11 @@ func (a OAuth2Auth) loginPassword(ctx context.Context) (*TokenCache, libError.Er
 	return oauth2TokenToCache(tok), nil
 }
 
-func (a OAuth2Auth) withHTTPClient(ctx context.Context) context.Context {
+func (a OAuth2Auth) withHTTPClient(w webFramework.WebFramework) context.Context {
 	if a.httpClient == nil {
-		return ctx
+		return w.Ctx
 	}
-	return context.WithValue(ctx, oauth2.HTTPClient, a.httpClient)
+	return context.WithValue(w.Ctx, oauth2.HTTPClient, a.httpClient)
 }
 
 func oauth2TokenToCache(tok *oauth2.Token) *TokenCache {

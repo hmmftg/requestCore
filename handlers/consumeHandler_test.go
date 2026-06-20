@@ -68,7 +68,10 @@ func Test_extractHeader(t *testing.T) {
 		t.Run(tc.Name, func(t *testing.T) {
 			t.Setenv(libContext.HeaderEnvKey, tc.HeaderEnv)
 			t.Setenv(libContext.LocalEnvKey, tc.LocalEnv)
-			w := libContext.InitContext(t)
+
+			t.Setenv(libContext.HeaderEnvKey, "User-Id#a@b#b")
+			t.Setenv(libContext.LocalEnvKey, "User-Id#a@b#b")
+			w := libContext.InitContextNoAuditTrail(t)
 			result := handlers.ExtractHeaders(w, tc.Headers, tc.Locals)
 			assert.DeepEqual(t, result, tc.Dest)
 		})
@@ -220,7 +223,7 @@ func TestConsumeHandler(t *testing.T) {
 				Headers: map[string]string{"H1": "a"},
 				Method:  "POST",
 			},
-			Api:           "simulation",
+			Api:          "simulation",
 			Path:         "users",
 			Mode:         libRequest.JSON,
 			VerifyHeader: false,

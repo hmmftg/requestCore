@@ -106,7 +106,7 @@ func (c CallArgs[Req, Resp]) Handler(req HandlerRequest[Req, Resp]) (Resp, error
 			"unable to get headers, wrong data type: %T", req.W.Parser.GetLocal(HeadersMap))
 	}
 
-	resp, err := libCallApi.RemoteCall(
+	resp, err := libCallApi.RemoteCall(req.W,
 		&libCallApi.RemoteCallParamData[Req, Resp]{
 			Headers:  headers,
 			JsonBody: *req.Request,

@@ -1,7 +1,6 @@
 package libCallApi_test
 
 import (
-	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -9,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/hmmftg/requestCore/libCallApi"
+	"github.com/hmmftg/requestCore/libContext"
 	"gotest.tools/v3/assert"
 )
 
@@ -31,6 +31,10 @@ func TestOAuth2Auth_ClientCredentialsLogin(t *testing.T) {
 	}))
 	defer server.Close()
 
+	t.Setenv(libContext.HeaderEnvKey, "User-Id#a@b#b")
+	t.Setenv(libContext.LocalEnvKey, "User-Id#a@b#b")
+	w := libContext.InitContextNoAuditTrail(t)
+
 	auth, err := libCallApi.NewOAuth2AuthFromAuthData(libCallApi.Auth{
 		GrantType:    libCallApi.GrantTypeClientCredentials,
 		AuthURI:      server.URL + "/token",
@@ -39,7 +43,7 @@ func TestOAuth2Auth_ClientCredentialsLogin(t *testing.T) {
 	}, server.Client())
 	assert.NilError(t, err)
 
-	cache, loginErr := auth.Login(context.Background())
+	cache, loginErr := auth.Login(w)
 	assert.NilError(t, loginErr)
 	assert.Equal(t, tokenCalls.Load(), int32(1))
 	assert.Equal(t, cache.AccessToken.Token, "test-access-token")
@@ -66,6 +70,10 @@ func TestOAuth2Auth_RefreshToken(t *testing.T) {
 	}))
 	defer server.Close()
 
+	t.Setenv(libContext.HeaderEnvKey, "User-Id#a@b#b")
+	t.Setenv(libContext.LocalEnvKey, "User-Id#a@b#b")
+	w := libContext.InitContextNoAuditTrail(t)
+
 	auth, err := libCallApi.NewOAuth2AuthFromAuthData(libCallApi.Auth{
 		GrantType:    libCallApi.GrantTypeClientCredentials,
 		AuthURI:      server.URL + "/token",
@@ -74,7 +82,7 @@ func TestOAuth2Auth_RefreshToken(t *testing.T) {
 	}, server.Client())
 	assert.NilError(t, err)
 
-	cache, refreshErr := auth.Refresh(context.Background(), "old-refresh")
+	cache, refreshErr := auth.Refresh(w, "old-refresh")
 	assert.NilError(t, refreshErr)
 	assert.Equal(t, cache.AccessToken.Token, "new-access-token")
 	assert.Equal(t, cache.RefreshToken.Token, "new-refresh")

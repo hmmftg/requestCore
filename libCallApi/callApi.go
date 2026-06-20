@@ -26,13 +26,14 @@ import (
 	"github.com/hmmftg/requestCore/libTracing"
 	"github.com/hmmftg/requestCore/response"
 	"github.com/hmmftg/requestCore/status"
+	"github.com/hmmftg/requestCore/webFramework"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/propagation"
 	"go.opentelemetry.io/otel/trace"
 )
 
-func (m RemoteApiModel) ConsumeRestBasicAuthApi(requestJson []byte, apiName, path, contentType, method string, headers map[string]string) ([]byte, string, error) {
+func (m RemoteApiModel) ConsumeRestBasicAuthApi(w webFramework.WebFramework, requestJson []byte, apiName, path, contentType, method string, headers map[string]string) ([]byte, string, error) {
 	if timeOutString, ok := headers["Time-Out"]; ok {
 		timeoutSeconds, _ := strconv.Atoi(timeOutString)
 		httpClient.Timeout = time.Duration(timeoutSeconds * int(time.Second))
@@ -41,7 +42,7 @@ func (m RemoteApiModel) ConsumeRestBasicAuthApi(requestJson []byte, apiName, pat
 	if headers == nil {
 		headers = make(map[string]string)
 	}
-	if err := (&api).EnsureAuthorization(context.Background(), headers); err != nil {
+	if err := (&api).EnsureAuthorization(w, headers); err != nil {
 		return nil, "AUTH_FAILED", err
 	}
 	req, err := http.NewRequest(method, api.Domain+"/"+path, bytes.NewBuffer(requestJson))
@@ -86,7 +87,7 @@ func (m RemoteApiModel) GetApi(apiName string) RemoteApi {
 	return m.RemoteApiList[apiName]
 }
 
-func (m RemoteApiModel) ConsumeRestApi(requestJson []byte, apiName, path, contentType, method string, headers map[string]string) ([]byte, string, int, error) {
+func (m RemoteApiModel) ConsumeRestApi(w webFramework.WebFramework, requestJson []byte, apiName, path, contentType, method string, headers map[string]string) ([]byte, string, int, error) {
 	if timeOutString, ok := headers["Time-Out"]; ok {
 		timeoutSeconds, _ := strconv.Atoi(timeOutString)
 		httpClient.Timeout = time.Duration(timeoutSeconds * int(time.Second))
@@ -95,7 +96,7 @@ func (m RemoteApiModel) ConsumeRestApi(requestJson []byte, apiName, path, conten
 	if headers == nil {
 		headers = make(map[string]string)
 	}
-	if err := (&api).EnsureAuthorization(context.Background(), headers); err != nil {
+	if err := (&api).EnsureAuthorization(w, headers); err != nil {
 		return nil, "AUTH_FAILED", http.StatusInternalServerError, err
 	}
 	req, err := http.NewRequest(method, api.Domain+"/"+path, bytes.NewBuffer(requestJson))
@@ -246,7 +247,7 @@ func GetJSONResp[Resp any](api RemoteApi, resp *http.Response, Builder func(int,
 	return &jsonResp, nil
 }
 
-func PrepareCall[Resp any](c CallData[Resp]) (*http.Request, error) {
+func PrepareCall[Resp any](w webFramework.WebFramework, c CallData[Resp]) (*http.Request, error) {
 	var to time.Duration
 	if timeOutString, ok := c.Headers["Time-Out"]; ok {
 		timeoutSeconds, _ := strconv.Atoi(timeOutString)
@@ -301,7 +302,7 @@ func PrepareCall[Resp any](c CallData[Resp]) (*http.Request, error) {
 	if c.Headers == nil {
 		c.Headers = make(map[string]string)
 	}
-	if err := c.Api.EnsureAuthorization(ctx, c.Headers); err != nil {
+	if err := c.Api.EnsureAuthorization(w, c.Headers); err != nil {
 		return nil, err
 	}
 	switch c.BodyType {
@@ -344,8 +345,8 @@ func (c CallData[Resp]) SetLogs(req *http.Request) *http.Request {
 	return req
 }
 
-func ConsumeRest[Resp any](c CallData[Resp]) (*Resp, *response.WsRemoteResponse, *CallResp, error) {
-	req, err := PrepareCall(c)
+func ConsumeRest[Resp any](w webFramework.WebFramework, c CallData[Resp]) (*Resp, *response.WsRemoteResponse, *CallResp, error) {
+	req, err := PrepareCall(w, c)
 	if err != nil {
 		if ok, errPrepare := response.Unwrap(err); ok {
 			return nil, nil, nil, errPrepare.Input(c)
@@ -451,8 +452,8 @@ func DefaultBuilderfunc[Resp any](stat int, rawResp []byte, headers map[string]s
 	return &resp, nil
 }
 
-func ConsumeRestJSON[Resp any](c *CallData[Resp]) (*Resp, error) {
-	req, err := PrepareCall(*c)
+func ConsumeRestJSON[Resp any](w webFramework.WebFramework, c *CallData[Resp]) (*Resp, error) {
+	req, err := PrepareCall(w, *c)
 	if err != nil {
 		if ok, errPrepare := response.Unwrap(err); ok {
 			return nil, errPrepare.Input(c)

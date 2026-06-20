@@ -1,13 +1,12 @@
 package libCallApi
 
 import (
-	"context"
-
 	"github.com/hmmftg/requestCore/libError"
 	"github.com/hmmftg/requestCore/status"
+	"github.com/hmmftg/requestCore/webFramework"
 )
 
-func (api *RemoteApi) EnsureAuthorization(ctx context.Context, headers map[string]string) libError.Error {
+func (api *RemoteApi) EnsureAuthorization(w webFramework.WebFramework, headers map[string]string) libError.Error {
 	if headers == nil {
 		return libError.NewWithDescription(
 			status.InternalServerError,
@@ -20,7 +19,7 @@ func (api *RemoteApi) EnsureAuthorization(ctx context.Context, headers map[strin
 		return nil
 	}
 	if api.Auth != nil {
-		if err := api.Authenticate(ctx); err != nil {
+		if err := api.Authenticate(w); err != nil {
 			return err
 		}
 		authHeader, err := api.GetAuthHeader()

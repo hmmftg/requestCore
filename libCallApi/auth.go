@@ -1,7 +1,6 @@
 package libCallApi
 
 import (
-	"context"
 	"encoding/base64"
 	"fmt"
 	"sync"
@@ -9,6 +8,7 @@ import (
 
 	"github.com/hmmftg/requestCore/libError"
 	"github.com/hmmftg/requestCore/status"
+	"github.com/hmmftg/requestCore/webFramework"
 )
 
 type Auth struct {
@@ -47,8 +47,8 @@ func InitTokenCache() (*TokenCache, *sync.Mutex) {
 }
 
 type AuthSystem interface {
-	Login(ctx context.Context) (*TokenCache, libError.Error)
-	Refresh(ctx context.Context, refreshToken string) (*TokenCache, libError.Error)
+	Login(w webFramework.WebFramework) (*TokenCache, libError.Error)
+	Refresh(w webFramework.WebFramework, refreshToken string) (*TokenCache, libError.Error)
 }
 
 func (api RemoteApi) GetBasicAuthHeader() string {
@@ -74,7 +74,7 @@ func (api RemoteApi) GetAuthHeader() (string, error) {
 	return fmt.Sprintf("%s %s", api.TokenCache.AccessToken.Type, api.TokenCache.AccessToken.Token), nil
 }
 
-func (api *RemoteApi) handleToken(ctx context.Context) libError.Error {
+func (api *RemoteApi) handleToken(w webFramework.WebFramework) libError.Error {
 	api.TokenCacheLock.Lock()
 	defer api.TokenCacheLock.Unlock()
 
@@ -92,7 +92,7 @@ func (api *RemoteApi) handleToken(ctx context.Context) libError.Error {
 	}
 
 	if api.TokenCache.RefreshToken != nil && api.TokenCache.RefreshToken.Token != "" {
-		tokens, err := api.Auth.Refresh(ctx, api.TokenCache.RefreshToken.Token)
+		tokens, err := api.Auth.Refresh(w, api.TokenCache.RefreshToken.Token)
 		if err == nil {
 			api.TokenCache.AccessToken = tokens.AccessToken
 			if tokens.RefreshToken != nil {
@@ -105,7 +105,7 @@ func (api *RemoteApi) handleToken(ctx context.Context) libError.Error {
 	api.TokenCache.AccessToken = nil
 	api.TokenCache.RefreshToken = nil
 
-	tokens, err := api.Auth.Login(ctx)
+	tokens, err := api.Auth.Login(w)
 	if err != nil {
 		return err
 	}
@@ -114,7 +114,7 @@ func (api *RemoteApi) handleToken(ctx context.Context) libError.Error {
 	return nil
 }
 
-func (api *RemoteApi) Authenticate(ctx context.Context) libError.Error {
+func (api *RemoteApi) Authenticate(w webFramework.WebFramework) libError.Error {
 	if api.TokenCacheLock == nil {
 		return libError.NewWithDescription(status.InternalServerError, "TOKEN_CACHE_NOT_INITIALIZED", "token cache lock of api %s is null", api.Name)
 	}
@@ -122,7 +122,7 @@ func (api *RemoteApi) Authenticate(ctx context.Context) libError.Error {
 		return libError.NewWithDescription(status.InternalServerError, "TOKEN_CACHE_NOT_INITIALIZED", "token cache of api %s is null", api.Name)
 	}
 	if api.TokenCache.AccessToken == nil || api.TokenCache.Expired() {
-		return api.handleToken(ctx)
+		return api.handleToken(w)
 	}
 	return nil
 }

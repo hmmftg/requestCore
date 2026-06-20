@@ -11,7 +11,9 @@ import (
 	"time"
 
 	"github.com/hmmftg/requestCore/libCallApi"
+	"github.com/hmmftg/requestCore/libContext"
 	"github.com/hmmftg/requestCore/libError"
+	"github.com/hmmftg/requestCore/webFramework"
 	"gotest.tools/v3/assert"
 )
 
@@ -20,7 +22,7 @@ type countingAuth struct {
 	refreshes atomic.Int32
 }
 
-func (a *countingAuth) Login(ctx context.Context) (*libCallApi.TokenCache, libError.Error) {
+func (a *countingAuth) Login(w webFramework.WebFramework) (*libCallApi.TokenCache, libError.Error) {
 	a.logins.Add(1)
 	return &libCallApi.TokenCache{
 		AccessToken: &libCallApi.OAuth2Token{
@@ -32,7 +34,7 @@ func (a *countingAuth) Login(ctx context.Context) (*libCallApi.TokenCache, libEr
 	}, nil
 }
 
-func (a *countingAuth) Refresh(ctx context.Context, refreshToken string) (*libCallApi.TokenCache, libError.Error) {
+func (a *countingAuth) Refresh(w webFramework.WebFramework, refreshToken string) (*libCallApi.TokenCache, libError.Error) {
 	a.refreshes.Add(1)
 	return &libCallApi.TokenCache{
 		AccessToken: &libCallApi.OAuth2Token{
@@ -54,9 +56,13 @@ func TestAuthenticate_CacheHitAvoidsSecondLogin(t *testing.T) {
 		TokenCacheLock: lock,
 	}
 
-	err := api.Authenticate(context.Background())
+	t.Setenv(libContext.HeaderEnvKey, "User-Id#a@b#b")
+	t.Setenv(libContext.LocalEnvKey, "User-Id#a@b#b")
+	w := libContext.InitContextNoAuditTrail(t)
+
+	err := api.Authenticate(w)
 	assert.NilError(t, err)
-	err = api.Authenticate(context.Background())
+	err = api.Authenticate(w)
 	assert.NilError(t, err)
 	assert.Equal(t, auth.logins.Load(), int32(1))
 }
@@ -82,7 +88,11 @@ func TestAuthenticate_ExpiredTokenTriggersRefresh(t *testing.T) {
 		TokenCacheLock: lock,
 	}
 
-	err := api.Authenticate(context.Background())
+	t.Setenv(libContext.HeaderEnvKey, "User-Id#a@b#b")
+	t.Setenv(libContext.LocalEnvKey, "User-Id#a@b#b")
+	w := libContext.InitContextNoAuditTrail(t)
+
+	err := api.Authenticate(w)
 	assert.NilError(t, err)
 	assert.Equal(t, auth.refreshes.Load(), int32(1))
 	assert.Equal(t, auth.logins.Load(), int32(0))
@@ -99,12 +109,16 @@ func TestAuthenticate_ConcurrentLoginOnce(t *testing.T) {
 		TokenCacheLock: lock,
 	}
 
+	t.Setenv(libContext.HeaderEnvKey, "User-Id#a@b#b")
+	t.Setenv(libContext.LocalEnvKey, "User-Id#a@b#b")
+	w := libContext.InitContextNoAuditTrail(t)
+
 	var wg sync.WaitGroup
 	for i := 0; i < 10; i++ {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			err := api.Authenticate(context.Background())
+			err := api.Authenticate(w)
 			assert.NilError(t, err)
 		}()
 	}
@@ -120,7 +134,11 @@ func TestEnsureAuthorization_PreservesExplicitHeader(t *testing.T) {
 	headers := map[string]string{
 		"Authorization": "Bearer explicit-token",
 	}
-	err := api.EnsureAuthorization(context.Background(), headers)
+
+	t.Setenv(libContext.HeaderEnvKey, "User-Id#a@b#b")
+	t.Setenv(libContext.LocalEnvKey, "User-Id#a@b#b")
+	w := libContext.InitContextNoAuditTrail(t)
+	err := api.EnsureAuthorization(w, headers)
 	assert.NilError(t, err)
 	assert.Equal(t, headers["Authorization"], "Bearer explicit-token")
 }
@@ -134,7 +152,11 @@ func TestEnsureAuthorization_BasicAuthFallback(t *testing.T) {
 		},
 	}
 	headers := map[string]string{}
-	err := api.EnsureAuthorization(context.Background(), headers)
+
+	t.Setenv(libContext.HeaderEnvKey, "User-Id#a@b#b")
+	t.Setenv(libContext.LocalEnvKey, "User-Id#a@b#b")
+	w := libContext.InitContextNoAuditTrail(t)
+	err := api.EnsureAuthorization(w, headers)
 	assert.NilError(t, err)
 	assert.Equal(t, headers["Authorization"], api.GetBasicAuthHeader())
 }
@@ -185,7 +207,11 @@ func TestPrepareCall_OAuthAuthorizationHeader(t *testing.T) {
 		Context:  context.Background(),
 	}
 
-	req, err := libCallApi.PrepareCall(callData)
+	t.Setenv(libContext.HeaderEnvKey, "User-Id#a@b#b")
+	t.Setenv(libContext.LocalEnvKey, "User-Id#a@b#b")
+	w := libContext.InitContextNoAuditTrail(t)
+
+	req, err := libCallApi.PrepareCall(w, callData)
 	assert.NilError(t, err)
 	assert.Equal(t, req.Header.Get("Authorization"), "Bearer oauth-access-token")
 }

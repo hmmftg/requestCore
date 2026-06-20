@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/hmmftg/requestCore/libCallApi"
+	"github.com/hmmftg/requestCore/libContext"
 	"github.com/hmmftg/requestCore/response"
 	"gotest.tools/v3/assert"
 )
@@ -86,10 +87,14 @@ func TestCall(t *testing.T) {
 		},
 	}
 
+	t.Setenv(libContext.HeaderEnvKey, "User-Id#a@b#b")
+	t.Setenv(libContext.LocalEnvKey, "User-Id#a@b#b")
+	w := libContext.InitContextNoAuditTrail(t)
+
 	for id := range testCases {
 		t.Run(
 			testCases[id].Name, func(t *testing.T) {
-				result, err := libCallApi.RemoteCall(&callParam)
+				result, err := libCallApi.RemoteCall(w, &callParam)
 				assert.DeepEqual(t, err, testCases[id].Error)
 				assert.DeepEqual(t, result, testCases[id].Result)
 			},
@@ -157,10 +162,14 @@ func TestCallJSON(t *testing.T) {
 		},
 	}
 
+	t.Setenv(libContext.HeaderEnvKey, "User-Id#a@b#b")
+	t.Setenv(libContext.LocalEnvKey, "User-Id#a@b#b")
+	w := libContext.InitContextNoAuditTrail(t)
+
 	for id := range testCases {
 		t.Run(
 			testCases[id].Name, func(t *testing.T) {
-				result, err := libCallApi.RemoteCall(&callParam)
+				result, err := libCallApi.RemoteCall(w, &callParam)
 				assert.DeepEqual(t, err, testCases[id].Error)
 				assert.DeepEqual(t, result, testCases[id].Result)
 			},

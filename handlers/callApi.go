@@ -41,7 +41,7 @@ func CallApiInternal[Resp any](
 	param libCallApi.CallParam) (*Resp, error) {
 	webFramework.AddLog(w, CallApiLogEntry, slog.Any(method, param))
 
-	resp1 := libCallApi.Call[Resp](param)
+	resp1 := libCallApi.Call[Resp](w, param)
 
 	if resp1.Error != nil {
 		webFramework.AddLog(w, CallApiLogEntry, slog.Any(fmt.Sprintf("%s-error", method), resp1.Error))
@@ -98,7 +98,7 @@ func CallApiJSON[Req any, Resp any](
 	if param.Parser == nil {
 		param.Parser = w.Parser // Set parser for distributed tracing if not already set
 	}
-	resp, err := libCallApi.RemoteCall(param)
+	resp, err := libCallApi.RemoteCall(w, param)
 	if err != nil {
 		webFramework.AddLog(w, CallApiLogEntry, slog.Any(fmt.Sprintf("%s-error", method), err))
 		return *new(Resp), err
@@ -119,7 +119,7 @@ func CallApiForm[Req any, Resp any](
 	if param.Parser == nil {
 		param.Parser = w.Parser // Set parser for distributed tracing if not already set
 	}
-	resp, err := libCallApi.RemoteCall(param)
+	resp, err := libCallApi.RemoteCall(w, param)
 	if err != nil {
 		webFramework.AddLog(w, CallApiLogEntry, slog.Any(fmt.Sprintf("%s-error", method), err))
 		return *new(Resp), err
@@ -128,9 +128,10 @@ func CallApiForm[Req any, Resp any](
 	return *resp, nil
 }
 func callApiNoLog[Resp any](
+	w webFramework.WebFramework,
 	_ string,
 	param libCallApi.CallParam) (*Resp, error) {
-	resp1 := libCallApi.Call[Resp](param)
+	resp1 := libCallApi.Call[Resp](w, param)
 
 	if resp1.Error != nil {
 		if ok, err := response.Unwrap(resp1.Error); ok {
@@ -149,9 +150,10 @@ func callApiNoLog[Resp any](
 }
 
 func CallApiNoLog[Resp any](
+	w webFramework.WebFramework,
 	method string,
 	param libCallApi.CallParam) (*Resp, error) {
-	result, err := callApiNoLog[WsResponse[Resp]](method, param)
+	result, err := callApiNoLog[WsResponse[Resp]](w, method, param)
 	if result == nil {
 		return nil, err
 	}

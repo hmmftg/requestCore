@@ -86,7 +86,7 @@ type CallResult[RespType any] struct {
 	Error  error
 }
 
-func Call[RespType any](param CallParam) CallResult[RespType] {
+func Call[RespType any](w webFramework.WebFramework, param CallParam) CallResult[RespType] {
 	if param.QueryStack != nil && len(*param.QueryStack) > 0 {
 		param.Query = (*param.QueryStack)[0]
 		if len(*param.QueryStack) > 1 {
@@ -116,11 +116,11 @@ func Call[RespType any](param CallParam) CallResult[RespType] {
 		httpClient: param.HttpClient,
 	}
 
-	resp, wsResp, callResp, err := ConsumeRest(callData)
+	resp, wsResp, callResp, err := ConsumeRest(w, callData)
 	return CallResult[RespType]{resp, wsResp, callResp, err}
 }
 
-func RemoteCall[Req, Resp any](param *RemoteCallParamData[Req, Resp]) (*Resp, error) {
+func RemoteCall[Req, Resp any](w webFramework.WebFramework, param *RemoteCallParamData[Req, Resp]) (*Resp, error) {
 	if param.QueryStack != nil && len(*param.QueryStack) > 0 {
 		param.Query = (*param.QueryStack)[0]
 		if len(*param.QueryStack) > 1 {
@@ -128,12 +128,6 @@ func RemoteCall[Req, Resp any](param *RemoteCallParamData[Req, Resp]) (*Resp, er
 		} else {
 			*param.QueryStack = nil
 		}
-	}
-
-	// Prepare context for distributed tracing / cancellation
-	ctx := context.Background()
-	if param.Parser != nil {
-		ctx = param.Parser.GetContext()
 	}
 
 	callData := CallData[Resp]{
@@ -147,10 +141,10 @@ func RemoteCall[Req, Resp any](param *RemoteCallParamData[Req, Resp]) (*Resp, er
 		Req:        param.JsonBody,
 		BodyType:   param.BodyType,
 		Builder:    param.Builder,
-		Context:    ctx,
+		Context:    w.Ctx,
 		LogValue:   param.LogValue(),
 		httpClient: param.HttpClient,
 	}
 
-	return ConsumeRestJSON(&callData)
+	return ConsumeRestJSON(w, &callData)
 }
