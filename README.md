@@ -13,6 +13,50 @@ It is designed to reduce boilerplate around request processing while keeping the
 
 ---
 
+## Why requestCore?
+
+### The problem
+
+Backend services repeat the same cross-cutting work: parsing requests consistently, logging/tracing, duplicate detection, DB execution, and uniform error responses — often locked to one web framework.
+
+### What requestCore gives you
+
+- **One request API across Gin, Fiber, and net/http** via `webFramework.RequestParser`
+- **Composable handler pipeline** — parse, validate, persist, execute, respond ([handlers/baseHandler.go](handlers/baseHandler.go))
+- **Database abstraction** — Oracle, PostgreSQL, MySQL, SQLite, MockDB ([libQuery/](libQuery/))
+- **Observability built in** — OpenTelemetry, slog, Splunk adapters ([libTracing/](libTracing/), [libLogger/](libLogger/))
+- **Incremental adoption** — use only the adapter/parser layer, or the full request lifecycle
+
+### When to use it
+
+- Teams on **multiple HTTP frameworks** (or migrating between them)
+- Services needing **request audit/persistence** and duplicate checking
+- Projects using **sqlc + database/sql** or GORM with shared query/error handling
+- Platforms standardizing logging and tracing without coupling business logic to Gin/Fiber
+
+### When not to use it
+
+- A minimal API where stdlib or a single framework with no shared infra is enough
+- Greenfield apps that won't need request persistence, multi-DB, or cross-framework portability
+
+### Compared to alternatives
+
+| Approach | Strength | requestCore adds |
+|---|---|---|
+| Raw Gin / Fiber / chi | Simple, fast | Unified parsing, lifecycle, DB, observability across frameworks |
+| Middleware-only stack | Lightweight | Request persistence, duplicate detection, query runner, handler orchestration |
+| Rolling your own | Full control | Reusable, tested abstractions already in this repo |
+
+### See it in action
+
+Runnable examples: [examples/](examples/)
+
+- [chi + net/http](examples/chi-hello/) — recommended starting point
+- [Gin](examples/gin-hello/)
+- [Fiber](examples/fiber-hello/)
+
+---
+
 ## Features
 
 - **Framework adapters**
@@ -142,9 +186,9 @@ The repository is centered around a thin root façade and multiple focused subpa
 
 `requestCore` currently supports:
 
-- **Gin**
-- **Fiber**
-- **net/http**
+- **[Gin](examples/gin-hello/)**
+- **[Fiber](examples/fiber-hello/)**
+- **[net/http](examples/chi-hello/)** (chi adapter in [libChi/](libChi/))
 - **testing**
 
 ---
@@ -172,34 +216,20 @@ Then import the package in your project:
 import "github.com/hmmftg/requestCore"
 ```
 
+See [examples/](examples/) for runnable demos.
+
 ---
 
 ## Quick start
 
-> The exact initialization pattern depends on which framework adapter you use.  
-> The example below shows the intent of the library: create a core model and use it to access request, query, response, and parameter services.
+Pick a runnable example:
 
-```go
-package main
-
-import (
-	"fmt"
-
-	requestcore "github.com/hmmftg/requestCore"
-)
-
-func main() {
-	core := requestcore.NewRequestCore()
-
-	fmt.Println(core != nil)
-}
+```bash
+go run ./examples/chi-hello
+curl http://localhost:8080/users/42
 ```
 
-If your project initializes through a specific framework context, you would typically:
-
-1. create the request context
-2. initialize `libContext`
-3. access request/query/response services through the root model
+For the full request lifecycle (DB, persistence, handlers), see [examples/README.md](examples/README.md) and the [handlers](handlers/) package.
 
 ---
 
@@ -419,6 +449,7 @@ This minimizes risk for existing users while allowing pgx-native optimization wh
 ```text
 requestCore/
 ├── requestCore.go
+├── examples/
 ├── libContext/
 ├── libRequest/
 ├── libQuery/
