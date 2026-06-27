@@ -42,7 +42,7 @@ func (m RemoteApiModel) ConsumeRestBasicAuthApi(w webFramework.WebFramework, req
 	if headers == nil {
 		headers = make(map[string]string)
 	}
-	if err := (&api).EnsureAuthorization(w, headers); err != nil {
+	if err := api.EnsureAuthorization(w, headers); err != nil {
 		return nil, "AUTH_FAILED", err
 	}
 	req, err := http.NewRequest(method, api.Domain+"/"+path, bytes.NewBuffer(requestJson))
@@ -96,7 +96,7 @@ func (m RemoteApiModel) ConsumeRestApi(w webFramework.WebFramework, requestJson 
 	if headers == nil {
 		headers = make(map[string]string)
 	}
-	if err := (&api).EnsureAuthorization(w, headers); err != nil {
+	if err := api.EnsureAuthorization(w, headers); err != nil {
 		return nil, "AUTH_FAILED", http.StatusInternalServerError, err
 	}
 	req, err := http.NewRequest(method, api.Domain+"/"+path, bytes.NewBuffer(requestJson))

@@ -1,5 +1,9 @@
-
 # requestCore
+
+[![Go Reference](https://pkg.go.dev/badge/github.com/hmmftg/requestCore.svg)](https://pkg.go.dev/github.com/hmmftg/requestCore)
+[![Release](https://img.shields.io/github/v/release/hmmftg/requestCore)](https://github.com/hmmftg/requestCore/releases)
+[![License](https://img.shields.io/github/license/hmmftg/requestCore)](https://github.com/hmmftg/requestCore/blob/main/LICENSE)
+[![Go Version](https://img.shields.io/github/go-mod/go-version/hmmftg/requestCore)](https://go.dev/dl/)
 
 `requestCore` is a Go library for handling RESTful requests with a **framework-agnostic core** and adapters for **Gin**, **Fiber**, and **net/http**. It provides a unified request/context layer, query execution abstractions, response handling, logging, tracing, and testing utilities.
 
@@ -145,7 +149,7 @@ The repository is centered around a thin root façade and multiple focused subpa
 
 ## Requirements
 
-- Go 1.x
+- Go 1.25+
 - A supported SQL database driver, depending on your chosen DB mode
 - Optional:
   - OpenTelemetry
