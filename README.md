@@ -483,6 +483,11 @@ Additional documentation included in the repository:
 - `SETUP_COMPLETE.md`
 
 ---
+## Articles
+
+- [Framework-Portable HTTP Handlers in Go with requestCore](articles/framework-portable-http-handlers-in-go-with-requestcore.md) — also on [Medium](https://medium.com/...)
+
+---
 
 ## Contributing
 
