@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/hmmftg/requestCore/libError"
+	"github.com/hmmftg/requestCore/libLogger"
 	"github.com/hmmftg/requestCore/libValidate"
 	"github.com/hmmftg/requestCore/response"
 	"github.com/hmmftg/requestCore/status"
@@ -182,6 +183,7 @@ func parseRequest[Req any](params ParseParams) (*ParseResult[Req], error) {
 		}
 	}
 	if len(errorResponses) > 0 {
+		params.W.Parser.SetLocal(libLogger.SlogRequestBody, request)
 		return nil, errors.Join(libError.New(http.StatusBadRequest, "VALIDATION_FAILED", errorResponses))
 	}
 

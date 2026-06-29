@@ -64,6 +64,10 @@ func (m WebHanlder) errorhandler(w webFramework.WebFramework, err error) {
 			}, true, w)
 			return
 		}
+		if errs, ok := newError.ActionData.Message.([]ErrorResponse); ok && len(errs) > 0 {
+			m.Respond(newError.ActionData.Status.Int(), 1, newError.ActionData.Description, errs, true, w)
+			return
+		}
 		m.Respond(newError.ActionData.Status.Int(), 1, newError.ActionData.Description, nil, true, w)
 		return
 	}
