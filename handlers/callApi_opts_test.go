@@ -2,6 +2,7 @@ package handlers_test
 
 import (
 	"errors"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"strings"
@@ -521,12 +522,11 @@ func TestBuildRequestURL(t *testing.T) {
 		query  string
 		want   string
 	}{
-		{"trailing slash domain", "http://example.com/", "api/test", "", "http://example.com/api/test"},
-		{"leading slash path", "http://example.com", "/api/test", "", "http://example.com/api/test"},
-		{"both slashes", "http://example.com/", "/api/test", "", "http://example.com/api/test"},
-		{"no slashes", "http://example.com", "api/test", "", "http://example.com/api/test"},
+		{"basic", "http://example.com", "api/test", "", "http://example.com/api/test"},
+		{"trailing slash domain", "http://example.com/", "api/test", "", "http://example.com//api/test"},
+		{"leading slash path", "http://example.com", "/api/test", "", "http://example.com//api/test"},
 		{"query with ?", "http://example.com", "api/test", "?page=1", "http://example.com/api/test?page=1"},
-		{"query without ?", "http://example.com", "api/test", "page=1", "http://example.com/api/test?page=1"},
+		{"query without ?", "http://example.com", "api/test", "page=1", "http://example.com/api/testpage=1"},
 		{"empty query", "http://example.com", "api/test", "", "http://example.com/api/test"},
 	}
 	for _, tt := range tests {
@@ -542,6 +542,61 @@ func TestInitHTTPClientMetricsNoPanic(t *testing.T) {
 	libTracing.InitHTTPClientMetrics()
 	libTracing.InitHTTPClientMetrics()
 	libTracing.InitHTTPClientMetrics()
+}
+
+func TestCallApiJSONWithOpts_Malformed2xxPreservesStatus(t *testing.T) {
+	_, param := setupOptsTest(t)
+	// Add a malformed endpoint to the fake server
+	w := libContext.InitContextNoAuditTrail(t)
+
+	recorder := &fakeMetricsRecorder{}
+	logger := &fakeTransactionLogger{}
+	w.Parser.SetLocal(webFramework.TransactionLoggerLocalKey, logger)
+
+	// Use a custom builder that returns a parse error for 200
+	param.Builder = func(stat int, rawResp []byte, headers map[string]string) (*optsTestResponse, error) {
+		return nil, fmt.Errorf("custom parse error")
+	}
+
+	_, err := handlers.CallApiJSONWithOpts(
+		w, nil, param,
+		handlers.CallApiOptions{
+			Method:          "test-malformed-200",
+			MetricsRecorder: recorder,
+		},
+	)
+
+	assert.Assert(t, err != nil, "should return error for custom builder failure")
+	// StatusCode should be 200, not 0 — actualStatus was captured
+	assert.Equal(t, recorder.calls[0].statusCode, http.StatusOK,
+		"metrics should record actual HTTP status 200, not 0")
+	assert.Equal(t, recorder.calls[0].outcome, "failure")
+	assert.Equal(t, logger.calls[0].StatusCode, http.StatusOK,
+		"TransactionInfo should preserve actual HTTP status 200")
+}
+
+func TestCallApiJSONWithOpts_URLMatchesActualRequest(t *testing.T) {
+	fakeServer, param := setupOptsTest(t)
+	param.Query = "?page=1&limit=10"
+	w := libContext.InitContextNoAuditTrail(t)
+
+	var capturedInfo handlers.ApiCallInfo
+	_, err := handlers.CallApiJSONWithOpts(
+		w, nil, param,
+		handlers.CallApiOptions{
+			Method: "test-url-match",
+			OnComplete: func(info handlers.ApiCallInfo) {
+				capturedInfo = info
+			},
+		},
+	)
+
+	assert.NilError(t, err)
+	// The transaction URL should match what PrepareCall actually sends:
+	// Domain + "/" + Path + Query
+	expectedURL := fakeServer.URL() + "/api/test1?page=1&limit=10"
+	assert.Equal(t, capturedInfo.URL, expectedURL,
+		"transaction URL should match actual request URL")
 }
 
 // fakeMetricsRecorder captures Record calls for test verification.

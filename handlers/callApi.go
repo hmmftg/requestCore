@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
-	"strings"
 	"time"
 
 	"github.com/hmmftg/requestCore"
@@ -269,33 +268,22 @@ var errTimeout = errors.New("server-side timeout exceeded")
 // resolveStatusCode returns the actual HTTP status code captured by the builder
 // closure. On error, it prefers the RemoteCallError's status if available.
 func resolveStatusCode(err error, actualStatus int) int {
-	if err != nil {
-		var rce *libCallApi.RemoteCallError
-		if errors.As(err, &rce) {
-			return rce.Status
-		}
-		return 0
+	var rce *libCallApi.RemoteCallError
+	if errors.As(err, &rce) {
+		return rce.Status
 	}
 	if actualStatus > 0 {
 		return actualStatus
 	}
-	return http.StatusOK
+	return 0
 }
 
 // BuildRequestURL constructs the full request URL from domain, path, and query.
-// It trims trailing/leading slashes to avoid double slashes, and appends the
-// query string as-is (preserving already-encoded content).
+// It mirrors the URL construction in libCallApi.PrepareCall, which builds the
+// request URL as Domain + "/" + Path + Query (direct concatenation).
+// Callers must ensure Query is either empty or begins with "?".
 func BuildRequestURL(domain, path, query string) string {
-	domain = strings.TrimSuffix(domain, "/")
-	path = strings.TrimPrefix(path, "/")
-	url := domain + "/" + path
-	if query != "" {
-		if !strings.HasPrefix(query, "?") {
-			url += "?"
-		}
-		url += query
-	}
-	return url
+	return domain + "/" + path + query
 }
 
 // logTransactionAndCallback resolves the TransactionLogger from the framework
