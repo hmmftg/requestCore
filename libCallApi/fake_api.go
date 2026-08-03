@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"strconv"
 	"strings"
+	"time"
 )
 
 // FakeAPIServer creates a local test server that mimics external APIs
@@ -56,6 +57,11 @@ func NewFakeAPIServer() *FakeAPIServer {
 	})
 	mux.HandleFunc("/api/no-content", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusNoContent)
+	})
+	mux.HandleFunc("/api/slow", func(w http.ResponseWriter, r *http.Request) {
+		time.Sleep(50 * time.Millisecond)
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(generateMockSimpleResponse("test1"))
 	})
 
 	// Mock generic API endpoints

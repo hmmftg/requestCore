@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/hmmftg/requestCore"
@@ -162,42 +163,36 @@ func CallApiNoLog[Resp any](
 	return &result.Result, err
 }
 
-// ApiCallInfo describes a completed remote API call for observability hooks.
-// The OnComplete callback in CallApiOptions receives this so application
-// layers (e.g. Cartino) can record it in their own transaction logger.
-type ApiCallInfo struct {
-	ServiceName  string        // param.Api.Name
-	URL          string        // full request URL (domain + "/" + path)
-	Endpoint     string        // param.Path
-	Method       string        // param.Method (HTTP method)
-	StatusCode   int           // actual HTTP status (0 if request failed before getting a response)
-	Duration     time.Duration // elapsed time
-	Error        error         // nil on success
-	Request      any           // param.JsonBody (caller may mask sensitive fields)
-	Response     any           // parsed response (nil on error)
-	ResponseBody []byte        // raw response body (from RemoteCallError on error, nil on success)
-}
+// ApiCallInfo is a compatibility alias for webFramework.TransactionInfo.
+// New code should use webFramework.TransactionInfo directly.
+type ApiCallInfo = webFramework.TransactionInfo
 
 // CallApiOptions holds optional parameters for CallApiJSONWithOpts.
 type CallApiOptions struct {
 	Method  string        // log key, e.g. "soha-authorize"
 	Timeout time.Duration // server-side elapsed-time guard (0 = no guard)
 
+	// MetricsRecorder, if set, records Prometheus-style metrics for the call.
+	// If nil, the default global Prometheus recorder is used.
+	MetricsRecorder libTracing.HTTPClientMetricsRecorder
+
 	// OnComplete is an optional callback invoked after the remote call
 	// finishes (success or failure). It receives the call metadata so the
 	// application layer can record it in its own transaction logger, metrics,
 	// or any other observability system. nil = no callback.
-	OnComplete func(ApiCallInfo)
+	OnComplete func(webFramework.TransactionInfo)
 }
 
 // CallApiJSONWithOpts is an enhanced version of CallApiJSON that adds:
-//   - Prometheus metrics recording via libTracing.RecordHTTPClientCall
+//   - Prometheus metrics recording via libTracing.RecordHTTPClientCallWithOutcome
 //   - A server-side elapsed-time timeout guard (in addition to the HTTP client timeout)
-//   - HTTP status code preservation via RemoteCallError (using StatusPreservingBuilder)
-//   - An optional OnComplete callback for application-layer transaction logging
+//   - HTTP status code preservation via RemoteCallError (independently of the caller's builder)
+//   - Framework-level transaction logging via webFramework.TransactionLogger
+//   - An optional OnComplete callback for application-layer extension hooks
 //
 // webFramework.AddLog is called on every code path (request, error, response)
-// and is never skipped or conditionally bypassed.
+// and is never skipped or conditionally bypassed. Transaction logging runs
+// after AddLog and never replaces it.
 //
 // Custom headers: set param.Headers directly (e.g. param.Headers["SIGNATURE"] = "...").
 func CallApiJSONWithOpts[Req any, Resp any](
@@ -213,8 +208,11 @@ func CallApiJSONWithOpts[Req any, Resp any](
 		param.Parser = w.Parser
 	}
 
-	// Wrap the builder in a closure to capture the actual HTTP status code
-	// returned by the remote server, since RemoteCall does not expose it.
+	// Wrap the builder in a closure to:
+	// 1. Capture the actual HTTP status code (RemoteCall does not expose it).
+	// 2. Intercept non-2xx responses and always return RemoteCallError,
+	//    regardless of the caller's custom builder. Custom builders are only
+	//    called for 2xx (successful) responses.
 	var actualStatus int
 	originalBuilder := param.Builder
 	if originalBuilder == nil {
@@ -222,6 +220,13 @@ func CallApiJSONWithOpts[Req any, Resp any](
 	}
 	param.Builder = func(stat int, rawResp []byte, headers map[string]string) (*Resp, error) {
 		actualStatus = stat
+		if stat < 200 || stat >= 300 {
+			return nil, &libCallApi.RemoteCallError{
+				Status: stat,
+				Body:   rawResp,
+				Err:    fmt.Errorf("HTTP %d", stat),
+			}
+		}
 		return originalBuilder(stat, rawResp, headers)
 	}
 
@@ -230,27 +235,32 @@ func CallApiJSONWithOpts[Req any, Resp any](
 	elapsed := time.Since(start)
 
 	statusCode := resolveStatusCode(err, actualStatus)
+	requestURL := BuildRequestURL(param.Api.Domain, param.Path, param.Query)
+	recorder := opts.MetricsRecorder
+	if recorder == nil {
+		recorder = libTracing.DefaultHTTPClientMetricsRecorder()
+	}
 
 	if err != nil {
 		webFramework.AddLog(w, CallApiLogEntry, slog.Any(fmt.Sprintf("%s-error", opts.Method), err))
-		libTracing.RecordHTTPClientCall(param.Api.Name, param.Method, statusCode, elapsed, err)
-		invokeOnComplete(opts, param, resp, err, statusCode, elapsed)
+		recorder.Record(param.Api.Name, param.Method, statusCode, elapsed, "failure")
+		logTransactionAndCallback(w, opts, param, resp, err, statusCode, elapsed, requestURL)
 		return *new(Resp), err
 	}
 
 	webFramework.AddLog(w, CallApiLogEntry, slog.Any(fmt.Sprintf("%s-resp", opts.Method), resp))
 
-	if opts.Timeout > 0 && elapsed > opts.Timeout {
+	if opts.Timeout > 0 && elapsed >= opts.Timeout {
 		timeoutErr := fmt.Errorf("%s: elapsed %s exceeds timeout %s: %w",
 			param.Api.Domain, elapsed, opts.Timeout, errTimeout)
 		webFramework.AddLog(w, CallApiLogEntry, slog.Any(fmt.Sprintf("%s-error", opts.Method), timeoutErr))
-		libTracing.RecordHTTPClientCall(param.Api.Name, param.Method, statusCode, elapsed, timeoutErr)
-		invokeOnComplete(opts, param, resp, timeoutErr, statusCode, elapsed)
+		recorder.Record(param.Api.Name, param.Method, statusCode, elapsed, "timeout")
+		logTransactionAndCallback(w, opts, param, resp, timeoutErr, statusCode, elapsed, requestURL)
 		return *new(Resp), timeoutErr
 	}
 
-	libTracing.RecordHTTPClientCall(param.Api.Name, param.Method, statusCode, elapsed, nil)
-	invokeOnComplete(opts, param, resp, err, statusCode, elapsed)
+	recorder.Record(param.Api.Name, param.Method, statusCode, elapsed, "success")
+	logTransactionAndCallback(w, opts, param, resp, err, statusCode, elapsed, requestURL)
 	return *resp, nil
 }
 
@@ -272,17 +282,35 @@ func resolveStatusCode(err error, actualStatus int) int {
 	return http.StatusOK
 }
 
-func invokeOnComplete[Req any, Resp any](
+// BuildRequestURL constructs the full request URL from domain, path, and query.
+// It trims trailing/leading slashes to avoid double slashes, and appends the
+// query string as-is (preserving already-encoded content).
+func BuildRequestURL(domain, path, query string) string {
+	domain = strings.TrimSuffix(domain, "/")
+	path = strings.TrimPrefix(path, "/")
+	url := domain + "/" + path
+	if query != "" {
+		if !strings.HasPrefix(query, "?") {
+			url += "?"
+		}
+		url += query
+	}
+	return url
+}
+
+// logTransactionAndCallback resolves the TransactionLogger from the framework
+// context and invokes it, then invokes the OnComplete callback if set.
+// This runs after webFramework.AddLog on each path and never bypasses it.
+func logTransactionAndCallback[Req any, Resp any](
+	w webFramework.WebFramework,
 	opts CallApiOptions,
 	param *libCallApi.RemoteCallParamData[Req, Resp],
 	resp *Resp,
 	err error,
 	statusCode int,
 	elapsed time.Duration,
+	requestURL string,
 ) {
-	if opts.OnComplete == nil {
-		return
-	}
 	var respAny any
 	if resp != nil {
 		respAny = *resp
@@ -294,9 +322,9 @@ func invokeOnComplete[Req any, Resp any](
 			rawBody = rce.Body
 		}
 	}
-	opts.OnComplete(ApiCallInfo{
+	info := webFramework.TransactionInfo{
 		ServiceName:  param.Api.Name,
-		URL:          param.Api.Domain + "/" + param.Path,
+		URL:          requestURL,
 		Endpoint:     param.Path,
 		Method:       param.Method,
 		StatusCode:   statusCode,
@@ -305,5 +333,11 @@ func invokeOnComplete[Req any, Resp any](
 		Request:      param.JsonBody,
 		Response:     respAny,
 		ResponseBody: rawBody,
-	})
+	}
+	if logger, ok := w.Parser.GetLocal(webFramework.TransactionLoggerLocalKey).(webFramework.TransactionLogger); ok && logger != nil {
+		logger.LogTransaction(info)
+	}
+	if opts.OnComplete != nil {
+		opts.OnComplete(info)
+	}
 }

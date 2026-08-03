@@ -11,7 +11,8 @@ import (
 	"github.com/hmmftg/requestCore/handlers"
 	"github.com/hmmftg/requestCore/libCallApi"
 	"github.com/hmmftg/requestCore/libContext"
-	"github.com/prometheus/client_golang/prometheus"
+	"github.com/hmmftg/requestCore/libTracing"
+	"github.com/hmmftg/requestCore/webFramework"
 	"gotest.tools/v3/assert"
 )
 
@@ -121,13 +122,15 @@ func TestCallApiJSONWithOpts_Error(t *testing.T) {
 
 func TestCallApiJSONWithOpts_Timeout(t *testing.T) {
 	fakeServer, param := setupOptsTest(t)
+	param.Path = "slow"
+	param.Api.Domain = fakeServer.URL() + "/api"
 	w := libContext.InitContextNoAuditTrail(t)
 
 	_, err := handlers.CallApiJSONWithOpts(
 		w, nil, param,
 		handlers.CallApiOptions{
 			Method:  "test-timeout",
-			Timeout: 1 * time.Nanosecond, // impossibly small timeout
+			Timeout: 10 * time.Millisecond, // slow endpoint sleeps 50ms
 		},
 	)
 
@@ -296,28 +299,273 @@ func TestCallApiJSONWithOpts_MetricsRecorded(t *testing.T) {
 	_, param := setupOptsTest(t)
 	w := libContext.InitContextNoAuditTrail(t)
 
+	recorder := &fakeMetricsRecorder{}
 	_, err := handlers.CallApiJSONWithOpts(
 		w, nil, param,
 		handlers.CallApiOptions{
-			Method: "test-metrics",
+			Method:          "test-metrics",
+			MetricsRecorder: recorder,
 		},
 	)
 
 	assert.NilError(t, err)
+	assert.Equal(t, len(recorder.calls), 1, "recorder should be called once")
+	assert.Equal(t, recorder.calls[0].method, "GET")
+	assert.Equal(t, recorder.calls[0].statusCode, http.StatusOK)
+	assert.Equal(t, recorder.calls[0].outcome, "success")
+	assert.Assert(t, recorder.calls[0].duration >= 0, "duration should be non-negative")
+}
 
-	// Verify Prometheus metrics were recorded by collecting from the default registry
-	mfs, err := prometheus.DefaultGatherer.Gather()
-	assert.NilError(t, err)
+func TestCallApiJSONWithOpts_MetricsFailureOn403(t *testing.T) {
+	_, param := setupOptsTest(t)
+	param.Path = "forbidden"
+	w := libContext.InitContextNoAuditTrail(t)
 
-	var foundCounter, foundHistogram bool
-	for _, mf := range mfs {
-		if mf.GetName() == "http_client_calls_total" {
-			foundCounter = true
-		}
-		if mf.GetName() == "http_client_call_duration_seconds" {
-			foundHistogram = true
-		}
+	recorder := &fakeMetricsRecorder{}
+	_, err := handlers.CallApiJSONWithOpts(
+		w, nil, param,
+		handlers.CallApiOptions{
+			Method:          "test-metrics-403",
+			MetricsRecorder: recorder,
+		},
+	)
+
+	assert.Assert(t, err != nil)
+	assert.Equal(t, len(recorder.calls), 1)
+	assert.Equal(t, recorder.calls[0].statusCode, http.StatusForbidden)
+	assert.Equal(t, recorder.calls[0].outcome, "failure")
+}
+
+func TestCallApiJSONWithOpts_MetricsTimeoutOutcome(t *testing.T) {
+	fakeServer, param := setupOptsTest(t)
+	param.Path = "slow"
+	param.Api.Domain = fakeServer.URL() + "/api"
+	w := libContext.InitContextNoAuditTrail(t)
+
+	recorder := &fakeMetricsRecorder{}
+	_, err := handlers.CallApiJSONWithOpts(
+		w, nil, param,
+		handlers.CallApiOptions{
+			Method:          "test-metrics-timeout",
+			Timeout:         10 * time.Millisecond,
+			MetricsRecorder: recorder,
+		},
+	)
+
+	assert.Assert(t, err != nil)
+	assert.Equal(t, len(recorder.calls), 1)
+	assert.Equal(t, recorder.calls[0].outcome, "timeout")
+	assert.Assert(t, recorder.calls[0].statusCode >= 200 && recorder.calls[0].statusCode < 300,
+		"timeout should still record actual HTTP status, got: %d", recorder.calls[0].statusCode)
+}
+
+func TestCallApiJSONWithOpts_CustomBuilderNon2xx(t *testing.T) {
+	_, param := setupOptsTest(t)
+	param.Path = "forbidden"
+	w := libContext.InitContextNoAuditTrail(t)
+
+	builderCalled := false
+	param.Builder = func(stat int, rawResp []byte, headers map[string]string) (*optsTestResponse, error) {
+		builderCalled = true
+		return &optsTestResponse{}, nil
 	}
-	assert.Assert(t, foundCounter, "http_client_calls_total metric should be registered")
-	assert.Assert(t, foundHistogram, "http_client_call_duration_seconds metric should be registered")
+
+	_, err := handlers.CallApiJSONWithOpts(
+		w, nil, param,
+		handlers.CallApiOptions{
+			Method: "test-custom-builder-403",
+		},
+	)
+
+	assert.Assert(t, err != nil, "should return error for 403")
+	assert.Assert(t, !builderCalled, "custom builder should NOT be called for non-2xx response")
+
+	var rce *libCallApi.RemoteCallError
+	assert.Assert(t, errors.As(err, &rce), "err should be a RemoteCallError even with custom builder")
+	assert.Equal(t, rce.Status, http.StatusForbidden)
+	assert.Equal(t, libCallApi.IsForbidden(err), true)
+}
+
+func TestCallApiJSONWithOpts_TransactionLogger(t *testing.T) {
+	fakeServer, param := setupOptsTest(t)
+	w := libContext.InitContextNoAuditTrail(t)
+
+	logger := &fakeTransactionLogger{}
+	w.Parser.SetLocal(webFramework.TransactionLoggerLocalKey, logger)
+
+	resp, err := handlers.CallApiJSONWithOpts(
+		w, nil, param,
+		handlers.CallApiOptions{
+			Method: "test-tx-logger",
+		},
+	)
+
+	assert.NilError(t, err)
+	assert.Equal(t, resp.Status, "success")
+	assert.Equal(t, len(logger.calls), 1, "TransactionLogger should be called once on success")
+	assert.Equal(t, logger.calls[0].StatusCode, http.StatusOK)
+	assert.Equal(t, logger.calls[0].Method, "GET")
+	assert.Equal(t, logger.calls[0].URL, fakeServer.URL()+"/api/test1")
+	assert.Assert(t, logger.calls[0].Error == nil, "error should be nil on success")
+	assert.Assert(t, logger.calls[0].Duration >= 0, "duration should be non-negative")
+}
+
+func TestCallApiJSONWithOpts_TransactionLoggerOnError(t *testing.T) {
+	_, param := setupOptsTest(t)
+	param.Path = "forbidden"
+	w := libContext.InitContextNoAuditTrail(t)
+
+	logger := &fakeTransactionLogger{}
+	w.Parser.SetLocal(webFramework.TransactionLoggerLocalKey, logger)
+
+	_, err := handlers.CallApiJSONWithOpts(
+		w, nil, param,
+		handlers.CallApiOptions{
+			Method: "test-tx-logger-error",
+		},
+	)
+
+	assert.Assert(t, err != nil)
+	assert.Equal(t, len(logger.calls), 1, "TransactionLogger should be called on error")
+	assert.Equal(t, logger.calls[0].StatusCode, http.StatusForbidden)
+	assert.Assert(t, logger.calls[0].Error != nil, "error should be set in transaction info")
+	assert.Assert(t, len(logger.calls[0].ResponseBody) > 0, "ResponseBody should contain raw error body")
+}
+
+func TestCallApiJSONWithOpts_TransactionLoggerOnTimeout(t *testing.T) {
+	fakeServer, param := setupOptsTest(t)
+	param.Path = "slow"
+	param.Api.Domain = fakeServer.URL() + "/api"
+	w := libContext.InitContextNoAuditTrail(t)
+
+	logger := &fakeTransactionLogger{}
+	w.Parser.SetLocal(webFramework.TransactionLoggerLocalKey, logger)
+
+	_, err := handlers.CallApiJSONWithOpts(
+		w, nil, param,
+		handlers.CallApiOptions{
+			Method:  "test-tx-logger-timeout",
+			Timeout: 10 * time.Millisecond,
+		},
+	)
+
+	assert.Assert(t, err != nil)
+	assert.Equal(t, len(logger.calls), 1, "TransactionLogger should be called on timeout")
+	assert.Assert(t, logger.calls[0].Error != nil, "error should be set on timeout")
+	assert.Assert(t, strings.Contains(logger.calls[0].Error.Error(), "timeout"), "timeout error should contain 'timeout'")
+}
+
+func TestCallApiJSONWithOpts_TransactionLoggerAbsent(t *testing.T) {
+	_, param := setupOptsTest(t)
+	w := libContext.InitContextNoAuditTrail(t)
+
+	// No TransactionLogger registered — should not panic
+	resp, err := handlers.CallApiJSONWithOpts(
+		w, nil, param,
+		handlers.CallApiOptions{
+			Method: "test-no-tx-logger",
+		},
+	)
+
+	assert.NilError(t, err)
+	assert.Equal(t, resp.Status, "success")
+}
+
+func TestCallApiJSONWithOpts_QueryInURL(t *testing.T) {
+	fakeServer, param := setupOptsTest(t)
+	param.Query = "?page=1&limit=10"
+	w := libContext.InitContextNoAuditTrail(t)
+
+	var capturedInfo handlers.ApiCallInfo
+	_, err := handlers.CallApiJSONWithOpts(
+		w, nil, param,
+		handlers.CallApiOptions{
+			Method: "test-query-url",
+			OnComplete: func(info handlers.ApiCallInfo) {
+				capturedInfo = info
+			},
+		},
+	)
+
+	assert.NilError(t, err)
+	assert.Equal(t, capturedInfo.URL, fakeServer.URL()+"/api/test1?page=1&limit=10")
+}
+
+func TestCallApiJSONWithOpts_QueryStackInURL(t *testing.T) {
+	fakeServer, param := setupOptsTest(t)
+	param.Query = ""
+	param.QueryStack = &[]string{"?page=2"}
+	w := libContext.InitContextNoAuditTrail(t)
+
+	var capturedInfo handlers.ApiCallInfo
+	_, err := handlers.CallApiJSONWithOpts(
+		w, nil, param,
+		handlers.CallApiOptions{
+			Method: "test-querystack-url",
+			OnComplete: func(info handlers.ApiCallInfo) {
+				capturedInfo = info
+			},
+		},
+	)
+
+	assert.NilError(t, err)
+	assert.Equal(t, capturedInfo.URL, fakeServer.URL()+"/api/test1?page=2",
+		"URL should reflect QueryStack-selected query, got: %s", capturedInfo.URL)
+}
+
+func TestBuildRequestURL(t *testing.T) {
+	tests := []struct {
+		name   string
+		domain string
+		path   string
+		query  string
+		want   string
+	}{
+		{"trailing slash domain", "http://example.com/", "api/test", "", "http://example.com/api/test"},
+		{"leading slash path", "http://example.com", "/api/test", "", "http://example.com/api/test"},
+		{"both slashes", "http://example.com/", "/api/test", "", "http://example.com/api/test"},
+		{"no slashes", "http://example.com", "api/test", "", "http://example.com/api/test"},
+		{"query with ?", "http://example.com", "api/test", "?page=1", "http://example.com/api/test?page=1"},
+		{"query without ?", "http://example.com", "api/test", "page=1", "http://example.com/api/test?page=1"},
+		{"empty query", "http://example.com", "api/test", "", "http://example.com/api/test"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := handlers.BuildRequestURL(tt.domain, tt.path, tt.query)
+			assert.Equal(t, got, tt.want)
+		})
+	}
+}
+
+func TestInitHTTPClientMetricsNoPanic(t *testing.T) {
+	// Calling InitHTTPClientMetrics multiple times should not panic
+	libTracing.InitHTTPClientMetrics()
+	libTracing.InitHTTPClientMetrics()
+	libTracing.InitHTTPClientMetrics()
+}
+
+// fakeMetricsRecorder captures Record calls for test verification.
+type fakeMetricsRecorder struct {
+	calls []fakeMetricsCall
+}
+
+type fakeMetricsCall struct {
+	api        string
+	method     string
+	statusCode int
+	duration   time.Duration
+	outcome    string
+}
+
+func (r *fakeMetricsRecorder) Record(api, method string, statusCode int, duration time.Duration, outcome string) {
+	r.calls = append(r.calls, fakeMetricsCall{api, method, statusCode, duration, outcome})
+}
+
+// fakeTransactionLogger captures LogTransaction calls for test verification.
+type fakeTransactionLogger struct {
+	calls []webFramework.TransactionInfo
+}
+
+func (l *fakeTransactionLogger) LogTransaction(info webFramework.TransactionInfo) {
+	l.calls = append(l.calls, info)
 }

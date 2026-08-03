@@ -1,15 +1,25 @@
 package libTracing
 
 import (
+	"sync"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 )
 
+// HTTPClientMetricsRecorder is the interface for recording outbound HTTP client call metrics.
+// Inject a custom implementation for testing; use the default Prometheus-backed recorder in production.
+type HTTPClientMetricsRecorder interface {
+	Record(api, method string, statusCode int, duration time.Duration, outcome string)
+}
+
 var (
 	httpClientCallsTotal   *prometheus.CounterVec
 	httpClientCallDuration *prometheus.HistogramVec
 	metricsInitialized     bool
+	initOnce               sync.Once
+
+	defaultRecorder HTTPClientMetricsRecorder
 )
 
 func init() {
@@ -17,28 +27,49 @@ func init() {
 }
 
 // InitHTTPClientMetrics registers Prometheus metrics for outbound HTTP client calls.
-// Safe to call multiple times; uses MustRegister via a dedicated registry check.
+// Safe to call multiple times; uses sync.Once to prevent duplicate-registration panics.
 func InitHTTPClientMetrics() {
-	httpClientCallsTotal = prometheus.NewCounterVec(
-		prometheus.CounterOpts{
-			Name: "http_client_calls_total",
-			Help: "Total number of outbound HTTP client calls by API, method, and status class.",
-		},
-		[]string{"api", "method", "status_class"},
-	)
+	initOnce.Do(func() {
+		httpClientCallsTotal = prometheus.NewCounterVec(
+			prometheus.CounterOpts{
+				Name: "http_client_calls_total",
+				Help: "Total number of outbound HTTP client calls by API, method, status class, and outcome.",
+			},
+			[]string{"api", "method", "status_class", "outcome"},
+		)
 
-	httpClientCallDuration = prometheus.NewHistogramVec(
-		prometheus.HistogramOpts{
-			Name:    "http_client_call_duration_seconds",
-			Help:    "Latency of outbound HTTP client calls by API and method.",
-			Buckets: prometheus.DefBuckets,
-		},
-		[]string{"api", "method"},
-	)
+		httpClientCallDuration = prometheus.NewHistogramVec(
+			prometheus.HistogramOpts{
+				Name:    "http_client_call_duration_seconds",
+				Help:    "Latency of outbound HTTP client calls by API and method.",
+				Buckets: prometheus.DefBuckets,
+			},
+			[]string{"api", "method"},
+		)
 
-	prometheus.MustRegister(httpClientCallsTotal)
-	prometheus.MustRegister(httpClientCallDuration)
-	metricsInitialized = true
+		prometheus.MustRegister(httpClientCallsTotal)
+		prometheus.MustRegister(httpClientCallDuration)
+		metricsInitialized = true
+		defaultRecorder = &prometheusRecorder{}
+	})
+}
+
+// prometheusRecorder is the default HTTPClientMetricsRecorder backed by Prometheus.
+type prometheusRecorder struct{}
+
+func (r *prometheusRecorder) Record(api, method string, statusCode int, duration time.Duration, outcome string) {
+	if !metricsInitialized || httpClientCallsTotal == nil || httpClientCallDuration == nil {
+		return
+	}
+	sc := statusClass(statusCode)
+	httpClientCallsTotal.WithLabelValues(api, method, sc, outcome).Inc()
+	httpClientCallDuration.WithLabelValues(api, method).Observe(duration.Seconds())
+}
+
+// DefaultHTTPClientMetricsRecorder returns the default Prometheus-backed recorder.
+func DefaultHTTPClientMetricsRecorder() HTTPClientMetricsRecorder {
+	InitHTTPClientMetrics()
+	return defaultRecorder
 }
 
 func statusClass(statusCode int) string {
@@ -57,18 +88,18 @@ func statusClass(statusCode int) string {
 }
 
 // RecordHTTPClientCall records metrics for an outbound HTTP client call.
-// If metrics are not initialized or statusCode is 0 (request failed before
-// getting a response), it records with status_class "error".
+// This is a backward-compatible wrapper that derives outcome from err.
+// Use RecordHTTPClientCallWithOutcome for explicit outcome control (e.g. "timeout").
 func RecordHTTPClientCall(apiName, method string, statusCode int, duration time.Duration, err error) {
-	if !metricsInitialized || httpClientCallsTotal == nil || httpClientCallDuration == nil {
-		return
+	outcome := "success"
+	if err != nil {
+		outcome = "failure"
 	}
+	RecordHTTPClientCallWithOutcome(apiName, method, statusCode, duration, err, outcome)
+}
 
-	sc := statusClass(statusCode)
-	if err != nil && statusCode == 0 {
-		sc = "error"
-	}
-
-	httpClientCallsTotal.WithLabelValues(apiName, method, sc).Inc()
-	httpClientCallDuration.WithLabelValues(apiName, method).Observe(duration.Seconds())
+// RecordHTTPClientCallWithOutcome records metrics with an explicit outcome label
+// (success, failure, timeout) in addition to the HTTP status class.
+func RecordHTTPClientCallWithOutcome(apiName, method string, statusCode int, duration time.Duration, err error, outcome string) {
+	DefaultHTTPClientMetricsRecorder().Record(apiName, method, statusCode, duration, outcome)
 }

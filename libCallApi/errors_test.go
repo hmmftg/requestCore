@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strings"
 	"testing"
 
 	"github.com/hmmftg/requestCore/libCallApi"
@@ -129,4 +130,19 @@ func TestStatusPreservingBuilder403(t *testing.T) {
 	assert.Assert(t, errors.As(err, &rce), "err should be a RemoteCallError")
 	assert.Equal(t, rce.Status, 403)
 	assert.DeepEqual(t, rce.Body, []byte(`{"error":"forbidden"}`))
+}
+
+func TestStatusPreservingBuilderMalformed2xx(t *testing.T) {
+	resp, err := libCallApi.StatusPreservingBuilder[map[string]any](
+		200,
+		[]byte(`{invalid json`),
+		nil,
+	)
+	assert.Assert(t, resp == nil, "resp should be nil on parse error")
+	assert.Assert(t, err != nil, "err should be non-nil on parse error")
+
+	var rce *libCallApi.RemoteCallError
+	assert.Assert(t, !errors.As(err, &rce), "err should NOT be a RemoteCallError for malformed 2xx JSON")
+
+	assert.Assert(t, strings.Contains(err.Error(), "parse response"), "error should contain 'parse response', got: %s", err.Error())
 }
