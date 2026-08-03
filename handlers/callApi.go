@@ -5,11 +5,13 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/hmmftg/requestCore"
 	"github.com/hmmftg/requestCore/libCallApi"
 	"github.com/hmmftg/requestCore/libError"
+	"github.com/hmmftg/requestCore/libRetry"
 	"github.com/hmmftg/requestCore/libTracing"
 	"github.com/hmmftg/requestCore/response"
 	"github.com/hmmftg/requestCore/webFramework"
@@ -166,10 +168,22 @@ func CallApiNoLog[Resp any](
 // New code should use webFramework.TransactionInfo directly.
 type ApiCallInfo = webFramework.TransactionInfo
 
+// CallApiLogKeys holds configurable log key templates for AddLog entries.
+// When a field is empty, the corresponding default is used.
+type CallApiLogKeys struct {
+	Request  string // default: <Method>
+	Response string // default: <Method>-resp
+	Failure  string // default: <Method>-error
+}
+
 // CallApiOptions holds optional parameters for CallApiJSONWithOpts.
 type CallApiOptions struct {
 	Method  string        // log key, e.g. "soha-authorize"
 	Timeout time.Duration // server-side elapsed-time guard (0 = no guard)
+
+	// LogKeys, when set, overrides the default AddLog key templates.
+	// Empty fields fall back to the defaults.
+	LogKeys CallApiLogKeys
 
 	// MetricsRecorder, if set, records Prometheus-style metrics for the call.
 	// If nil, the default global Prometheus recorder is used.
@@ -180,6 +194,17 @@ type CallApiOptions struct {
 	// application layer can record it in its own transaction logger, metrics,
 	// or any other observability system. nil = no callback.
 	OnComplete func(webFramework.TransactionInfo)
+
+	// NormalizeError, when set, is applied to the returned error after
+	// raw observability (AddLog, metrics, transaction logging, OnComplete)
+	// has been recorded. This preserves raw Splunk logs while allowing
+	// callers to normalize the error returned to their consumers.
+	NormalizeError func(error) error
+
+	// RetryPolicy, when set, enables retry behavior. The single-attempt
+	// logic is reused for each attempt with full observability per attempt.
+	// nil = no retries (single attempt, existing behavior).
+	RetryPolicy *libRetry.RetryPolicy
 }
 
 // CallApiJSONWithOpts is an enhanced version of CallApiJSON that adds:
@@ -188,6 +213,9 @@ type CallApiOptions struct {
 //   - HTTP status code preservation via RemoteCallError (independently of the caller's builder)
 //   - Framework-level transaction logging via webFramework.TransactionLogger
 //   - An optional OnComplete callback for application-layer extension hooks
+//   - Optional error normalization via NormalizeError
+//   - Optional retry via RetryPolicy
+//   - Configurable log keys via LogKeys
 //
 // webFramework.AddLog is called on every code path (request, error, response)
 // and is never skipped or conditionally bypassed. Transaction logging runs
@@ -200,12 +228,63 @@ func CallApiJSONWithOpts[Req any, Resp any](
 	param *libCallApi.RemoteCallParamData[Req, Resp],
 	opts CallApiOptions,
 ) (Resp, error) {
-	webFramework.AddLog(w, CallApiLogEntry, slog.Any(opts.Method, param))
-
 	param.BodyType = libCallApi.JSON
 	if param.Parser == nil {
 		param.Parser = w.Parser
 	}
+
+	// Resolve log keys
+	reqKey, respKey, failKey := resolveLogKeys(opts)
+
+	// Resolve QueryStack once before retry loop to pin the effective query
+	if param.QueryStack != nil && len(*param.QueryStack) > 0 {
+		param.Query = (*param.QueryStack)[0]
+		param.QueryStack = nil
+	}
+
+	// If no retry policy, execute a single attempt directly
+	if opts.RetryPolicy == nil {
+		resp, err, _ := executeSingleAttempt(w, param, opts, reqKey, respKey, failKey)
+		return finalizeResult(resp, err, opts)
+	}
+
+	// Retry path: use libRetry.WithRetry
+	originalBuilder := param.Builder
+	if originalBuilder == nil {
+		originalBuilder = libCallApi.StatusPreservingBuilder[Resp]
+	}
+
+	retryResult := libRetry.WithRetry(opts.RetryPolicy, func(attempt int) (*Resp, error, int) {
+		attemptReqKey := formatRetryKey(reqKey, attempt)
+		attemptRespKey := formatRetryKey(respKey, attempt)
+		attemptFailKey := formatRetryKey(failKey, attempt)
+
+		// Clone mutable parts for this attempt
+		attemptParam := *param
+		if param.Headers != nil {
+			attemptParam.Headers = make(map[string]string, len(param.Headers))
+			for k, v := range param.Headers {
+				attemptParam.Headers[k] = v
+			}
+		}
+		attemptParam.Builder = originalBuilder
+
+		return executeSingleAttempt(w, &attemptParam, opts, attemptReqKey, attemptRespKey, attemptFailKey)
+	})
+
+	return finalizeResult(retryResult.Response, retryResult.Error, opts)
+}
+
+// executeSingleAttempt runs one attempt of the remote call with full
+// observability (AddLog, metrics, transaction logging, OnComplete).
+// Returns the response, error, and HTTP status code.
+func executeSingleAttempt[Req any, Resp any](
+	w webFramework.WebFramework,
+	param *libCallApi.RemoteCallParamData[Req, Resp],
+	opts CallApiOptions,
+	reqKey, respKey, failKey string,
+) (*Resp, error, int) {
+	webFramework.AddLog(w, CallApiLogEntry, slog.Any(reqKey, param))
 
 	// Wrap the builder in a closure to:
 	// 1. Capture the actual HTTP status code (RemoteCall does not expose it).
@@ -241,29 +320,71 @@ func CallApiJSONWithOpts[Req any, Resp any](
 	}
 
 	if err != nil {
-		webFramework.AddLog(w, CallApiLogEntry, slog.Any(fmt.Sprintf("%s-error", opts.Method), err))
+		webFramework.AddLog(w, CallApiLogEntry, slog.Any(failKey, err))
 		recorder.Record(param.Api.Name, param.Method, statusCode, elapsed, "failure")
 		logTransactionAndCallback(w, opts, param, resp, err, statusCode, elapsed, requestURL)
-		return *new(Resp), err
+		return nil, err, statusCode
 	}
 
-	webFramework.AddLog(w, CallApiLogEntry, slog.Any(fmt.Sprintf("%s-resp", opts.Method), resp))
+	webFramework.AddLog(w, CallApiLogEntry, slog.Any(respKey, resp))
 
 	if opts.Timeout > 0 && elapsed >= opts.Timeout {
-		timeoutErr := fmt.Errorf("%s: elapsed %s exceeds timeout %s: %w",
-			param.Api.Domain, elapsed, opts.Timeout, errTimeout)
-		webFramework.AddLog(w, CallApiLogEntry, slog.Any(fmt.Sprintf("%s-error", opts.Method), timeoutErr))
+		timeoutErr := BuildTimeoutError(param.Api.Domain)
+		webFramework.AddLog(w, CallApiLogEntry, slog.Any(failKey, timeoutErr))
 		recorder.Record(param.Api.Name, param.Method, statusCode, elapsed, "timeout")
 		logTransactionAndCallback(w, opts, param, resp, timeoutErr, statusCode, elapsed, requestURL)
-		return *new(Resp), timeoutErr
+		return nil, timeoutErr, statusCode
 	}
 
 	recorder.Record(param.Api.Name, param.Method, statusCode, elapsed, "success")
 	logTransactionAndCallback(w, opts, param, resp, err, statusCode, elapsed, requestURL)
-	return *resp, nil
+	return resp, nil, statusCode
 }
 
-var errTimeout = errors.New("server-side timeout exceeded")
+// resolveLogKeys returns the request, response, and failure log keys,
+// falling back to defaults for empty configured values.
+func resolveLogKeys(opts CallApiOptions) (string, string, string) {
+	reqKey := opts.LogKeys.Request
+	if reqKey == "" {
+		reqKey = opts.Method
+	}
+	respKey := opts.LogKeys.Response
+	if respKey == "" {
+		respKey = opts.Method + "-resp"
+	}
+	failKey := opts.LogKeys.Failure
+	if failKey == "" {
+		failKey = opts.Method + "-error"
+	}
+	return reqKey, respKey, failKey
+}
+
+// finalizeResult applies NormalizeError if set and returns the final result.
+func finalizeResult[Resp any](resp *Resp, err error, opts CallApiOptions) (Resp, error) {
+	if err != nil && opts.NormalizeError != nil {
+		err = opts.NormalizeError(err)
+	}
+	if resp != nil {
+		return *resp, err
+	}
+	return *new(Resp), err
+}
+
+// formatRetryKey inserts the retry marker before known suffixes (-resp, -error)
+// or appends it for base keys. e.g. "svc-call" → "svc-call-retry-1",
+// "svc-call-resp" → "svc-call-retry-1-resp", "svc-call-error" → "svc-call-retry-1-error".
+func formatRetryKey(key string, attempt int) string {
+	if attempt <= 1 {
+		return key
+	}
+	retryMarker := fmt.Sprintf("-retry-%d", attempt-1)
+	for _, suffix := range []string{"-resp", "-error"} {
+		if strings.HasSuffix(key, suffix) {
+			return strings.TrimSuffix(key, suffix) + retryMarker + suffix
+		}
+	}
+	return key + retryMarker
+}
 
 // resolveStatusCode returns the actual HTTP status code captured by the builder
 // closure. On error, it prefers the RemoteCallError's status if available.

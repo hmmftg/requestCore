@@ -5,13 +5,16 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"net/http/httptest"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/hmmftg/requestCore/handlers"
 	"github.com/hmmftg/requestCore/libCallApi"
 	"github.com/hmmftg/requestCore/libContext"
+	"github.com/hmmftg/requestCore/libRetry"
 	"github.com/hmmftg/requestCore/libTracing"
 	"github.com/hmmftg/requestCore/webFramework"
 	"gotest.tools/v3/assert"
@@ -623,4 +626,330 @@ type fakeTransactionLogger struct {
 
 func (l *fakeTransactionLogger) LogTransaction(info webFramework.TransactionInfo) {
 	l.calls = append(l.calls, info)
+}
+
+func TestCallApiJSONWithOpts_ConfigurableLogKeys(t *testing.T) {
+	_, param := setupOptsTest(t)
+	w := libContext.InitContextNoAuditTrail(t)
+
+	_, err := handlers.CallApiJSONWithOpts(
+		w, nil, param,
+		handlers.CallApiOptions{
+			Method: "test-default",
+			LogKeys: handlers.CallApiLogKeys{
+				Request:  "svc-test-req",
+				Response: "svc-test-resp",
+				Failure:  "svc-test-fail",
+			},
+		},
+	)
+
+	assert.NilError(t, err)
+	logs := w.Parser.GetLocal("LOG_ARRAY_ApiCall")
+	assert.Assert(t, logs != nil, "AddLog entries should exist")
+	logArr, ok := logs.([]slog.Attr)
+	assert.Assert(t, ok, "logs should be []slog.Attr")
+	assert.Equal(t, len(logArr), 2, "success path should have 2 log entries (req + resp)")
+	assert.Equal(t, logArr[0].Key, "svc-test-req")
+	assert.Equal(t, logArr[1].Key, "svc-test-resp")
+}
+
+func TestCallApiJSONWithOpts_ConfigurableLogKeysFailure(t *testing.T) {
+	_, param := setupOptsTest(t)
+	param.Path = "forbidden"
+	w := libContext.InitContextNoAuditTrail(t)
+
+	_, err := handlers.CallApiJSONWithOpts(
+		w, nil, param,
+		handlers.CallApiOptions{
+			Method: "test-fail",
+			LogKeys: handlers.CallApiLogKeys{
+				Request:  "svc-test-req",
+				Response: "svc-test-resp",
+				Failure:  "svc-test-fail",
+			},
+		},
+	)
+
+	assert.Assert(t, err != nil)
+	logs := w.Parser.GetLocal("LOG_ARRAY_ApiCall")
+	logArr, ok := logs.([]slog.Attr)
+	assert.Assert(t, ok)
+	assert.Equal(t, len(logArr), 2, "failure path should have 2 log entries (req + fail)")
+	assert.Equal(t, logArr[0].Key, "svc-test-req")
+	assert.Equal(t, logArr[1].Key, "svc-test-fail")
+}
+
+func TestCallApiJSONWithOpts_ConfigurableLogKeysEmptyFallback(t *testing.T) {
+	_, param := setupOptsTest(t)
+	w := libContext.InitContextNoAuditTrail(t)
+
+	_, err := handlers.CallApiJSONWithOpts(
+		w, nil, param,
+		handlers.CallApiOptions{
+			Method: "test-fallback",
+			LogKeys: handlers.CallApiLogKeys{
+				Request: "",
+			},
+		},
+	)
+
+	assert.NilError(t, err)
+	logs := w.Parser.GetLocal("LOG_ARRAY_ApiCall")
+	logArr, ok := logs.([]slog.Attr)
+	assert.Assert(t, ok)
+	assert.Equal(t, logArr[0].Key, "test-fallback", "empty Request key should fall back to Method")
+	assert.Equal(t, logArr[1].Key, "test-fallback-resp", "empty Response key should fall back to default")
+}
+
+func TestCallApiJSONWithOpts_NormalizeErrorOptIn(t *testing.T) {
+	_, param := setupOptsTest(t)
+	param.Path = "forbidden"
+	w := libContext.InitContextNoAuditTrail(t)
+
+	recorder := &fakeMetricsRecorder{}
+	logger := &fakeTransactionLogger{}
+	w.Parser.SetLocal(webFramework.TransactionLoggerLocalKey, logger)
+
+	_, err := handlers.CallApiJSONWithOpts(
+		w, nil, param,
+		handlers.CallApiOptions{
+			Method:          "test-normalize",
+			MetricsRecorder: recorder,
+			NormalizeError:  handlers.NormalizeCallError,
+		},
+	)
+
+	assert.Assert(t, err != nil)
+	var rce *libCallApi.RemoteCallError
+	assert.Assert(t, !errors.As(err, &rce), "normalized error should not be RemoteCallError")
+
+	assert.Equal(t, len(recorder.calls), 1)
+	assert.Equal(t, recorder.calls[0].statusCode, http.StatusForbidden)
+	assert.Equal(t, recorder.calls[0].outcome, "failure")
+	assert.Equal(t, logger.calls[0].StatusCode, http.StatusForbidden)
+
+	var origRCE *libCallApi.RemoteCallError
+	assert.Assert(t, errors.As(logger.calls[0].Error, &origRCE),
+		"transaction logger should retain original RemoteCallError")
+}
+
+func TestCallApiJSONWithOpts_NormalizeErrorDefault(t *testing.T) {
+	_, param := setupOptsTest(t)
+	param.Path = "forbidden"
+	w := libContext.InitContextNoAuditTrail(t)
+
+	_, err := handlers.CallApiJSONWithOpts(
+		w, nil, param,
+		handlers.CallApiOptions{
+			Method: "test-no-normalize",
+		},
+	)
+
+	assert.Assert(t, err != nil)
+	var rce *libCallApi.RemoteCallError
+	assert.Assert(t, errors.As(err, &rce), "default error should be RemoteCallError")
+	assert.Equal(t, rce.Status, http.StatusForbidden)
+}
+
+func TestCallApiJSONWithOpts_RetrySuccessOnSecondAttempt(t *testing.T) {
+	setupOptsTest(t) // for env setup
+	w := libContext.InitContextNoAuditTrail(t)
+
+	var serverAttempts int32
+	mux := http.NewServeMux()
+	mux.HandleFunc("/api/test1", func(w http.ResponseWriter, r *http.Request) {
+		n := atomic.AddInt32(&serverAttempts, 1)
+		if n == 1 {
+			w.WriteHeader(http.StatusServiceUnavailable)
+			w.Write([]byte(`{"error":"unavailable"}`))
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`{"status":"success","data":[],"count":0}`))
+	})
+	srv := httptest.NewServer(mux)
+	t.Cleanup(srv.Close)
+
+	param := &libCallApi.RemoteCallParamData[any, optsTestResponse]{
+		Api:    libCallApi.RemoteApi{Domain: srv.URL + "/api"},
+		Method: "GET",
+		Path:   "test1",
+	}
+
+	recorder := &fakeMetricsRecorder{}
+	_, err := handlers.CallApiJSONWithOpts(
+		w, nil, param,
+		handlers.CallApiOptions{
+			Method:          "test-retry",
+			MetricsRecorder: recorder,
+			RetryPolicy: &libRetry.RetryPolicy{
+				MaxRetries:    1,
+				RetryOnStatus: map[int]bool{http.StatusServiceUnavailable: true},
+				Backoff:       0,
+			},
+		},
+	)
+
+	assert.NilError(t, err, "should succeed on second attempt")
+	assert.Equal(t, atomic.LoadInt32(&serverAttempts), int32(2), "server should be called twice")
+	assert.Equal(t, len(recorder.calls), 2, "should record metrics for both attempts")
+	assert.Equal(t, recorder.calls[0].outcome, "failure")
+	assert.Equal(t, recorder.calls[0].statusCode, http.StatusServiceUnavailable)
+	assert.Equal(t, recorder.calls[1].outcome, "success")
+	assert.Equal(t, recorder.calls[1].statusCode, http.StatusOK)
+}
+
+func TestCallApiJSONWithOpts_RetryLogKeysPerAttempt(t *testing.T) {
+	setupOptsTest(t)
+	w := libContext.InitContextNoAuditTrail(t)
+
+	var serverAttempts int32
+	mux := http.NewServeMux()
+	mux.HandleFunc("/api/test1", func(w http.ResponseWriter, r *http.Request) {
+		n := atomic.AddInt32(&serverAttempts, 1)
+		if n == 1 {
+			w.WriteHeader(http.StatusServiceUnavailable)
+			w.Write([]byte(`{"error":"unavailable"}`))
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`{"status":"success","data":[],"count":0}`))
+	})
+	srv := httptest.NewServer(mux)
+	t.Cleanup(srv.Close)
+
+	param := &libCallApi.RemoteCallParamData[any, optsTestResponse]{
+		Api:    libCallApi.RemoteApi{Domain: srv.URL + "/api"},
+		Method: "GET",
+		Path:   "test1",
+	}
+
+	_, err := handlers.CallApiJSONWithOpts(
+		w, nil, param,
+		handlers.CallApiOptions{
+			Method: "svc-call",
+			RetryPolicy: &libRetry.RetryPolicy{
+				MaxRetries:    1,
+				RetryOnStatus: map[int]bool{http.StatusServiceUnavailable: true},
+				Backoff:       0,
+			},
+		},
+	)
+
+	assert.NilError(t, err)
+	logs := w.Parser.GetLocal("LOG_ARRAY_ApiCall")
+	logArr, ok := logs.([]slog.Attr)
+	assert.Assert(t, ok)
+	// Attempt 1: req + fail = 2 entries
+	// Attempt 2: req-retry-1 + resp-retry-1 = 2 entries
+	assert.Equal(t, len(logArr), 4, "should have 4 log entries across 2 attempts")
+	assert.Equal(t, logArr[0].Key, "svc-call")
+	assert.Equal(t, logArr[1].Key, "svc-call-error")
+	assert.Equal(t, logArr[2].Key, "svc-call-retry-1")
+	assert.Equal(t, logArr[3].Key, "svc-call-retry-1-resp")
+}
+
+func TestCallApiJSONWithOpts_RetryExhausted(t *testing.T) {
+	setupOptsTest(t)
+	w := libContext.InitContextNoAuditTrail(t)
+
+	var serverAttempts int32
+	mux := http.NewServeMux()
+	mux.HandleFunc("/api/test1", func(w http.ResponseWriter, r *http.Request) {
+		atomic.AddInt32(&serverAttempts, 1)
+		w.WriteHeader(http.StatusServiceUnavailable)
+		w.Write([]byte(`{"error":"unavailable"}`))
+	})
+	srv := httptest.NewServer(mux)
+	t.Cleanup(srv.Close)
+
+	param := &libCallApi.RemoteCallParamData[any, optsTestResponse]{
+		Api:    libCallApi.RemoteApi{Domain: srv.URL + "/api"},
+		Method: "GET",
+		Path:   "test1",
+	}
+
+	_, err := handlers.CallApiJSONWithOpts(
+		w, nil, param,
+		handlers.CallApiOptions{
+			Method: "svc-call",
+			RetryPolicy: &libRetry.RetryPolicy{
+				MaxRetries:    2,
+				RetryOnStatus: map[int]bool{http.StatusServiceUnavailable: true},
+				Backoff:       0,
+			},
+		},
+	)
+
+	assert.Assert(t, err != nil)
+	assert.Equal(t, atomic.LoadInt32(&serverAttempts), int32(3), "server should be called 3 times")
+}
+
+func TestCallApiJSONWithOpts_RetryQueryStackPinned(t *testing.T) {
+	setupOptsTest(t)
+	w := libContext.InitContextNoAuditTrail(t)
+
+	var capturedQueries []string
+	var serverAttempts int32
+	mux := http.NewServeMux()
+	mux.HandleFunc("/api/test1", func(w http.ResponseWriter, r *http.Request) {
+		atomic.AddInt32(&serverAttempts, 1)
+		capturedQueries = append(capturedQueries, r.URL.RawQuery)
+		if atomic.LoadInt32(&serverAttempts) == 1 {
+			w.WriteHeader(http.StatusServiceUnavailable)
+			w.Write([]byte(`{"error":"unavailable"}`))
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`{"status":"success","data":[],"count":0}`))
+	})
+	srv := httptest.NewServer(mux)
+	t.Cleanup(srv.Close)
+
+	param := &libCallApi.RemoteCallParamData[any, optsTestResponse]{
+		Api:        libCallApi.RemoteApi{Domain: srv.URL + "/api"},
+		Method:     "GET",
+		Path:       "test1",
+		QueryStack: &[]string{"?page=2&limit=5"},
+	}
+
+	_, err := handlers.CallApiJSONWithOpts(
+		w, nil, param,
+		handlers.CallApiOptions{
+			Method: "svc-call",
+			RetryPolicy: &libRetry.RetryPolicy{
+				MaxRetries:    1,
+				RetryOnStatus: map[int]bool{http.StatusServiceUnavailable: true},
+				Backoff:       0,
+			},
+		},
+	)
+
+	assert.NilError(t, err)
+	assert.Equal(t, len(capturedQueries), 2)
+	assert.Equal(t, capturedQueries[0], "page=2&limit=5", "first attempt should use pinned query")
+	assert.Equal(t, capturedQueries[1], "page=2&limit=5", "second attempt should use same pinned query")
+}
+
+func TestCallApiJSONWithOpts_TimeoutErrorErrorsIs(t *testing.T) {
+	fakeServer, param := setupOptsTest(t)
+	param.Path = "slow"
+	param.Api.Domain = fakeServer.URL() + "/api"
+	w := libContext.InitContextNoAuditTrail(t)
+
+	_, err := handlers.CallApiJSONWithOpts(
+		w, nil, param,
+		handlers.CallApiOptions{
+			Method:  "test-timeout",
+			Timeout: 10 * time.Millisecond,
+		},
+	)
+
+	assert.Assert(t, err != nil)
+	assert.Assert(t, errors.Is(err, handlers.ErrServerTimeout),
+		"timeout error should match ErrServerTimeout sentinel")
 }
