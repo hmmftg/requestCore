@@ -21,7 +21,7 @@ type testResp struct {
 	errCode    int
 }
 
-func (r *testResp) GetStatus() int   { return r.statusCode }
+func (r *testResp) GetStatus() int    { return r.statusCode }
 func (r *testResp) GetErrorCode() int { return r.errCode }
 
 func TestWithRetry_ImmediateSuccess(t *testing.T) {
@@ -42,9 +42,9 @@ func TestWithRetry_ImmediateSuccess(t *testing.T) {
 func TestWithRetry_TimeoutThenSuccess(t *testing.T) {
 	var calls atomic.Int32
 	policy := &libRetry.RetryPolicy{
-		MaxRetries:      2,
-		RetryOnTimeout:  true,
-		Backoff:         0,
+		MaxRetries:     2,
+		RetryOnTimeout: true,
+		Backoff:        0,
 	}
 
 	result := libRetry.WithRetry(policy, func(attempt int) (*testResp, error, int) {
@@ -83,8 +83,8 @@ func TestWithRetry_ExhaustedTimeout(t *testing.T) {
 func TestWithRetry_RetryableStatus(t *testing.T) {
 	var calls atomic.Int32
 	policy := &libRetry.RetryPolicy{
-		MaxRetries:     2,
-		RetryOnStatus:  map[int]bool{503: true},
+		MaxRetries:    2,
+		RetryOnStatus: map[int]bool{503: true},
 	}
 
 	result := libRetry.WithRetry(policy, func(attempt int) (*testResp, error, int) {
@@ -120,7 +120,7 @@ func TestWithRetry_NonRetryableStatus(t *testing.T) {
 func TestWithRetry_RetryableErrorCode(t *testing.T) {
 	var calls atomic.Int32
 	policy := &libRetry.RetryPolicy{
-		MaxRetries:       2,
+		MaxRetries:        2,
 		RetryOnErrorCodes: map[int]bool{5001: true},
 	}
 
