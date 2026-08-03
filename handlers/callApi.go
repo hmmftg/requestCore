@@ -5,10 +5,12 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"time"
 
 	"github.com/hmmftg/requestCore"
 	"github.com/hmmftg/requestCore/libCallApi"
 	"github.com/hmmftg/requestCore/libError"
+	"github.com/hmmftg/requestCore/libTracing"
 	"github.com/hmmftg/requestCore/response"
 	"github.com/hmmftg/requestCore/webFramework"
 )
@@ -158,4 +160,172 @@ func CallApiNoLog[Resp any](
 		return nil, err
 	}
 	return &result.Result, err
+}
+
+// ApiCallInfo is a compatibility alias for webFramework.TransactionInfo.
+// New code should use webFramework.TransactionInfo directly.
+type ApiCallInfo = webFramework.TransactionInfo
+
+// CallApiOptions holds optional parameters for CallApiJSONWithOpts.
+type CallApiOptions struct {
+	Method  string        // log key, e.g. "soha-authorize"
+	Timeout time.Duration // server-side elapsed-time guard (0 = no guard)
+
+	// MetricsRecorder, if set, records Prometheus-style metrics for the call.
+	// If nil, the default global Prometheus recorder is used.
+	MetricsRecorder libTracing.HTTPClientMetricsRecorder
+
+	// OnComplete is an optional callback invoked after the remote call
+	// finishes (success or failure). It receives the call metadata so the
+	// application layer can record it in its own transaction logger, metrics,
+	// or any other observability system. nil = no callback.
+	OnComplete func(webFramework.TransactionInfo)
+}
+
+// CallApiJSONWithOpts is an enhanced version of CallApiJSON that adds:
+//   - Prometheus metrics recording via libTracing.RecordHTTPClientCallWithOutcome
+//   - A server-side elapsed-time timeout guard (in addition to the HTTP client timeout)
+//   - HTTP status code preservation via RemoteCallError (independently of the caller's builder)
+//   - Framework-level transaction logging via webFramework.TransactionLogger
+//   - An optional OnComplete callback for application-layer extension hooks
+//
+// webFramework.AddLog is called on every code path (request, error, response)
+// and is never skipped or conditionally bypassed. Transaction logging runs
+// after AddLog and never replaces it.
+//
+// Custom headers: set param.Headers directly (e.g. param.Headers["SIGNATURE"] = "...").
+func CallApiJSONWithOpts[Req any, Resp any](
+	w webFramework.WebFramework,
+	core requestCore.RequestCoreInterface,
+	param *libCallApi.RemoteCallParamData[Req, Resp],
+	opts CallApiOptions,
+) (Resp, error) {
+	webFramework.AddLog(w, CallApiLogEntry, slog.Any(opts.Method, param))
+
+	param.BodyType = libCallApi.JSON
+	if param.Parser == nil {
+		param.Parser = w.Parser
+	}
+
+	// Wrap the builder in a closure to:
+	// 1. Capture the actual HTTP status code (RemoteCall does not expose it).
+	// 2. Intercept non-2xx responses and always return RemoteCallError,
+	//    regardless of the caller's custom builder. Custom builders are only
+	//    called for 2xx (successful) responses.
+	var actualStatus int
+	originalBuilder := param.Builder
+	if originalBuilder == nil {
+		originalBuilder = libCallApi.StatusPreservingBuilder[Resp]
+	}
+	param.Builder = func(stat int, rawResp []byte, headers map[string]string) (*Resp, error) {
+		actualStatus = stat
+		if stat < 200 || stat >= 300 {
+			return nil, &libCallApi.RemoteCallError{
+				Status: stat,
+				Body:   rawResp,
+				Err:    fmt.Errorf("HTTP %d", stat),
+			}
+		}
+		return originalBuilder(stat, rawResp, headers)
+	}
+
+	start := time.Now()
+	resp, err := libCallApi.RemoteCall(w, param)
+	elapsed := time.Since(start)
+
+	statusCode := resolveStatusCode(err, actualStatus)
+	requestURL := BuildRequestURL(param.Api.Domain, param.Path, param.Query)
+	recorder := opts.MetricsRecorder
+	if recorder == nil {
+		recorder = libTracing.DefaultHTTPClientMetricsRecorder()
+	}
+
+	if err != nil {
+		webFramework.AddLog(w, CallApiLogEntry, slog.Any(fmt.Sprintf("%s-error", opts.Method), err))
+		recorder.Record(param.Api.Name, param.Method, statusCode, elapsed, "failure")
+		logTransactionAndCallback(w, opts, param, resp, err, statusCode, elapsed, requestURL)
+		return *new(Resp), err
+	}
+
+	webFramework.AddLog(w, CallApiLogEntry, slog.Any(fmt.Sprintf("%s-resp", opts.Method), resp))
+
+	if opts.Timeout > 0 && elapsed >= opts.Timeout {
+		timeoutErr := fmt.Errorf("%s: elapsed %s exceeds timeout %s: %w",
+			param.Api.Domain, elapsed, opts.Timeout, errTimeout)
+		webFramework.AddLog(w, CallApiLogEntry, slog.Any(fmt.Sprintf("%s-error", opts.Method), timeoutErr))
+		recorder.Record(param.Api.Name, param.Method, statusCode, elapsed, "timeout")
+		logTransactionAndCallback(w, opts, param, resp, timeoutErr, statusCode, elapsed, requestURL)
+		return *new(Resp), timeoutErr
+	}
+
+	recorder.Record(param.Api.Name, param.Method, statusCode, elapsed, "success")
+	logTransactionAndCallback(w, opts, param, resp, err, statusCode, elapsed, requestURL)
+	return *resp, nil
+}
+
+var errTimeout = errors.New("server-side timeout exceeded")
+
+// resolveStatusCode returns the actual HTTP status code captured by the builder
+// closure. On error, it prefers the RemoteCallError's status if available.
+func resolveStatusCode(err error, actualStatus int) int {
+	var rce *libCallApi.RemoteCallError
+	if errors.As(err, &rce) {
+		return rce.Status
+	}
+	if actualStatus > 0 {
+		return actualStatus
+	}
+	return 0
+}
+
+// BuildRequestURL constructs the full request URL from domain, path, and query.
+// It mirrors the URL construction in libCallApi.PrepareCall, which builds the
+// request URL as Domain + "/" + Path + Query (direct concatenation).
+// Callers must ensure Query is either empty or begins with "?".
+func BuildRequestURL(domain, path, query string) string {
+	return domain + "/" + path + query
+}
+
+// logTransactionAndCallback resolves the TransactionLogger from the framework
+// context and invokes it, then invokes the OnComplete callback if set.
+// This runs after webFramework.AddLog on each path and never bypasses it.
+func logTransactionAndCallback[Req any, Resp any](
+	w webFramework.WebFramework,
+	opts CallApiOptions,
+	param *libCallApi.RemoteCallParamData[Req, Resp],
+	resp *Resp,
+	err error,
+	statusCode int,
+	elapsed time.Duration,
+	requestURL string,
+) {
+	var respAny any
+	if resp != nil {
+		respAny = *resp
+	}
+	var rawBody []byte
+	if err != nil {
+		var rce *libCallApi.RemoteCallError
+		if errors.As(err, &rce) {
+			rawBody = rce.Body
+		}
+	}
+	info := webFramework.TransactionInfo{
+		ServiceName:  param.Api.Name,
+		URL:          requestURL,
+		Endpoint:     param.Path,
+		Method:       param.Method,
+		StatusCode:   statusCode,
+		Duration:     elapsed,
+		Error:        err,
+		Request:      param.JsonBody,
+		Response:     respAny,
+		ResponseBody: rawBody,
+	}
+	if logger, ok := w.Parser.GetLocal(webFramework.TransactionLoggerLocalKey).(webFramework.TransactionLogger); ok && logger != nil {
+		logger.LogTransaction(info)
+	}
+	if opts.OnComplete != nil {
+		opts.OnComplete(info)
+	}
 }

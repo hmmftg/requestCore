@@ -22,6 +22,7 @@ require (
 	github.com/jinzhu/copier v0.4.0
 	github.com/lib/pq v1.10.9
 	github.com/pavlo-v-chernykh/keystore-go/v4 v4.5.0
+	github.com/prometheus/client_golang v1.18.0
 	github.com/samber/slog-fiber v1.18.0
 	github.com/samber/slog-formatter v1.2.0
 	github.com/samber/slog-gin v1.16.1
@@ -90,7 +91,6 @@ require (
 	github.com/openzipkin/zipkin-go v0.4.3 // indirect
 	github.com/pelletier/go-toml/v2 v2.2.4 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
-	github.com/prometheus/client_golang v1.18.0 // indirect
 	github.com/prometheus/client_model v0.5.0 // indirect
 	github.com/prometheus/common v0.45.0 // indirect
 	github.com/prometheus/procfs v0.12.0 // indirect
