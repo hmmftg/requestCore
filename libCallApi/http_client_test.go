@@ -32,7 +32,7 @@ func TestNewInstrumentedHTTPClient_Independent(t *testing.T) {
 func TestNewInstrumentedHTTPClient_MakesRequest(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{"status":"ok"}`))
+		_, _ = w.Write([]byte(`{"status":"ok"}`))
 	}))
 	t.Cleanup(srv.Close)
 
