@@ -9,12 +9,13 @@ import (
 
 // SplunkParams holds configuration for the Splunk logger.
 type SplunkParams struct {
-	URL        string `yaml:"url"`        // Splunk HEC endpoint (e.g., "https://<splunk-server>:8088/services/collector/event")
-	Token      string `yaml:"token"`      // HEC token
-	SourceType string `yaml:"source"`     // Splunk source type
-	Source     string `yaml:"sourceType"` // Splunk source
-	Index      string `yaml:"index"`      // Splunk index
-	RawHandler bool   `yaml:"rawHandler"`
+	URL           string `yaml:"url"`        // Splunk HEC endpoint (e.g., "https://<splunk-server>:8088/services/collector/event")
+	Token         string `yaml:"token"`      // HEC token
+	SourceType    string `yaml:"source"`     // Splunk source type
+	Source        string `yaml:"sourceType"` // Splunk source
+	Index         string `yaml:"index"`      // Splunk index
+	RawHandler    bool   `yaml:"rawHandler"`
+	SkipTLSVerify bool   `yaml:"skipTlsVerify"` // when true, skips TLS certificate verification (use only for internal collectors with self-signed certs)
 }
 
 // Logging related params

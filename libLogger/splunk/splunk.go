@@ -15,17 +15,30 @@ import (
 
 var httpClient = &http.Client{
 	Timeout: 2 * time.Second,
-	Transport: &http.Transport{
-		TLSClientConfig: &tls.Config{
-			InsecureSkipVerify: true,
-		},
-	},
 }
 
 // SplunkLogger is a logger that sends logs to Splunk.
 type SplunkLogger struct {
-	lock   *sync.Mutex
-	params *libParams.SplunkParams
+	lock       *sync.Mutex
+	params     *libParams.SplunkParams
+	httpClient *http.Client
+}
+
+// newHTTPClient builds an HTTP client whose TLS verification behavior
+// is controlled by params.SkipTLSVerify. When SkipTLSVerify is false the
+// default secure client (verifying certificates) is returned.
+func newHTTPClient(skipTLS bool) *http.Client {
+	if !skipTLS {
+		return httpClient
+	}
+	return &http.Client{
+		Timeout: 2 * time.Second,
+		Transport: &http.Transport{
+			TLSClientConfig: &tls.Config{
+				InsecureSkipVerify: true, // #nosec G402 -- opt-in via SplunkParams.SkipTLSVerify for internal collectors
+			},
+		},
+	}
 }
 
 // SplunkLog represents the structure of a log event sent to Splunk.
@@ -71,17 +84,17 @@ func (j SplunkLogger) write(p []byte) (n int, err error) {
 	req.Header.Set("Content-Type", "application/json")
 
 	// Send the request using a custom HTTP client with a timeout
-	resp, err := httpClient.Do(req)
+	resp, err := j.httpClient.Do(req)
 	if err != nil {
 		log.Printf("Failed to send Splunk request: %v", err)
 		return 0, err
 	}
-	defer resp.Body.Close() // Always close the response body
+	defer func() { _ = resp.Body.Close() }() // Always close the response body
 
 	// Check for non-200 status codes
 	if resp.StatusCode != http.StatusOK {
 		log.Printf("Splunk request failed with status: %v", resp.Status)
-		return 0, fmt.Errorf("Splunk request failed with status: %v", resp.Status)
+		return 0, fmt.Errorf("splunk request failed with status: %v", resp.Status)
 	}
 	return len(p), nil
 }
@@ -96,8 +109,9 @@ func (j SplunkLogger) Write(p []byte) (n int, err error) {
 // checkIfSplunkIsWorking tests the Splunk connection by sending a test log.
 func CheckIfSplunkIsWorking(params *libParams.SplunkParams) (*SplunkLogger, error) {
 	logger := SplunkLogger{
-		lock:   &sync.Mutex{},
-		params: params,
+		lock:       &sync.Mutex{},
+		params:     params,
+		httpClient: newHTTPClient(params.SkipTLSVerify),
 	}
 	_, err := logger.write([]byte("Startup"))
 	if err != nil {
