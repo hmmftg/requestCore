@@ -1,0 +1,41 @@
+version: "2"
+
+run:
+  timeout: 5m
+  go: "1.25"
+
+linters:
+  enable:
+    - errcheck
+    - gosimple
+    - govet
+    - ineffassign
+    - staticcheck
+    - unused
+    - gosec
+    - misspell
+    - revive
+  settings:
+    gosec:
+      excludes:
+        - G104
+
+formatters:
+  enable:
+    - gofmt
+    - goimports
+  settings:
+    goimports:
+      local-prefixes:
+        - github.com/hmmftg/requestCore
+
+issues:
+  exclude-rules:
+    - path: _test\.go
+      linters:
+        - gosec
+    - path: examples/
+      linters:
+        - gosec
+  max-issues-per-linter: 0
+  max-same-issues: 0
