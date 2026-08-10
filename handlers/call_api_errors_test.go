@@ -63,7 +63,7 @@ func TestNormalizeCallError_OtherLibError(t *testing.T) {
 }
 
 func TestBuildTimeoutError(t *testing.T) {
-	err := handlers.BuildTimeoutError("https://api.example.com")
+	err := handlers.BuildTimeoutError("https://api.example.com", 0)
 	assert.Assert(t, err != nil)
 
 	ok, libErr := libError.Unwrap(err)
@@ -76,7 +76,7 @@ func TestBuildTimeoutError(t *testing.T) {
 }
 
 func TestBuildTimeoutError_ErrorsIs(t *testing.T) {
-	err := handlers.BuildTimeoutError("https://api.example.com")
+	err := handlers.BuildTimeoutError("https://api.example.com", 0)
 	assert.Assert(t, errors.Is(err, handlers.ErrServerTimeout),
 		"errors.Is should detect ErrServerTimeout sentinel")
 }
@@ -85,4 +85,40 @@ func TestBuildTimeoutError_ErrorsIsNotRegularError(t *testing.T) {
 	regularErr := errors.New("some other error")
 	assert.Assert(t, !errors.Is(regularErr, handlers.ErrServerTimeout),
 		"regular errors should not match ErrServerTimeout")
+}
+
+func TestBuildTimeoutError_DefaultStatus(t *testing.T) {
+	err := handlers.BuildTimeoutError("https://api.example.com", 0)
+	assert.Assert(t, err != nil)
+
+	ok, libErr := libError.Unwrap(err)
+	assert.Assert(t, ok)
+	assert.Equal(t, int(libErr.Action().Status), http.StatusRequestTimeout)
+}
+
+func TestBuildTimeoutError_Status500(t *testing.T) {
+	err := handlers.BuildTimeoutError("https://api.example.com", http.StatusInternalServerError)
+	assert.Assert(t, err != nil)
+
+	ok, libErr := libError.Unwrap(err)
+	assert.Assert(t, ok)
+	assert.Equal(t, int(libErr.Action().Status), http.StatusInternalServerError)
+}
+
+func TestBuildTimeoutError_ErrorsIsAnyStatus(t *testing.T) {
+	err408 := handlers.BuildTimeoutError("https://api.example.com", 0)
+	err500 := handlers.BuildTimeoutError("https://api.example.com", http.StatusInternalServerError)
+	assert.Assert(t, errors.Is(err408, handlers.ErrServerTimeout), "408 variant should match sentinel")
+	assert.Assert(t, errors.Is(err500, handlers.ErrServerTimeout), "500 variant should match sentinel")
+}
+
+func TestBuildTimeoutError_DescriptionAlwaysConstant(t *testing.T) {
+	for _, code := range []int{0, http.StatusRequestTimeout, http.StatusInternalServerError, http.StatusBadGateway} {
+		err := handlers.BuildTimeoutError("https://api.example.com", code)
+		assert.Assert(t, err != nil)
+		ok, libErr := libError.Unwrap(err)
+		assert.Assert(t, ok)
+		assert.Equal(t, libErr.Action().Description, "API_CALL_TIME_OUT",
+			"description should be constant for status %d", code)
+	}
 }

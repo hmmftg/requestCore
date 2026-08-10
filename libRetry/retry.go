@@ -23,6 +23,19 @@ type ErrorCodeProvider interface {
 	GetErrorCode() int
 }
 
+// ErrorKeyProvider is an optional interface that response types can implement
+// to expose an application-level error key (string) for retry eligibility
+// checks. This complements ErrorCodeProvider (int-based) for APIs that use
+// string error keys (e.g. Galaxy's ExceptionDetail.Key field).
+//
+// It is evaluated only in shouldRetryResponse, which runs for nil-error
+// attempts — i.e., responses successfully decoded from HTTP 2xx. HTTP failure
+// retries (non-2xx → RemoteCallError) remain governed by shouldRetryError's
+// timeout/status predicates and do NOT consult ErrorKeyProvider.
+type ErrorKeyProvider interface {
+	GetErrorKey() string
+}
+
 // RetryPolicy configures the retry behavior for a sequence of attempts.
 type RetryPolicy struct {
 	// MaxRetries is the maximum number of retry attempts (0 = no retries,
@@ -38,6 +51,12 @@ type RetryPolicy struct {
 	// RetryOnErrorCodes is a set of application-level error codes (from
 	// ErrorCodeProvider) that should trigger a retry.
 	RetryOnErrorCodes map[int]bool
+
+	// RetryOnErrorKeys is a set of application-level error keys (strings from
+	// ErrorKeyProvider) that should trigger a retry. This complements
+	// RetryOnErrorCodes (int-based) for APIs that use string error keys
+	// (e.g. "SERVICE_UNAVAILABLE", "RATE_LIMITED").
+	RetryOnErrorKeys map[string]bool
 
 	// Backoff is the duration to wait between retry attempts.
 	// If zero, no delay is applied between attempts.
@@ -197,6 +216,14 @@ func shouldRetryResponse[Resp any](policy *RetryPolicy, resp *Resp, status int) 
 	if ecp, ok := any(resp).(ErrorCodeProvider); ok {
 		code := ecp.GetErrorCode()
 		if policy.RetryOnErrorCodes != nil && policy.RetryOnErrorCodes[code] {
+			return true
+		}
+	}
+
+	// Check response's ErrorKeyProvider interface
+	if ekp, ok := any(resp).(ErrorKeyProvider); ok {
+		key := ekp.GetErrorKey()
+		if policy.RetryOnErrorKeys != nil && policy.RetryOnErrorKeys[key] {
 			return true
 		}
 	}

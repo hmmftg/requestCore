@@ -18,9 +18,18 @@ var ErrServerTimeout = errors.New("server-side timeout exceeded")
 // BuildTimeoutError creates a standardized libError for server-side timeout
 // conditions. The domain is included for context. The returned error wraps
 // ErrServerTimeout so callers can use errors.Is to detect timeout errors.
-func BuildTimeoutError(domain string) error {
+//
+// statusCode selects the status stored in the returned libError. When zero,
+// it defaults to http.StatusRequestTimeout (408). Note: this status is the
+// application-level error status of the returned error only; it does not
+// override the observed remote HTTP status recorded in metrics or
+// TransactionInfo.StatusCode.
+func BuildTimeoutError(domain string, statusCode int) error {
+	if statusCode == 0 {
+		statusCode = http.StatusRequestTimeout
+	}
 	timeoutErr := libError.NewWithDescription(
-		status.StatusCode(http.StatusRequestTimeout),
+		status.StatusCode(statusCode),
 		"API_CALL_TIME_OUT",
 		"%s: elapsed time exceeds timeout: %s",
 		domain, ErrServerTimeout.Error(),

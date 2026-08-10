@@ -14,6 +14,7 @@ import (
 	"github.com/hmmftg/requestCore/handlers"
 	"github.com/hmmftg/requestCore/libCallApi"
 	"github.com/hmmftg/requestCore/libContext"
+	"github.com/hmmftg/requestCore/libError"
 	"github.com/hmmftg/requestCore/libRetry"
 	"github.com/hmmftg/requestCore/libTracing"
 	"github.com/hmmftg/requestCore/webFramework"
@@ -952,4 +953,496 @@ func TestCallApiJSONWithOpts_TimeoutErrorErrorsIs(t *testing.T) {
 	assert.Assert(t, err != nil)
 	assert.Assert(t, errors.Is(err, handlers.ErrServerTimeout),
 		"timeout error should match ErrServerTimeout sentinel")
+}
+
+func TestCallApiJSONWithOpts_RetryWithFailedSuffix(t *testing.T) {
+	setupOptsTest(t)
+	w := libContext.InitContextNoAuditTrail(t)
+
+	var serverAttempts int32
+	mux := http.NewServeMux()
+	mux.HandleFunc("/api/test1", func(w http.ResponseWriter, r *http.Request) {
+		n := atomic.AddInt32(&serverAttempts, 1)
+		if n == 1 {
+			w.WriteHeader(http.StatusServiceUnavailable)
+			w.Write([]byte(`{"error":"unavailable"}`))
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`{"status":"success","data":[],"count":0}`))
+	})
+	srv := httptest.NewServer(mux)
+	t.Cleanup(srv.Close)
+
+	param := &libCallApi.RemoteCallParamData[any, optsTestResponse]{
+		Api:    libCallApi.RemoteApi{Domain: srv.URL + "/api"},
+		Method: "GET",
+		Path:   "test1",
+	}
+
+	_, err := handlers.CallApiJSONWithOpts(
+		w, nil, param,
+		handlers.CallApiOptions{
+			Method: "svc-call",
+			LogKeys: handlers.CallApiLogKeys{
+				Request:  "svc-call-req",
+				Response: "svc-call-req-resp",
+				Failure:  "svc-call-req-failed",
+			},
+			RetryPolicy: &libRetry.RetryPolicy{
+				MaxRetries:    1,
+				RetryOnStatus: map[int]bool{http.StatusServiceUnavailable: true},
+				Backoff:       0,
+			},
+		},
+	)
+
+	assert.NilError(t, err)
+	logs := w.Parser.GetLocal("LOG_ARRAY_ApiCall")
+	logArr, ok := logs.([]slog.Attr)
+	assert.Assert(t, ok)
+	// Attempt 1: req + failed = 2 entries
+	// Attempt 2: req-retry-1 + resp-retry-1 = 2 entries
+	assert.Equal(t, len(logArr), 4, "should have 4 log entries across 2 attempts")
+	assert.Equal(t, logArr[0].Key, "svc-call-req")
+	assert.Equal(t, logArr[1].Key, "svc-call-req-failed")
+	assert.Equal(t, logArr[2].Key, "svc-call-req-retry-1")
+	assert.Equal(t, logArr[3].Key, "svc-call-req-retry-1-resp")
+}
+
+func TestCallApiJSONWithOpts_TimeoutWithCustomStatus(t *testing.T) {
+	fakeServer, param := setupOptsTest(t)
+	param.Path = "slow"
+	param.Api.Domain = fakeServer.URL() + "/api"
+	w := libContext.InitContextNoAuditTrail(t)
+
+	_, err := handlers.CallApiJSONWithOpts(
+		w, nil, param,
+		handlers.CallApiOptions{
+			Method:            "test-timeout-500",
+			Timeout:           10 * time.Millisecond,
+			TimeoutStatusCode: http.StatusInternalServerError,
+		},
+	)
+
+	assert.Assert(t, err != nil)
+	ok, libErr := libError.Unwrap(err)
+	assert.Assert(t, ok, "timeout error should be a libError")
+	assert.Equal(t, int(libErr.Action().Status), http.StatusInternalServerError,
+		"returned timeout libError should carry the configured 500 status")
+	assert.Assert(t, errors.Is(err, handlers.ErrServerTimeout), "should still match sentinel")
+}
+
+func TestCallApiJSONWithOpts_TimeoutDefaultStatus(t *testing.T) {
+	fakeServer, param := setupOptsTest(t)
+	param.Path = "slow"
+	param.Api.Domain = fakeServer.URL() + "/api"
+	w := libContext.InitContextNoAuditTrail(t)
+
+	_, err := handlers.CallApiJSONWithOpts(
+		w, nil, param,
+		handlers.CallApiOptions{
+			Method:            "test-timeout-default",
+			Timeout:           10 * time.Millisecond,
+			TimeoutStatusCode: 0,
+		},
+	)
+
+	assert.Assert(t, err != nil)
+	ok, libErr := libError.Unwrap(err)
+	assert.Assert(t, ok)
+	assert.Equal(t, int(libErr.Action().Status), http.StatusRequestTimeout,
+		"zero TimeoutStatusCode should default to 408")
+}
+
+func TestCallApiJSONWithOpts_TimeoutStatusDoesNotOverrideObserved(t *testing.T) {
+	fakeServer, param := setupOptsTest(t)
+	param.Path = "slow"
+	param.Api.Domain = fakeServer.URL() + "/api"
+	w := libContext.InitContextNoAuditTrail(t)
+
+	recorder := &fakeMetricsRecorder{}
+	logger := &fakeTransactionLogger{}
+	w.Parser.SetLocal(webFramework.TransactionLoggerLocalKey, logger)
+
+	var onCompleteInfo handlers.ApiCallInfo
+	_, err := handlers.CallApiJSONWithOpts(
+		w, nil, param,
+		handlers.CallApiOptions{
+			Method:            "test-timeout-observed",
+			Timeout:           10 * time.Millisecond,
+			TimeoutStatusCode: http.StatusInternalServerError,
+			MetricsRecorder:   recorder,
+			OnComplete: func(info handlers.ApiCallInfo) {
+				onCompleteInfo = info
+			},
+		},
+	)
+
+	assert.Assert(t, err != nil)
+	// The returned libError status should be the configured 500.
+	ok, libErr := libError.Unwrap(err)
+	assert.Assert(t, ok)
+	assert.Equal(t, int(libErr.Action().Status), http.StatusInternalServerError,
+		"returned timeout libError should carry configured 500 status")
+
+	// TransactionInfo.StatusCode should reflect the actual observed HTTP
+	// status (200 from the slow endpoint), NOT the configured timeout status.
+	assert.Equal(t, logger.calls[0].StatusCode, http.StatusOK,
+		"TransactionInfo.StatusCode should be the observed 200, not the timeout 500")
+	assert.Equal(t, onCompleteInfo.StatusCode, http.StatusOK,
+		"OnComplete info StatusCode should be the observed 200, not the timeout 500")
+
+	// Metrics should also retain the observed status.
+	assert.Equal(t, recorder.calls[0].statusCode, http.StatusOK,
+		"metrics statusCode should be the observed 200, not the timeout 500")
+	assert.Equal(t, recorder.calls[0].outcome, "timeout")
+}
+
+// maskTestRequest is a request body type with a sensitive string field used
+// to verify MaskFunc transforms TransactionInfo.Request without affecting
+// AddLog attrs or the outbound request.
+type maskTestRequest struct {
+	PAN  string `json:"pan"`
+	Name string `json:"name"`
+}
+
+// maskTestResponse is a response body type with a sensitive string field used
+// to verify MaskFunc transforms TransactionInfo.Response without affecting
+// the typed response returned by CallApiJSONWithOpts.
+type maskTestResponse struct {
+	Token   string `json:"token"`
+	Status  string `json:"status"`
+	Message string `json:"message"`
+}
+
+func (s maskTestResponse) SetStatus(int)                {}
+func (s maskTestResponse) SetHeaders(map[string]string) {}
+
+// maskFunc wraps string values in "***" and returns other types unchanged.
+// It is used to verify which fields MaskFunc is applied to.
+func maskFunc(v any) any {
+	switch s := v.(type) {
+	case string:
+		return "***" + s + "***"
+	case []byte:
+		return []byte("***" + string(s) + "***")
+	case maskTestRequest:
+		s.PAN = "***" + s.PAN + "***"
+		return s
+	case maskTestResponse:
+		s.Token = "***" + s.Token + "***"
+		return s
+	default:
+		return v
+	}
+}
+
+func TestCallApiJSONWithOpts_MaskFuncApplied(t *testing.T) {
+	setupOptsTest(t)
+	w := libContext.InitContextNoAuditTrail(t)
+
+	mux := http.NewServeMux()
+	mux.HandleFunc("/api/mask", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`{"token":"secret-token","status":"ok","message":"hello"}`))
+	})
+	srv := httptest.NewServer(mux)
+	t.Cleanup(srv.Close)
+
+	reqBody := maskTestRequest{PAN: "1234567890123456", Name: "alice"}
+	param := &libCallApi.RemoteCallParamData[maskTestRequest, maskTestResponse]{
+		Api:      libCallApi.RemoteApi{Domain: srv.URL + "/api"},
+		Method:   "POST",
+		Path:     "mask",
+		JsonBody: reqBody,
+	}
+
+	var capturedInfo handlers.ApiCallInfo
+	resp, err := handlers.CallApiJSONWithOpts(
+		w, nil, param,
+		handlers.CallApiOptions{
+			Method:   "test-mask",
+			MaskFunc: maskFunc,
+			OnComplete: func(info handlers.ApiCallInfo) {
+				capturedInfo = info
+			},
+		},
+	)
+
+	assert.NilError(t, err)
+	// OnComplete info should have masked Request and Response.
+	maskedReq, ok := capturedInfo.Request.(maskTestRequest)
+	assert.Assert(t, ok, "Request should be maskTestRequest")
+	assert.Equal(t, maskedReq.PAN, "***1234567890123456***", "Request.PAN should be masked")
+
+	maskedResp, ok := capturedInfo.Response.(maskTestResponse)
+	assert.Assert(t, ok, "Response should be maskTestResponse")
+	assert.Equal(t, maskedResp.Token, "***secret-token***", "Response.Token should be masked")
+
+	// The typed response returned by CallApiJSONWithOpts should be unmasked.
+	assert.Equal(t, resp.Token, "secret-token", "returned response should be unmasked")
+}
+
+func TestCallApiJSONWithOpts_MaskFuncNil(t *testing.T) {
+	setupOptsTest(t)
+	w := libContext.InitContextNoAuditTrail(t)
+
+	mux := http.NewServeMux()
+	mux.HandleFunc("/api/mask", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`{"token":"secret-token","status":"ok","message":"hello"}`))
+	})
+	srv := httptest.NewServer(mux)
+	t.Cleanup(srv.Close)
+
+	reqBody := maskTestRequest{PAN: "1234567890123456", Name: "alice"}
+	param := &libCallApi.RemoteCallParamData[maskTestRequest, maskTestResponse]{
+		Api:      libCallApi.RemoteApi{Domain: srv.URL + "/api"},
+		Method:   "POST",
+		Path:     "mask",
+		JsonBody: reqBody,
+	}
+
+	var capturedInfo handlers.ApiCallInfo
+	_, err := handlers.CallApiJSONWithOpts(
+		w, nil, param,
+		handlers.CallApiOptions{
+			Method: "test-mask-nil",
+			OnComplete: func(info handlers.ApiCallInfo) {
+				capturedInfo = info
+			},
+		},
+	)
+
+	assert.NilError(t, err)
+	rawReq, ok := capturedInfo.Request.(maskTestRequest)
+	assert.Assert(t, ok)
+	assert.Equal(t, rawReq.PAN, "1234567890123456", "nil MaskFunc should pass raw Request through")
+
+	rawResp, ok := capturedInfo.Response.(maskTestResponse)
+	assert.Assert(t, ok)
+	assert.Equal(t, rawResp.Token, "secret-token", "nil MaskFunc should pass raw Response through")
+	assert.Assert(t, capturedInfo.MaskedResponseBody == nil, "MaskedResponseBody should be nil when MaskFunc is nil")
+}
+
+func TestCallApiJSONWithOpts_MaskFuncAppliedOnError(t *testing.T) {
+	_, param := setupOptsTest(t)
+	param.Path = "forbidden"
+	w := libContext.InitContextNoAuditTrail(t)
+
+	reqBody := maskTestRequest{PAN: "1234567890123456", Name: "alice"}
+	param.JsonBody = reqBody
+
+	var capturedInfo handlers.ApiCallInfo
+	_, err := handlers.CallApiJSONWithOpts(
+		w, nil, param,
+		handlers.CallApiOptions{
+			Method:   "test-mask-error",
+			MaskFunc: maskFunc,
+			OnComplete: func(info handlers.ApiCallInfo) {
+				capturedInfo = info
+			},
+		},
+	)
+
+	assert.Assert(t, err != nil)
+	// Request should be masked.
+	maskedReq, ok := capturedInfo.Request.(maskTestRequest)
+	assert.Assert(t, ok)
+	assert.Equal(t, maskedReq.PAN, "***1234567890123456***", "Request.PAN should be masked on error path")
+
+	// Response should be nil on error.
+	assert.Assert(t, capturedInfo.Response == nil, "Response should be nil on error path")
+
+	// ResponseBody should retain raw bytes; MaskedResponseBody should be masked.
+	assert.Assert(t, len(capturedInfo.ResponseBody) > 0, "raw ResponseBody should be present")
+	assert.Assert(t, strings.Contains(string(capturedInfo.ResponseBody), "forbidden"),
+		"raw ResponseBody should contain 'forbidden'")
+
+	maskedBody, ok := capturedInfo.MaskedResponseBody.([]byte)
+	assert.Assert(t, ok, "MaskedResponseBody should be []byte")
+	assert.Assert(t, strings.Contains(string(maskedBody), "***"),
+		"MaskedResponseBody should contain mask markers")
+	assert.Assert(t, strings.Contains(string(maskedBody), "forbidden"),
+		"MaskedResponseBody should still contain original content")
+}
+
+func TestCallApiJSONWithOpts_MaskFuncNotAppliedToAddLog(t *testing.T) {
+	setupOptsTest(t)
+	w := libContext.InitContextNoAuditTrail(t)
+
+	mux := http.NewServeMux()
+	mux.HandleFunc("/api/mask", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`{"token":"secret-token","status":"ok","message":"hello"}`))
+	})
+	srv := httptest.NewServer(mux)
+	t.Cleanup(srv.Close)
+
+	reqBody := maskTestRequest{PAN: "1234567890123456", Name: "alice"}
+	param := &libCallApi.RemoteCallParamData[maskTestRequest, maskTestResponse]{
+		Api:      libCallApi.RemoteApi{Domain: srv.URL + "/api"},
+		Method:   "POST",
+		Path:     "mask",
+		JsonBody: reqBody,
+		Headers:  map[string]string{"Authorization": "Bearer super-secret"},
+	}
+
+	_, err := handlers.CallApiJSONWithOpts(
+		w, nil, param,
+		handlers.CallApiOptions{
+			Method:   "test-mask-addlog",
+			MaskFunc: maskFunc,
+		},
+	)
+	assert.NilError(t, err)
+
+	logs := w.Parser.GetLocal("LOG_ARRAY_ApiCall")
+	assert.Assert(t, logs != nil)
+	logArr, ok := logs.([]slog.Attr)
+	assert.Assert(t, ok)
+	// Success path: req + resp = 2 entries.
+	assert.Equal(t, len(logArr), 2)
+
+	// The request log entry (logArr[0]) should be a slog.GroupValue containing
+	// a nested "request" attr with the ORIGINAL unmasked request body.
+	reqAttr := logArr[0]
+	assert.Equal(t, reqAttr.Key, "test-mask-addlog")
+
+	// Resolve the group children of the request log attr. The param implements
+	// slog.LogValuer, so we need to call LogValue() to resolve the group.
+	anyVal := reqAttr.Value.Any()
+	lv, ok := anyVal.(slog.LogValuer)
+	assert.Assert(t, ok, "request log attr should be a slog.LogValuer, got %T", anyVal)
+	resolvedVal := lv.LogValue()
+	assert.Equal(t, resolvedVal.Kind(), slog.KindGroup, "resolved value should be a group")
+	groupVal := resolvedVal.Group()
+	var foundRequestAttr *slog.Attr
+	for i := range groupVal {
+		if groupVal[i].Key == "request" {
+			foundRequestAttr = &groupVal[i]
+			break
+		}
+	}
+	assert.Assert(t, foundRequestAttr != nil, "request group should contain a 'request' attr")
+
+	// The nested request value should resolve to the original unmasked request.
+	loggedReq, ok := foundRequestAttr.Value.Any().(maskTestRequest)
+	assert.Assert(t, ok, "nested request attr should be the original maskTestRequest")
+	assert.Equal(t, loggedReq.PAN, "1234567890123456",
+		"AddLog request attr should be unmasked (MaskFunc must not apply to AddLog)")
+
+	// Also verify Authorization masking by LogValue() is independent of MaskFunc.
+	var foundHeadersAttr *slog.Attr
+	for i := range groupVal {
+		if groupVal[i].Key == "headers" {
+			foundHeadersAttr = &groupVal[i]
+			break
+		}
+	}
+	assert.Assert(t, foundHeadersAttr != nil, "request group should contain a 'headers' attr")
+	headersVal, ok := foundHeadersAttr.Value.Any().(map[string]string)
+	assert.Assert(t, ok, "headers attr should be map[string]string")
+	assert.Equal(t, headersVal["Authorization"], "[masked]",
+		"LogValue() should mask Authorization independently of MaskFunc")
+}
+
+func TestCallApiJSONWithOpts_MaskFuncReturnedResponseIsolated(t *testing.T) {
+	setupOptsTest(t)
+	w := libContext.InitContextNoAuditTrail(t)
+
+	mux := http.NewServeMux()
+	mux.HandleFunc("/api/mask", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`{"token":"secret-token","status":"ok","message":"hello"}`))
+	})
+	srv := httptest.NewServer(mux)
+	t.Cleanup(srv.Close)
+
+	reqBody := maskTestRequest{PAN: "1234567890123456", Name: "alice"}
+	param := &libCallApi.RemoteCallParamData[maskTestRequest, maskTestResponse]{
+		Api:      libCallApi.RemoteApi{Domain: srv.URL + "/api"},
+		Method:   "POST",
+		Path:     "mask",
+		JsonBody: reqBody,
+	}
+
+	resp, err := handlers.CallApiJSONWithOpts(
+		w, nil, param,
+		handlers.CallApiOptions{
+			Method:   "test-mask-isolation",
+			MaskFunc: maskFunc,
+		},
+	)
+
+	assert.NilError(t, err)
+	// The typed response returned by CallApiJSONWithOpts must be the original
+	// unmasked value, even though MaskFunc transformed TransactionInfo.Response.
+	assert.Equal(t, resp.Token, "secret-token",
+		"returned typed response should be unmasked (MaskFunc must not mutate it)")
+	assert.Equal(t, resp.Status, "ok")
+}
+
+func TestCallApiJSONWithOpts_MaskFuncLoggerAndCallbackReceiveMasked(t *testing.T) {
+	setupOptsTest(t)
+	w := libContext.InitContextNoAuditTrail(t)
+
+	mux := http.NewServeMux()
+	mux.HandleFunc("/api/mask", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`{"token":"secret-token","status":"ok","message":"hello"}`))
+	})
+	srv := httptest.NewServer(mux)
+	t.Cleanup(srv.Close)
+
+	reqBody := maskTestRequest{PAN: "1234567890123456", Name: "alice"}
+	param := &libCallApi.RemoteCallParamData[maskTestRequest, maskTestResponse]{
+		Api:      libCallApi.RemoteApi{Domain: srv.URL + "/api"},
+		Method:   "POST",
+		Path:     "mask",
+		JsonBody: reqBody,
+	}
+
+	logger := &fakeTransactionLogger{}
+	w.Parser.SetLocal(webFramework.TransactionLoggerLocalKey, logger)
+
+	var callbackInfo handlers.ApiCallInfo
+	_, err := handlers.CallApiJSONWithOpts(
+		w, nil, param,
+		handlers.CallApiOptions{
+			Method:   "test-mask-logger-callback",
+			MaskFunc: maskFunc,
+			OnComplete: func(info handlers.ApiCallInfo) {
+				callbackInfo = info
+			},
+		},
+	)
+	assert.NilError(t, err)
+
+	// Both TransactionLogger and OnComplete should receive masked Request/Response.
+	assert.Equal(t, len(logger.calls), 1, "TransactionLogger should be called once")
+	loggerReq, ok := logger.calls[0].Request.(maskTestRequest)
+	assert.Assert(t, ok)
+	assert.Equal(t, loggerReq.PAN, "***1234567890123456***",
+		"TransactionLogger should receive masked Request")
+	loggerResp, ok := logger.calls[0].Response.(maskTestResponse)
+	assert.Assert(t, ok)
+	assert.Equal(t, loggerResp.Token, "***secret-token***",
+		"TransactionLogger should receive masked Response")
+
+	cbReq, ok := callbackInfo.Request.(maskTestRequest)
+	assert.Assert(t, ok)
+	assert.Equal(t, cbReq.PAN, "***1234567890123456***",
+		"OnComplete should receive masked Request")
+	cbResp, ok := callbackInfo.Response.(maskTestResponse)
+	assert.Assert(t, ok)
+	assert.Equal(t, cbResp.Token, "***secret-token***",
+		"OnComplete should receive masked Response")
 }

@@ -22,12 +22,14 @@ func setupHeadersTest(t *testing.T) {
 func TestBuildBaseRemoteHeaders_Basic(t *testing.T) {
 	setupHeadersTest(t)
 	w := libContext.InitContextNoAuditTrail(t)
-	headers := handlers.BuildBaseRemoteHeaders(w, "myapp")
+	headers := handlers.BuildBaseRemoteHeaders(w, "myapp", "")
 
 	assert.Equal(t, headers["Accept"], "application/json")
 	assert.Equal(t, headers["X-App-ID"], "myapp-"+strconv.Itoa(os.Getpid()))
 	_, hasRID := headers[handlers.RequestIDHeader]
 	assert.Assert(t, !hasRID, "should not have X-Request-ID when not set")
+	_, hasCID := headers[handlers.CorrelationIDHeader]
+	assert.Assert(t, !hasCID, "should not have X-Correlation-ID when not set")
 }
 
 func TestBuildBaseRemoteHeaders_WithRequestID(t *testing.T) {
@@ -35,7 +37,7 @@ func TestBuildBaseRemoteHeaders_WithRequestID(t *testing.T) {
 	w := libContext.InitContextNoAuditTrail(t)
 	w.Parser.SetLocal(handlers.RequestIDLocalKey, "req-123-abc")
 
-	headers := handlers.BuildBaseRemoteHeaders(w, "svc")
+	headers := handlers.BuildBaseRemoteHeaders(w, "svc", "")
 
 	assert.Equal(t, headers[handlers.RequestIDHeader], "req-123-abc")
 	assert.Equal(t, headers["Accept"], "application/json")
@@ -46,7 +48,7 @@ func TestBuildBaseRemoteHeaders_RequestIDWrongType(t *testing.T) {
 	w := libContext.InitContextNoAuditTrail(t)
 	w.Parser.SetLocal(handlers.RequestIDLocalKey, 12345)
 
-	headers := handlers.BuildBaseRemoteHeaders(w, "svc")
+	headers := handlers.BuildBaseRemoteHeaders(w, "svc", "")
 
 	_, hasRID := headers[handlers.RequestIDHeader]
 	assert.Assert(t, !hasRID, "should not have X-Request-ID when type is not string")
@@ -57,7 +59,7 @@ func TestBuildBaseRemoteHeaders_RequestIDEmpty(t *testing.T) {
 	w := libContext.InitContextNoAuditTrail(t)
 	w.Parser.SetLocal(handlers.RequestIDLocalKey, "")
 
-	headers := handlers.BuildBaseRemoteHeaders(w, "svc")
+	headers := handlers.BuildBaseRemoteHeaders(w, "svc", "")
 
 	_, hasRID := headers[handlers.RequestIDHeader]
 	assert.Assert(t, !hasRID, "should not have X-Request-ID when empty")
@@ -66,12 +68,74 @@ func TestBuildBaseRemoteHeaders_RequestIDEmpty(t *testing.T) {
 func TestBuildBaseRemoteHeaders_MapIsolation(t *testing.T) {
 	setupHeadersTest(t)
 	w := libContext.InitContextNoAuditTrail(t)
-	h1 := handlers.BuildBaseRemoteHeaders(w, "app")
-	h2 := handlers.BuildBaseRemoteHeaders(w, "app")
+	h1 := handlers.BuildBaseRemoteHeaders(w, "app", "")
+	h2 := handlers.BuildBaseRemoteHeaders(w, "app", "")
 
 	h1["Custom"] = "value"
 	_, ok := h2["Custom"]
 	assert.Assert(t, !ok, "modifying one map should not affect the other")
+}
+
+func TestBuildBaseRemoteHeaders_WithCorrelationIDParam(t *testing.T) {
+	setupHeadersTest(t)
+	w := libContext.InitContextNoAuditTrail(t)
+
+	headers := handlers.BuildBaseRemoteHeaders(w, "svc", "corr-from-arg")
+
+	assert.Equal(t, headers[handlers.CorrelationIDHeader], "corr-from-arg")
+}
+
+func TestBuildBaseRemoteHeaders_CorrelationIDParamEmptyFallsBackToLocal(t *testing.T) {
+	setupHeadersTest(t)
+	w := libContext.InitContextNoAuditTrail(t)
+	w.Parser.SetLocal(handlers.CorrelationIDLocalKey, "corr-from-local")
+
+	headers := handlers.BuildBaseRemoteHeaders(w, "svc", "")
+
+	assert.Equal(t, headers[handlers.CorrelationIDHeader], "corr-from-local")
+}
+
+func TestBuildBaseRemoteHeaders_ParamOverridesLocal(t *testing.T) {
+	setupHeadersTest(t)
+	w := libContext.InitContextNoAuditTrail(t)
+	w.Parser.SetLocal(handlers.CorrelationIDLocalKey, "corr-from-local")
+
+	headers := handlers.BuildBaseRemoteHeaders(w, "svc", "corr-from-arg")
+
+	assert.Equal(t, headers[handlers.CorrelationIDHeader], "corr-from-arg",
+		"non-empty arg should take precedence over parser local")
+}
+
+func TestBuildBaseRemoteHeaders_BothRequestAndCorrelationID(t *testing.T) {
+	setupHeadersTest(t)
+	w := libContext.InitContextNoAuditTrail(t)
+	w.Parser.SetLocal(handlers.RequestIDLocalKey, "req-123")
+
+	headers := handlers.BuildBaseRemoteHeaders(w, "svc", "corr-456")
+
+	assert.Equal(t, headers[handlers.RequestIDHeader], "req-123")
+	assert.Equal(t, headers[handlers.CorrelationIDHeader], "corr-456")
+}
+
+func TestBuildBaseRemoteHeaders_CorrelationIDLocalWrongType(t *testing.T) {
+	setupHeadersTest(t)
+	w := libContext.InitContextNoAuditTrail(t)
+	w.Parser.SetLocal(handlers.CorrelationIDLocalKey, 12345)
+
+	headers := handlers.BuildBaseRemoteHeaders(w, "svc", "")
+
+	_, hasCID := headers[handlers.CorrelationIDHeader]
+	assert.Assert(t, !hasCID, "should not have X-Correlation-ID when local type is not string")
+}
+
+func TestBuildBaseRemoteHeaders_CorrelationIDEmpty(t *testing.T) {
+	setupHeadersTest(t)
+	w := libContext.InitContextNoAuditTrail(t)
+
+	headers := handlers.BuildBaseRemoteHeaders(w, "svc", "")
+
+	_, hasCID := headers[handlers.CorrelationIDHeader]
+	assert.Assert(t, !hasCID, "should not have X-Correlation-ID when arg empty and no local set")
 }
 
 func TestPrepareCall_NoDuplicateAcceptHeader(t *testing.T) {

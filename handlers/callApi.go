@@ -205,6 +205,23 @@ type CallApiOptions struct {
 	// logic is reused for each attempt with full observability per attempt.
 	// nil = no retries (single attempt, existing behavior).
 	RetryPolicy *libRetry.RetryPolicy
+
+	// TimeoutStatusCode selects the status stored in the returned timeout
+	// libError when the server-side elapsed-time guard fires. Zero = default
+	// (http.StatusRequestTimeout, 408). This affects ONLY the returned
+	// libError's application status; TransactionInfo.StatusCode and metrics
+	// status_class continue to represent the actual observed remote HTTP
+	// status.
+	TimeoutStatusCode int
+
+	// MaskFunc, when set, is applied to Request, parsed Response, and
+	// ResponseBody (the result is stored in MaskedResponseBody) before
+	// TransactionLogger and OnComplete receive TransactionInfo. nil = no
+	// masking (raw values passed through). Must NOT mutate the outbound
+	// request or the typed response returned by CallApiJSONWithOpts. Never
+	// applied to webFramework.AddLog attrs (AddLog uses
+	// RemoteCallParamData.LogValue which independently masks Authorization).
+	MaskFunc func(any) any
 }
 
 // CallApiJSONWithOpts is an enhanced version of CallApiJSON that adds:
@@ -329,7 +346,7 @@ func executeSingleAttempt[Req any, Resp any](
 	webFramework.AddLog(w, CallApiLogEntry, slog.Any(respKey, resp))
 
 	if opts.Timeout > 0 && elapsed >= opts.Timeout {
-		timeoutErr := BuildTimeoutError(param.Api.Domain)
+		timeoutErr := BuildTimeoutError(param.Api.Domain, opts.TimeoutStatusCode)
 		webFramework.AddLog(w, CallApiLogEntry, slog.Any(failKey, timeoutErr))
 		recorder.Record(param.Api.Name, param.Method, statusCode, elapsed, "timeout")
 		logTransactionAndCallback(w, opts, param, resp, timeoutErr, statusCode, elapsed, requestURL)
@@ -370,15 +387,16 @@ func finalizeResult[Resp any](resp *Resp, err error, opts CallApiOptions) (Resp,
 	return *new(Resp), err
 }
 
-// formatRetryKey inserts the retry marker before known suffixes (-resp, -error)
-// or appends it for base keys. e.g. "svc-call" → "svc-call-retry-1",
-// "svc-call-resp" → "svc-call-retry-1-resp", "svc-call-error" → "svc-call-retry-1-error".
+// formatRetryKey inserts the retry marker before known suffixes (-resp, -error,
+// -failed) or appends it for base keys. e.g. "svc-call" → "svc-call-retry-1",
+// "svc-call-resp" → "svc-call-retry-1-resp", "svc-call-error" → "svc-call-retry-1-error",
+// "svc-call-req-failed" → "svc-call-req-retry-1-failed".
 func formatRetryKey(key string, attempt int) string {
 	if attempt <= 1 {
 		return key
 	}
 	retryMarker := fmt.Sprintf("-retry-%d", attempt-1)
-	for _, suffix := range []string{"-resp", "-error"} {
+	for _, suffix := range []string{"-resp", "-error", "-failed"} {
 		if strings.HasSuffix(key, suffix) {
 			return strings.TrimSuffix(key, suffix) + retryMarker + suffix
 		}
@@ -431,17 +449,29 @@ func logTransactionAndCallback[Req any, Resp any](
 			rawBody = rce.Body
 		}
 	}
+
+	requestField := any(param.JsonBody)
+	var maskedBody any
+	if opts.MaskFunc != nil {
+		requestField = opts.MaskFunc(requestField)
+		respAny = opts.MaskFunc(respAny)
+		if rawBody != nil {
+			maskedBody = opts.MaskFunc(rawBody)
+		}
+	}
+
 	info := webFramework.TransactionInfo{
-		ServiceName:  param.Api.Name,
-		URL:          requestURL,
-		Endpoint:     param.Path,
-		Method:       param.Method,
-		StatusCode:   statusCode,
-		Duration:     elapsed,
-		Error:        err,
-		Request:      param.JsonBody,
-		Response:     respAny,
-		ResponseBody: rawBody,
+		ServiceName:        param.Api.Name,
+		URL:                requestURL,
+		Endpoint:           param.Path,
+		Method:             param.Method,
+		StatusCode:         statusCode,
+		Duration:           elapsed,
+		Error:              err,
+		Request:            requestField,
+		Response:           respAny,
+		ResponseBody:       rawBody,
+		MaskedResponseBody: maskedBody,
 	}
 	if logger, ok := w.Parser.GetLocal(webFramework.TransactionLoggerLocalKey).(webFramework.TransactionLogger); ok && logger != nil {
 		logger.LogTransaction(info)

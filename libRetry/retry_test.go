@@ -19,10 +19,12 @@ type testResp struct {
 	Data       string `json:"data"`
 	statusCode int
 	errCode    int
+	errKey     string
 }
 
-func (r *testResp) GetStatus() int    { return r.statusCode }
-func (r *testResp) GetErrorCode() int { return r.errCode }
+func (r *testResp) GetStatus() int      { return r.statusCode }
+func (r *testResp) GetErrorCode() int   { return r.errCode }
+func (r *testResp) GetErrorKey() string { return r.errKey }
 
 func TestWithRetry_ImmediateSuccess(t *testing.T) {
 	var calls atomic.Int32
@@ -316,4 +318,98 @@ func TestWithRetry_DefaultTimeoutPredicateSentinel(t *testing.T) {
 
 	assert.NilError(t, result.Error)
 	assert.Equal(t, result.Attempts, 2)
+}
+
+func TestWithRetry_RetryableErrorKey(t *testing.T) {
+	var calls atomic.Int32
+	policy := &libRetry.RetryPolicy{
+		MaxRetries:       2,
+		RetryOnErrorKeys: map[string]bool{"SERVICE_UNAVAILABLE": true},
+	}
+
+	result := libRetry.WithRetry(policy, func(attempt int) (*testResp, error, int) {
+		n := calls.Add(1)
+		if n == 1 {
+			return &testResp{Data: "", statusCode: 200, errKey: "SERVICE_UNAVAILABLE"}, nil, 200
+		}
+		return &testResp{Data: "ok", statusCode: 200, errKey: ""}, nil, 200
+	})
+
+	assert.Equal(t, calls.Load(), int32(2))
+	assert.NilError(t, result.Error)
+	assert.Equal(t, result.Attempts, 2)
+	assert.Equal(t, result.Response.Data, "ok")
+}
+
+func TestWithRetry_NonRetryableErrorKey(t *testing.T) {
+	var calls atomic.Int32
+	policy := &libRetry.RetryPolicy{
+		MaxRetries:       2,
+		RetryOnErrorKeys: map[string]bool{"SERVICE_UNAVAILABLE": true},
+	}
+
+	result := libRetry.WithRetry(policy, func(attempt int) (*testResp, error, int) {
+		calls.Add(1)
+		return &testResp{Data: "bad", statusCode: 200, errKey: "BAD_REQUEST"}, nil, 200
+	})
+
+	assert.Equal(t, calls.Load(), int32(1))
+	assert.NilError(t, result.Error)
+	assert.Equal(t, result.Attempts, 1)
+}
+
+func TestWithRetry_ErrorKeyAndCodeBothChecked(t *testing.T) {
+	var calls atomic.Int32
+	policy := &libRetry.RetryPolicy{
+		MaxRetries:        2,
+		RetryOnErrorCodes: map[int]bool{5001: true},
+		RetryOnErrorKeys:  map[string]bool{"SERVICE_UNAVAILABLE": true},
+	}
+
+	result := libRetry.WithRetry(policy, func(attempt int) (*testResp, error, int) {
+		n := calls.Add(1)
+		if n == 1 {
+			// errCode matches but errKey does not — retry should trigger by code.
+			return &testResp{Data: "", statusCode: 200, errCode: 5001, errKey: "OTHER"}, nil, 200
+		}
+		return &testResp{Data: "ok", statusCode: 200, errCode: 0, errKey: ""}, nil, 200
+	})
+
+	assert.Equal(t, calls.Load(), int32(2))
+	assert.NilError(t, result.Error)
+	assert.Equal(t, result.Attempts, 2)
+}
+
+func TestWithRetry_ErrorKeyEmptyString(t *testing.T) {
+	var calls atomic.Int32
+	policy := &libRetry.RetryPolicy{
+		MaxRetries:       2,
+		RetryOnErrorKeys: map[string]bool{"SERVICE_UNAVAILABLE": true},
+	}
+
+	result := libRetry.WithRetry(policy, func(attempt int) (*testResp, error, int) {
+		calls.Add(1)
+		return &testResp{Data: "ok", statusCode: 200, errKey: ""}, nil, 200
+	})
+
+	assert.Equal(t, calls.Load(), int32(1))
+	assert.NilError(t, result.Error)
+	assert.Equal(t, result.Attempts, 1)
+}
+
+func TestWithRetry_NilRetryOnErrorKeys(t *testing.T) {
+	var calls atomic.Int32
+	policy := &libRetry.RetryPolicy{
+		MaxRetries: 2,
+		// RetryOnErrorKeys is nil.
+	}
+
+	result := libRetry.WithRetry(policy, func(attempt int) (*testResp, error, int) {
+		calls.Add(1)
+		return &testResp{Data: "ok", statusCode: 200, errKey: "SERVICE_UNAVAILABLE"}, nil, 200
+	})
+
+	assert.Equal(t, calls.Load(), int32(1))
+	assert.NilError(t, result.Error)
+	assert.Equal(t, result.Attempts, 1)
 }
