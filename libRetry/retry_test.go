@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/http"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -412,4 +413,61 @@ func TestWithRetry_NilRetryOnErrorKeys(t *testing.T) {
 	assert.Equal(t, calls.Load(), int32(1))
 	assert.NilError(t, result.Error)
 	assert.Equal(t, result.Attempts, 1)
+}
+
+// nonStatusType is a test type that does NOT implement StatusProvider.
+type nonStatusType struct {
+	val int
+}
+
+func TestExtractStatusCode(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		resp *testResp
+		want int
+	}{
+		{name: "status_200", resp: &testResp{statusCode: 200}, want: 200},
+		{name: "status_zero", resp: &testResp{statusCode: 0}, want: 0},
+		{name: "nil_pointer", resp: (*testResp)(nil), want: 0},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			got := libRetry.ExtractStatusCode(tc.resp)
+			assert.Equal(t, got, tc.want)
+		})
+	}
+
+	t.Run("non_status_provider", func(t *testing.T) {
+		t.Parallel()
+		got := libRetry.ExtractStatusCode(&nonStatusType{val: 42})
+		assert.Equal(t, got, 0)
+	})
+}
+
+func TestDeriveStatusCode(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		resp *testResp
+		err  error
+		want int
+	}{
+		{name: "with_error", resp: &testResp{statusCode: 200}, err: errors.New("fail"), want: http.StatusInternalServerError},
+		{name: "nil_resp_nil_err", resp: nil, err: nil, want: http.StatusInternalServerError},
+		{name: "status_406", resp: &testResp{statusCode: 406}, err: nil, want: 406},
+		{name: "status_zero", resp: &testResp{statusCode: 0}, err: nil, want: http.StatusOK},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			got := libRetry.DeriveStatusCode(tc.resp, tc.err)
+			assert.Equal(t, got, tc.want)
+		})
+	}
 }
