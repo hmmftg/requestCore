@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/http"
 	"strings"
 	"time"
 
@@ -15,6 +16,37 @@ import (
 // to expose their HTTP status code for retry eligibility checks.
 type StatusProvider interface {
 	GetStatus() int
+}
+
+// ExtractStatusCode returns the status code from a response pointer whose
+// concrete type implements StatusProvider. Returns 0 if resp is nil or the
+// type does not implement StatusProvider.
+//
+// The type assertion is performed on the pointer (not the dereferenced
+// value) so that both pointer-receiver and value-receiver GetStatus methods
+// are recognized.
+func ExtractStatusCode[T any](resp *T) int {
+	if resp == nil {
+		return 0
+	}
+	if sp, ok := any(resp).(StatusProvider); ok {
+		return sp.GetStatus()
+	}
+	return 0
+}
+
+// DeriveStatusCode returns the appropriate HTTP status code for a completed
+// call. Returns http.StatusInternalServerError (500) if err != nil or resp is
+// nil. Otherwise returns ExtractStatusCode(resp) if non-zero, or
+// http.StatusOK (200) if the response's status is zero.
+func DeriveStatusCode[T any](resp *T, err error) int {
+	if err != nil || resp == nil {
+		return http.StatusInternalServerError
+	}
+	if code := ExtractStatusCode(resp); code != 0 {
+		return code
+	}
+	return http.StatusOK
 }
 
 // ErrorCodeProvider is an optional interface that response types can implement
