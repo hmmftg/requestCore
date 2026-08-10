@@ -6,10 +6,11 @@ import (
 	"strings"
 	"testing"
 
+	"gotest.tools/v3/assert"
+
 	"github.com/hmmftg/requestCore/handlers"
 	"github.com/hmmftg/requestCore/libError"
 	"github.com/hmmftg/requestCore/status"
-	"gotest.tools/v3/assert"
 )
 
 func TestNormalizeCallError_Nil(t *testing.T) {

@@ -7,9 +7,10 @@ import (
 	"testing"
 
 	"github.com/DATA-DOG/go-sqlmock"
+	"gotest.tools/v3/assert"
+
 	"github.com/hmmftg/requestCore/response"
 	"github.com/hmmftg/requestCore/webFramework"
-	"gotest.tools/v3/assert"
 )
 
 type AnyString string

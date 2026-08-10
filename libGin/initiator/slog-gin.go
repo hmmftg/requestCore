@@ -9,11 +9,12 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	slogformatter "github.com/samber/slog-formatter"
+
 	"github.com/hmmftg/requestCore/libGin"
 	"github.com/hmmftg/requestCore/libLogger/splunk"
 	"github.com/hmmftg/requestCore/libParams"
 	"github.com/hmmftg/requestCore/webFramework"
-	slogformatter "github.com/samber/slog-formatter"
 )
 
 func InitSlogGin(wsParams libParams.ParamInterface, app *gin.Engine) {

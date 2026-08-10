@@ -6,9 +6,10 @@ import (
 	"time"
 
 	"github.com/DATA-DOG/go-sqlmock"
+	"gotest.tools/v3/assert"
+
 	"github.com/hmmftg/requestCore/libsql"
 	"github.com/hmmftg/requestCore/testingtools"
-	"gotest.tools/v3/assert"
 )
 
 func TestQuery(t *testing.T) {

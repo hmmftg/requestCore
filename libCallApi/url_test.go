@@ -3,8 +3,9 @@ package libCallApi_test
 import (
 	"testing"
 
-	"github.com/hmmftg/requestCore/libCallApi"
 	"gotest.tools/v3/assert"
+
+	"github.com/hmmftg/requestCore/libCallApi"
 )
 
 func TestExtractTrackerID(t *testing.T) {

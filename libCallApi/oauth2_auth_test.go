@@ -7,9 +7,10 @@ import (
 	"sync/atomic"
 	"testing"
 
+	"gotest.tools/v3/assert"
+
 	"github.com/hmmftg/requestCore/libCallApi"
 	"github.com/hmmftg/requestCore/libContext"
-	"gotest.tools/v3/assert"
 )
 
 func TestOAuth2Auth_ClientCredentialsLogin(t *testing.T) {

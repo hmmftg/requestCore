@@ -7,8 +7,9 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/hmmftg/requestCore/libTracing"
 	"gotest.tools/v3/assert"
+
+	"github.com/hmmftg/requestCore/libTracing"
 )
 
 func TestTracingManager(t *testing.T) {

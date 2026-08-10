@@ -17,12 +17,13 @@ import (
 	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/gin-gonic/gin"
 	"github.com/gofiber/fiber/v2"
+	"gotest.tools/v3/assert"
+	"gotest.tools/v3/assert/cmp"
+
 	"github.com/hmmftg/requestCore/libFiber"
 	"github.com/hmmftg/requestCore/libGin"
 	"github.com/hmmftg/requestCore/libQuery"
 	"github.com/hmmftg/requestCore/webFramework"
-	"gotest.tools/v3/assert"
-	"gotest.tools/v3/assert/cmp"
 )
 
 // initializeTestServer creates a gin server,

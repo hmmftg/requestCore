@@ -10,11 +10,12 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/gofiber/fiber/v2"
+	"github.com/valyala/fasthttp"
+
 	"github.com/hmmftg/requestCore/libContext"
 	"github.com/hmmftg/requestCore/libError"
 	"github.com/hmmftg/requestCore/libLogger"
 	"github.com/hmmftg/requestCore/webFramework"
-	"github.com/valyala/fasthttp"
 )
 
 func TestGinReq(t *testing.T) {

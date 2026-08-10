@@ -4,9 +4,10 @@ import (
 	"context"
 	"time"
 
+	"go.opentelemetry.io/otel/trace"
+
 	"github.com/hmmftg/requestCore/libQuery"
 	"github.com/hmmftg/requestCore/webFramework"
-	"go.opentelemetry.io/otel/trace"
 )
 
 type RequestModel struct {

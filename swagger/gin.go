@@ -9,8 +9,9 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/hmmftg/requestCore/libContext"
 	"github.com/swaggo/swag/v2"
+
+	"github.com/hmmftg/requestCore/libContext"
 )
 
 func GinHandler(base, name string, spec *swag.Spec) gin.HandlerFunc {

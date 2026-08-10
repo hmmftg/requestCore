@@ -3,8 +3,9 @@ package handlers_test
 import (
 	"testing"
 
-	"github.com/hmmftg/requestCore/handlers"
 	"gotest.tools/v3/assert"
+
+	"github.com/hmmftg/requestCore/handlers"
 )
 
 func TestShouldSkipApiCall(t *testing.T) {

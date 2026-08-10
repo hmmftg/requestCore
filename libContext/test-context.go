@@ -10,8 +10,9 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/hmmftg/requestCore/webFramework"
 	"go.opentelemetry.io/otel/trace"
+
+	"github.com/hmmftg/requestCore/webFramework"
 )
 
 type TestingParser struct {

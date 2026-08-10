@@ -10,8 +10,9 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
-	"github.com/hmmftg/requestCore/libLogger"
 	"go.opentelemetry.io/otel/trace"
+
+	"github.com/hmmftg/requestCore/libLogger"
 )
 
 const (

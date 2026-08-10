@@ -13,6 +13,8 @@ import (
 	"github.com/Depado/ginprom"
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
+	"github.com/swaggo/swag/v2"
+
 	"github.com/hmmftg/requestCore"
 	"github.com/hmmftg/requestCore/libApplication/metrics"
 	"github.com/hmmftg/requestCore/libCallApi"
@@ -21,7 +23,6 @@ import (
 	"github.com/hmmftg/requestCore/libParams"
 	"github.com/hmmftg/requestCore/swagger"
 	"github.com/hmmftg/requestCore/webFramework"
-	"github.com/swaggo/swag/v2"
 
 	_ "github.com/lib/pq"
 	_ "github.com/sijms/go-ora/v2"

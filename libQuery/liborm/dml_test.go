@@ -4,10 +4,11 @@ import (
 	"context"
 	"testing"
 
+	"gorm.io/gorm"
+
 	"github.com/hmmftg/requestCore/libQuery"
 	"github.com/hmmftg/requestCore/libQuery/liborm"
 	"github.com/hmmftg/requestCore/libQuery/mockdb"
-	"gorm.io/gorm"
 )
 
 func TestSetVariable(t *testing.T) {

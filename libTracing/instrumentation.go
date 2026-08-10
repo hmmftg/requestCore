@@ -7,10 +7,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/hmmftg/requestCore/webFramework"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/trace"
+
+	"github.com/hmmftg/requestCore/webFramework"
 )
 
 // TracableArg constraint for types that have RequestParser (like HandlerRequest)

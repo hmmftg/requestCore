@@ -18,6 +18,9 @@ linters:
     gosec:
       excludes:
         - G104
+    govet:
+      disable:
+        - inline
   exclusions:
     rules:
       - path: _test\.go
@@ -26,6 +29,10 @@ linters:
       - path: examples/
         linters:
           - gosec
+      - path: libCrypto/ssm/des\.go
+        linters:
+          - gosec
+        text: "G502|G405"
 
 formatters:
   enable:

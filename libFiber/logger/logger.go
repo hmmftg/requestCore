@@ -5,9 +5,10 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/logger"
+	"gopkg.in/natefinch/lumberjack.v2"
+
 	"github.com/hmmftg/requestCore/libLogger"
 	"github.com/hmmftg/requestCore/libParams"
-	"gopkg.in/natefinch/lumberjack.v2"
 )
 
 func ConfigFiberLogger(params libLogger.LoggerInterface) logger.Config {

@@ -5,8 +5,9 @@ import (
 	"testing"
 
 	"github.com/gofiber/fiber/v2"
-	"github.com/hmmftg/requestCore/webFramework"
 	"github.com/valyala/fasthttp"
+
+	"github.com/hmmftg/requestCore/webFramework"
 )
 
 func TestGetBody(t *testing.T) {

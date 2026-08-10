@@ -3,9 +3,10 @@ package libFiber
 import (
 	"github.com/gofiber/contrib/otelfiber/v2"
 	"github.com/gofiber/fiber/v2"
-	"github.com/hmmftg/requestCore/libTracing"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
+
+	"github.com/hmmftg/requestCore/libTracing"
 )
 
 // TracingMiddleware creates Fiber middleware for OpenTelemetry tracing using official otelfiber

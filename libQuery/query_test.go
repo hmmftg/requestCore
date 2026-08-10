@@ -6,9 +6,10 @@ import (
 	"time"
 
 	"github.com/DATA-DOG/go-sqlmock"
+	"gotest.tools/v3/assert"
+
 	"github.com/hmmftg/requestCore/libQuery"
 	"github.com/hmmftg/requestCore/testingtools"
-	"gotest.tools/v3/assert"
 )
 
 func getQueryMock(err error, cols []string, values ...driver.Value) libQuery.QueryRunnerInterface {

@@ -8,9 +8,10 @@ import (
 	"testing"
 
 	"github.com/gin-gonic/gin"
+	"gotest.tools/v3/assert"
+
 	"github.com/hmmftg/requestCore/libGin"
 	"github.com/hmmftg/requestCore/libTracing"
-	"gotest.tools/v3/assert"
 )
 
 func TestGinTracingMiddleware(t *testing.T) {

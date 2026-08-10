@@ -6,6 +6,8 @@ import (
 	"testing"
 
 	"github.com/gin-gonic/gin"
+	"gotest.tools/v3/assert"
+
 	"github.com/hmmftg/requestCore"
 	"github.com/hmmftg/requestCore/handlers"
 	"github.com/hmmftg/requestCore/libCallApi"
@@ -13,7 +15,6 @@ import (
 	"github.com/hmmftg/requestCore/libParams"
 	"github.com/hmmftg/requestCore/libRequest"
 	"github.com/hmmftg/requestCore/testingtools"
-	"gotest.tools/v3/assert"
 )
 
 func mockGetHeader(name string) string {

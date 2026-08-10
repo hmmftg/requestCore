@@ -6,8 +6,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/hmmftg/requestCore/libCallApi"
 	"gotest.tools/v3/assert"
+
+	"github.com/hmmftg/requestCore/libCallApi"
 )
 
 func TestNewInstrumentedHTTPClient_ZeroTimeout(t *testing.T) {

@@ -2,13 +2,15 @@ package libGin
 
 import (
 	"fmt"
+	"strconv"
 
 	"github.com/gin-gonic/gin"
-	"github.com/hmmftg/requestCore/libTracing"
 	"go.opentelemetry.io/contrib/instrumentation/github.com/gin-gonic/gin/otelgin"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/trace"
+
+	"github.com/hmmftg/requestCore/libTracing"
 )
 
 // TracingMiddleware creates Gin middleware for OpenTelemetry tracing
@@ -56,7 +58,7 @@ func CustomTracingMiddleware(tm *libTracing.TracingManager) gin.HandlerFunc {
 
 		// Add response attributes
 		tm.AddSpanAttributes(ctx, map[string]string{
-			"http.status_code": string(rune(c.Writer.Status())),
+			"http.status_code": strconv.Itoa(c.Writer.Status()),
 		})
 
 		// Set response status

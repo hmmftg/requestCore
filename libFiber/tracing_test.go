@@ -8,9 +8,10 @@ import (
 	"testing"
 
 	"github.com/gofiber/fiber/v2"
+	"gotest.tools/v3/assert"
+
 	"github.com/hmmftg/requestCore/libFiber"
 	"github.com/hmmftg/requestCore/libTracing"
-	"gotest.tools/v3/assert"
 )
 
 func TestFiberTracingMiddleware(t *testing.T) {

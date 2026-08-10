@@ -5,9 +5,10 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/jinzhu/copier"
+
 	"github.com/hmmftg/requestCore/libCrypto"
 	"github.com/hmmftg/requestCore/libCrypto/ssm"
-	"github.com/jinzhu/copier"
 )
 
 type SecurityParam struct {

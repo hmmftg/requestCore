@@ -3,10 +3,11 @@ package liborm_test
 import (
 	"testing"
 
+	"gorm.io/gorm"
+
 	"github.com/hmmftg/requestCore/libQuery"
 	"github.com/hmmftg/requestCore/libQuery/liborm"
 	"github.com/hmmftg/requestCore/libQuery/mockdb"
-	"gorm.io/gorm"
 )
 
 // SimpleTestStruct represents a simplified test structure
