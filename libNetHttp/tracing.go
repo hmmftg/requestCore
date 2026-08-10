@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"strconv"
 
 	"github.com/hmmftg/requestCore/libTracing"
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
@@ -58,7 +59,7 @@ func CustomTracingMiddleware(tm *libTracing.TracingManager) func(http.Handler) h
 
 			// Add response attributes
 			tm.AddSpanAttributes(ctx, map[string]string{
-				"http.status_code": string(rune(wrapped.statusCode)),
+				"http.status_code": strconv.Itoa(wrapped.statusCode),
 			})
 
 			// Set response status

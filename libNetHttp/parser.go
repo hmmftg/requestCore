@@ -8,6 +8,8 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
+	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/hmmftg/requestCore/libQuery"
@@ -16,8 +18,8 @@ import (
 	"go.opentelemetry.io/otel/trace"
 )
 
-func InitContext(r *http.Request, w http.ResponseWriter) NetHttpParser {
-	parser := NetHttpParser{
+func InitContext(r *http.Request, w http.ResponseWriter) *NetHttpParser {
+	parser := &NetHttpParser{
 		Request:  r,
 		Response: w,
 		Locals:   make(map[string]any),
@@ -219,18 +221,23 @@ func (c NetHttpParser) FormValue(name string) string {
 }
 
 func (c NetHttpParser) SaveFile(formTagName, path string) error {
+	// Clean the path to prevent directory traversal (gosec G304).
+	cleanPath := filepath.Clean(path)
+	if filepath.IsAbs(cleanPath) || containsTraversal(cleanPath) {
+		return fmt.Errorf("invalid file path: %s", path)
+	}
 	file, _, err := c.Request.FormFile(formTagName)
 	if err != nil {
 		return err
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	// Create the file
-	dst, err := os.Create(path)
+	dst, err := os.Create(cleanPath) // #nosec G304 -- path validated above
 	if err != nil {
 		return err
 	}
-	defer dst.Close()
+	defer func() { _ = dst.Close() }()
 
 	// Copy the uploaded file to the destination
 	_, err = io.Copy(dst, file)
@@ -239,6 +246,12 @@ func (c NetHttpParser) SaveFile(formTagName, path string) error {
 	}
 
 	return nil
+}
+
+// containsTraversal checks whether the cleaned path still contains
+// parent-directory references ("..") that could escape the intended directory.
+func containsTraversal(cleanPath string) bool {
+	return cleanPath == ".." || strings.HasPrefix(cleanPath, "../") || strings.HasPrefix(cleanPath, "..\\")
 }
 
 func (c NetHttpParser) FileAttachment(path, fileName string) {
@@ -401,7 +414,9 @@ func (c NetHttpParser) GetContext() context.Context {
 	return c.Request.Context()
 }
 
-// SetContext updates the context in the HTTP request
-func (c NetHttpParser) SetContext(ctx context.Context) {
+// SetContext updates the context in the HTTP request.
+// It uses a pointer receiver because http.Request.WithContext returns a
+// new *http.Request and the mutation must be visible to callers.
+func (c *NetHttpParser) SetContext(ctx context.Context) {
 	c.Request = c.Request.WithContext(ctx)
 }

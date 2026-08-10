@@ -29,9 +29,9 @@ func BindURLParams(r *http.Request, parser *libNetHttp.NetHttpParser) {
 	}
 }
 
-func InitParser(r *http.Request, w http.ResponseWriter) libNetHttp.NetHttpParser {
+func InitParser(r *http.Request, w http.ResponseWriter) *libNetHttp.NetHttpParser {
 	parser := libNetHttp.InitContext(r, w)
-	BindURLParams(r, &parser)
+	BindURLParams(r, parser)
 	return parser
 }
 

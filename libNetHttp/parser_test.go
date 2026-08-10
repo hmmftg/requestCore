@@ -1,6 +1,7 @@
 package libNetHttp
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -67,6 +68,22 @@ func TestJSONResponse(t *testing.T) {
 
 	if result["message"] != "test" {
 		t.Errorf("Expected message 'test', got %s", result["message"])
+	}
+}
+
+func TestSetContext_PropagatesToGetContext(t *testing.T) {
+	req := httptest.NewRequest("GET", "/test", nil)
+	w := httptest.NewRecorder()
+	parser := InitContext(req, w)
+
+	type ctxKey struct{}
+	key := ctxKey{}
+	ctx := context.WithValue(context.Background(), key, "test-value")
+	parser.SetContext(ctx)
+
+	got := parser.GetContext()
+	if v, ok := got.Value(key).(string); !ok || v != "test-value" {
+		t.Errorf("GetContext did not observe value set via SetContext: got %v, want test-value", got.Value(key))
 	}
 }
 

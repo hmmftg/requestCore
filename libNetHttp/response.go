@@ -4,6 +4,7 @@ import (
 	"context"
 	"log"
 	"net/http"
+	"strings"
 
 	"github.com/hmmftg/requestCore/webFramework"
 )
@@ -114,11 +115,19 @@ func CORSMiddleware() Middleware {
 	}
 }
 
+// sanitizeLogValue strips control characters and newlines from a string to
+// prevent log injection (gosec G706) when logging untrusted request data.
+func sanitizeLogValue(s string) string {
+	s = strings.ReplaceAll(s, "\n", "\\n")
+	s = strings.ReplaceAll(s, "\r", "\\r")
+	return s
+}
+
 // Logging middleware for net/http
 func LoggingMiddleware() Middleware {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			log.Printf("%s %s %s", r.Method, r.URL.Path, r.RemoteAddr)
+			log.Printf("%s %s %s", sanitizeLogValue(r.Method), sanitizeLogValue(r.URL.Path), sanitizeLogValue(r.RemoteAddr))
 			next.ServeHTTP(w, r)
 		})
 	}
