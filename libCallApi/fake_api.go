@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"strconv"
 	"strings"
+	"time"
 )
 
 // FakeAPIServer creates a local test server that mimics external APIs
@@ -32,6 +33,36 @@ type AnimeEpisodesResponse struct {
 // NewFakeAPIServer creates a new fake API server for testing
 func NewFakeAPIServer() *FakeAPIServer {
 	mux := http.NewServeMux()
+
+	// Mock error status endpoints for testing HTTP status preservation
+	mux.HandleFunc("/api/forbidden", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusForbidden)
+		json.NewEncoder(w).Encode(map[string]interface{}{"error": "forbidden"})
+	})
+	mux.HandleFunc("/api/unauthorized", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusUnauthorized)
+		json.NewEncoder(w).Encode(map[string]interface{}{"error": "unauthorized"})
+	})
+	mux.HandleFunc("/api/server-error", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(map[string]interface{}{"error": "internal server error"})
+	})
+	mux.HandleFunc("/api/created", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusCreated)
+		json.NewEncoder(w).Encode(map[string]interface{}{"status": "created"})
+	})
+	mux.HandleFunc("/api/no-content", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNoContent)
+	})
+	mux.HandleFunc("/api/slow", func(w http.ResponseWriter, r *http.Request) {
+		time.Sleep(50 * time.Millisecond)
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(generateMockSimpleResponse("test1"))
+	})
 
 	// Mock generic API endpoints
 	mux.HandleFunc("/api/", func(w http.ResponseWriter, r *http.Request) {

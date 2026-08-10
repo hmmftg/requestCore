@@ -259,7 +259,10 @@ func PrepareCall[Resp any](w webFramework.WebFramework, c CallData[Resp]) (*http
 	}
 	if c.httpClient == nil {
 		httpClient.Timeout = to
-	} else {
+	} else if to != defaultTimeOut {
+		// Only override a supplied client's timeout when an explicit
+		// Time-Out header or CallData.Timeout is set. When neither is
+		// provided (to == defaultTimeOut), preserve the caller's timeout.
 		c.httpClient.Timeout = to
 	}
 	var buffer *bytes.Buffer
@@ -311,9 +314,14 @@ func PrepareCall[Resp any](w webFramework.WebFramework, c CallData[Resp]) (*http
 	case Form:
 		req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 	}
-	req.Header.Add("Accept", "application/json")
+	// Apply caller-provided headers first, then add the default Accept
+	// only when the caller has not already set one. This avoids duplicate
+	// Accept headers when a caller provides a custom value.
 	for header, value := range c.Headers {
 		req.Header.Add(header, value)
+	}
+	if req.Header.Get("Accept") == "" {
+		req.Header.Set("Accept", "application/json")
 	}
 
 	return req, nil
