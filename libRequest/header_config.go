@@ -277,7 +277,11 @@ func InitGlobalHeaderConfig(configPath string) error {
 func GetGlobalHeaderConfig() *DynamicHeaderConfig {
 	if globalHeaderLoader == nil {
 		globalHeaderLoader = NewHeaderConfigLoader("")
-		globalHeaderLoader.LoadConfigFromEnv()
+		if err := globalHeaderLoader.LoadConfigFromEnv(); err != nil {
+			// Best-effort initialization: fall back to default config when
+			// environment loading fails so callers still get a usable config.
+			return globalHeaderLoader.GetConfig()
+		}
 	}
 	return globalHeaderLoader.GetConfig()
 }

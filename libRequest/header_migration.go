@@ -96,30 +96,30 @@ func (m *HeaderMigration) GetLegacyMappings() map[string]string {
 func (m *HeaderMigration) ValidateMigration(legacy *RequestHeader, dynamic *DynamicRequestHeader) error {
 	// Check core fields
 	if legacy.RequestId != dynamic.RequestId {
-		return fmt.Errorf("RequestId mismatch: %s != %s", legacy.RequestId, dynamic.RequestId)
+		return fmt.Errorf("requestId mismatch: %s != %s", legacy.RequestId, dynamic.RequestId)
 	}
 	if legacy.Program != dynamic.Program {
-		return fmt.Errorf("Program mismatch: %s != %s", legacy.Program, dynamic.Program)
+		return fmt.Errorf("program mismatch: %s != %s", legacy.Program, dynamic.Program)
 	}
 	if legacy.Module != dynamic.Module {
-		return fmt.Errorf("Module mismatch: %s != %s", legacy.Module, dynamic.Module)
+		return fmt.Errorf("module mismatch: %s != %s", legacy.Module, dynamic.Module)
 	}
 	if legacy.Method != dynamic.Method {
-		return fmt.Errorf("Method mismatch: %s != %s", legacy.Method, dynamic.Method)
+		return fmt.Errorf("method mismatch: %s != %s", legacy.Method, dynamic.Method)
 	}
 	if legacy.User != dynamic.User {
-		return fmt.Errorf("User mismatch: %s != %s", legacy.User, dynamic.User)
+		return fmt.Errorf("user mismatch: %s != %s", legacy.User, dynamic.User)
 	}
 
 	// Check dynamic headers
 	if legacy.Branch != dynamic.GetDynamicHeader("Branch-Id") {
-		return fmt.Errorf("Branch mismatch: %s != %s", legacy.Branch, dynamic.GetDynamicHeader("Branch-Id"))
+		return fmt.Errorf("branch mismatch: %s != %s", legacy.Branch, dynamic.GetDynamicHeader("Branch-Id"))
 	}
 	if legacy.Bank != dynamic.GetDynamicHeader("Bank-Id") {
-		return fmt.Errorf("Bank mismatch: %s != %s", legacy.Bank, dynamic.GetDynamicHeader("Bank-Id"))
+		return fmt.Errorf("bank mismatch: %s != %s", legacy.Bank, dynamic.GetDynamicHeader("Bank-Id"))
 	}
 	if legacy.Person != dynamic.GetDynamicHeader("Person-Id") {
-		return fmt.Errorf("Person mismatch: %s != %s", legacy.Person, dynamic.GetDynamicHeader("Person-Id"))
+		return fmt.Errorf("person mismatch: %s != %s", legacy.Person, dynamic.GetDynamicHeader("Person-Id"))
 	}
 
 	return nil
@@ -169,10 +169,10 @@ func (m *HeaderMigration) GetHeaderDifferences(header1, header2 interface{}) []s
 	v1 := reflect.ValueOf(header1)
 	v2 := reflect.ValueOf(header2)
 
-	if v1.Kind() == reflect.Ptr {
+	if v1.Kind() == reflect.Pointer {
 		v1 = v1.Elem()
 	}
-	if v2.Kind() == reflect.Ptr {
+	if v2.Kind() == reflect.Pointer {
 		v2 = v2.Elem()
 	}
 

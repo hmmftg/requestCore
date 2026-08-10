@@ -62,7 +62,7 @@ func (m RequestModel) InitRequest(w webFramework.WebFramework, method, url strin
 		return errors.Join(err, libError.NewWithDescription(
 			status.BadRequest,
 			"DUPLICATE_REQUEST",
-			"dupicate request"))
+			"duplicate request"))
 	}
 	prg, mdl := m.QueryInterface.GetModule()
 	req.Header.SetProgram(prg)
