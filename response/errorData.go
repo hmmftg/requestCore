@@ -79,7 +79,7 @@ func (e ErrorData) Format(header string, stack *strings.Builder) {
 		js, _ := json.Marshal(e.Message)
 		jsonMsg = string(js)
 	}
-	stack.WriteString(fmt.Sprintf("%s%d,%s,%s,%s,%s\n", header, e.Status, e.Description, e.source, jsonInput, jsonMsg))
+	fmt.Fprintf(stack, "%s%d,%s,%s,%s,%s\n", header, e.Status, e.Description, e.source, jsonInput, jsonMsg)
 	childHeader := fmt.Sprintf("%s\t", header)
 	for _, errorData := range e.childs {
 		switch err := errorData.(type) {
