@@ -16,14 +16,14 @@ type ResponseHandler interface {
 type RespType int
 
 type RespData struct {
-	Code           int               `json:"code"`
-	Status         int               `json:"status"`
-	Message        string            `json:"message"`
-	Type           RespType          `json:"type"`
-	JSON           any               `json:"description"`
-	PrintData      *Receipt          `json:"receipt"`
-	Attachment     *FileResponse     `json:"attachment"`
-	PreBuiltErrors *[]ErrorResponse  `json:"-"` // when set, used instead of GetErrorsArray (e.g. for PublicDescription)
+	Code           int              `json:"code"`
+	Status         int              `json:"status"`
+	Message        string           `json:"message"`
+	Type           RespType         `json:"type"`
+	JSON           any              `json:"description"`
+	PrintData      *Receipt         `json:"receipt"`
+	Attachment     *FileResponse    `json:"attachment"`
+	PreBuiltErrors *[]ErrorResponse `json:"-"` // when set, used instead of GetErrorsArray (e.g. for PublicDescription)
 }
 
 const (

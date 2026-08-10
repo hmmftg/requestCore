@@ -95,10 +95,10 @@ func TestDMLHandler(t *testing.T) {
 			}),
 		},
 		{
-			Name:      "Precontrol failed",
-			Url:       "/",
-			Request:   testDMLReq{ID: "1"},
-			Status:    500,
+			Name:    "Precontrol failed",
+			Url:     "/",
+			Request: testDMLReq{ID: "1"},
+			Status:  500,
 			// Safe error response: internal message (PreControl: pre1) no longer exposed; expect errors and safe description
 			CheckBody: []string{"errors", "description"},
 			Model: testingtools.SampleQueryMock(t, func(mockDB sqlmock.Sqlmock) {

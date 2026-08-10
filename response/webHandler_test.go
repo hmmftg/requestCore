@@ -23,21 +23,21 @@ func (p *captureParser) GetPath() string   { return "/" }
 func (p *captureParser) GetHeader(webFramework.HeaderInterface) error {
 	return nil
 }
-func (p *captureParser) GetHeaderValue(string) string                   { return "" }
-func (p *captureParser) GetHttpHeader() http.Header                     { return nil }
-func (p *captureParser) GetBody(any) error                              { return nil }
-func (p *captureParser) GetUri(any) error                               { return nil }
-func (p *captureParser) GetUrlQuery(any) error                          { return nil }
-func (p *captureParser) GetRawUrlQuery() string                         { return "" }
-func (p *captureParser) GetLocal(name string) any                       { return p.locals[name] }
-func (p *captureParser) GetLocalString(name string) string              { return "" }
-func (p *captureParser) GetUrlParam(string) string                      { return "" }
-func (p *captureParser) GetUrlParams() map[string]string                { return nil }
-func (p *captureParser) CheckUrlParam(string) (string, bool)            { return "", false }
-func (p *captureParser) SetLocal(name string, value any)                { p.locals[name] = value }
-func (p *captureParser) SetReqHeader(string, string)                    {}
-func (p *captureParser) SetRespHeader(string, string)                   {}
-func (p *captureParser) GetArgs(...any) map[string]string               { return nil }
+func (p *captureParser) GetHeaderValue(string) string        { return "" }
+func (p *captureParser) GetHttpHeader() http.Header          { return nil }
+func (p *captureParser) GetBody(any) error                   { return nil }
+func (p *captureParser) GetUri(any) error                    { return nil }
+func (p *captureParser) GetUrlQuery(any) error               { return nil }
+func (p *captureParser) GetRawUrlQuery() string              { return "" }
+func (p *captureParser) GetLocal(name string) any            { return p.locals[name] }
+func (p *captureParser) GetLocalString(name string) string   { return "" }
+func (p *captureParser) GetUrlParam(string) string           { return "" }
+func (p *captureParser) GetUrlParams() map[string]string     { return nil }
+func (p *captureParser) CheckUrlParam(string) (string, bool) { return "", false }
+func (p *captureParser) SetLocal(name string, value any)     { p.locals[name] = value }
+func (p *captureParser) SetReqHeader(string, string)         {}
+func (p *captureParser) SetRespHeader(string, string)        {}
+func (p *captureParser) GetArgs(...any) map[string]string    { return nil }
 func (p *captureParser) ParseCommand(string, string, webFramework.RecordData, webFramework.FieldParser) string {
 	return ""
 }
@@ -45,12 +45,12 @@ func (p *captureParser) SendJSONRespBody(_ int, resp any) error {
 	p.lastResp = resp
 	return nil
 }
-func (p *captureParser) Next() error                     { return nil }
-func (p *captureParser) Abort() error                    { return nil }
-func (p *captureParser) FormValue(string) string         { return "" }
-func (p *captureParser) SaveFile(string, string) error   { return nil }
-func (p *captureParser) FileAttachment(string, string)   {}
-func (p *captureParser) AddCustomAttributes(slog.Attr)   {}
+func (p *captureParser) Next() error                   { return nil }
+func (p *captureParser) Abort() error                  { return nil }
+func (p *captureParser) FormValue(string) string       { return "" }
+func (p *captureParser) SaveFile(string, string) error { return nil }
+func (p *captureParser) FileAttachment(string, string) {}
+func (p *captureParser) AddCustomAttributes(slog.Attr) {}
 func (p *captureParser) GetTraceContext() trace.SpanContext {
 	return trace.SpanContext{}
 }

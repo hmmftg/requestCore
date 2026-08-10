@@ -112,5 +112,3 @@ func truncateAttr(s string) string {
 	}
 	return s[:max] + "…"
 }
-
-

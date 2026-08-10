@@ -155,7 +155,7 @@ func TraceFuncWithParser[T any, Arg any](parser webFramework.RequestParser, fn f
 func traceFuncWithParser[T any, Arg any](parser webFramework.RequestParser, fn func(Arg) (T, error), arg Arg) (T, error) {
 	// Get context from parser
 	ctx := parser.GetContext()
-	
+
 	// Auto-detect span name from caller
 	_, spanName := getCallerInfo(2)
 	if spanName == "" || spanName == "unknown" {
@@ -178,7 +178,7 @@ func traceFuncWithParser[T any, Arg any](parser webFramework.RequestParser, fn f
 	attrs := map[string]string{
 		"function.name": spanName,
 	}
-	
+
 	spanCtx, span := tm.StartSpanWithAttributes(ctx, spanName, attrs)
 	if span == nil {
 		// Span creation failed, execute function normally (zero-error design)
@@ -242,7 +242,7 @@ func TraceErrorWithParser[Arg any](parser webFramework.RequestParser, fn func(Ar
 func traceErrorWithParser[Arg any](parser webFramework.RequestParser, fn func(Arg) error, arg Arg) error {
 	// Get context from parser
 	ctx := parser.GetContext()
-	
+
 	// Auto-detect span name from caller
 	_, spanName := getCallerInfo(2)
 	if spanName == "" || spanName == "unknown" {
@@ -265,7 +265,7 @@ func traceErrorWithParser[Arg any](parser webFramework.RequestParser, fn func(Ar
 	attrs := map[string]string{
 		"function.name": spanName,
 	}
-	
+
 	spanCtx, span := tm.StartSpanWithAttributes(ctx, spanName, attrs)
 	if span == nil {
 		// Span creation failed, execute function normally (zero-error design)
@@ -329,7 +329,7 @@ func TraceVoidWithParser[Arg any](parser webFramework.RequestParser, fn func(Arg
 func traceVoidWithParser[Arg any](parser webFramework.RequestParser, fn func(Arg), arg Arg) {
 	// Get context from parser
 	ctx := parser.GetContext()
-	
+
 	// Auto-detect span name from caller
 	_, spanName := getCallerInfo(2)
 	if spanName == "" || spanName == "unknown" {
@@ -354,7 +354,7 @@ func traceVoidWithParser[Arg any](parser webFramework.RequestParser, fn func(Arg
 	attrs := map[string]string{
 		"function.name": spanName,
 	}
-	
+
 	spanCtx, span := tm.StartSpanWithAttributes(ctx, spanName, attrs)
 	if span == nil {
 		// Span creation failed, execute function normally (zero-error design)

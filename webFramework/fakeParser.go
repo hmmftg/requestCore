@@ -1,4 +1,3 @@
-// nolint:,staticcheck,ineffassign
 package webFramework
 
 import (

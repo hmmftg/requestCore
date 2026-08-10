@@ -82,8 +82,8 @@ type RequestHandler interface {
 }
 
 type WebFramework struct {
-	Ctx     context.Context
-	Span    trace.Span
+	Ctx  context.Context
+	Span trace.Span
 	//Handler response.ResponseHandler
 	Parser RequestParser
 }
