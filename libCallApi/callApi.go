@@ -392,7 +392,7 @@ func ConsumeRest[Resp any](w webFramework.WebFramework, c CallData[Resp]) (*Resp
 	startTime := time.Now()
 
 	// Ensure propagation by running request with the span context.
-	resp, err, traceCtx := libTracing.TraceFuncWithSpanName(ctx, spanName, spanAttrs, func(spanCtx context.Context) (*http.Response, error) {
+	resp, traceCtx, err := libTracing.TraceFuncWithSpanName(ctx, spanName, spanAttrs, func(spanCtx context.Context) (*http.Response, error) {
 		return cl.Do(req.WithContext(spanCtx))
 	})
 	if err != nil {
@@ -498,7 +498,7 @@ func ConsumeRestJSON[Resp any](w webFramework.WebFramework, c *CallData[Resp]) (
 	startTime := time.Now()
 
 	// Ensure propagation by running request with the span context.
-	resp, err, traceCtx := libTracing.TraceFuncWithSpanName(ctx, spanName, spanAttrs, func(spanCtx context.Context) (*http.Response, error) {
+	resp, traceCtx, err := libTracing.TraceFuncWithSpanName(ctx, spanName, spanAttrs, func(spanCtx context.Context) (*http.Response, error) {
 		return cl.Do(req.WithContext(spanCtx))
 	})
 	if err != nil {

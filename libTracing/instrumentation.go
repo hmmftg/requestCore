@@ -322,9 +322,9 @@ func traceVoidWithParser[Arg any](parser webFramework.RequestParser, fn func(Arg
 }
 
 // TraceFuncWithContext traces a function that takes context and returns (T, error)
-// Usage: result, err, newCtx := TraceFuncWithContext(ctx, func(ctx context.Context) (ResultType, error) { ... })
-// Returns: (result, error, newContext) - newContext contains the span context for propagation
-func TraceFuncWithContext[T any](ctx context.Context, fn func(context.Context) (T, error)) (T, error, context.Context) {
+// Usage: result, newCtx, err := TraceFuncWithContext(ctx, func(ctx context.Context) (ResultType, error) { ... })
+// Returns: (result, newContext, error) - newContext contains the span context for propagation
+func TraceFuncWithContext[T any](ctx context.Context, fn func(context.Context) (T, error)) (T, context.Context, error) {
 	// Auto-detect span name from caller
 	_, spanName := getCallerInfo(1)
 	if spanName == "" || spanName == "unknown" {
@@ -334,7 +334,7 @@ func TraceFuncWithContext[T any](ctx context.Context, fn func(context.Context) (
 	// Fast path: if tracing is not enabled, execute function without tracing
 	if !isTracingEnabled(ctx) {
 		result, err := fn(ctx)
-		return result, err, ctx
+		return result, ctx, err
 	}
 
 	// Get tracing manager
@@ -342,7 +342,7 @@ func TraceFuncWithContext[T any](ctx context.Context, fn func(context.Context) (
 	if tm == nil {
 		// Tracing manager not available, execute function normally
 		result, err := fn(ctx)
-		return result, err, ctx
+		return result, ctx, err
 	}
 
 	// Start span
@@ -354,7 +354,7 @@ func TraceFuncWithContext[T any](ctx context.Context, fn func(context.Context) (
 	if span == nil {
 		// Span creation failed, execute function normally (zero-error design)
 		result, err := fn(ctx)
-		return result, err, ctx
+		return result, ctx, err
 	}
 
 	// Measure execution time
@@ -389,13 +389,13 @@ func TraceFuncWithContext[T any](ctx context.Context, fn func(context.Context) (
 	// End span
 	span.End()
 
-	return result, err, spanCtx
+	return result, spanCtx, err
 }
 
 // TraceErrorWithContext traces a function that takes context and returns error
-// Usage: err, newCtx := TraceErrorWithContext(ctx, func(ctx context.Context) error { ... })
-// Returns: (error, newContext) - newContext contains the span context for propagation
-func TraceErrorWithContext(ctx context.Context, fn func(context.Context) error) (error, context.Context) {
+// Usage: newCtx, err := TraceErrorWithContext(ctx, func(ctx context.Context) error { ... })
+// Returns: (newContext, error) - newContext contains the span context for propagation
+func TraceErrorWithContext(ctx context.Context, fn func(context.Context) error) (context.Context, error) {
 	// Auto-detect span name from caller
 	_, spanName := getCallerInfo(1)
 	if spanName == "" || spanName == "unknown" {
@@ -405,7 +405,7 @@ func TraceErrorWithContext(ctx context.Context, fn func(context.Context) error) 
 	// Fast path: if tracing is not enabled, execute function without tracing
 	if !isTracingEnabled(ctx) {
 		err := fn(ctx)
-		return err, ctx
+		return ctx, err
 	}
 
 	// Get tracing manager
@@ -413,7 +413,7 @@ func TraceErrorWithContext(ctx context.Context, fn func(context.Context) error) 
 	if tm == nil {
 		// Tracing manager not available, execute function normally
 		err := fn(ctx)
-		return err, ctx
+		return ctx, err
 	}
 
 	// Start span
@@ -425,7 +425,7 @@ func TraceErrorWithContext(ctx context.Context, fn func(context.Context) error) 
 	if span == nil {
 		// Span creation failed, execute function normally (zero-error design)
 		err := fn(ctx)
-		return err, ctx
+		return ctx, err
 	}
 
 	// Measure execution time
@@ -460,7 +460,7 @@ func TraceErrorWithContext(ctx context.Context, fn func(context.Context) error) 
 	// End span
 	span.End()
 
-	return err, spanCtx
+	return spanCtx, err
 }
 
 // TraceVoidWithContext traces a function that takes context and returns nothing
@@ -522,12 +522,12 @@ func TraceVoidWithContext(ctx context.Context, fn func(context.Context)) context
 }
 
 // TraceFuncWithSpanName traces a function that takes context and returns (T, error) with custom span name and attributes
-// Usage: result, err, newCtx := TraceFuncWithSpanName(ctx, spanName, attrs, func(ctx context.Context) (ResultType, error) { ... })
-func TraceFuncWithSpanName[T any](ctx context.Context, spanName string, attrs map[string]string, fn func(context.Context) (T, error)) (T, error, context.Context) {
+// Usage: result, newCtx, err := TraceFuncWithSpanName(ctx, spanName, attrs, func(ctx context.Context) (ResultType, error) { ... })
+func TraceFuncWithSpanName[T any](ctx context.Context, spanName string, attrs map[string]string, fn func(context.Context) (T, error)) (T, context.Context, error) {
 	// Fast path: if tracing is not enabled, execute function without tracing
 	if !isTracingEnabled(ctx) {
 		result, err := fn(ctx)
-		return result, err, ctx
+		return result, ctx, err
 	}
 
 	// Get tracing manager
@@ -535,7 +535,7 @@ func TraceFuncWithSpanName[T any](ctx context.Context, spanName string, attrs ma
 	if tm == nil {
 		// Tracing manager not available, execute function normally
 		result, err := fn(ctx)
-		return result, err, ctx
+		return result, ctx, err
 	}
 
 	// Use provided span name or auto-detect
@@ -557,7 +557,7 @@ func TraceFuncWithSpanName[T any](ctx context.Context, spanName string, attrs ma
 	if span == nil {
 		// Span creation failed, execute function normally (zero-error design)
 		result, err := fn(ctx)
-		return result, err, ctx
+		return result, ctx, err
 	}
 
 	// Measure execution time
@@ -592,5 +592,5 @@ func TraceFuncWithSpanName[T any](ctx context.Context, spanName string, attrs ma
 	// End span
 	span.End()
 
-	return result, err, spanCtx
+	return result, spanCtx, err
 }

@@ -106,9 +106,9 @@ func addSlogValueAttrs(out map[string]string, key string, v slog.Value) {
 }
 
 func truncateAttr(s string) string {
-	const max = 1024
-	if len(s) <= max {
+	const maxLen = 1024
+	if len(s) <= maxLen {
 		return s
 	}
-	return s[:max] + "…"
+	return s[:maxLen] + "…"
 }

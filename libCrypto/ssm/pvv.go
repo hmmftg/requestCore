@@ -79,20 +79,20 @@ func IsPinEasy(pin int) bool {
 		slices.IndexFunc(BadPins, func(badPin int) bool { return pinMid10 == badPin }) == -1)
 }
 
-func GenerateRandomPin(len int) string {
-	if len == 4 {
+func GenerateRandomPin(length int) string {
+	if length == 4 {
 		nPin := rand.Intn(9999) // #nosec G404 -- PIN generation is not a cryptographic secret
 		for IsPinEasy(nPin) {
 			nPin = rand.Intn(9999) // #nosec G404
 		}
 		return fmt.Sprintf("%04d", nPin)
 	}
-	max := (int)(math.Pow10(len))
-	nPin := rand.Intn(max) // #nosec G404
+	maxVal := (int)(math.Pow10(length))
+	nPin := rand.Intn(maxVal) // #nosec G404
 	for IsPinEasy(nPin) {
-		nPin = rand.Intn(max) // #nosec G404
+		nPin = rand.Intn(maxVal) // #nosec G404
 	}
-	return fmt.Sprintf("%0*d", len, nPin)
+	return fmt.Sprintf("%0*d", length, nPin)
 }
 
 const DECIMALIZATION_TABLE string = "0123456789012345"

@@ -24,8 +24,8 @@ import (
 	"github.com/hmmftg/requestCore/swagger"
 	"github.com/hmmftg/requestCore/webFramework"
 
-	_ "github.com/lib/pq"
-	_ "github.com/sijms/go-ora/v2"
+	_ "github.com/lib/pq"          // register postgres driver
+	_ "github.com/sijms/go-ora/v2" // register oracle driver
 )
 
 type Application[T any] interface {

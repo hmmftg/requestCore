@@ -63,8 +63,8 @@ func AesEncrypt(kaeyB64, ivB64, text string) (string, error) {
 }
 
 // 28cEVB4BUE7GKNwjuRhN3szK5E3!&q*y
-func RandomData(len int) string {
-	key := make([]byte, len)
+func RandomData(length int) string {
+	key := make([]byte, length)
 
 	rand.Read(key)
 
