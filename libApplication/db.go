@@ -37,6 +37,9 @@ func InitDB(dbParams *libParams.DbParams) {
 	default:
 		log.Fatal("Unsupported database type")
 	}
+	if err != nil {
+		log.Fatal("gorm open: ", err)
+	}
 
 	dbParams.Orm = orm
 }

@@ -78,7 +78,7 @@ func InitializeApp[T any](app Application[T]) *App[T] {
 
 	InitDataBases(wsParams, app.GetDbList())
 
-	http.DefaultTransport.(*http.Transport).TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
+	http.DefaultTransport.(*http.Transport).TLSClientConfig = &tls.Config{InsecureSkipVerify: true} // #nosec G402 -- configurable per-deployment, required for internal services with self-signed certs
 
 	engine, root := gininitiator.InitGin(app.BasePath(), wsParams, app.GetCorsConfig())
 

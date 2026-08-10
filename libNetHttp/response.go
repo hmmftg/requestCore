@@ -127,7 +127,7 @@ func sanitizeLogValue(s string) string {
 func LoggingMiddleware() Middleware {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			log.Printf("%s %s %s", sanitizeLogValue(r.Method), sanitizeLogValue(r.URL.Path), sanitizeLogValue(r.RemoteAddr))
+			log.Printf("%s %s %s", sanitizeLogValue(r.Method), sanitizeLogValue(r.URL.Path), sanitizeLogValue(r.RemoteAddr)) // #nosec G706 -- inputs sanitized via sanitizeLogValue
 			next.ServeHTTP(w, r)
 		})
 	}

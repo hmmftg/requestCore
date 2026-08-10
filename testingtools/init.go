@@ -44,7 +44,7 @@ func InitTesting(t *testing.T,
 	if err != nil {
 		t.Errorf("An error '%s' was not expected when opening a stub database connection", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 	// expect transaction begin
 	mock.ExpectBegin()
 	// expect query to fetch order and user, match it with regexp
@@ -111,7 +111,7 @@ func DefaultDB(t *testing.T) *sql.DB {
 	if err != nil {
 		t.Errorf("An error '%s' was not expected when opening a stub database connection", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 	return db
 }
 

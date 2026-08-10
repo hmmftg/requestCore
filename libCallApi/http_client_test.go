@@ -41,7 +41,7 @@ func TestNewInstrumentedHTTPClient_MakesRequest(t *testing.T) {
 	resp, err := client.Get(srv.URL)
 	assert.NilError(t, err)
 	assert.Equal(t, resp.StatusCode, http.StatusOK)
-	resp.Body.Close()
+	_ = resp.Body.Close()
 }
 
 func TestNewInstrumentedHTTPClient_SkipTLSAcceptsSelfSigned(t *testing.T) {
@@ -54,7 +54,7 @@ func TestNewInstrumentedHTTPClient_SkipTLSAcceptsSelfSigned(t *testing.T) {
 	resp, err := clientSkip.Get(srv.URL)
 	assert.NilError(t, err, "skipTLS=true should allow self-signed certs")
 	assert.Equal(t, resp.StatusCode, http.StatusOK)
-	resp.Body.Close()
+	_ = resp.Body.Close()
 }
 
 func TestNewInstrumentedHTTPClient_TLSVerifyRejectsSelfSigned(t *testing.T) {

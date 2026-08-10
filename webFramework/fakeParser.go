@@ -138,7 +138,7 @@ func (c FakeParser) SaveFile(
 }
 
 func (c FakeParser) FileAttachment(path, fileName string) {
-	c.FileAttachment(path, fileName)
+	// no-op for fake parser
 }
 
 // Tracing methods for TestingParser

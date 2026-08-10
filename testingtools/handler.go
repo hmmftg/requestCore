@@ -27,7 +27,7 @@ import (
 )
 
 // initializeTestServer creates a gin server,
-// if there was a middleware it will be handled by this function automaticly.
+// if there was a middleware it will be handled by this function automatically.
 func initializeTestServer(options *TestOptions) *gin.Engine {
 	webFramework.AddStartUpLog(slog.String("StartUp", "test app"))
 	if options.Silent {
@@ -50,7 +50,7 @@ func initializeTestServer(options *TestOptions) *gin.Engine {
 }
 
 // initializeTestServer creates a gin server,
-// if there was a middleware it will be handled by this function automaticly.
+// if there was a middleware it will be handled by this function automatically.
 func initializeTestServerFiber(options *TestOptions) *fiber.App {
 	if options.Silent {
 		log.SetOutput(io.Discard)
@@ -92,7 +92,7 @@ func createTestRequest(t *testing.T, tc *TestCase, method string) (*httptest.Res
 // getTestResponse returns response status code and response body.
 func getTestResponse(t *testing.T, w *httptest.ResponseRecorder, tc *TestCase) (int, string, http.Header) {
 	res := w.Result()
-	defer res.Body.Close()
+	defer func() { _ = res.Body.Close() }()
 	return getResponse(t, res, tc)
 }
 
@@ -182,7 +182,7 @@ func doTestFiber(t *testing.T, f *fiber.App, tc *TestCase, options *TestOptions)
 		resp, err := f.Test(r)
 		defer func() {
 			if resp != nil && resp.Body != nil {
-				resp.Body.Close()
+				_ = resp.Body.Close()
 			}
 		}()
 		if err != nil {
