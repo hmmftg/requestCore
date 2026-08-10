@@ -55,7 +55,7 @@ func (l *TracingConfigLoader) LoadConfigFromEnv() error {
 		ServiceVersion: getEnvOrDefault("TRACING_SERVICE_VERSION", "1.0.0"),
 		Environment:    getEnvOrDefault("TRACING_ENVIRONMENT", "development"),
 		Exporter:       getEnvOrDefault("TRACING_EXPORTER", "stdout"),
-		JaegerEndpoint: getEnvOrDefault("TRACING_JAEGER_ENDPOINT", "http://localhost:14268/api/traces"),
+		OTLPEndpoint:   getEnvOrDefault("TRACING_OTLP_ENDPOINT", "http://localhost:4318/v1/traces"),
 		ZipkinEndpoint: getEnvOrDefault("TRACING_ZIPKIN_ENDPOINT", "http://localhost:9411/api/v2/spans"),
 		SamplingRatio:  getEnvFloatOrDefault("TRACING_SAMPLING_RATIO", 1.0),
 		Enabled:        getEnvBoolOrDefault("TRACING_ENABLED", true),
@@ -198,7 +198,7 @@ type TracingConfig struct {
 
 	// Exporter configuration
 	Exporter       string `yaml:"exporter" json:"exporter"`
-	JaegerEndpoint string `yaml:"jaeger_endpoint" json:"jaeger_endpoint"`
+	OTLPEndpoint   string `yaml:"otlp_endpoint" json:"otlp_endpoint"`
 	ZipkinEndpoint string `yaml:"zipkin_endpoint" json:"zipkin_endpoint"`
 
 	// Sampling configuration

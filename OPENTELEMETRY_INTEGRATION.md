@@ -19,7 +19,7 @@ This implementation adds comprehensive OpenTelemetry tracing support to the requ
 - **Custom Spans**: Manual span creation for business logic
 
 ### ✅ **Flexible Configuration**
-- **Multiple Exporters**: Jaeger, Zipkin, stdout, none
+- **Multiple Exporters**: OTLP/HTTP, Zipkin, stdout, none
 - **Environment Variables**: Runtime configuration
 - **YAML Configuration**: File-based configuration
 - **Sampling Control**: Configurable sampling ratios
@@ -61,8 +61,8 @@ export TRACING_SERVICE_VERSION="1.0.0"
 export TRACING_ENVIRONMENT="production"
 
 # Exporter configuration
-export TRACING_EXPORTER="jaeger"  # jaeger, zipkin, stdout, none
-export TRACING_JAEGER_ENDPOINT="http://localhost:14268/api/traces"
+export TRACING_EXPORTER="otlp"  # otlp, zipkin, stdout, none
+export TRACING_OTLP_ENDPOINT="http://localhost:4318/v1/traces"
 export TRACING_ZIPKIN_ENDPOINT="http://localhost:9411/api/v2/spans"
 
 # Sampling configuration
@@ -78,8 +78,8 @@ Create a `tracing_config.yaml` file:
 service_name: "requestCore"
 service_version: "1.0.0"
 environment: "production"
-exporter: "jaeger"
-jaeger_endpoint: "http://localhost:14268/api/traces"
+exporter: "otlp"
+otlp_endpoint: "http://localhost:4318/v1/traces"
 zipkin_endpoint: "http://localhost:9411/api/v2/spans"
 sampling_ratio: 1.0
 enabled: true
@@ -482,8 +482,8 @@ func main() {
         ServiceName:    "my-service",
         ServiceVersion: "1.0.0",
         Environment:    "production",
-        Exporter:       "jaeger",
-        JaegerEndpoint: "http://jaeger:14268/api/traces",
+        Exporter:       "otlp",
+        OTLPEndpoint:   "http://otel-collector:4318/v1/traces",
         SamplingRatio:  0.1, // Sample 10% of requests
         Enabled:        true,
         Attributes: map[string]string{
@@ -594,10 +594,10 @@ func main() {
 
 ## Integration with Observability Platforms
 
-### Jaeger
+### OTLP/HTTP (Jaeger, Tempo, etc.)
 ```yaml
-exporter: "jaeger"
-jaeger_endpoint: "http://jaeger:14268/api/traces"
+exporter: "otlp"
+otlp_endpoint: "http://otel-collector:4318/v1/traces"
 ```
 
 ### Zipkin

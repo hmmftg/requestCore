@@ -9,7 +9,7 @@ import (
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
-	"go.opentelemetry.io/otel/exporters/jaeger"
+	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp"
 	"go.opentelemetry.io/otel/exporters/stdout/stdouttrace"
 	"go.opentelemetry.io/otel/exporters/zipkin"
 	"go.opentelemetry.io/otel/propagation"
@@ -17,6 +17,7 @@ import (
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	semconv "go.opentelemetry.io/otel/semconv/v1.24.0"
 	"go.opentelemetry.io/otel/trace"
+	"go.opentelemetry.io/otel/trace/noop"
 )
 
 // TracingManager manages OpenTelemetry tracing
@@ -52,7 +53,7 @@ func NewTracingManager(config *TracingConfig) (*TracingManager, error) {
 	if !config.Enabled {
 		return &TracingManager{
 			config: config,
-			tracer: trace.NewNoopTracerProvider().Tracer("noop"),
+			tracer: noop.NewTracerProvider().Tracer("noop"),
 		}, nil
 	}
 
@@ -78,10 +79,10 @@ func NewTracingManager(config *TracingConfig) (*TracingManager, error) {
 	// Create exporter
 	var exporter sdktrace.SpanExporter
 	switch config.Exporter {
-	case "jaeger":
-		exporter, err = jaeger.New(jaeger.WithCollectorEndpoint(jaeger.WithEndpoint(config.JaegerEndpoint)))
+	case "otlp":
+		exporter, err = otlptracehttp.New(context.Background(), otlptracehttp.WithEndpointURL(config.OTLPEndpoint))
 		if err != nil {
-			return nil, fmt.Errorf("failed to create Jaeger exporter: %w", err)
+			return nil, fmt.Errorf("failed to create OTLP exporter: %w", err)
 		}
 	case "zipkin":
 		exporter, err = zipkin.New(config.ZipkinEndpoint)

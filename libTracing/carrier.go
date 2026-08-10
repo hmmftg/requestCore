@@ -187,10 +187,7 @@ func ParseTraceParent(traceParent string) *TraceContextInfo {
 	traceFlags := parts[3]
 
 	// Parse trace flags (last character indicates sampling)
-	sampled := false
-	if len(traceFlags) > 0 && traceFlags[len(traceFlags)-1] == '1' {
-		sampled = true
-	}
+	sampled := len(traceFlags) > 0 && traceFlags[len(traceFlags)-1] == '1'
 
 	return &TraceContextInfo{
 		TraceID: traceID,

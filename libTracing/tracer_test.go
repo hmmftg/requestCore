@@ -17,7 +17,7 @@ func TestTracingManager(t *testing.T) {
 	tm, err := libTracing.NewTracingManager(config)
 	assert.NilError(t, err, "NewTracingManager should not return an error")
 	assert.Assert(t, tm != nil, "TracingManager should not be nil")
-	defer tm.Shutdown(context.Background())
+	defer func() { _ = tm.Shutdown(context.Background()) }()
 
 	// Test span creation
 	ctx := context.Background()
@@ -50,8 +50,8 @@ func TestTracingConfigLoader(t *testing.T) {
 	configContent := `
 service_name: "test-service"
 service_version: "0.1.0"
-exporter: "jaeger"
-jaeger_endpoint: "http://localhost:14268/api/traces"
+exporter: "otlp"
+otlp_endpoint: "http://localhost:4318/v1/traces"
 sampling_ratio: 0.5
 `
 	err := os.WriteFile(configPath, []byte(configContent), 0644)
@@ -65,8 +65,8 @@ sampling_ratio: 0.5
 
 	// Verify loaded config
 	assert.Equal(t, config.ServiceName, "test-service")
-	assert.Equal(t, config.Exporter, "jaeger")
-	assert.Equal(t, config.JaegerEndpoint, "http://localhost:14268/api/traces")
+	assert.Equal(t, config.Exporter, "otlp")
+	assert.Equal(t, config.OTLPEndpoint, "http://localhost:4318/v1/traces")
 	assert.Equal(t, config.SamplingRatio, 0.5)
 
 	// Test GetGlobalTracingConfig
