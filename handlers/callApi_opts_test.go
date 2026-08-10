@@ -763,12 +763,12 @@ func TestCallApiJSONWithOpts_RetrySuccessOnSecondAttempt(t *testing.T) {
 		n := atomic.AddInt32(&serverAttempts, 1)
 		if n == 1 {
 			w.WriteHeader(http.StatusServiceUnavailable)
-			w.Write([]byte(`{"error":"unavailable"}`))
+			_, _ = w.Write([]byte(`{"error":"unavailable"}`))
 			return
 		}
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{"status":"success","data":[],"count":0}`))
+		_, _ = w.Write([]byte(`{"status":"success","data":[],"count":0}`))
 	})
 	srv := httptest.NewServer(mux)
 	t.Cleanup(srv.Close)
@@ -812,12 +812,12 @@ func TestCallApiJSONWithOpts_RetryLogKeysPerAttempt(t *testing.T) {
 		n := atomic.AddInt32(&serverAttempts, 1)
 		if n == 1 {
 			w.WriteHeader(http.StatusServiceUnavailable)
-			w.Write([]byte(`{"error":"unavailable"}`))
+			_, _ = w.Write([]byte(`{"error":"unavailable"}`))
 			return
 		}
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{"status":"success","data":[],"count":0}`))
+		_, _ = w.Write([]byte(`{"status":"success","data":[],"count":0}`))
 	})
 	srv := httptest.NewServer(mux)
 	t.Cleanup(srv.Close)
@@ -862,7 +862,7 @@ func TestCallApiJSONWithOpts_RetryExhausted(t *testing.T) {
 	mux.HandleFunc("/api/test1", func(w http.ResponseWriter, r *http.Request) {
 		atomic.AddInt32(&serverAttempts, 1)
 		w.WriteHeader(http.StatusServiceUnavailable)
-		w.Write([]byte(`{"error":"unavailable"}`))
+		_, _ = w.Write([]byte(`{"error":"unavailable"}`))
 	})
 	srv := httptest.NewServer(mux)
 	t.Cleanup(srv.Close)
@@ -901,12 +901,12 @@ func TestCallApiJSONWithOpts_RetryQueryStackPinned(t *testing.T) {
 		capturedQueries = append(capturedQueries, r.URL.RawQuery)
 		if atomic.LoadInt32(&serverAttempts) == 1 {
 			w.WriteHeader(http.StatusServiceUnavailable)
-			w.Write([]byte(`{"error":"unavailable"}`))
+			_, _ = w.Write([]byte(`{"error":"unavailable"}`))
 			return
 		}
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{"status":"success","data":[],"count":0}`))
+		_, _ = w.Write([]byte(`{"status":"success","data":[],"count":0}`))
 	})
 	srv := httptest.NewServer(mux)
 	t.Cleanup(srv.Close)
@@ -965,12 +965,12 @@ func TestCallApiJSONWithOpts_RetryWithFailedSuffix(t *testing.T) {
 		n := atomic.AddInt32(&serverAttempts, 1)
 		if n == 1 {
 			w.WriteHeader(http.StatusServiceUnavailable)
-			w.Write([]byte(`{"error":"unavailable"}`))
+			_, _ = w.Write([]byte(`{"error":"unavailable"}`))
 			return
 		}
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{"status":"success","data":[],"count":0}`))
+		_, _ = w.Write([]byte(`{"status":"success","data":[],"count":0}`))
 	})
 	srv := httptest.NewServer(mux)
 	t.Cleanup(srv.Close)
@@ -1147,7 +1147,7 @@ func TestCallApiJSONWithOpts_MaskFuncApplied(t *testing.T) {
 	mux.HandleFunc("/api/mask", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{"token":"secret-token","status":"ok","message":"hello"}`))
+		_, _ = w.Write([]byte(`{"token":"secret-token","status":"ok","message":"hello"}`))
 	})
 	srv := httptest.NewServer(mux)
 	t.Cleanup(srv.Close)
@@ -1194,7 +1194,7 @@ func TestCallApiJSONWithOpts_MaskFuncNil(t *testing.T) {
 	mux.HandleFunc("/api/mask", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{"token":"secret-token","status":"ok","message":"hello"}`))
+		_, _ = w.Write([]byte(`{"token":"secret-token","status":"ok","message":"hello"}`))
 	})
 	srv := httptest.NewServer(mux)
 	t.Cleanup(srv.Close)
@@ -1279,7 +1279,7 @@ func TestCallApiJSONWithOpts_MaskFuncNotAppliedToAddLog(t *testing.T) {
 	mux.HandleFunc("/api/mask", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{"token":"secret-token","status":"ok","message":"hello"}`))
+		_, _ = w.Write([]byte(`{"token":"secret-token","status":"ok","message":"hello"}`))
 	})
 	srv := httptest.NewServer(mux)
 	t.Cleanup(srv.Close)
@@ -1360,7 +1360,7 @@ func TestCallApiJSONWithOpts_MaskFuncReturnedResponseIsolated(t *testing.T) {
 	mux.HandleFunc("/api/mask", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{"token":"secret-token","status":"ok","message":"hello"}`))
+		_, _ = w.Write([]byte(`{"token":"secret-token","status":"ok","message":"hello"}`))
 	})
 	srv := httptest.NewServer(mux)
 	t.Cleanup(srv.Close)
@@ -1397,7 +1397,7 @@ func TestCallApiJSONWithOpts_MaskFuncLoggerAndCallbackReceiveMasked(t *testing.T
 	mux.HandleFunc("/api/mask", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{"token":"secret-token","status":"ok","message":"hello"}`))
+		_, _ = w.Write([]byte(`{"token":"secret-token","status":"ok","message":"hello"}`))
 	})
 	srv := httptest.NewServer(mux)
 	t.Cleanup(srv.Close)

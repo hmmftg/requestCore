@@ -259,8 +259,7 @@ func BaseHandler[Req any, Resp any, Handler HandlerInterface[Req, Resp]](
 			requestInserted = true
 		}
 
-		var errInit error
-		errInit = libTracing.TraceError(handler.Initializer, trx)
+		errInit := libTracing.TraceError(handler.Initializer, trx)
 		webFramework.AddLog(w, webFramework.HandlerLogTag, slog.Any("initialize", errInit))
 		if errInit != nil {
 			respondError(core, &trx, errInit)

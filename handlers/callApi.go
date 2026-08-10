@@ -261,7 +261,7 @@ func CallApiJSONWithOpts[Req any, Resp any](
 
 	// If no retry policy, execute a single attempt directly
 	if opts.RetryPolicy == nil {
-		resp, err, _ := executeSingleAttempt(w, param, opts, reqKey, respKey, failKey)
+		resp, _, err := executeSingleAttempt(w, param, opts, reqKey, respKey, failKey)
 		return finalizeResult(resp, err, opts)
 	}
 
@@ -271,7 +271,7 @@ func CallApiJSONWithOpts[Req any, Resp any](
 		originalBuilder = libCallApi.StatusPreservingBuilder[Resp]
 	}
 
-	retryResult := libRetry.WithRetry(opts.RetryPolicy, func(attempt int) (*Resp, error, int) {
+	retryResult := libRetry.WithRetry(opts.RetryPolicy, func(attempt int) (*Resp, int, error) {
 		attemptReqKey := formatRetryKey(reqKey, attempt)
 		attemptRespKey := formatRetryKey(respKey, attempt)
 		attemptFailKey := formatRetryKey(failKey, attempt)
@@ -294,13 +294,13 @@ func CallApiJSONWithOpts[Req any, Resp any](
 
 // executeSingleAttempt runs one attempt of the remote call with full
 // observability (AddLog, metrics, transaction logging, OnComplete).
-// Returns the response, error, and HTTP status code.
+// Returns the response, the HTTP status code, and an error.
 func executeSingleAttempt[Req any, Resp any](
 	w webFramework.WebFramework,
 	param *libCallApi.RemoteCallParamData[Req, Resp],
 	opts CallApiOptions,
 	reqKey, respKey, failKey string,
-) (*Resp, error, int) {
+) (*Resp, int, error) {
 	webFramework.AddLog(w, CallApiLogEntry, slog.Any(reqKey, param))
 
 	// Wrap the builder in a closure to:
@@ -340,7 +340,7 @@ func executeSingleAttempt[Req any, Resp any](
 		webFramework.AddLog(w, CallApiLogEntry, slog.Any(failKey, err))
 		recorder.Record(param.Api.Name, param.Method, statusCode, elapsed, "failure")
 		logTransactionAndCallback(w, opts, param, resp, err, statusCode, elapsed, requestURL)
-		return nil, err, statusCode
+		return nil, statusCode, err
 	}
 
 	webFramework.AddLog(w, CallApiLogEntry, slog.Any(respKey, resp))
@@ -350,12 +350,12 @@ func executeSingleAttempt[Req any, Resp any](
 		webFramework.AddLog(w, CallApiLogEntry, slog.Any(failKey, timeoutErr))
 		recorder.Record(param.Api.Name, param.Method, statusCode, elapsed, "timeout")
 		logTransactionAndCallback(w, opts, param, resp, timeoutErr, statusCode, elapsed, requestURL)
-		return nil, timeoutErr, statusCode
+		return nil, statusCode, timeoutErr
 	}
 
 	recorder.Record(param.Api.Name, param.Method, statusCode, elapsed, "success")
 	logTransactionAndCallback(w, opts, param, resp, err, statusCode, elapsed, requestURL)
-	return resp, nil, statusCode
+	return resp, statusCode, nil
 }
 
 // resolveLogKeys returns the request, response, and failure log keys,

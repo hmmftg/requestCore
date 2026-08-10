@@ -119,8 +119,8 @@ type RetryResult[Resp any] struct {
 
 // AttemptFunc is the function executed for each retry attempt.
 // The attempt number (1-based) is passed as the title argument.
-// It returns the response, an error, and the HTTP status code observed.
-type AttemptFunc[Resp any] func(attempt int) (*Resp, error, int)
+// It returns the response, the HTTP status code observed, and an error.
+type AttemptFunc[Resp any] func(attempt int) (*Resp, int, error)
 
 // defaultIsTimeoutError checks whether an error represents a timeout condition
 // by looking for known libError descriptions.
@@ -186,7 +186,7 @@ func WithRetry[Resp any](policy *RetryPolicy, attempt AttemptFunc[Resp]) RetryRe
 	for attemptNum := 1; attemptNum <= maxAttempts; attemptNum++ {
 		result.Attempts = attemptNum
 
-		resp, err, status := attempt(attemptNum)
+		resp, status, err := attempt(attemptNum)
 		result.LastStatus = status
 		result.Response = resp
 		result.Error = err

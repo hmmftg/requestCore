@@ -31,9 +31,9 @@ func TestWithRetry_ImmediateSuccess(t *testing.T) {
 	var calls atomic.Int32
 	policy := &libRetry.RetryPolicy{MaxRetries: 3}
 
-	result := libRetry.WithRetry(policy, func(attempt int) (*testResp, error, int) {
+	result := libRetry.WithRetry(policy, func(attempt int) (*testResp, int, error) {
 		calls.Add(1)
-		return &testResp{Data: "ok"}, nil, 200
+		return &testResp{Data: "ok"}, 200, nil
 	})
 
 	assert.Equal(t, calls.Load(), int32(1))
@@ -50,13 +50,13 @@ func TestWithRetry_TimeoutThenSuccess(t *testing.T) {
 		Backoff:        0,
 	}
 
-	result := libRetry.WithRetry(policy, func(attempt int) (*testResp, error, int) {
+	result := libRetry.WithRetry(policy, func(attempt int) (*testResp, int, error) {
 		n := calls.Add(1)
 		if n == 1 {
-			return nil, libError.NewWithDescription(
-				status.StatusCode(408), "API_CALL_TIME_OUT", "timeout"), 408
+			return nil, 408, libError.NewWithDescription(
+				status.StatusCode(408), "API_CALL_TIME_OUT", "timeout")
 		}
-		return &testResp{Data: "ok"}, nil, 200
+		return &testResp{Data: "ok"}, 200, nil
 	})
 
 	assert.Equal(t, calls.Load(), int32(2))
@@ -72,10 +72,10 @@ func TestWithRetry_ExhaustedTimeout(t *testing.T) {
 		RetryOnTimeout: true,
 	}
 
-	result := libRetry.WithRetry(policy, func(attempt int) (*testResp, error, int) {
+	result := libRetry.WithRetry(policy, func(attempt int) (*testResp, int, error) {
 		calls.Add(1)
-		return nil, libError.NewWithDescription(
-			status.StatusCode(408), "API_CALL_TIME_OUT", "timeout"), 408
+		return nil, 408, libError.NewWithDescription(
+			status.StatusCode(408), "API_CALL_TIME_OUT", "timeout")
 	})
 
 	assert.Equal(t, calls.Load(), int32(3))
@@ -90,12 +90,12 @@ func TestWithRetry_RetryableStatus(t *testing.T) {
 		RetryOnStatus: map[int]bool{503: true},
 	}
 
-	result := libRetry.WithRetry(policy, func(attempt int) (*testResp, error, int) {
+	result := libRetry.WithRetry(policy, func(attempt int) (*testResp, int, error) {
 		n := calls.Add(1)
 		if n < 3 {
-			return nil, &libCallApi.RemoteCallError{Status: 503, Body: nil, Err: errors.New("503")}, 503
+			return nil, 503, &libCallApi.RemoteCallError{Status: 503, Body: nil, Err: errors.New("503")}
 		}
-		return &testResp{Data: "ok"}, nil, 200
+		return &testResp{Data: "ok"}, 200, nil
 	})
 
 	assert.Equal(t, calls.Load(), int32(3))
@@ -110,9 +110,9 @@ func TestWithRetry_NonRetryableStatus(t *testing.T) {
 		RetryOnStatus: map[int]bool{503: true},
 	}
 
-	result := libRetry.WithRetry(policy, func(attempt int) (*testResp, error, int) {
+	result := libRetry.WithRetry(policy, func(attempt int) (*testResp, int, error) {
 		calls.Add(1)
-		return nil, &libCallApi.RemoteCallError{Status: 404, Body: nil, Err: errors.New("404")}, 404
+		return nil, 404, &libCallApi.RemoteCallError{Status: 404, Body: nil, Err: errors.New("404")}
 	})
 
 	assert.Equal(t, calls.Load(), int32(1))
@@ -127,12 +127,12 @@ func TestWithRetry_RetryableErrorCode(t *testing.T) {
 		RetryOnErrorCodes: map[int]bool{5001: true},
 	}
 
-	result := libRetry.WithRetry(policy, func(attempt int) (*testResp, error, int) {
+	result := libRetry.WithRetry(policy, func(attempt int) (*testResp, int, error) {
 		n := calls.Add(1)
 		if n < 3 {
-			return &testResp{Data: "", statusCode: 200, errCode: 5001}, nil, 200
+			return &testResp{Data: "", statusCode: 200, errCode: 5001}, 200, nil
 		}
-		return &testResp{Data: "ok", statusCode: 200, errCode: 0}, nil, 200
+		return &testResp{Data: "ok", statusCode: 200, errCode: 0}, 200, nil
 	})
 
 	assert.Equal(t, calls.Load(), int32(3))
@@ -147,10 +147,10 @@ func TestWithRetry_NoRetries(t *testing.T) {
 		RetryOnTimeout: true,
 	}
 
-	result := libRetry.WithRetry(policy, func(attempt int) (*testResp, error, int) {
+	result := libRetry.WithRetry(policy, func(attempt int) (*testResp, int, error) {
 		calls.Add(1)
-		return nil, libError.NewWithDescription(
-			status.StatusCode(408), "API_CALL_TIME_OUT", "timeout"), 408
+		return nil, 408, libError.NewWithDescription(
+			status.StatusCode(408), "API_CALL_TIME_OUT", "timeout")
 	})
 
 	assert.Equal(t, calls.Load(), int32(1))
@@ -172,9 +172,9 @@ func TestWithRetry_CancellationDuringBackoff(t *testing.T) {
 		cancel()
 	}()
 
-	result := libRetry.WithRetry(policy, func(attempt int) (*testResp, error, int) {
-		return nil, libError.NewWithDescription(
-			status.StatusCode(408), "API_CALL_TIME_OUT", "timeout"), 408
+	result := libRetry.WithRetry(policy, func(attempt int) (*testResp, int, error) {
+		return nil, 408, libError.NewWithDescription(
+			status.StatusCode(408), "API_CALL_TIME_OUT", "timeout")
 	})
 
 	assert.Assert(t, result.Error != nil)
@@ -188,10 +188,10 @@ func TestWithRetry_TitlesPerAttempt(t *testing.T) {
 		RetryOnTimeout: true,
 	}
 
-	libRetry.WithRetry(policy, func(attempt int) (*testResp, error, int) {
+	libRetry.WithRetry(policy, func(attempt int) (*testResp, int, error) {
 		titles = append(titles, libRetry.FormatAttemptTitle("test-call", attempt))
-		return nil, libError.NewWithDescription(
-			status.StatusCode(408), "API_CALL_TIME_OUT", "timeout"), 408
+		return nil, 408, libError.NewWithDescription(
+			status.StatusCode(408), "API_CALL_TIME_OUT", "timeout")
 	})
 
 	assert.Equal(t, len(titles), 3)
@@ -212,12 +212,12 @@ func TestWithRetry_CustomSleep(t *testing.T) {
 		},
 	}
 
-	result := libRetry.WithRetry(policy, func(attempt int) (*testResp, error, int) {
+	result := libRetry.WithRetry(policy, func(attempt int) (*testResp, int, error) {
 		if attempt < 3 {
-			return nil, libError.NewWithDescription(
-				status.StatusCode(408), "API_CALL_TIME_OUT", "timeout"), 408
+			return nil, 408, libError.NewWithDescription(
+				status.StatusCode(408), "API_CALL_TIME_OUT", "timeout")
 		}
-		return &testResp{Data: "ok"}, nil, 200
+		return &testResp{Data: "ok"}, 200, nil
 	})
 
 	assert.NilError(t, result.Error)
@@ -225,8 +225,8 @@ func TestWithRetry_CustomSleep(t *testing.T) {
 }
 
 func TestWithRetry_NilPolicy(t *testing.T) {
-	result := libRetry.WithRetry(nil, func(attempt int) (*testResp, error, int) {
-		return &testResp{Data: "ok"}, nil, 200
+	result := libRetry.WithRetry(nil, func(attempt int) (*testResp, int, error) {
+		return &testResp{Data: "ok"}, 200, nil
 	})
 
 	assert.NilError(t, result.Error)
@@ -244,12 +244,12 @@ func TestWithRetry_ElapsedDuration(t *testing.T) {
 		Backoff: 5 * time.Millisecond,
 	}
 
-	result := libRetry.WithRetry(policy, func(attempt int) (*testResp, error, int) {
+	result := libRetry.WithRetry(policy, func(attempt int) (*testResp, int, error) {
 		if attempt == 1 {
-			return nil, libError.NewWithDescription(
-				status.StatusCode(408), "API_CALL_TIME_OUT", "timeout"), 408
+			return nil, 408, libError.NewWithDescription(
+				status.StatusCode(408), "API_CALL_TIME_OUT", "timeout")
 		}
-		return &testResp{Data: "ok"}, nil, 200
+		return &testResp{Data: "ok"}, 200, nil
 	})
 
 	assert.NilError(t, result.Error)
@@ -269,13 +269,13 @@ func TestWithRetry_ConnectTimedOut(t *testing.T) {
 		RetryOnTimeout: true,
 	}
 
-	result := libRetry.WithRetry(policy, func(attempt int) (*testResp, error, int) {
+	result := libRetry.WithRetry(policy, func(attempt int) (*testResp, int, error) {
 		n := calls.Add(1)
 		if n == 1 {
-			return nil, libError.NewWithDescription(
-				status.StatusCode(408), "API_CONNECT_TIMED_OUT", "connect timeout"), 408
+			return nil, 408, libError.NewWithDescription(
+				status.StatusCode(408), "API_CONNECT_TIMED_OUT", "connect timeout")
 		}
-		return &testResp{Data: "ok"}, nil, 200
+		return &testResp{Data: "ok"}, 200, nil
 	})
 
 	assert.Equal(t, calls.Load(), int32(2))
@@ -292,11 +292,11 @@ func TestWithRetry_CustomTimeoutPredicate(t *testing.T) {
 		},
 	}
 
-	result := libRetry.WithRetry(policy, func(attempt int) (*testResp, error, int) {
+	result := libRetry.WithRetry(policy, func(attempt int) (*testResp, int, error) {
 		if attempt == 1 {
-			return nil, customErr, 0
+			return nil, 0, customErr
 		}
-		return &testResp{Data: "ok"}, nil, 200
+		return &testResp{Data: "ok"}, 200, nil
 	})
 
 	assert.NilError(t, result.Error)
@@ -310,11 +310,11 @@ func TestWithRetry_DefaultTimeoutPredicateSentinel(t *testing.T) {
 		RetryOnTimeout: true,
 	}
 
-	result := libRetry.WithRetry(policy, func(attempt int) (*testResp, error, int) {
+	result := libRetry.WithRetry(policy, func(attempt int) (*testResp, int, error) {
 		if attempt == 1 {
-			return nil, fmt.Errorf("api.example.com: elapsed 5s exceeds timeout 1s: %w", sentinelErr), 200
+			return nil, 200, fmt.Errorf("api.example.com: elapsed 5s exceeds timeout 1s: %w", sentinelErr)
 		}
-		return &testResp{Data: "ok"}, nil, 200
+		return &testResp{Data: "ok"}, 200, nil
 	})
 
 	assert.NilError(t, result.Error)
@@ -328,12 +328,12 @@ func TestWithRetry_RetryableErrorKey(t *testing.T) {
 		RetryOnErrorKeys: map[string]bool{"SERVICE_UNAVAILABLE": true},
 	}
 
-	result := libRetry.WithRetry(policy, func(attempt int) (*testResp, error, int) {
+	result := libRetry.WithRetry(policy, func(attempt int) (*testResp, int, error) {
 		n := calls.Add(1)
 		if n == 1 {
-			return &testResp{Data: "", statusCode: 200, errKey: "SERVICE_UNAVAILABLE"}, nil, 200
+			return &testResp{Data: "", statusCode: 200, errKey: "SERVICE_UNAVAILABLE"}, 200, nil
 		}
-		return &testResp{Data: "ok", statusCode: 200, errKey: ""}, nil, 200
+		return &testResp{Data: "ok", statusCode: 200, errKey: ""}, 200, nil
 	})
 
 	assert.Equal(t, calls.Load(), int32(2))
@@ -349,9 +349,9 @@ func TestWithRetry_NonRetryableErrorKey(t *testing.T) {
 		RetryOnErrorKeys: map[string]bool{"SERVICE_UNAVAILABLE": true},
 	}
 
-	result := libRetry.WithRetry(policy, func(attempt int) (*testResp, error, int) {
+	result := libRetry.WithRetry(policy, func(attempt int) (*testResp, int, error) {
 		calls.Add(1)
-		return &testResp{Data: "bad", statusCode: 200, errKey: "BAD_REQUEST"}, nil, 200
+		return &testResp{Data: "bad", statusCode: 200, errKey: "BAD_REQUEST"}, 200, nil
 	})
 
 	assert.Equal(t, calls.Load(), int32(1))
@@ -367,13 +367,13 @@ func TestWithRetry_ErrorKeyAndCodeBothChecked(t *testing.T) {
 		RetryOnErrorKeys:  map[string]bool{"SERVICE_UNAVAILABLE": true},
 	}
 
-	result := libRetry.WithRetry(policy, func(attempt int) (*testResp, error, int) {
+	result := libRetry.WithRetry(policy, func(attempt int) (*testResp, int, error) {
 		n := calls.Add(1)
 		if n == 1 {
 			// errCode matches but errKey does not — retry should trigger by code.
-			return &testResp{Data: "", statusCode: 200, errCode: 5001, errKey: "OTHER"}, nil, 200
+			return &testResp{Data: "", statusCode: 200, errCode: 5001, errKey: "OTHER"}, 200, nil
 		}
-		return &testResp{Data: "ok", statusCode: 200, errCode: 0, errKey: ""}, nil, 200
+		return &testResp{Data: "ok", statusCode: 200, errCode: 0, errKey: ""}, 200, nil
 	})
 
 	assert.Equal(t, calls.Load(), int32(2))
@@ -388,9 +388,9 @@ func TestWithRetry_ErrorKeyEmptyString(t *testing.T) {
 		RetryOnErrorKeys: map[string]bool{"SERVICE_UNAVAILABLE": true},
 	}
 
-	result := libRetry.WithRetry(policy, func(attempt int) (*testResp, error, int) {
+	result := libRetry.WithRetry(policy, func(attempt int) (*testResp, int, error) {
 		calls.Add(1)
-		return &testResp{Data: "ok", statusCode: 200, errKey: ""}, nil, 200
+		return &testResp{Data: "ok", statusCode: 200, errKey: ""}, 200, nil
 	})
 
 	assert.Equal(t, calls.Load(), int32(1))
@@ -405,9 +405,9 @@ func TestWithRetry_NilRetryOnErrorKeys(t *testing.T) {
 		// RetryOnErrorKeys is nil.
 	}
 
-	result := libRetry.WithRetry(policy, func(attempt int) (*testResp, error, int) {
+	result := libRetry.WithRetry(policy, func(attempt int) (*testResp, int, error) {
 		calls.Add(1)
-		return &testResp{Data: "ok", statusCode: 200, errKey: "SERVICE_UNAVAILABLE"}, nil, 200
+		return &testResp{Data: "ok", statusCode: 200, errKey: "SERVICE_UNAVAILABLE"}, 200, nil
 	})
 
 	assert.Equal(t, calls.Load(), int32(1))

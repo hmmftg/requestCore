@@ -149,7 +149,7 @@ func TestPrepareCall_NoDuplicateAcceptHeader(t *testing.T) {
 		observedAccept = r.Header["Accept"]
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{"status":"ok"}`))
+		_, _ = w.Write([]byte(`{"status":"ok"}`))
 	})
 	srv := httptest.NewServer(mux)
 	t.Cleanup(srv.Close)
@@ -179,7 +179,7 @@ func TestPrepareCall_DefaultAcceptWhenNotProvided(t *testing.T) {
 		observedAccept = r.Header["Accept"]
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{"status":"success","data":[],"count":0}`))
+		_, _ = w.Write([]byte(`{"status":"success","data":[],"count":0}`))
 	})
 	srv := httptest.NewServer(mux)
 	t.Cleanup(srv.Close)
