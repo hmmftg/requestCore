@@ -12,7 +12,7 @@ type Source struct {
 }
 
 func (s Source) Format(stack *strings.Builder) {
-	stack.WriteString(fmt.Sprintf("%s:%d", s.File, s.Line))
+	fmt.Fprintf(stack, "%s:%d", s.File, s.Line)
 }
 
 // LogValue implements slog.LogValuer and returns a grouped value

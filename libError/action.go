@@ -29,11 +29,11 @@ func ToSnakeCase(str string) string {
 }
 
 func (a Action) Format(stack *strings.Builder) {
-	stack.WriteString(fmt.Sprintf(
+	fmt.Fprintf(stack,
 		"status: %d|%s, desc: %s",
 		a.Status, a.Status.String(),
 		ToSnakeCase(a.Description),
-	))
+	)
 	message := ""
 	if a.Message != nil {
 		message = fmt.Sprintf(", message: {%+v}", a.Message)
