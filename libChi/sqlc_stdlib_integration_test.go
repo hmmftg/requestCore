@@ -11,6 +11,7 @@ import (
 
 	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/go-chi/chi/v5"
+
 	"github.com/hmmftg/requestCore/libChi"
 )
 
@@ -32,7 +33,7 @@ func TestChiStdlibSqlcStyleWithSQLDB(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed creating sqlmock: %v", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	queries := sqlcStyleQueries{db: db}
 

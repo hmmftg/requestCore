@@ -5,11 +5,12 @@ import (
 	"net/http"
 	"time"
 
+	"golang.org/x/oauth2"
+	"golang.org/x/oauth2/clientcredentials"
+
 	"github.com/hmmftg/requestCore/libError"
 	"github.com/hmmftg/requestCore/status"
 	"github.com/hmmftg/requestCore/webFramework"
-	"golang.org/x/oauth2"
-	"golang.org/x/oauth2/clientcredentials"
 )
 
 const tokenExpirySkew = 30 * time.Second

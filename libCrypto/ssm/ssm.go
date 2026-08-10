@@ -206,7 +206,7 @@ func (s *Ssm) PinBlockDecode(pan, pinBlock string) (string, error) {
 }
 
 func Initialize() {
-	rand.New(rand.NewSource(time.Now().UTC().UnixNano()))
+	rand.New(rand.NewSource(time.Now().UTC().UnixNano())) // #nosec G404 -- seeding for PIN generation, not cryptographic use
 }
 
 func Init(cvk, pvk, tpk string) (*Ssm, error) {

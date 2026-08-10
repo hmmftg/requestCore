@@ -24,7 +24,7 @@ func TestInitNetHttpContext(t *testing.T) {
 	}
 
 	// Verify we can cast to NetHttpParser
-	parser, ok := wf.Parser.(libNetHttp.NetHttpParser)
+	parser, ok := wf.Parser.(*libNetHttp.NetHttpParser)
 	if !ok {
 		t.Error("Parser should be of type NetHttpParser")
 	}
@@ -59,7 +59,7 @@ func TestInitNetHttpContextWithUnknownUser(t *testing.T) {
 	}
 
 	// Verify we can cast to NetHttpParser
-	parser, ok := wf.Parser.(libNetHttp.NetHttpParser)
+	parser, ok := wf.Parser.(*libNetHttp.NetHttpParser)
 	if !ok {
 		t.Error("Parser should be of type NetHttpParser")
 	}

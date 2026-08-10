@@ -154,7 +154,7 @@ func (c GinParser) SaveFile(
 	if fileErr != nil {
 		return fileErr
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	saveErr := c.Ctx.SaveUploadedFile(fileHeaders, path)
 	if saveErr != nil {

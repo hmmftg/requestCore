@@ -22,15 +22,16 @@ import (
 	"time"
 
 	"github.com/google/go-querystring/query"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/codes"
+	"go.opentelemetry.io/otel/propagation"
+	"go.opentelemetry.io/otel/trace"
+
 	"github.com/hmmftg/requestCore/libError"
 	"github.com/hmmftg/requestCore/libTracing"
 	"github.com/hmmftg/requestCore/response"
 	"github.com/hmmftg/requestCore/status"
 	"github.com/hmmftg/requestCore/webFramework"
-	"go.opentelemetry.io/otel"
-	"go.opentelemetry.io/otel/codes"
-	"go.opentelemetry.io/otel/propagation"
-	"go.opentelemetry.io/otel/trace"
 )
 
 func (m RemoteApiModel) ConsumeRestBasicAuthApi(w webFramework.WebFramework, requestJson []byte, apiName, path, contentType, method string, headers map[string]string) ([]byte, string, error) {
@@ -61,7 +62,7 @@ func (m RemoteApiModel) ConsumeRestBasicAuthApi(w webFramework.WebFramework, req
 		}
 		return nil, "API_UNABLE_TO_CALL#" + apiName + "#" + m.RemoteApiList[apiName].Name + "#", err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	responseData, err := io.ReadAll(resp.Body)
 	if err != nil {
@@ -115,7 +116,7 @@ func (m RemoteApiModel) ConsumeRestApi(w webFramework.WebFramework, requestJson 
 		}
 		return nil, "API_UNABLE_TO_CALL#" + apiName + "# " + m.RemoteApiList[apiName].Name + "#", http.StatusRequestTimeout, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	responseData, err := io.ReadAll(resp.Body)
 	if err != nil {
@@ -407,7 +408,7 @@ func ConsumeRest[Resp any](w webFramework.WebFramework, c CallData[Resp]) (*Resp
 		}
 		return nil, nil, nil, errors.Join(err, libError.NewWithDescription(http.StatusRequestTimeout, "API_UNABLE_TO_CALL", "error in ConsumeRest.ClientDo: %s %s", req.Method, req.RequestURI))
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Add HTTP response attributes to span
 	if span := trace.SpanFromContext(traceCtx); span.IsRecording() {
@@ -513,7 +514,7 @@ func ConsumeRestJSON[Resp any](w webFramework.WebFramework, c *CallData[Resp]) (
 		}
 		return nil, errors.Join(err, libError.NewWithDescription(http.StatusRequestTimeout, "API_UNABLE_TO_CALL", "error in ConsumeRest.ClientDo: %s %s", req.Method, req.RequestURI))
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Add HTTP response attributes to span
 	if span := trace.SpanFromContext(traceCtx); span.IsRecording() {
@@ -597,7 +598,7 @@ func TransmitSoap[Resp any](request any, url string, debug bool, timeout time.Du
 		}
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	result, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, err

@@ -6,11 +6,12 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/hmmftg/requestCore/libTracing"
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/trace"
+
+	"github.com/hmmftg/requestCore/libTracing"
 )
 
 // TracingMiddleware creates net/http middleware for OpenTelemetry tracing

@@ -26,7 +26,7 @@ import (
 func NewInstrumentedHTTPClient(timeout time.Duration, skipTLS bool) *http.Client {
 	transport := &http.Transport{
 		TLSClientConfig: &tls.Config{
-			InsecureSkipVerify: skipTLS,
+			InsecureSkipVerify: skipTLS, // #nosec G402 -- configurable via parameter, opt-in for internal services
 		},
 	}
 	return &http.Client{

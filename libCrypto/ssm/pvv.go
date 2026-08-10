@@ -81,16 +81,16 @@ func IsPinEasy(pin int) bool {
 
 func GenerateRandomPin(len int) string {
 	if len == 4 {
-		nPin := rand.Intn(9999)
+		nPin := rand.Intn(9999) // #nosec G404 -- PIN generation is not a cryptographic secret
 		for IsPinEasy(nPin) {
-			nPin = rand.Intn(9999)
+			nPin = rand.Intn(9999) // #nosec G404
 		}
 		return fmt.Sprintf("%04d", nPin)
 	}
 	max := (int)(math.Pow10(len))
-	nPin := rand.Intn(max)
+	nPin := rand.Intn(max) // #nosec G404
 	for IsPinEasy(nPin) {
-		nPin = rand.Intn(max)
+		nPin = rand.Intn(max) // #nosec G404
 	}
 	return fmt.Sprintf("%0*d", len, nPin)
 }

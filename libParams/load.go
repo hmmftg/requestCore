@@ -8,7 +8,7 @@ import (
 )
 
 func Load[T any](path string) (*ApplicationParams[T], error) {
-	data, err := os.ReadFile(path)
+	data, err := os.ReadFile(path) // #nosec G304 -- path comes from application config, not user input
 	if err != nil {
 		return nil, err
 	}

@@ -161,7 +161,7 @@ func (c FiberParser) SaveFile(
 
 func (c FiberParser) FileAttachment(path, fileName string) {
 	file := fmt.Sprintf("%s%s", path, fileName)
-	c.Ctx.SendFile(file, true)
+	_ = c.Ctx.SendFile(file, true)
 }
 
 const FiberCtxKey = "fiber.Ctx"

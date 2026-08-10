@@ -106,7 +106,7 @@ func main() {
 	}
 	channel = make(chan string)
 
-	connectionString := "postgres://pcbo:pcbo@10.15.1.61:9254/test"
+	connectionString := "postgres://pcbo:pcbo@10.15.1.61:9254/test" // #nosec G101 -- demo/test program with local dev credentials
 	db := Connect(connectionString, channel)
 	statements := strings.Split(string(sqlFileContents), ";")
 	var myresults Results

@@ -6,10 +6,11 @@ import (
 	"testing"
 
 	"github.com/DATA-DOG/go-sqlmock"
-	"github.com/hmmftg/requestCore/libQuery"
-	"github.com/hmmftg/requestCore/libQuery/liborm"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
+
+	"github.com/hmmftg/requestCore/libQuery"
+	"github.com/hmmftg/requestCore/libQuery/liborm"
 )
 
 // MockDBHelper provides a simplified interface for creating mock databases
@@ -40,7 +41,7 @@ func NewMockDBHelper(t *testing.T) *MockDBHelper {
 
 // Close closes the mock database connection
 func (m *MockDBHelper) Close() {
-	m.RawDB.Close()
+	_ = m.RawDB.Close()
 }
 
 // ExpectQuery sets up a mock query expectation

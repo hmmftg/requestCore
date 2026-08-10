@@ -19,12 +19,12 @@ func Query[Result any](db *sql.DB, querySql string, args ...any) ([]Result, erro
 	if err != nil {
 		return nil, response.ToError("QUERY_PREPARE_ERROR", fmt.Sprintf("Query[prepare](%s,%v)", querySql, args), err)
 	}
-	defer stmt.Close()
+	defer func() { _ = stmt.Close() }()
 	rows, err := stmt.Query(args...)
 	if err != nil {
 		return nil, response.ToError("QUERY_RUN_ERROR", fmt.Sprintf("Query[run](%s,%v)", querySql, args), err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	results := make([]Result, 0)
 	err = scan.Rows(&results, rows)

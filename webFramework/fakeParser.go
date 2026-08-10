@@ -42,15 +42,15 @@ func (f FakeParser) GetHttpHeader() http.Header {
 	return f.HttpHeader
 }
 func (f FakeParser) GetBody(target any) error {
-	target = f.Body
+	_ = target
 	return nil
 }
 func (f FakeParser) GetUri(target any) error {
-	target = f.Uri
+	_ = target
 	return nil
 }
 func (f FakeParser) GetUrlQuery(target any) error {
-	target = f.UrlQuery
+	_ = target
 	return nil
 }
 func (f FakeParser) GetRawUrlQuery() string {
@@ -73,7 +73,7 @@ func (f FakeParser) CheckUrlParam(name string) (string, bool) {
 	return p, ok
 }
 func (f FakeParser) SetLocal(name string, value any) {
-	value = f.Locals[name]
+	f.Locals[name] = value
 }
 
 func (f FakeParser) GetLogger() *slog.Logger {
@@ -117,7 +117,7 @@ func (f FakeParser) ParseCommand(command, title string, request RecordData, pars
 	return ""
 }
 func (f FakeParser) SendJSONRespBody(status int, resp any) error {
-	resp = f.JsonResp
+	_ = resp
 	return nil
 }
 func (f FakeParser) Next() error {
@@ -128,19 +128,12 @@ func (f FakeParser) Abort() error {
 }
 
 func (c FakeParser) FormValue(name string) string {
-	value := c.FormValue(name)
-
-	return value
+	return c.Args[name]
 }
 
 func (c FakeParser) SaveFile(
 	formTagName, path string,
 ) error {
-	fileErr := c.SaveFile(formTagName, path)
-	if fileErr != nil {
-		return fileErr
-	}
-
 	return nil
 }
 

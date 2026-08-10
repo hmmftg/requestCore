@@ -5,14 +5,16 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"math"
 	"reflect"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/go-viper/mapstructure/v2"
-	"github.com/hmmftg/requestCore/webFramework"
 	"github.com/valyala/fasttemplate"
+
+	"github.com/hmmftg/requestCore/webFramework"
 )
 
 func parseTimeUsingTimeFormat(field reflect.StructField, value string) (reflect.Value, error) {
@@ -58,7 +60,7 @@ func ParseQueryResult(result map[string]any, t reflect.Type, v reflect.Value) {
 			} else {
 				if t.Field(i).Type.Kind() == reflect.Slice {
 					v.FieldByName(t.Field(i).Name).Set(reflect.MakeSlice(reflect.TypeOf([]string{}), 0, 0))
-				} else if t.Field(i).Type.Kind() == reflect.Ptr {
+				} else if t.Field(i).Type.Kind() == reflect.Pointer {
 					if t.Field(i).Type.String() == "*time.Time" {
 						newV, err := parseTimeUsingTimeFormat(t.Field(i), value)
 						if err != nil {
@@ -126,7 +128,13 @@ func ParseQueryResult(result map[string]any, t reflect.Type, v reflect.Value) {
 		case uint64:
 			switch t.Field(i).Type.Kind() {
 			case reflect.Int64:
-				v.FieldByName(t.Field(i).Name).SetInt(int64(value))
+				if value > math.MaxInt64 {
+					slog.Error("ParseQueryResult, uint64 value overflows int64",
+						"value", value,
+						"field", t.Field(i).Name)
+				} else {
+					v.FieldByName(t.Field(i).Name).SetInt(int64(value)) // #nosec G115 -- bounds checked above
+				}
 			case reflect.Uint64:
 				v.FieldByName(t.Field(i).Name).SetUint(value)
 			default:

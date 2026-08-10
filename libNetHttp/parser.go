@@ -12,10 +12,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/hmmftg/requestCore/libQuery"
-	"github.com/hmmftg/requestCore/webFramework"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
+
+	"github.com/hmmftg/requestCore/libQuery"
+	"github.com/hmmftg/requestCore/webFramework"
 )
 
 func InitContext(r *http.Request, w http.ResponseWriter) *NetHttpParser {

@@ -7,10 +7,11 @@ import (
 	"net/http"
 	"testing"
 
+	"go.opentelemetry.io/otel/trace"
+
 	"github.com/hmmftg/requestCore/libError"
 	"github.com/hmmftg/requestCore/status"
 	"github.com/hmmftg/requestCore/webFramework"
-	"go.opentelemetry.io/otel/trace"
 )
 
 type captureParser struct {

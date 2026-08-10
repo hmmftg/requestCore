@@ -1,7 +1,6 @@
 package libCallApi
 
 import (
-	"crypto/tls"
 	"net/http"
 	"sync"
 	"time"
@@ -28,10 +27,6 @@ type CallApiInterface interface {
 const defaultTimeOut = 30 * time.Second
 
 var httpClient = &http.Client{
-	Timeout: defaultTimeOut,
-	Transport: &http.Transport{
-		TLSClientConfig: &tls.Config{
-			InsecureSkipVerify: true,
-		},
-	},
+	Timeout:   defaultTimeOut,
+	Transport: &http.Transport{},
 }

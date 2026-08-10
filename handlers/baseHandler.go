@@ -6,6 +6,9 @@ import (
 	"log/slog"
 	"time"
 
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
+
 	"github.com/hmmftg/requestCore"
 	"github.com/hmmftg/requestCore/libContext"
 	"github.com/hmmftg/requestCore/libLogger"
@@ -13,8 +16,6 @@ import (
 	"github.com/hmmftg/requestCore/libTracing"
 	"github.com/hmmftg/requestCore/response"
 	"github.com/hmmftg/requestCore/webFramework"
-	"go.opentelemetry.io/otel/attribute"
-	"go.opentelemetry.io/otel/trace"
 )
 
 type HandlerParameters[Req, Resp any] struct {

@@ -12,7 +12,7 @@ import (
 )
 
 func ReadKeyStore(filename string, password []byte) keystore.KeyStore {
-	f, err := os.Open(filename)
+	f, err := os.Open(filename) // #nosec G304 -- filename comes from application config, not user input
 	if err != nil {
 		log.Fatal("ReadKeyStore 1 ", err)
 	}
@@ -32,7 +32,7 @@ func ReadKeyStore(filename string, password []byte) keystore.KeyStore {
 }
 
 func WriteKeyStore(ks keystore.KeyStore, filename string, password []byte) {
-	f, err := os.Create(filename)
+	f, err := os.Create(filename) // #nosec G304 -- filename comes from application config, not user input
 	if err != nil {
 		log.Fatal("WriteKeyStore 1 ", err)
 	}

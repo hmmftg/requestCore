@@ -45,7 +45,7 @@ func QueryToStruct[Target any](q QueryRunnerInterface, querySql string, args ...
 				"queryRunner[prepare](%s,%v)", querySql, args,
 			))
 	}
-	defer stmt.Close()
+	defer func() { _ = stmt.Close() }()
 	rows, err := stmt.Query(args...)
 	if err != nil {
 		return nil, errors.Join(err,
@@ -55,7 +55,7 @@ func QueryToStruct[Target any](q QueryRunnerInterface, querySql string, args ...
 				"queryRunner[query](%s,%v)", querySql, args,
 			))
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	columnTypes, err := rows.ColumnTypes()
 

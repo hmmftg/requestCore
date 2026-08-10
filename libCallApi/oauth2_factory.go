@@ -1,7 +1,6 @@
 package libCallApi
 
 import (
-	"crypto/tls"
 	"fmt"
 	"net/http"
 
@@ -15,12 +14,8 @@ const (
 
 func NewTokenHTTPClient() *http.Client {
 	return &http.Client{
-		Timeout: defaultTimeOut,
-		Transport: &http.Transport{
-			TLSClientConfig: &tls.Config{
-				InsecureSkipVerify: true,
-			},
-		},
+		Timeout:   defaultTimeOut,
+		Transport: &http.Transport{},
 	}
 }
 

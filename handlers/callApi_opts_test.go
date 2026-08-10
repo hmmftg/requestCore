@@ -11,6 +11,8 @@ import (
 	"testing"
 	"time"
 
+	"gotest.tools/v3/assert"
+
 	"github.com/hmmftg/requestCore/handlers"
 	"github.com/hmmftg/requestCore/libCallApi"
 	"github.com/hmmftg/requestCore/libContext"
@@ -18,7 +20,6 @@ import (
 	"github.com/hmmftg/requestCore/libRetry"
 	"github.com/hmmftg/requestCore/libTracing"
 	"github.com/hmmftg/requestCore/webFramework"
-	"gotest.tools/v3/assert"
 )
 
 type optsTestResponse struct {
