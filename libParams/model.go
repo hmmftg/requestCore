@@ -1,3 +1,4 @@
+// Package libParams provides application parameter configuration management.
 package libParams
 
 import (

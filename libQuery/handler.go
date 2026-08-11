@@ -1,3 +1,4 @@
+// Package libQuery provides database query runner abstractions for requestCore.
 package libQuery
 
 import (

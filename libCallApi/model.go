@@ -1,3 +1,4 @@
+// Package libCallApi provides HTTP client utilities for consuming remote REST APIs.
 package libCallApi
 
 import (

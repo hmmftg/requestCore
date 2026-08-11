@@ -18,9 +18,8 @@ func fakeErrorCaller(data string, depth int, err error, child libError.Error) li
 	if depth <= 0 {
 		if child != nil {
 			return libError.Add(child, http.StatusNotFound, data, err)
-		} else {
-			return libError.Convert(err, http.StatusNotFound, data, err)
 		}
+		return libError.Convert(err, http.StatusNotFound, data, err)
 	}
 	return fakeErrorCaller(data, depth-1, errors.Join(err, fmt.Errorf("sub %d", depth)), child)
 }

@@ -1,3 +1,4 @@
+// Package ginsplunk provides Gin Splunk logging middleware integration.
 package ginsplunk
 
 import (

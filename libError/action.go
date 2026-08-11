@@ -1,3 +1,4 @@
+// Package libError provides structured error handling with action and source tracking.
 package libError
 
 import (

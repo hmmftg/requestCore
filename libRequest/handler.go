@@ -1,3 +1,4 @@
+// Package libRequest provides request parsing and validation utilities.
 package libRequest
 
 import (

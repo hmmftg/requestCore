@@ -281,7 +281,7 @@ func (s testTransformer[Row, Resp]) TranslateWithPaginate(rows []testQueryReq, r
 			Address: rows[id].Data,
 		}
 	}
-	result = Filterate(pd, result, func(f Filter) func(testQueryResp) bool {
+	result = Filterate(pd, result, func(_ Filter) func(testQueryResp) bool {
 		return func(r testQueryResp) bool {
 			return r.Address == "filtered"
 		}

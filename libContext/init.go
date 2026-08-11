@@ -1,3 +1,4 @@
+// Package libContext provides context initialization utilities for requestCore handlers.
 package libContext
 
 import (

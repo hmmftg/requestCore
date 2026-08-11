@@ -127,55 +127,55 @@ func (f FakeParser) Abort() error {
 	return nil
 }
 
-func (c FakeParser) FormValue(name string) string {
-	return c.Args[name]
+func (f FakeParser) FormValue(name string) string {
+	return f.Args[name]
 }
 
-func (c FakeParser) SaveFile(
+func (f FakeParser) SaveFile(
 	formTagName, path string,
 ) error {
 	return nil
 }
 
-func (c FakeParser) FileAttachment(path, fileName string) {
+func (f FakeParser) FileAttachment(path, fileName string) {
 	// no-op for fake parser
 }
 
 // Tracing methods for TestingParser
-func (c FakeParser) GetTraceContext() trace.SpanContext {
+func (f FakeParser) GetTraceContext() trace.SpanContext {
 	return trace.SpanContext{}
 }
 
-func (c FakeParser) SetTraceContext(spanCtx trace.SpanContext) {
+func (f FakeParser) SetTraceContext(spanCtx trace.SpanContext) {
 	// No-op for testing
 }
 
-func (c FakeParser) StartSpan(name string, opts ...trace.SpanStartOption) (context.Context, trace.Span) {
+func (f FakeParser) StartSpan(name string, opts ...trace.SpanStartOption) (context.Context, trace.Span) {
 	return context.Background(), trace.SpanFromContext(context.Background())
 }
 
-func (c FakeParser) AddSpanAttribute(key, value string) {
+func (f FakeParser) AddSpanAttribute(key, value string) {
 	// No-op for testing
 }
 
-func (c FakeParser) AddSpanAttributes(attrs map[string]string) {
+func (f FakeParser) AddSpanAttributes(attrs map[string]string) {
 	// No-op for testing
 }
 
-func (c FakeParser) AddSpanEvent(name string, attrs map[string]string) {
+func (f FakeParser) AddSpanEvent(name string, attrs map[string]string) {
 	// No-op for testing
 }
 
-func (c FakeParser) RecordSpanError(err error, attrs map[string]string) {
+func (f FakeParser) RecordSpanError(err error, attrs map[string]string) {
 	// No-op for testing
 }
 
 // GetContext returns a background context for testing
-func (c FakeParser) GetContext() context.Context {
+func (f FakeParser) GetContext() context.Context {
 	return context.Background()
 }
 
 // SetContext is a no-op for testing
-func (c FakeParser) SetContext(ctx context.Context) {
+func (f FakeParser) SetContext(ctx context.Context) {
 	// No-op for testing
 }

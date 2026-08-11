@@ -407,10 +407,7 @@ func TestValidatorRegistry(t *testing.T) {
 		if info.Type != libValidate.ValidatorTypeSystem {
 			t.Errorf("Expected %s to be a system validator", tag)
 		}
-		if !libValidate.IsCustomValidator(tag) {
-			// System validators should not be custom
-			// This is correct
-		} else {
+		if libValidate.IsCustomValidator(tag) {
 			t.Errorf("Expected %s to NOT be a custom validator", tag)
 		}
 	}

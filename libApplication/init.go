@@ -1,3 +1,4 @@
+// Package initiator provides application initialization utilities for Gin-based services.
 package initiator
 
 import (

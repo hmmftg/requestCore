@@ -1,3 +1,4 @@
+// Package libGin provides a Gin web framework adapter for requestCore.
 package libGin
 
 import (

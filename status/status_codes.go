@@ -1,3 +1,4 @@
+// Package status provides HTTP and application status code constants.
 package status
 
 import (

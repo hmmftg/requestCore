@@ -1,3 +1,4 @@
+// Package gininitiator provides Gin engine initialization with middleware setup.
 package gininitiator
 
 import (

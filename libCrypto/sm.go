@@ -1,3 +1,4 @@
+// Package libCrypto provides cryptographic utility wrappers.
 package libCrypto
 
 type Sm interface {

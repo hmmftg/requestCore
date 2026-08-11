@@ -1,3 +1,4 @@
+// Package metrics provides Prometheus metrics collection for requestCore applications.
 package metrics
 
 import (

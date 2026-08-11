@@ -34,8 +34,8 @@ type optsTestData struct {
 	Value string `json:"value"`
 }
 
-func (s optsTestResponse) SetStatus(a int)                {}
-func (s optsTestResponse) SetHeaders(a map[string]string) {}
+func (s optsTestResponse) SetStatus(_ int)                {}
+func (s optsTestResponse) SetHeaders(_ map[string]string) {}
 
 func setupOptsTest(t *testing.T) (*libCallApi.FakeAPIServer, *libCallApi.RemoteCallParamData[any, optsTestResponse]) {
 	t.Helper()
@@ -371,7 +371,7 @@ func TestCallApiJSONWithOpts_CustomBuilderNon2xx(t *testing.T) {
 	w := libContext.InitContextNoAuditTrail(t)
 
 	builderCalled := false
-	param.Builder = func(stat int, rawResp []byte, headers map[string]string) (*optsTestResponse, error) {
+	param.Builder = func(_ int, rawResp []byte, headers map[string]string) (*optsTestResponse, error) {
 		builderCalled = true
 		return &optsTestResponse{}, nil
 	}
@@ -542,7 +542,7 @@ func TestBuildRequestURL(t *testing.T) {
 	}
 }
 
-func TestInitHTTPClientMetricsNoPanic(t *testing.T) {
+func TestInitHTTPClientMetricsNoPanic(_ *testing.T) {
 	// Calling InitHTTPClientMetrics multiple times should not panic
 	libTracing.InitHTTPClientMetrics()
 	libTracing.InitHTTPClientMetrics()
@@ -559,7 +559,7 @@ func TestCallApiJSONWithOpts_Malformed2xxPreservesStatus(t *testing.T) {
 	w.Parser.SetLocal(webFramework.TransactionLoggerLocalKey, logger)
 
 	// Use a custom builder that returns a parse error for 200
-	param.Builder = func(stat int, rawResp []byte, headers map[string]string) (*optsTestResponse, error) {
+	param.Builder = func(_ int, rawResp []byte, headers map[string]string) (*optsTestResponse, error) {
 		return nil, fmt.Errorf("custom parse error")
 	}
 
@@ -760,7 +760,7 @@ func TestCallApiJSONWithOpts_RetrySuccessOnSecondAttempt(t *testing.T) {
 
 	var serverAttempts int32
 	mux := http.NewServeMux()
-	mux.HandleFunc("/api/test1", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/api/test1", func(w http.ResponseWriter, _ *http.Request) {
 		n := atomic.AddInt32(&serverAttempts, 1)
 		if n == 1 {
 			w.WriteHeader(http.StatusServiceUnavailable)
@@ -809,7 +809,7 @@ func TestCallApiJSONWithOpts_RetryLogKeysPerAttempt(t *testing.T) {
 
 	var serverAttempts int32
 	mux := http.NewServeMux()
-	mux.HandleFunc("/api/test1", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/api/test1", func(w http.ResponseWriter, _ *http.Request) {
 		n := atomic.AddInt32(&serverAttempts, 1)
 		if n == 1 {
 			w.WriteHeader(http.StatusServiceUnavailable)
@@ -860,7 +860,7 @@ func TestCallApiJSONWithOpts_RetryExhausted(t *testing.T) {
 
 	var serverAttempts int32
 	mux := http.NewServeMux()
-	mux.HandleFunc("/api/test1", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/api/test1", func(w http.ResponseWriter, _ *http.Request) {
 		atomic.AddInt32(&serverAttempts, 1)
 		w.WriteHeader(http.StatusServiceUnavailable)
 		_, _ = w.Write([]byte(`{"error":"unavailable"}`))
@@ -962,7 +962,7 @@ func TestCallApiJSONWithOpts_RetryWithFailedSuffix(t *testing.T) {
 
 	var serverAttempts int32
 	mux := http.NewServeMux()
-	mux.HandleFunc("/api/test1", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/api/test1", func(w http.ResponseWriter, _ *http.Request) {
 		n := atomic.AddInt32(&serverAttempts, 1)
 		if n == 1 {
 			w.WriteHeader(http.StatusServiceUnavailable)
@@ -1145,7 +1145,7 @@ func TestCallApiJSONWithOpts_MaskFuncApplied(t *testing.T) {
 	w := libContext.InitContextNoAuditTrail(t)
 
 	mux := http.NewServeMux()
-	mux.HandleFunc("/api/mask", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/api/mask", func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte(`{"token":"secret-token","status":"ok","message":"hello"}`))
@@ -1192,7 +1192,7 @@ func TestCallApiJSONWithOpts_MaskFuncNil(t *testing.T) {
 	w := libContext.InitContextNoAuditTrail(t)
 
 	mux := http.NewServeMux()
-	mux.HandleFunc("/api/mask", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/api/mask", func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte(`{"token":"secret-token","status":"ok","message":"hello"}`))
@@ -1277,7 +1277,7 @@ func TestCallApiJSONWithOpts_MaskFuncNotAppliedToAddLog(t *testing.T) {
 	w := libContext.InitContextNoAuditTrail(t)
 
 	mux := http.NewServeMux()
-	mux.HandleFunc("/api/mask", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/api/mask", func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte(`{"token":"secret-token","status":"ok","message":"hello"}`))
@@ -1358,7 +1358,7 @@ func TestCallApiJSONWithOpts_MaskFuncReturnedResponseIsolated(t *testing.T) {
 	w := libContext.InitContextNoAuditTrail(t)
 
 	mux := http.NewServeMux()
-	mux.HandleFunc("/api/mask", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/api/mask", func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte(`{"token":"secret-token","status":"ok","message":"hello"}`))
@@ -1395,7 +1395,7 @@ func TestCallApiJSONWithOpts_MaskFuncLoggerAndCallbackReceiveMasked(t *testing.T
 	w := libContext.InitContextNoAuditTrail(t)
 
 	mux := http.NewServeMux()
-	mux.HandleFunc("/api/mask", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/api/mask", func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte(`{"token":"secret-token","status":"ok","message":"hello"}`))

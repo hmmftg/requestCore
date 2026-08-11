@@ -1,3 +1,4 @@
+// Package liborm provides ORM-based query execution using Gorm.
 package liborm
 
 import (

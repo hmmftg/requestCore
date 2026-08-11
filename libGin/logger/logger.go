@@ -1,3 +1,4 @@
+// Package logger provides Gin middleware logging integration.
 package logger
 
 import (

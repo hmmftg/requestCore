@@ -69,11 +69,11 @@ func (h testHandlerType[Req, Resp]) Parameters() HandlerParameters[Req, Resp] {
 		TracingSpanName: "",
 	}
 }
-func (h testHandlerType[Req, Resp]) Initializer(req HandlerRequest[Req, Resp]) error {
+func (h testHandlerType[Req, Resp]) Initializer(_ HandlerRequest[Req, Resp]) error {
 	log.Println("Initializer")
 	return h.InitErr
 }
-func (h testHandlerType[Req, Resp]) Handler(req HandlerRequest[Req, Resp]) (Resp, error) {
+func (h testHandlerType[Req, Resp]) Handler(_ HandlerRequest[Req, Resp]) (Resp, error) {
 	log.Println("Handler")
 	if h.PanicInHandler {
 		panic("handler panic")
@@ -84,12 +84,12 @@ func (h testHandlerType[Req, Resp]) Handler(req HandlerRequest[Req, Resp]) (Resp
 	result := testResp{Result: "a"}
 	return Resp(result), nil
 }
-func (h testHandlerType[Req, Resp]) Simulation(req HandlerRequest[Req, Resp]) (Resp, error) {
+func (h testHandlerType[Req, Resp]) Simulation(_ HandlerRequest[Req, Resp]) (Resp, error) {
 	log.Println("Simulation")
 	result := testResp{Result: "a"}
 	return Resp(result), nil
 }
-func (h testHandlerType[Req, Resp]) Finalizer(req HandlerRequest[Req, Resp]) {
+func (h testHandlerType[Req, Resp]) Finalizer(_ HandlerRequest[Req, Resp]) {
 	log.Println("Finalizer")
 }
 

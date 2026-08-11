@@ -116,7 +116,7 @@ func (h Header) Map() map[string][]string {
 }
 
 // setHeaders sets given headers with dynamic header support
-func (header Header) setHeaders(r *http.Request) {
+func (h Header) setHeaders(r *http.Request) {
 	// Set core headers
 	r.Header.Add("Request-Id", "0123456789")
 	r.Header.Add("User-Id", "testuser")
@@ -139,7 +139,7 @@ func (header Header) setHeaders(r *http.Request) {
 	}
 
 	// Override with explicitly set headers
-	for _, h := range header {
+	for _, h := range h {
 		r.Header.Add(h.Key, h.Value)
 	}
 }

@@ -1,3 +1,4 @@
+// Package libTracing provides OpenTelemetry tracing integration for requestCore.
 package libTracing
 
 import (

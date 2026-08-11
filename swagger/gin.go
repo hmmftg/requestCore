@@ -1,3 +1,4 @@
+// Package swagger provides Swagger/OpenAPI documentation integration for Gin.
 package swagger
 
 import (

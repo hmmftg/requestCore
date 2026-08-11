@@ -1,3 +1,4 @@
+// Package libNetHttp provides a net/http web framework adapter for requestCore.
 package libNetHttp
 
 import (

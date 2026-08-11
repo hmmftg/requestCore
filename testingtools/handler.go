@@ -1,3 +1,4 @@
+// Package testingtools provides test helpers and mock infrastructure for requestCore.
 package testingtools
 
 import (

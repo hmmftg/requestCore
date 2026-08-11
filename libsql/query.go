@@ -1,3 +1,4 @@
+// Package libsql provides SQL query execution utilities with result scanning.
 package libsql
 
 import (

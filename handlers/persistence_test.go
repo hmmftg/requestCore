@@ -27,7 +27,7 @@ func (p *mapParser) GetUri(any) error                    { return nil }
 func (p *mapParser) GetUrlQuery(any) error               { return nil }
 func (p *mapParser) GetRawUrlQuery() string              { return "" }
 func (p *mapParser) GetLocal(name string) any            { return p.locals[name] }
-func (p *mapParser) GetLocalString(name string) string   { return "" }
+func (p *mapParser) GetLocalString(_ string) string      { return "" }
 func (p *mapParser) GetUrlParam(string) string           { return "" }
 func (p *mapParser) GetUrlParams() map[string]string     { return nil }
 func (p *mapParser) CheckUrlParam(string) (string, bool) { return "", false }
@@ -83,14 +83,14 @@ func TestPersistedRecordIDHelpers(t *testing.T) {
 func TestFuncPersister(t *testing.T) {
 	var insertCalled, updateCalled bool
 	p := FuncPersister[testReq, testResp]{
-		InsertFn: func(path string, req *HandlerRequest[testReq, testResp]) error {
+		InsertFn: func(path string, _ *HandlerRequest[testReq, testResp]) error {
 			insertCalled = true
 			if path != "/path" {
 				t.Fatalf("unexpected path %q", path)
 			}
 			return nil
 		},
-		UpdateFn: func(path string, req *HandlerRequest[testReq, testResp]) error {
+		UpdateFn: func(_ string, _ *HandlerRequest[testReq, testResp]) error {
 			updateCalled = true
 			return nil
 		},

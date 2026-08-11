@@ -1,3 +1,4 @@
+// Package handlers provides request handler primitives for requestCore applications.
 package handlers
 
 import (
@@ -79,52 +80,52 @@ func (trx *HandlerRequest[Req, Resp]) SetOutcome(err error, httpStatus int) {
 }
 
 // Tracing methods for HandlerRequest
-func (hr *HandlerRequest[Req, Resp]) AddSpanAttribute(key, value string) {
-	if hr.Span != nil && hr.Span.IsRecording() {
-		hr.Span.SetAttributes(attribute.String(key, value))
+func (trx *HandlerRequest[Req, Resp]) AddSpanAttribute(key, value string) {
+	if trx.Span != nil && trx.Span.IsRecording() {
+		trx.Span.SetAttributes(attribute.String(key, value))
 	}
 }
 
-func (hr *HandlerRequest[Req, Resp]) AddSpanAttributes(attrs map[string]string) {
-	if hr.Span != nil && hr.Span.IsRecording() {
+func (trx *HandlerRequest[Req, Resp]) AddSpanAttributes(attrs map[string]string) {
+	if trx.Span != nil && trx.Span.IsRecording() {
 		for k, v := range attrs {
-			hr.Span.SetAttributes(attribute.String(k, v))
+			trx.Span.SetAttributes(attribute.String(k, v))
 		}
 	}
 }
 
-func (hr *HandlerRequest[Req, Resp]) AddSpanEvent(name string, attrs map[string]string) {
-	if hr.Span != nil && hr.Span.IsRecording() {
+func (trx *HandlerRequest[Req, Resp]) AddSpanEvent(name string, attrs map[string]string) {
+	if trx.Span != nil && trx.Span.IsRecording() {
 		var eventAttrs []attribute.KeyValue
 		for k, v := range attrs {
 			eventAttrs = append(eventAttrs, attribute.String(k, v))
 		}
-		hr.Span.AddEvent(name, trace.WithAttributes(eventAttrs...))
+		trx.Span.AddEvent(name, trace.WithAttributes(eventAttrs...))
 	}
 }
 
-func (hr *HandlerRequest[Req, Resp]) RecordSpanError(err error, attrs map[string]string) {
-	if hr.Span != nil && hr.Span.IsRecording() {
+func (trx *HandlerRequest[Req, Resp]) RecordSpanError(err error, attrs map[string]string) {
+	if trx.Span != nil && trx.Span.IsRecording() {
 		var eventAttrs []attribute.KeyValue
 		for k, v := range attrs {
 			eventAttrs = append(eventAttrs, attribute.String(k, v))
 		}
-		hr.Span.RecordError(err, trace.WithAttributes(eventAttrs...))
+		trx.Span.RecordError(err, trace.WithAttributes(eventAttrs...))
 	}
 }
 
-func (hr *HandlerRequest[Req, Resp]) StartChildSpan(name string, attrs map[string]string) (context.Context, trace.Span) {
-	if hr.SpanCtx == nil {
-		hr.SpanCtx = context.Background()
+func (trx *HandlerRequest[Req, Resp]) StartChildSpan(name string, attrs map[string]string) (context.Context, trace.Span) {
+	if trx.SpanCtx == nil {
+		trx.SpanCtx = context.Background()
 	}
 
 	tm := libTracing.GetGlobalTracingManager()
-	return tm.StartSpanWithAttributes(hr.SpanCtx, name, attrs)
+	return tm.StartSpanWithAttributes(trx.SpanCtx, name, attrs)
 }
 
 // GetParser returns the RequestParser from WebFramework for tracing
-func (hr HandlerRequest[Req, Resp]) GetParser() webFramework.RequestParser {
-	return hr.W.Parser
+func (trx HandlerRequest[Req, Resp]) GetParser() webFramework.RequestParser {
+	return trx.W.Parser
 }
 
 func respondError[Req, Resp any](core requestCore.RequestCoreInterface, trx *HandlerRequest[Req, Resp], err error) {

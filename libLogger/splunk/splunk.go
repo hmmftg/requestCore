@@ -1,3 +1,4 @@
+// Package splunk provides Splunk HTTP event collector integration for requestCore logging.
 package splunk
 
 import (

@@ -1,3 +1,4 @@
+// Package mockdb provides mock database helpers for testing query runners.
 package mockdb
 
 import (

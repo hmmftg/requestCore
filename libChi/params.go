@@ -1,3 +1,4 @@
+// Package libChi provides a Chi web framework adapter for requestCore.
 package libChi
 
 import (

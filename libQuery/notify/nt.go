@@ -1,3 +1,4 @@
+// Package main provides database notification/listen utilities for PostgreSQL.
 package main
 
 import (

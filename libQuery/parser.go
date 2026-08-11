@@ -23,9 +23,8 @@ func parseTimeUsingTimeFormat(field reflect.StructField, value string) (reflect.
 		tm, errParseTime := time.Parse(field.Tag.Get("timeFormat"), value)
 		if errParseTime != nil {
 			return reflect.Value{}, fmt.Errorf("unable to parse time field with timeFormat tag: %s, => %s", format, errParseTime.Error())
-		} else {
-			return reflect.ValueOf(&tm), nil
 		}
+		return reflect.ValueOf(&tm), nil
 	}
 	return reflect.Value{}, errors.New("empty value")
 }

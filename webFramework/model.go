@@ -1,3 +1,4 @@
+// Package webFramework provides the web framework abstraction layer for requestCore.
 package webFramework
 
 import (

@@ -1,3 +1,4 @@
+// Package ssm provides cryptographic utilities for banking SSM operations.
 package ssm
 
 import (

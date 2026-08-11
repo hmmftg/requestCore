@@ -26,8 +26,8 @@ type SimpleTestResponse struct {
 	Count  int              `json:"count"`
 }
 
-func (s SimpleTestResponse) SetStatus(a int)                {}
-func (s SimpleTestResponse) SetHeaders(a map[string]string) {}
+func (s SimpleTestResponse) SetStatus(_ int)                {}
+func (s SimpleTestResponse) SetHeaders(_ map[string]string) {}
 
 func (env *testCallRemoteEnv) handlerCallAPI(method string, queryStack *[]string) any {
 	return func(c context.Context) {
@@ -67,7 +67,7 @@ func TestCallAPI(t *testing.T) {
 			},
 			Status:    200,
 			CheckBody: []string{"Test Item 1", "Value 1"},
-			Model:     testingtools.SampleRequestModelMock(t, func(mockDB sqlmock.Sqlmock) {}),
+			Model:     testingtools.SampleRequestModelMock(t, func(_ sqlmock.Sqlmock) {}),
 		},
 		{
 			Name:         "Step2",
@@ -80,7 +80,7 @@ func TestCallAPI(t *testing.T) {
 			},
 			Status:    200,
 			CheckBody: []string{"Test Item 3", "Value 3"},
-			Model:     testingtools.SampleRequestModelMock(t, func(mockDB sqlmock.Sqlmock) {}),
+			Model:     testingtools.SampleRequestModelMock(t, func(_ sqlmock.Sqlmock) {}),
 		},
 		{
 			Name:         "Step3",
@@ -93,7 +93,7 @@ func TestCallAPI(t *testing.T) {
 			},
 			Status:    200,
 			CheckBody: []string{"Test Item 5", "Value 5"},
-			Model:     testingtools.SampleRequestModelMock(t, func(mockDB sqlmock.Sqlmock) {}),
+			Model:     testingtools.SampleRequestModelMock(t, func(_ sqlmock.Sqlmock) {}),
 		},
 		/*{
 			Name:         "Step4",
@@ -105,7 +105,7 @@ func TestCallAPI(t *testing.T) {
 			},
 			Status:    200,
 			CheckBody: []string{"https://myanimelist.net/anime/400/Seihou_Bukyou_Outlaw_Star/episode/1", "Outlaw World"},
-			Model:     testingtools.SampleRequestModelMock(t, func(mockDB sqlmock.Sqlmock) {}),
+			Model:     testingtools.SampleRequestModelMock(t, func(_ sqlmock.Sqlmock) {}),
 		},*/
 	}
 
@@ -178,7 +178,7 @@ func TestCallAPIJSON(t *testing.T) {
 			},
 			Status:    200,
 			CheckBody: []string{"Test Item 1", "Value 1"},
-			Model:     testingtools.SampleRequestModelMock(t, func(mockDB sqlmock.Sqlmock) {}),
+			Model:     testingtools.SampleRequestModelMock(t, func(_ sqlmock.Sqlmock) {}),
 		},
 		{
 			Name:         "Step2",
@@ -191,7 +191,7 @@ func TestCallAPIJSON(t *testing.T) {
 			},
 			Status:    200,
 			CheckBody: []string{"Test Item 3", "Value 3"},
-			Model:     testingtools.SampleRequestModelMock(t, func(mockDB sqlmock.Sqlmock) {}),
+			Model:     testingtools.SampleRequestModelMock(t, func(_ sqlmock.Sqlmock) {}),
 		},
 		{
 			Name:         "Step3",
@@ -204,7 +204,7 @@ func TestCallAPIJSON(t *testing.T) {
 			},
 			Status:    200,
 			CheckBody: []string{"Test Item 5", "Value 5"},
-			Model:     testingtools.SampleRequestModelMock(t, func(mockDB sqlmock.Sqlmock) {}),
+			Model:     testingtools.SampleRequestModelMock(t, func(_ sqlmock.Sqlmock) {}),
 		},
 		/*{
 			Name:         "Step4",
@@ -216,7 +216,7 @@ func TestCallAPIJSON(t *testing.T) {
 			},
 			Status:    200,
 			CheckBody: []string{"https://myanimelist.net/anime/400/Seihou_Bukyou_Outlaw_Star/episode/1", "Outlaw World"},
-			Model:     testingtools.SampleRequestModelMock(t, func(mockDB sqlmock.Sqlmock) {}),
+			Model:     testingtools.SampleRequestModelMock(t, func(_ sqlmock.Sqlmock) {}),
 		},*/
 	}
 

@@ -1,3 +1,4 @@
+// Package libDictionary provides dictionary/lookup utilities for requestCore.
 package libDictionary
 
 type DictionaryModel struct {

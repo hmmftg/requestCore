@@ -1,3 +1,4 @@
+// Package libRetry provides retry policies with exponential backoff for function execution.
 package libRetry
 
 import (

@@ -1,3 +1,4 @@
+// Package libLogger provides structured logging utilities for requestCore.
 package libLogger
 
 import (

@@ -1,3 +1,4 @@
+// Package logger provides Fiber middleware logging integration.
 package logger
 
 import (

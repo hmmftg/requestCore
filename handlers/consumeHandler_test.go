@@ -23,7 +23,7 @@ func mockGetHeader(name string) string {
 func mockGetLocal(name string) string {
 	return "Local-" + name
 }
-func mockGetEmpty(name string) string {
+func mockGetEmpty(_ string) string {
 	return ""
 }
 
@@ -110,7 +110,7 @@ type githubRespOrg struct {
 	Description        string `json:"description"`
 }
 
-func ParseGithubRespJson(respBytes []byte, desc string, status int) (int, map[string]string, any, error) {
+func ParseGithubRespJson(respBytes []byte, _ string, status int) (int, map[string]string, any, error) {
 	var resp []githubRespOrg
 	err := json.Unmarshal(respBytes, &resp)
 	if err != nil {
@@ -157,11 +157,11 @@ func (h testConsumeHandlerType[Req, Resp]) Parameters() handlers.HandlerParamete
 		TracingSpanName: "",
 	}
 }
-func (h testConsumeHandlerType[Req, Resp]) Initializer(req handlers.HandlerRequest[Req, handlers.WsResponse[testRemoteCallResp]]) error {
+func (h testConsumeHandlerType[Req, Resp]) Initializer(_ handlers.HandlerRequest[Req, handlers.WsResponse[testRemoteCallResp]]) error {
 	return nil
 }
 func (h testConsumeHandlerType[Req, Resp]) Handler(
-	req handlers.HandlerRequest[Req, handlers.WsResponse[testRemoteCallResp]],
+	_ handlers.HandlerRequest[Req, handlers.WsResponse[testRemoteCallResp]],
 ) (handlers.WsResponse[testRemoteCallResp], error) {
 	ws := handlers.WsResponse[testRemoteCallResp]{
 		Result: testRemoteCallResp{
@@ -171,7 +171,7 @@ func (h testConsumeHandlerType[Req, Resp]) Handler(
 	return ws, nil
 }
 func (h testConsumeHandlerType[Req, Resp]) Simulation(
-	req handlers.HandlerRequest[Req, handlers.WsResponse[testRemoteCallResp]],
+	_ handlers.HandlerRequest[Req, handlers.WsResponse[testRemoteCallResp]],
 ) (handlers.WsResponse[testRemoteCallResp], error) {
 	ws := handlers.WsResponse[testRemoteCallResp]{
 		Result: testRemoteCallResp{
@@ -181,7 +181,7 @@ func (h testConsumeHandlerType[Req, Resp]) Simulation(
 
 	return ws, nil
 }
-func (h testConsumeHandlerType[Req, Resp]) Finalizer(req handlers.HandlerRequest[Req, handlers.WsResponse[testRemoteCallResp]]) {
+func (h testConsumeHandlerType[Req, Resp]) Finalizer(_ handlers.HandlerRequest[Req, handlers.WsResponse[testRemoteCallResp]]) {
 }
 
 func testConsumeHandler[Req, Resp any](

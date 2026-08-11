@@ -1,3 +1,4 @@
+// Package libValidate provides request field validation with custom and system validators.
 package libValidate
 
 import (

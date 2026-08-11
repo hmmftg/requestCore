@@ -1,3 +1,4 @@
+// Package libFiber provides a Fiber web framework adapter for requestCore.
 package libFiber
 
 import (

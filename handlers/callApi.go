@@ -40,7 +40,7 @@ func (w *WsResponse[any]) SetHeaders(headers map[string]string) {
 
 func CallApiInternal[Resp any](
 	w webFramework.WebFramework,
-	core requestCore.RequestCoreInterface,
+	_ requestCore.RequestCoreInterface,
 	method string,
 	param libCallApi.CallParam) (*Resp, error) {
 	webFramework.AddLog(w, CallApiLogEntry, slog.Any(method, param))
@@ -92,7 +92,7 @@ func CallApiWithReceipt[Resp any](
 
 func CallApiJSON[Req any, Resp any](
 	w webFramework.WebFramework,
-	core requestCore.RequestCoreInterface,
+	_ requestCore.RequestCoreInterface,
 	method string,
 	param *libCallApi.RemoteCallParamData[Req, Resp],
 ) (Resp, error) {
@@ -113,7 +113,7 @@ func CallApiJSON[Req any, Resp any](
 
 func CallApiForm[Req any, Resp any](
 	w webFramework.WebFramework,
-	core requestCore.RequestCoreInterface,
+	_ requestCore.RequestCoreInterface,
 	method string,
 	param *libCallApi.RemoteCallParamData[Req, Resp],
 ) (Resp, error) {
@@ -241,7 +241,7 @@ type CallApiOptions struct {
 // Custom headers: set param.Headers directly (e.g. param.Headers["SIGNATURE"] = "...").
 func CallApiJSONWithOpts[Req any, Resp any](
 	w webFramework.WebFramework,
-	core requestCore.RequestCoreInterface,
+	_ requestCore.RequestCoreInterface,
 	param *libCallApi.RemoteCallParamData[Req, Resp],
 	opts CallApiOptions,
 ) (Resp, error) {

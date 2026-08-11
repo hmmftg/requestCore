@@ -147,7 +147,7 @@ func CallRemoteWithRespParser[Req any, Resp any](
 func InitPostRequest(
 	w webFramework.WebFramework,
 	reqLog libRequest.RequestPtr,
-	method, url string,
+	_, url string,
 	checkDuplicate func(libRequest.Request) error,
 	insertRequest func(libRequest.Request) error,
 	args ...any,

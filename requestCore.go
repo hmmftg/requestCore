@@ -1,3 +1,4 @@
+// Package requestCore provides the core request processing pipeline framework.
 package requestCore
 
 import (
