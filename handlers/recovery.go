@@ -40,14 +40,14 @@ func Recovery[Req any, Resp any, Handler HandlerInterface[Req, Resp]](
 				panicErr = errors.Join(data,
 					libError.NewWithDescription(
 						status.InternalServerError,
-						response.SYSTEM_FAULT,
+						response.SystemFault,
 						"panic in %s",
 						params.Title,
 					))
 			default:
 				panicErr = libError.NewWithDescription(
 					http.StatusInternalServerError,
-					response.SYSTEM_FAULT,
+					response.SystemFault,
 					"panic in %s",
 					params.Title)
 			}
@@ -60,7 +60,7 @@ func Recovery[Req any, Resp any, Handler HandlerInterface[Req, Resp]](
 	webFramework.CollectLogArrays(w, webFramework.HandlerLogTag)
 	webFramework.CollectLogTags(w, webFramework.ErrorListLogTag)
 	webFramework.CollectLogArrays(w, webFramework.ErrorListLogTag)
-	webFramework.CollectLogArrays(w, CallApiLogEntry)
+	webFramework.CollectLogArrays(w, CallAPILogEntry)
 	for id := range params.LogTags {
 		webFramework.CollectLogTags(w, params.LogTags[id])
 	}

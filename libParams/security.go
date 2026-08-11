@@ -143,7 +143,7 @@ func DecryptParams[T any](keyByte, ivByte []byte, params *ApplicationParams[T]) 
 			tags := strings.Split(id, "#")
 			switch tags[0] {
 			case "remote-api":
-				api := params.RemoteApis[tags[1]]
+				api := params.RemoteAPIs[tags[1]]
 				switch tags[2] {
 				case "grant-type":
 					api.AuthData.GrantType = current.Value
@@ -158,7 +158,7 @@ func DecryptParams[T any](keyByte, ivByte []byte, params *ApplicationParams[T]) 
 				case "auth-url", "auth-uri":
 					api.AuthData.AuthURI = current.Value
 				}
-				params.RemoteApis[tags[1]] = api
+				params.RemoteAPIs[tags[1]] = api
 			case "security-module-param":
 				if tags[3] == "password" {
 					params.SecurityModule[tags[1]].Params[tags[2]+"-pass"] = current.Value

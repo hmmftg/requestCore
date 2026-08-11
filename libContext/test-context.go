@@ -92,22 +92,22 @@ func (t TestingParser) GetHeaderValue(name string) string {
 
 	return head
 }
-func (t TestingParser) GetHttpHeader() http.Header {
+func (t TestingParser) GetHTTPHeader() http.Header {
 	return t.HttpHeader
 }
 func (t TestingParser) GetBody(target any) error {
 	setTarget(target, t.Body)
 	return t.BodyError
 }
-func (t TestingParser) GetUri(target any) error {
+func (t TestingParser) GetURI(target any) error {
 	setTarget(target, t.Uri)
 	return t.UriError
 }
-func (t TestingParser) GetUrlQuery(target any) error {
+func (t TestingParser) GetURLQuery(target any) error {
 	setTarget(target, t.UrlQuery)
 	return t.UrlQueryError
 }
-func (t TestingParser) GetRawUrlQuery() string {
+func (t TestingParser) GetRawURLQuery() string {
 	return t.RawQuery
 }
 func (t TestingParser) GetLocal(name string) any {
@@ -147,13 +147,13 @@ func (t TestingParser) AddCustomAttributes(attr slog.Attr) {
 	}
 }
 
-func (t TestingParser) GetUrlParam(name string) string {
+func (t TestingParser) GetURLParam(name string) string {
 	return t.UrlParams[name]
 }
-func (t TestingParser) GetUrlParams() map[string]string {
+func (t TestingParser) GetURLParams() map[string]string {
 	return t.UrlParams
 }
-func (t TestingParser) CheckUrlParam(name string) (string, bool) {
+func (t TestingParser) CheckURLParam(name string) (string, bool) {
 	param, ok := t.UrlParams[name]
 	return param, ok
 }

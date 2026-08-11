@@ -42,16 +42,16 @@ type RequestParser interface {
 	GetPath() string
 	GetHeader(target HeaderInterface) error
 	GetHeaderValue(name string) string
-	GetHttpHeader() http.Header
+	GetHTTPHeader() http.Header
 	GetBody(target any) error
-	GetUri(target any) error
-	GetUrlQuery(target any) error
-	GetRawUrlQuery() string
+	GetURI(target any) error
+	GetURLQuery(target any) error
+	GetRawURLQuery() string
 	GetLocal(name string) any
 	GetLocalString(name string) string
-	GetUrlParam(name string) string
-	GetUrlParams() map[string]string
-	CheckUrlParam(name string) (string, bool)
+	GetURLParam(name string) string
+	GetURLParams() map[string]string
+	CheckURLParam(name string) (string, bool)
 	SetLocal(name string, value any)
 	SetReqHeader(name string, value string)
 	SetRespHeader(name string, value string)

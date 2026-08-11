@@ -50,7 +50,7 @@ func (a *countingAuth) Refresh(w webFramework.WebFramework, refreshToken string)
 func TestAuthenticate_CacheHitAvoidsSecondLogin(t *testing.T) {
 	auth := &countingAuth{}
 	cache, lock := libCallApi.InitTokenCache()
-	api := &libCallApi.RemoteApi{
+	api := &libCallApi.RemoteAPI{
 		Name:           "test-api",
 		Auth:           auth,
 		TokenCache:     cache,
@@ -82,7 +82,7 @@ func TestAuthenticate_ExpiredTokenTriggersRefresh(t *testing.T) {
 		TimeTaken:  time.Now(),
 		ValidUntil: time.Hour,
 	}
-	api := &libCallApi.RemoteApi{
+	api := &libCallApi.RemoteAPI{
 		Name:           "test-api",
 		Auth:           auth,
 		TokenCache:     cache,
@@ -103,7 +103,7 @@ func TestAuthenticate_ExpiredTokenTriggersRefresh(t *testing.T) {
 func TestAuthenticate_ConcurrentLoginOnce(t *testing.T) {
 	auth := &countingAuth{}
 	cache, lock := libCallApi.InitTokenCache()
-	api := &libCallApi.RemoteApi{
+	api := &libCallApi.RemoteAPI{
 		Name:           "test-api",
 		Auth:           auth,
 		TokenCache:     cache,
@@ -128,7 +128,7 @@ func TestAuthenticate_ConcurrentLoginOnce(t *testing.T) {
 }
 
 func TestEnsureAuthorization_PreservesExplicitHeader(t *testing.T) {
-	api := &libCallApi.RemoteApi{
+	api := &libCallApi.RemoteAPI{
 		Name: "test-api",
 		Auth: &countingAuth{},
 	}
@@ -145,7 +145,7 @@ func TestEnsureAuthorization_PreservesExplicitHeader(t *testing.T) {
 }
 
 func TestEnsureAuthorization_BasicAuthFallback(t *testing.T) {
-	api := &libCallApi.RemoteApi{
+	api := &libCallApi.RemoteAPI{
 		Name: "test-api",
 		AuthData: libCallApi.Auth{
 			User:     "user",
@@ -191,7 +191,7 @@ func TestPrepareCall_OAuthAuthorizationHeader(t *testing.T) {
 	assert.NilError(t, err)
 
 	cache, lock := libCallApi.InitTokenCache()
-	remoteApi := libCallApi.RemoteApi{
+	remoteAPI := libCallApi.RemoteAPI{
 		Name:           "partner-api",
 		Domain:         apiServer.URL,
 		Auth:           auth,
@@ -200,7 +200,7 @@ func TestPrepareCall_OAuthAuthorizationHeader(t *testing.T) {
 	}
 
 	callData := libCallApi.CallData[map[string]string]{
-		Api:      remoteApi,
+		API:      remoteAPI,
 		Path:     "",
 		Method:   http.MethodGet,
 		Headers:  map[string]string{},

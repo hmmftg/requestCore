@@ -35,7 +35,7 @@ const CorrelationIDHeader = "X-Correlation-ID"
 //     otherwise from CorrelationIDLocalKey in parser locals when present)
 //
 // The correlationID argument takes precedence over the parser local. It does
-// not add authorization; RemoteApi.EnsureAuthorization remains responsible for
+// not add authorization; RemoteAPI.EnsureAuthorization remains responsible for
 // that. Each invocation returns a new map; callers can safely mutate the result.
 func BuildBaseRemoteHeaders(w webFramework.WebFramework, appName, correlationID string) map[string]string {
 	headers := map[string]string{

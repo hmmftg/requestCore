@@ -119,7 +119,7 @@ func TestQueryHandler(t *testing.T) {
 	testCases := []testingtools.TestCase{
 		{
 			Name:      "Valid",
-			Url:       "/?id=1",
+			URL:       "/?id=1",
 			Status:    200,
 			CheckBody: []string{`"result":[`, `{"id":"1","data":"2"}`},
 			Model: testingtools.SampleQueryMock(t, func(mockDB sqlmock.Sqlmock) {
@@ -167,7 +167,7 @@ func TestQueryAllHandler(t *testing.T) {
 	testCases := []testingtools.TestCase{
 		{
 			Name:      "Valid",
-			Url:       "/?id=1",
+			URL:       "/?id=1",
 			Status:    200,
 			CheckBody: []string{`"result":[`, `{"id":"1","data":"2"}`, `{"id":"2","data":"3"}`},
 			Model: testingtools.SampleQueryMock(t, func(mockDB sqlmock.Sqlmock) {
@@ -216,7 +216,7 @@ func TestQueryHandlerWithArgs(t *testing.T) {
 	testCases := []testingtools.TestCase{
 		{
 			Name:      "Valid",
-			Url:       "/?id=1&p2=3",
+			URL:       "/?id=1&p2=3",
 			Status:    200,
 			CheckBody: []string{`"result":[`, `{"id":"1","data":"2"}`},
 			Model: testingtools.SampleQueryMock(t, func(mockDB sqlmock.Sqlmock) {
@@ -318,7 +318,7 @@ func TestQueryHandlerWithTransform(t *testing.T) {
 	testCases := []testingtools.TestCase{
 		{
 			Name:        "Valid",
-			Url:         "/?id=1&p2=3",
+			URL:         "/?id=1&p2=3",
 			Header:      testingtools.Header{testingtools.KeyValuePair{Key: "Request-Id", Value: "11111"}},
 			Status:      200,
 			CheckHeader: map[string]string{"X-Total-Count": "2"},
@@ -337,7 +337,7 @@ func TestQueryHandlerWithTransform(t *testing.T) {
 		},
 		{
 			Name:        "ValidWithPagination",
-			Url:         "/?id=1&p2=3&_start=0&_end=12",
+			URL:         "/?id=1&p2=3&_start=0&_end=12",
 			Status:      200,
 			CheckHeader: map[string]string{"X-Total-Count": "21"},
 			CheckBody: []string{`"result":[`,
@@ -375,7 +375,7 @@ func TestQueryHandlerWithTransform(t *testing.T) {
 		},
 		{
 			Name:        "ValidWithPaginationAndFilteration",
-			Url:         "/?id=1&p2=3&_start=0&_end=12&_filters=address%20ne%20filtered%20",
+			URL:         "/?id=1&p2=3&_start=0&_end=12&_filters=address%20ne%20filtered%20",
 			Status:      200,
 			CheckHeader: map[string]string{"X-Total-Count": "19"},
 			CheckBody: []string{`"result":[`,
@@ -452,7 +452,7 @@ func TestQueryHandlerMultiDb(t *testing.T) {
 	testCases := []testingtools.TestCase{
 		{
 			Name:      "Valid",
-			Url:       "/?id=1",
+			URL:       "/?id=1",
 			Status:    200,
 			CheckBody: []string{`"result":[`, `{"id":"4","data":"5"}`},
 			Model: testingtools.SampleQueryMock(t, func(mockDB sqlmock.Sqlmock) {
@@ -500,7 +500,7 @@ func TestQueryAllHandlerMultiDb(t *testing.T) {
 	testCases := []testingtools.TestCase{
 		{
 			Name:      "Valid",
-			Url:       "/?id=1",
+			URL:       "/?id=1",
 			Status:    200,
 			CheckBody: []string{`"result":[`, `{"id":"5","data":"6"}`, `{"id":"7","data":"8"}`},
 			Model: testingtools.SampleQueryMock(t, func(mockDB sqlmock.Sqlmock) {
@@ -549,7 +549,7 @@ func TestQueryHandlerWithArgsMultiDb(t *testing.T) {
 	testCases := []testingtools.TestCase{
 		{
 			Name:      "Valid",
-			Url:       "/?id=1&p2=3",
+			URL:       "/?id=1&p2=3",
 			Status:    200,
 			CheckBody: []string{`"result":[`, `{"id":"6","data":"7"}`},
 			Model: testingtools.SampleQueryMock(t, func(mockDB sqlmock.Sqlmock) {

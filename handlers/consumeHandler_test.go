@@ -96,18 +96,18 @@ func (env *testCallRemoteEnv) SetParams(params libParams.ParamInterface) {
 }
 
 type githubRespOrg struct {
-	Login              string `json:"login"`
-	Id                 int    `json:"id"`
-	Node_id            string `json:"node_id"`
-	Url                string `json:"url"`
-	Repos_url          string `json:"repos_url"`
-	Events_url         string `json:"events_url"`
-	Hooks_url          string `json:"hooks_url"`
-	Issues_url         string `json:"issues_url"`
-	Members_url        string `json:"members_url"`
-	Public_members_url string `json:"public_members_url"`
-	Avatar_url         string `json:"avatar_url"`
-	Description        string `json:"description"`
+	Login            string `json:"login"`
+	ID               int    `json:"id"`
+	NodeID           string `json:"node_id"`
+	URL              string `json:"url"`
+	ReposURL         string `json:"repos_url"`
+	EventsURL        string `json:"events_url"`
+	HooksURL         string `json:"hooks_url"`
+	IssuesURL        string `json:"issues_url"`
+	MembersURL       string `json:"members_url"`
+	PublicMembersURL string `json:"public_members_url"`
+	AvatarURL        string `json:"avatar_url"`
+	Description      string `json:"description"`
 }
 
 func ParseGithubRespJson(respBytes []byte, _ string, status int) (int, map[string]string, any, error) {
@@ -135,7 +135,7 @@ type testConsumeHandlerType[Req, Resp any] struct {
 	VerifyHeader    bool
 	HasReceipt      bool
 	Headers         []string
-	Api             string
+	API             string
 	Method          string
 	Query           string
 	RecoveryHandler func(any)
@@ -196,14 +196,14 @@ func TestConsumeHandler(t *testing.T) {
 	testCases := []testingtools.TestCase{
 		{
 			Name:      "Valid",
-			Url:       "/",
+			URL:       "/",
 			Request:   testRemoteCallReq{ID: "1"},
 			Status:    200,
 			CheckBody: []string{"result", `"a"`},
 		},
 		{
 			Name:    "Invalid Request",
-			Url:     "/",
+			URL:     "/",
 			Request: map[string]any{"ss": "a"},
 			Status:  400,
 		},
@@ -222,7 +222,7 @@ func TestConsumeHandler(t *testing.T) {
 				Headers: map[string]string{"H1": "a"},
 				Method:  "POST",
 			},
-			Api:          "simulation",
+			API:          "simulation",
 			Path:         "users",
 			Mode:         libRequest.JSON,
 			VerifyHeader: false,

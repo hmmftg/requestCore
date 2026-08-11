@@ -157,7 +157,7 @@ func TestPrepareCall_NoDuplicateAcceptHeader(t *testing.T) {
 
 	w := libContext.InitContextNoAuditTrail(t)
 	param := &libCallApi.RemoteCallParamData[any, map[string]any]{
-		Api:     libCallApi.RemoteApi{Domain: srv.URL + "/api"},
+		API:     libCallApi.RemoteAPI{Domain: srv.URL + "/api"},
 		Method:  "GET",
 		Path:    "test",
 		Headers: map[string]string{"Accept": "application/vnd.custom+json"},
@@ -187,7 +187,7 @@ func TestPrepareCall_DefaultAcceptWhenNotProvided(t *testing.T) {
 
 	w := libContext.InitContextNoAuditTrail(t)
 	param := &libCallApi.RemoteCallParamData[any, optsTestResponse]{
-		Api:    libCallApi.RemoteApi{Domain: srv.URL + "/api"},
+		API:    libCallApi.RemoteAPI{Domain: srv.URL + "/api"},
 		Method: "GET",
 		Path:   "test1",
 	}

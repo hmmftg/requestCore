@@ -22,9 +22,9 @@ func TestGetDescFromCode_SafeFallback(t *testing.T) {
 	if strings.Contains(gotDesc, "secret") || strings.Contains(gotDesc, "value") || strings.Contains(gotDesc, "upstream") {
 		t.Errorf("GetDescFromCode must not return raw data; got desc: %q", gotDesc)
 	}
-	if gotDesc != SYSTEM_FAULT_DESC && gotDesc != "other desc" {
-		// Should be SYSTEM_FAULT_DESC or errDescList[SYSTEM_FAULT] if set
-		if errDescList[SYSTEM_FAULT] != "" && gotDesc != errDescList[SYSTEM_FAULT] {
+	if gotDesc != SystemFaultDesc && gotDesc != "other desc" {
+		// Should be SystemFaultDesc or errDescList[SystemFault] if set
+		if errDescList[SystemFault] != "" && gotDesc != errDescList[SystemFault] {
 			t.Errorf("expected safe fallback; got %q", gotDesc)
 		}
 	}
@@ -64,16 +64,16 @@ func TestSanitizeForClient(t *testing.T) {
 			}
 		}
 	})
-	t.Run("non-string returns SYSTEM_FAULT_DESC", func(t *testing.T) {
+	t.Run("non-string returns SystemFaultDesc", func(t *testing.T) {
 		got := SanitizeForClient(map[string]int{"a": 1}, 100)
-		if got != SYSTEM_FAULT_DESC {
-			t.Errorf("got %q; want SYSTEM_FAULT_DESC", got)
+		if got != SystemFaultDesc {
+			t.Errorf("got %q; want SystemFaultDesc", got)
 		}
 	})
-	t.Run("nil returns SYSTEM_FAULT_DESC", func(t *testing.T) {
+	t.Run("nil returns SystemFaultDesc", func(t *testing.T) {
 		got := SanitizeForClient(nil, 100)
-		if got != SYSTEM_FAULT_DESC {
-			t.Errorf("got %q; want SYSTEM_FAULT_DESC", got)
+		if got != SystemFaultDesc {
+			t.Errorf("got %q; want SystemFaultDesc", got)
 		}
 	})
 }

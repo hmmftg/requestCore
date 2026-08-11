@@ -84,61 +84,61 @@ func parseRequest[Req any](params ParseParams) (*ParseResult[Req], error) {
 			desc = fmt.Sprintf(ErrorInGetRequest, "BODY")
 			err = libError.NewWithDescription(status.BadRequest, desc, "%s[GetBody](fails)", params.Name)
 		}
-		errUri := params.W.Parser.GetUri(&request)
+		errUri := params.W.Parser.GetURI(&request)
 		if errUri != nil {
 			desc = fmt.Sprintf(ErrorInGetRequest, "URI")
-			err = libError.NewWithDescription(status.BadRequest, desc, "%s[GetUri](fails)", params.Name)
+			err = libError.NewWithDescription(status.BadRequest, desc, "%s[GetURI](fails)", params.Name)
 		}
 	case Query:
-		err = params.W.Parser.GetUrlQuery(&request)
+		err = params.W.Parser.GetURLQuery(&request)
 		if err != nil {
 			desc = fmt.Sprintf(ErrorInGetRequest, "QUERY")
-			err = libError.NewWithDescription(status.BadRequest, desc, "%s[GetUrlQuery](fails)", params.Name)
+			err = libError.NewWithDescription(status.BadRequest, desc, "%s[GetURLQuery](fails)", params.Name)
 		}
 	case QueryWithPagination:
 		var pagination PaginationData
-		err = params.W.Parser.GetUrlQuery(&pagination)
+		err = params.W.Parser.GetURLQuery(&pagination)
 		if err != nil {
 			desc = fmt.Sprintf(ErrorInGetRequest, "PAGINATION")
 			err = libError.NewWithDescription(status.BadRequest, desc, "%s[GetPaginationQuery](fails)", params.Name)
 		} else {
 			params.W.Parser.SetLocal(PaginationLocalTag, pagination)
 		}
-		errQuery := params.W.Parser.GetUrlQuery(&request)
+		errQuery := params.W.Parser.GetURLQuery(&request)
 		if errQuery != nil {
 			desc = fmt.Sprintf(ErrorInGetRequest, "QUERY")
-			err = libError.NewWithDescription(status.BadRequest, desc, "%s[GetUrlQuery](fails)", params.Name)
+			err = libError.NewWithDescription(status.BadRequest, desc, "%s[GetURLQuery](fails)", params.Name)
 		}
 	case QueryWithURI:
-		err = params.W.Parser.GetUrlQuery(&request)
+		err = params.W.Parser.GetURLQuery(&request)
 		if err != nil {
 			desc = fmt.Sprintf(ErrorInGetRequest, "QUERY")
-			err = libError.NewWithDescription(status.BadRequest, desc, "%s[GetUrlQuery](fails)", params.Name)
+			err = libError.NewWithDescription(status.BadRequest, desc, "%s[GetURLQuery](fails)", params.Name)
 		}
-		errUri := params.W.Parser.GetUri(&request)
+		errUri := params.W.Parser.GetURI(&request)
 		if errUri != nil {
 			desc = fmt.Sprintf(ErrorInGetRequest, "URI")
-			err = libError.NewWithDescription(status.BadRequest, desc, "%s[GetUri](fails)", params.Name)
+			err = libError.NewWithDescription(status.BadRequest, desc, "%s[GetURI](fails)", params.Name)
 		}
 	case URI:
-		err = params.W.Parser.GetUri(&request)
+		err = params.W.Parser.GetURI(&request)
 		if err != nil {
 			desc = fmt.Sprintf(ErrorInGetRequest, "URI")
-			err = libError.NewWithDescription(status.BadRequest, desc, "%s[GetUri](fails)", params.Name)
+			err = libError.NewWithDescription(status.BadRequest, desc, "%s[GetURI](fails)", params.Name)
 		}
 	case URIAndPagination:
 		var pagination PaginationData
-		err = params.W.Parser.GetUrlQuery(&pagination)
+		err = params.W.Parser.GetURLQuery(&pagination)
 		if err != nil {
 			desc = fmt.Sprintf(ErrorInGetRequest, "PAGINATION")
 			err = libError.NewWithDescription(status.BadRequest, desc, "%s[GetPaginationQuery](fails)", params.Name)
 		} else {
 			params.W.Parser.SetLocal(PaginationLocalTag, pagination)
 		}
-		errUri := params.W.Parser.GetUri(&request)
+		errUri := params.W.Parser.GetURI(&request)
 		if errUri != nil {
 			desc = fmt.Sprintf(ErrorInGetRequest, "URI")
-			err = libError.NewWithDescription(status.BadRequest, desc, "%s[GetUri](fails)", params.Name)
+			err = libError.NewWithDescription(status.BadRequest, desc, "%s[GetURI](fails)", params.Name)
 		}
 	default:
 		err = nil
@@ -207,7 +207,7 @@ func ParseRequest[Req any](
 			libError.NewWithDescription(
 				status.BadRequest,
 				"HEADER_ABSENT",
-				"header absent in %s.GetRequest[GetHeader](%v)", function, w.Parser.GetHttpHeader()))
+				"header absent in %s.GetRequest[GetHeader](%v)", function, w.Parser.GetHTTPHeader()))
 	}
 
 	params := ParseParams{
@@ -245,7 +245,7 @@ func Req[Req any, Header any, PT interface {
 	headerPtr := PT(header)
 	err := params.W.Parser.GetHeader(headerPtr)
 	if err != nil {
-		return nil, errors.Join(err, libError.NewWithDescription(http.StatusBadRequest, "HEADER_ABSENT", "%s[GetHeader](%v)", function, params.W.Parser.GetHttpHeader()))
+		return nil, errors.Join(err, libError.NewWithDescription(http.StatusBadRequest, "HEADER_ABSENT", "%s[GetHeader](%v)", function, params.W.Parser.GetHTTPHeader()))
 	}
 
 	params.Header = headerPtr

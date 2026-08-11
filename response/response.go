@@ -9,9 +9,9 @@ import (
 )
 
 const (
-	NO_DATA_FOUND     = "NO-DATA-FOUND"
-	SYSTEM_FAULT      = "SYSTEM_FAULT"
-	SYSTEM_FAULT_DESC = "خطای سیستمی"
+	NoDataFound     = "NO-DATA-FOUND"
+	SystemFault     = "SYSTEM_FAULT"
+	SystemFaultDesc = "خطای سیستمی"
 )
 
 func JustPrintResp(respBytes []byte, desc string, status int) (int, map[string]string, any, error) {
@@ -59,10 +59,10 @@ func ParseWsRemoteResp(respBytes []byte, desc string, status int) (int, map[stri
 }
 
 // GetDescFromCode returns (code, description) for API response. When code is not in errDescList,
-// it returns a safe fallback (SYSTEM_FAULT + localized text) and never exposes raw data.
+// it returns a safe fallback (SystemFault + localized text) and never exposes raw data.
 func GetDescFromCode(code string, data any, errDescList map[string]string) (string, string) {
-	safeFallbackDesc := SYSTEM_FAULT_DESC
-	if d, ok := errDescList[SYSTEM_FAULT]; ok {
+	safeFallbackDesc := SystemFaultDesc
+	if d, ok := errDescList[SystemFault]; ok {
 		safeFallbackDesc = d
 	}
 	if strings.Contains(code, "#") {

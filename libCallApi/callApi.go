@@ -34,12 +34,12 @@ import (
 	"github.com/hmmftg/requestCore/webFramework"
 )
 
-func (m RemoteApiModel) ConsumeRestBasicAuthApi(w webFramework.WebFramework, requestJson []byte, apiName, path, contentType, method string, headers map[string]string) ([]byte, string, error) {
+func (m RemoteAPIModel) ConsumeRestBasicAuthAPI(w webFramework.WebFramework, requestJson []byte, apiName, path, contentType, method string, headers map[string]string) ([]byte, string, error) {
 	if timeOutString, ok := headers["Time-Out"]; ok {
 		timeoutSeconds, _ := strconv.Atoi(timeOutString)
 		httpClient.Timeout = time.Duration(timeoutSeconds * int(time.Second))
 	}
-	api := m.RemoteApiList[apiName]
+	api := m.RemoteAPIList[apiName]
 	if headers == nil {
 		headers = make(map[string]string)
 	}
@@ -58,18 +58,18 @@ func (m RemoteApiModel) ConsumeRestBasicAuthApi(w webFramework.WebFramework, req
 	resp, err := httpClient.Do(req)
 	if err != nil {
 		if os.IsTimeout(err) {
-			return nil, "API_CONNECT_TIMED_OUT#" + apiName + "#" + m.RemoteApiList[apiName].Name + "#", err
+			return nil, "API_CONNECT_TIMED_OUT#" + apiName + "#" + m.RemoteAPIList[apiName].Name + "#", err
 		}
-		return nil, "API_UNABLE_TO_CALL#" + apiName + "#" + m.RemoteApiList[apiName].Name + "#", err
+		return nil, "API_UNABLE_TO_CALL#" + apiName + "#" + m.RemoteAPIList[apiName].Name + "#", err
 	}
 	defer func() { _ = resp.Body.Close() }()
 
 	responseData, err := io.ReadAll(resp.Body)
 	if err != nil {
 		if os.IsTimeout(err) {
-			return nil, "API_READ_TIMED_OUT#" + apiName + "#" + m.RemoteApiList[apiName].Name + "#", err
+			return nil, "API_READ_TIMED_OUT#" + apiName + "#" + m.RemoteAPIList[apiName].Name + "#", err
 		}
-		return nil, "API_UNABLE_TO_READ#" + apiName + "#" + m.RemoteApiList[apiName].Name + "#", err
+		return nil, "API_UNABLE_TO_READ#" + apiName + "#" + m.RemoteAPIList[apiName].Name + "#", err
 	}
 
 	if resp.StatusCode != http.StatusOK {
@@ -77,23 +77,23 @@ func (m RemoteApiModel) ConsumeRestBasicAuthApi(w webFramework.WebFramework, req
 		if json.Unmarshal(responseData, &respJson) == nil {
 			return responseData, resp.Status, nil
 		}
-		errorDesc := fmt.Sprintf("API_NOK#%s#%s#%s#", apiName, m.RemoteApiList[apiName].Name, resp.Status)
-		return nil, errorDesc, fmt.Errorf("API_NOK#%s#%s#%s#", apiName, m.RemoteApiList[apiName].Name, resp.Status)
+		errorDesc := fmt.Sprintf("API_NOK#%s#%s#%s#", apiName, m.RemoteAPIList[apiName].Name, resp.Status)
+		return nil, errorDesc, fmt.Errorf("API_NOK#%s#%s#%s#", apiName, m.RemoteAPIList[apiName].Name, resp.Status)
 	}
 
 	return responseData, resp.Status, nil
 }
 
-func (m RemoteApiModel) GetApi(apiName string) RemoteApi {
-	return m.RemoteApiList[apiName]
+func (m RemoteAPIModel) GetApi(apiName string) RemoteAPI {
+	return m.RemoteAPIList[apiName]
 }
 
-func (m RemoteApiModel) ConsumeRestApi(w webFramework.WebFramework, requestJson []byte, apiName, path, contentType, method string, headers map[string]string) ([]byte, string, int, error) {
+func (m RemoteAPIModel) ConsumeRestAPI(w webFramework.WebFramework, requestJson []byte, apiName, path, contentType, method string, headers map[string]string) ([]byte, string, int, error) {
 	if timeOutString, ok := headers["Time-Out"]; ok {
 		timeoutSeconds, _ := strconv.Atoi(timeOutString)
 		httpClient.Timeout = time.Duration(timeoutSeconds * int(time.Second))
 	}
-	api := m.RemoteApiList[apiName]
+	api := m.RemoteAPIList[apiName]
 	if headers == nil {
 		headers = make(map[string]string)
 	}
@@ -112,18 +112,18 @@ func (m RemoteApiModel) ConsumeRestApi(w webFramework.WebFramework, requestJson 
 	resp, err := httpClient.Do(req)
 	if err != nil {
 		if os.IsTimeout(err) {
-			return nil, "API_CONNECT_TIMED_OUT#" + apiName + "# " + m.RemoteApiList[apiName].Name + "#", http.StatusRequestTimeout, err
+			return nil, "API_CONNECT_TIMED_OUT#" + apiName + "# " + m.RemoteAPIList[apiName].Name + "#", http.StatusRequestTimeout, err
 		}
-		return nil, "API_UNABLE_TO_CALL#" + apiName + "# " + m.RemoteApiList[apiName].Name + "#", http.StatusRequestTimeout, err
+		return nil, "API_UNABLE_TO_CALL#" + apiName + "# " + m.RemoteAPIList[apiName].Name + "#", http.StatusRequestTimeout, err
 	}
 	defer func() { _ = resp.Body.Close() }()
 
 	responseData, err := io.ReadAll(resp.Body)
 	if err != nil {
 		if os.IsTimeout(err) {
-			return nil, "API_READ_TIMED_OUT#" + apiName + "# " + m.RemoteApiList[apiName].Name + "#", http.StatusRequestTimeout, err
+			return nil, "API_READ_TIMED_OUT#" + apiName + "# " + m.RemoteAPIList[apiName].Name + "#", http.StatusRequestTimeout, err
 		}
-		return nil, "API_UNABLE_TO_READ#" + apiName + "# " + m.RemoteApiList[apiName].Name + "#", http.StatusRequestTimeout, err
+		return nil, "API_UNABLE_TO_READ#" + apiName + "# " + m.RemoteAPIList[apiName].Name + "#", http.StatusRequestTimeout, err
 	}
 
 	if resp.StatusCode != http.StatusOK {
@@ -131,8 +131,8 @@ func (m RemoteApiModel) ConsumeRestApi(w webFramework.WebFramework, requestJson 
 		if json.Unmarshal(responseData, &respJson) == nil {
 			return responseData, resp.Status, resp.StatusCode, nil
 		}
-		errorDesc := fmt.Sprintf("API_NOK#%s#%s#%s#", apiName, m.RemoteApiList[apiName].Name, resp.Status)
-		return nil, errorDesc, resp.StatusCode, fmt.Errorf("API_NOK#%s#%s#%s#", apiName, m.RemoteApiList[apiName].Name, resp.Status)
+		errorDesc := fmt.Sprintf("API_NOK#%s#%s#%s#", apiName, m.RemoteAPIList[apiName].Name, resp.Status)
+		return nil, errorDesc, resp.StatusCode, fmt.Errorf("API_NOK#%s#%s#%s#", apiName, m.RemoteAPIList[apiName].Name, resp.Status)
 	}
 
 	return responseData, resp.Status, resp.StatusCode, nil
@@ -170,12 +170,12 @@ const (
 
 type CallData[Resp any] struct {
 	httpClient *http.Client
-	Api        RemoteApi
+	API        RemoteAPI
 	Path       string
 	Method     string
 	Headers    map[string]string
 	Req        any
-	SslVerify  bool
+	SSLVerify  bool
 	BodyType   RequestBodyType
 	Timeout    time.Duration
 	EnableLog  bool
@@ -192,7 +192,7 @@ type CallResp struct {
 }
 
 // TODO replace response.Error with errors.Join(err, libError.New
-func GetResp[Resp any, Error any](api RemoteApi, resp *http.Response) (*Resp, *Error, *CallResp, error) {
+func GetResp[Resp any, Error any](api RemoteAPI, resp *http.Response) (*Resp, *Error, *CallResp, error) {
 	responseData, err := io.ReadAll(resp.Body)
 	if err != nil {
 		if os.IsTimeout(err) {
@@ -223,7 +223,7 @@ func GetResp[Resp any, Error any](api RemoteApi, resp *http.Response) (*Resp, *E
 	return &respJson, &errJson, &CallResp{Status: resp.StatusCode, Headers: headerMap}, nil
 }
 
-func GetJSONResp[Resp any](api RemoteApi, resp *http.Response, Builder func(int, []byte, map[string]string) (*Resp, error)) (*Resp, error) {
+func GetJSONResp[Resp any](api RemoteAPI, resp *http.Response, Builder func(int, []byte, map[string]string) (*Resp, error)) (*Resp, error) {
 	responseData, err := io.ReadAll(resp.Body)
 	if err != nil {
 		if os.IsTimeout(err) {
@@ -291,9 +291,9 @@ func PrepareCall[Resp any](w webFramework.WebFramework, c CallData[Resp]) (*http
 	if ctx == nil {
 		ctx = context.Background()
 	}
-	req, err := http.NewRequestWithContext(ctx, c.Method, c.Api.Domain+"/"+c.Path, buffer)
+	req, err := http.NewRequestWithContext(ctx, c.Method, c.API.Domain+"/"+c.Path, buffer)
 	if err != nil {
-		return nil, errors.Join(err, libError.NewWithDescription(http.StatusInternalServerError, "Generate Request Failed", "error in PrepareCall.NewRequestWithContext M=%s,Url:%s,json:%s", c.Method, c.Api.Domain+"/"+c.Path, buffer.String()))
+		return nil, errors.Join(err, libError.NewWithDescription(http.StatusInternalServerError, "Generate Request Failed", "error in PrepareCall.NewRequestWithContext M=%s,Url:%s,json:%s", c.Method, c.API.Domain+"/"+c.Path, buffer.String()))
 	}
 
 	// Explicitly inject trace context into headers for distributed tracing
@@ -306,7 +306,7 @@ func PrepareCall[Resp any](w webFramework.WebFramework, c CallData[Resp]) (*http
 	if c.Headers == nil {
 		c.Headers = make(map[string]string)
 	}
-	if err := c.Api.EnsureAuthorization(w, c.Headers); err != nil {
+	if err := c.API.EnsureAuthorization(w, c.Headers); err != nil {
 		return nil, err
 	}
 	switch c.BodyType {
@@ -378,12 +378,12 @@ func ConsumeRest[Resp any](w webFramework.WebFramework, c CallData[Resp]) (*Resp
 		ctx = context.Background()
 	}
 	spanName, spanAttrs := libTracing.HTTPClientSpanNameAndAttrs(
-		c.Api.Name,
-		c.Api.Domain,
+		c.API.Name,
+		c.API.Domain,
 		c.Method,
 		c.Path,
 		c.Timeout,
-		c.SslVerify,
+		c.SSLVerify,
 	)
 	for k, v := range libTracing.SpanAttrsFromSlogValue("call", c.LogValue) {
 		spanAttrs[k] = v
@@ -430,7 +430,7 @@ func ConsumeRest[Resp any](w webFramework.WebFramework, c CallData[Resp]) (*Resp
 	var respJson *Resp
 	var errResp *response.WsRemoteResponse
 
-	respJson, errResp, callResp, err := GetResp[Resp, response.WsRemoteResponse](c.Api, resp)
+	respJson, errResp, callResp, err := GetResp[Resp, response.WsRemoteResponse](c.API, resp)
 	if err != nil {
 		// Record parsing/response errors
 		if span := trace.SpanFromContext(traceCtx); span.IsRecording() {
@@ -485,12 +485,12 @@ func ConsumeRestJSON[Resp any](w webFramework.WebFramework, c *CallData[Resp]) (
 		ctx = context.Background()
 	}
 	spanName, spanAttrs := libTracing.HTTPClientSpanNameAndAttrs(
-		c.Api.Name,
-		c.Api.Domain,
+		c.API.Name,
+		c.API.Domain,
 		c.Method,
 		c.Path,
 		c.Timeout,
-		c.SslVerify,
+		c.SSLVerify,
 	)
 	for k, v := range libTracing.SpanAttrsFromSlogValue("call", c.LogValue) {
 		spanAttrs[k] = v
@@ -539,7 +539,7 @@ func ConsumeRestJSON[Resp any](w webFramework.WebFramework, c *CallData[Resp]) (
 		c.Builder = DefaultBuilderfunc[Resp]
 	}
 
-	respJson, err := GetJSONResp(c.Api, resp, c.Builder)
+	respJson, err := GetJSONResp(c.API, resp, c.Builder)
 	if err != nil {
 		// Record parsing/response errors
 		if span := trace.SpanFromContext(traceCtx); span.IsRecording() {

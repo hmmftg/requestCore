@@ -110,8 +110,8 @@ func InitializeApp[T any](app Application[T]) *App[T] {
 
 	app.InitGinApp(engine)
 
-	for id := range wsParams.RemoteApis {
-		api := wsParams.RemoteApis[id]
+	for id := range wsParams.RemoteAPIs {
+		api := wsParams.RemoteAPIs[id]
 		cache, lock := libCallApi.InitTokenCache()
 		api.TokenCache = cache
 		api.TokenCacheLock = lock
@@ -122,7 +122,7 @@ func InitializeApp[T any](app Application[T]) *App[T] {
 			}
 			api.Auth = auth
 		}
-		wsParams.RemoteApis[id] = api
+		wsParams.RemoteAPIs[id] = api
 	}
 
 	app.AddRoutes(

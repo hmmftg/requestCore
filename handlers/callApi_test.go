@@ -39,7 +39,7 @@ func (env *testCallRemoteEnv) handlerCallAPI(method string, queryStack *[]string
 			return
 		}
 		req.QueryStack = queryStack
-		result, errCall := handlers.CallApiInternal[SimpleTestResponse](w, env.Interface, method, req)
+		result, errCall := handlers.CallAPIInternal[SimpleTestResponse](w, env.Interface, method, req)
 		if errCall != nil {
 			env.Interface.Responder().Error(w, errCall)
 			return
@@ -58,10 +58,10 @@ func TestCallAPI(t *testing.T) {
 	testCases := []testingtools.TestCase{
 		{
 			Name:         "Step1",
-			Url:          "/",
+			URL:          "/",
 			DesiredError: "api@GET@false@false",
 			Request: libCallApi.CallParamData{
-				Api:    libCallApi.RemoteApi{Domain: fakeServer.URL() + "/api"},
+				API:    libCallApi.RemoteAPI{Domain: fakeServer.URL() + "/api"},
 				Method: "GET",
 				Path:   "/",
 			},
@@ -71,10 +71,10 @@ func TestCallAPI(t *testing.T) {
 		},
 		{
 			Name:         "Step2",
-			Url:          "/",
+			URL:          "/",
 			DesiredError: "api@GET@false@false",
 			Request: libCallApi.CallParamData{
-				Api:    libCallApi.RemoteApi{Domain: fakeServer.URL() + "/api"},
+				API:    libCallApi.RemoteAPI{Domain: fakeServer.URL() + "/api"},
 				Method: "GET",
 				Path:   "/",
 			},
@@ -84,10 +84,10 @@ func TestCallAPI(t *testing.T) {
 		},
 		{
 			Name:         "Step3",
-			Url:          "/",
+			URL:          "/",
 			DesiredError: "api@GET@false@false",
 			Request: libCallApi.CallParamData{
-				Api:    libCallApi.RemoteApi{Domain: fakeServer.URL() + "/api"},
+				API:    libCallApi.RemoteAPI{Domain: fakeServer.URL() + "/api"},
 				Method: "GET",
 				Path:   "/",
 			},
@@ -97,10 +97,10 @@ func TestCallAPI(t *testing.T) {
 		},
 		/*{
 			Name:         "Step4",
-			Url:          "/",
+			URL:          "/",
 			DesiredError: "v4/anime@GET@false@false",
 			Request: libCallApi.CallParamData{
-				Api:    libCallApi.RemoteApi{Domain: "https://api.jikan.moe/v4/anime"},
+				API:    libCallApi.RemoteAPI{Domain: "https://api.jikan.moe/v4/anime"},
 				Method: "GET",
 			},
 			Status:    200,
@@ -142,12 +142,12 @@ func (env *testCallRemoteEnv) handlerCallAPIJSON(method string, queryStack *[]st
 			return
 		}
 		req.QueryStack = queryStack
-		result, errCall := handlers.CallApiJSON(
+		result, errCall := handlers.CallAPIJSON(
 			w,
 			env.Interface,
 			method,
 			&libCallApi.RemoteCallParamData[any, SimpleTestResponse]{
-				Api:        libCallApi.RemoteApi{Domain: fakeServer.URL() + "/api"},
+				API:        libCallApi.RemoteAPI{Domain: fakeServer.URL() + "/api"},
 				QueryStack: queryStack,
 				Method:     "GET",
 				Path:       "/",
@@ -169,10 +169,10 @@ func TestCallAPIJSON(t *testing.T) {
 	testCases := []testingtools.TestCase{
 		{
 			Name:         "Step1",
-			Url:          "/",
+			URL:          "/",
 			DesiredError: "api@GET@false@false",
 			Request: libCallApi.RemoteCallParamData[any, any]{
-				Api:    libCallApi.RemoteApi{Domain: fakeServer.URL() + "/api"},
+				API:    libCallApi.RemoteAPI{Domain: fakeServer.URL() + "/api"},
 				Method: "GET",
 				Path:   "/",
 			},
@@ -182,10 +182,10 @@ func TestCallAPIJSON(t *testing.T) {
 		},
 		{
 			Name:         "Step2",
-			Url:          "/",
+			URL:          "/",
 			DesiredError: "api@GET@false@false",
 			Request: libCallApi.RemoteCallParamData[any, any]{
-				Api:    libCallApi.RemoteApi{Domain: fakeServer.URL() + "/api"},
+				API:    libCallApi.RemoteAPI{Domain: fakeServer.URL() + "/api"},
 				Method: "GET",
 				Path:   "/",
 			},
@@ -195,10 +195,10 @@ func TestCallAPIJSON(t *testing.T) {
 		},
 		{
 			Name:         "Step3",
-			Url:          "/",
+			URL:          "/",
 			DesiredError: "api@GET@false@false",
 			Request: libCallApi.RemoteCallParamData[any, any]{
-				Api:    libCallApi.RemoteApi{Domain: fakeServer.URL() + "/api"},
+				API:    libCallApi.RemoteAPI{Domain: fakeServer.URL() + "/api"},
 				Method: "GET",
 				Path:   "/",
 			},
@@ -208,10 +208,10 @@ func TestCallAPIJSON(t *testing.T) {
 		},
 		/*{
 			Name:         "Step4",
-			Url:          "/",
+			URL:          "/",
 			DesiredError: "v4/anime@GET@false@false",
 			Request: libCallApi.RemoteCallParamData[any]{
-				Api:    libCallApi.RemoteApi{Domain: "https://api.jikan.moe/v4/anime"},
+				API:    libCallApi.RemoteAPI{Domain: "https://api.jikan.moe/v4/anime"},
 				Method: "GET",
 			},
 			Status:    200,

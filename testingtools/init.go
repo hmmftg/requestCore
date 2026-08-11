@@ -24,7 +24,7 @@ const Default = "default"
 // columns are prefixed with "o" since we used sqlstruct to generate them
 func InitTesting(t *testing.T,
 	errDesc map[string]string,
-	remoteApis map[string]libCallApi.RemoteApi,
+	remoteApis map[string]libCallApi.RemoteAPI,
 	query string,
 	columns []string,
 	csv string,
@@ -36,7 +36,7 @@ func InitTesting(t *testing.T,
 				ErrorDesc: errDesc,
 			},
 		},
-		RemoteApis: remoteApis,
+		RemoteAPIs: remoteApis,
 	}
 
 	// open database stub
@@ -91,8 +91,8 @@ func DefaultErrorDesc() map[string]string {
 	}
 }
 
-func DefaultAPIList() map[string]libCallApi.RemoteApi {
-	return map[string]libCallApi.RemoteApi{
+func DefaultAPIList() map[string]libCallApi.RemoteAPI {
+	return map[string]libCallApi.RemoteAPI{
 		"simulation": {
 			Domain: "http://local.simulation.dev/simulation/api",
 			// Domain: "http://localhost:9055/simulation/api",
@@ -117,14 +117,14 @@ func DefaultDB(t *testing.T) *sql.DB {
 
 func InitTestingNoDB(t *testing.T,
 	errDesc map[string]string,
-	remoteApis map[string]libCallApi.RemoteApi,
+	remoteApis map[string]libCallApi.RemoteAPI,
 ) (requestCore.RequestCoreModel, libParams.ParamInterface) {
 	return InitTestingWithDB(errDesc, remoteApis, DefaultDB(t))
 }
 
 func InitTestingWithDB(
 	errDesc map[string]string,
-	remoteApis map[string]libCallApi.RemoteApi,
+	remoteApis map[string]libCallApi.RemoteAPI,
 	db *sql.DB,
 ) (requestCore.RequestCoreModel, libParams.ApplicationParams[TestingParams]) {
 	wsParams := libParams.ApplicationParams[TestingParams]{
@@ -133,7 +133,7 @@ func InitTestingWithDB(
 				ErrorDesc: errDesc,
 			},
 		},
-		RemoteApis: remoteApis,
+		RemoteAPIs: remoteApis,
 	}
 
 	queryRunner := libQuery.QueryRunnerModel{

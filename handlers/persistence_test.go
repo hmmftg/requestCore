@@ -21,16 +21,16 @@ func (p *mapParser) GetHeader(webFramework.HeaderInterface) error {
 	return nil
 }
 func (p *mapParser) GetHeaderValue(string) string        { return "" }
-func (p *mapParser) GetHttpHeader() http.Header          { return nil }
+func (p *mapParser) GetHTTPHeader() http.Header          { return nil }
 func (p *mapParser) GetBody(any) error                   { return nil }
-func (p *mapParser) GetUri(any) error                    { return nil }
-func (p *mapParser) GetUrlQuery(any) error               { return nil }
-func (p *mapParser) GetRawUrlQuery() string              { return "" }
+func (p *mapParser) GetURI(any) error                    { return nil }
+func (p *mapParser) GetURLQuery(any) error               { return nil }
+func (p *mapParser) GetRawURLQuery() string              { return "" }
 func (p *mapParser) GetLocal(name string) any            { return p.locals[name] }
 func (p *mapParser) GetLocalString(_ string) string      { return "" }
-func (p *mapParser) GetUrlParam(string) string           { return "" }
-func (p *mapParser) GetUrlParams() map[string]string     { return nil }
-func (p *mapParser) CheckUrlParam(string) (string, bool) { return "", false }
+func (p *mapParser) GetURLParam(string) string           { return "" }
+func (p *mapParser) GetURLParams() map[string]string     { return nil }
+func (p *mapParser) CheckURLParam(string) (string, bool) { return "", false }
 func (p *mapParser) SetLocal(name string, value any)     { p.locals[name] = value }
 func (p *mapParser) SetReqHeader(string, string)         {}
 func (p *mapParser) SetRespHeader(string, string)        {}

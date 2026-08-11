@@ -33,8 +33,8 @@ func ExtractHeaders(w webFramework.WebFramework, headers, locals []string) map[s
 }
 
 type CallArgs[Req any, Resp any] struct {
-	Title, Path, Api, Method string
-	HasQuery, IsJson         bool
+	Title, Path, API, Method string
+	HasQuery, IsJSON         bool
 	HasInitializer           bool
 	ForwardAuth              bool
 	Transmitter              func(
@@ -51,7 +51,7 @@ type CallArgs[Req any, Resp any] struct {
 
 func (c CallArgs[Req, Resp]) Parameters() HandlerParameters[Req, Resp] {
 	var mode libRequest.Type
-	if c.IsJson {
+	if c.IsJSON {
 		mode = libRequest.JSON
 	} else {
 		mode = libRequest.Query
@@ -83,13 +83,13 @@ func (c CallArgs[Req, Resp]) Initializer(req HandlerRequest[Req, Resp]) error {
 	}
 	headersMap := ExtractHeaders(req.W, c.Headers, c.Locals)
 	if !c.ForwardAuth {
-		remoteApi := req.Core.Params().GetRemoteApi(c.Api)
-		headersMap["Authorization"] = "Basic " + libCallApi.BasicAuth(remoteApi.AuthData.User, remoteApi.AuthData.Password)
+		remoteAPI := req.Core.Params().GetRemoteAPI(c.API)
+		headersMap["Authorization"] = "Basic " + libCallApi.BasicAuth(remoteAPI.AuthData.User, remoteAPI.AuthData.Password)
 	}
 	req.W.Parser.SetLocal(HeadersMap, headersMap)
 
 	finalPath := c.Path
-	for _, value := range req.W.Parser.GetUrlParams() {
+	for _, value := range req.W.Parser.GetURLParams() {
 		//normalized := strings.ReplaceAll(param.Value, "*", "/")
 		finalPath += "/" + value //normalized
 	}
@@ -110,7 +110,7 @@ func (c CallArgs[Req, Resp]) Handler(req HandlerRequest[Req, Resp]) (Resp, error
 		&libCallApi.RemoteCallParamData[Req, Resp]{
 			Headers:  headers,
 			JsonBody: *req.Request,
-			Api:      *req.Core.Params().GetRemoteApi(c.Api),
+			API:      *req.Core.Params().GetRemoteAPI(c.API),
 			Method:   c.Method,
 			Path:     finalPath,
 			Parser:   req.W.Parser, // Pass parser for distributed tracing
@@ -162,7 +162,7 @@ func InitPostRequest(
 	}
 	var params []any
 	for _, arg := range args {
-		params = append(params, w.Parser.GetUrlParam(arg.(string)))
+		params = append(params, w.Parser.GetURLParam(arg.(string)))
 	}
 	path := fmt.Sprintf(url, params...)
 	return http.StatusOK, map[string]string{"path": path}, nil
@@ -176,7 +176,7 @@ type ConsumeHandlerType[Req, Resp any] struct {
 	VerifyHeader    bool
 	HasReceipt      bool
 	Headers         []string
-	Api             string
+	API             string
 	Method          string
 	Query           string
 	RecoveryHandler func(any)
@@ -200,7 +200,7 @@ func (h *ConsumeHandlerType[Req, Resp]) Parameters() HandlerParameters[Req, Resp
 }
 
 func (h *ConsumeHandlerType[Req, Resp]) Initializer(req HandlerRequest[Req, Resp]) error {
-	for _, value := range req.W.Parser.GetUrlParams() {
+	for _, value := range req.W.Parser.GetURLParams() {
 		//normalized := strings.ReplaceAll(param.Value, "*", "/")
 		h.Path += "/" + value //normalized
 	}
@@ -209,14 +209,14 @@ func (h *ConsumeHandlerType[Req, Resp]) Initializer(req HandlerRequest[Req, Resp
 
 func (h *ConsumeHandlerType[Req, Resp]) Handler(req HandlerRequest[Req, Resp]) (Resp, error) {
 	headersMap := ExtractHeaders(req.W, h.Headers, nil)
-	resp, errCall := CallApiJSON(req.W, req.Core, h.Title,
+	resp, errCall := CallAPIJSON(req.W, req.Core, h.Title,
 		&libCallApi.RemoteCallParamData[Req, Resp]{
-			Api:         *req.Core.Params().GetRemoteApi(h.Api),
+			API:         *req.Core.Params().GetRemoteAPI(h.API),
 			Method:      h.Method,
 			Path:        h.Path,
 			Query:       h.Query,
 			JsonBody:    *req.Request,
-			ValidateTls: false,
+			ValidateTLS: false,
 			EnableLog:   false,
 			Headers:     headersMap,
 			Builder:     req.Builder,

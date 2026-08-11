@@ -84,12 +84,12 @@ func GetFormTagValue(name string, s any) (*string, *string, error) {
 }
 
 const (
-	NO_DATA_FOUND        = "NO_DATA_FOUND"
-	NO_DATA_FOUND_DESC   = "رکوردی یافت نشد"
-	DUPLICATE_FOUND      = "DUPLICATE_FOUND"
-	DUPLICATE_FOUND_DESC = "رکورد تکراری است"
-	DB_READ_ERROR        = "DB_READ_ERROR"
-	PARSE_DB_RESP_ERROR  = "PARSE_DB_RESP_ERROR"
+	NoDataFound        = "NoDataFound"
+	NoDataFoundDesc    = "رکوردی یافت نشد"
+	DuplicateFound     = "DuplicateFound"
+	DuplicateFoundDesc = "رکورد تکراری است"
+	DBReadError        = "DBReadError"
+	ParseDBRespError   = "ParseDBRespError"
 )
 
 const (
@@ -107,16 +107,16 @@ func QueryOld[Result QueryResult](core QueryRunnerInterface, command QueryComman
 	result, err := GetQuery[Result](sqlCommand, core, args...)
 	if err != nil {
 		if ok, err := libError.Unwrap(err); ok {
-			if err.Action().Description == NO_DATA_FOUND {
+			if err.Action().Description == NoDataFound {
 				return nil, errors.Join(err, libError.NewWithDescription(
 					http.StatusBadRequest,
-					NO_DATA_FOUND,
-					"no data found: %s(%s)=> %s", command.Type.String(), command.Name, NO_DATA_FOUND))
+					NoDataFound,
+					"no data found: %s(%s)=> %s", command.Type.String(), command.Name, NoDataFound))
 			}
 		}
 		return nil, errors.Join(err, libError.NewWithDescription(
 			http.StatusBadRequest,
-			NO_DATA_FOUND,
+			NoDataFound,
 			"error call sql: %s(%s)", command.Type.String(), command.Name))
 	}
 	switch command.Type {

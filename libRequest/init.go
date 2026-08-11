@@ -33,7 +33,7 @@ func (m RequestModel) Initialize(w webFramework.WebFramework, method, url string
 	}
 	var params []any
 	for _, arg := range args {
-		params = append(params, w.Parser.GetUrlParam(arg.(string)))
+		params = append(params, w.Parser.GetURLParam(arg.(string)))
 	}
 	path := fmt.Sprintf(url, params...)
 	return http.StatusOK, map[string]string{"path": path}, nil
@@ -42,7 +42,7 @@ func (m RequestModel) Initialize(w webFramework.WebFramework, method, url string
 func (m RequestModel) InitializeNoLog(w webFramework.WebFramework, method, url string, req RequestPtr, args ...any) (int, map[string]string, error) {
 	var params []any
 	for _, arg := range args {
-		params = append(params, w.Parser.GetUrlParam(arg.(string)))
+		params = append(params, w.Parser.GetURLParam(arg.(string)))
 	}
 	path := fmt.Sprintf(url, params...)
 	return http.StatusOK, map[string]string{"path": path}, nil

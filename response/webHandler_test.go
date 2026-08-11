@@ -25,16 +25,16 @@ func (p *captureParser) GetHeader(webFramework.HeaderInterface) error {
 	return nil
 }
 func (p *captureParser) GetHeaderValue(string) string        { return "" }
-func (p *captureParser) GetHttpHeader() http.Header          { return nil }
+func (p *captureParser) GetHTTPHeader() http.Header          { return nil }
 func (p *captureParser) GetBody(any) error                   { return nil }
-func (p *captureParser) GetUri(any) error                    { return nil }
-func (p *captureParser) GetUrlQuery(any) error               { return nil }
-func (p *captureParser) GetRawUrlQuery() string              { return "" }
+func (p *captureParser) GetURI(any) error                    { return nil }
+func (p *captureParser) GetURLQuery(any) error               { return nil }
+func (p *captureParser) GetRawURLQuery() string              { return "" }
 func (p *captureParser) GetLocal(name string) any            { return p.locals[name] }
 func (p *captureParser) GetLocalString(name string) string   { return "" }
-func (p *captureParser) GetUrlParam(string) string           { return "" }
-func (p *captureParser) GetUrlParams() map[string]string     { return nil }
-func (p *captureParser) CheckUrlParam(string) (string, bool) { return "", false }
+func (p *captureParser) GetURLParam(string) string           { return "" }
+func (p *captureParser) GetURLParams() map[string]string     { return nil }
+func (p *captureParser) CheckURLParam(string) (string, bool) { return "", false }
 func (p *captureParser) SetLocal(name string, value any)     { p.locals[name] = value }
 func (p *captureParser) SetReqHeader(string, string)         {}
 func (p *captureParser) SetRespHeader(string, string)        {}
@@ -108,7 +108,7 @@ func TestWebHandler_Error_ValidationFailedMultiField(t *testing.T) {
 		}
 	}
 	for _, e := range errs {
-		if e.Description == SYSTEM_FAULT_DESC {
+		if e.Description == SystemFaultDesc {
 			t.Errorf("unexpected system fault description: %+v", e)
 		}
 	}

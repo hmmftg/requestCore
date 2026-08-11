@@ -18,8 +18,8 @@ import (
 )
 
 type WsResponse[Result any] struct {
-	HttpStatus   int                      `json:"-"`
-	HttpHeaders  map[string]string        `json:"-"`
+	HTTPStatus   int                      `json:"-"`
+	HTTPHeaders  map[string]string        `json:"-"`
 	Status       int                      `json:"status"`
 	Description  string                   `json:"description"`
 	Result       Result                   `json:"result,omitempty"`
@@ -28,27 +28,27 @@ type WsResponse[Result any] struct {
 }
 
 const (
-	CallApiLogEntry string = "ApiCall"
+	CallAPILogEntry string = "ApiCall"
 )
 
 func (w *WsResponse[any]) SetStatus(status int) {
-	w.HttpStatus = status
+	w.HTTPStatus = status
 }
 func (w *WsResponse[any]) SetHeaders(headers map[string]string) {
-	w.HttpHeaders = headers
+	w.HTTPHeaders = headers
 }
 
-func CallApiInternal[Resp any](
+func CallAPIInternal[Resp any](
 	w webFramework.WebFramework,
 	_ requestCore.RequestCoreInterface,
 	method string,
 	param libCallApi.CallParam) (*Resp, error) {
-	webFramework.AddLog(w, CallApiLogEntry, slog.Any(method, param))
+	webFramework.AddLog(w, CallAPILogEntry, slog.Any(method, param))
 
 	resp1 := libCallApi.Call[Resp](w, param)
 
 	if resp1.Error != nil {
-		webFramework.AddLog(w, CallApiLogEntry, slog.Any(fmt.Sprintf("%s-error", method), resp1.Error))
+		webFramework.AddLog(w, CallAPILogEntry, slog.Any(fmt.Sprintf("%s-error", method), resp1.Error))
 		if ok, err := response.Unwrap(resp1.Error); ok {
 			return nil, response.Errors(http.StatusInternalServerError, "REMOTE_CALL_ERROR", param, err)
 		}
@@ -59,44 +59,44 @@ func CallApiInternal[Resp any](
 				param,
 			))
 	}
-	webFramework.AddLog(w, CallApiLogEntry, slog.Any(fmt.Sprintf("%s-resp", method), resp1))
+	webFramework.AddLog(w, CallAPILogEntry, slog.Any(fmt.Sprintf("%s-resp", method), resp1))
 	if resp1.Status.Status != http.StatusOK {
 		return nil, resp1.WsResp.ToErrorState().Input(param).SetStatus(resp1.Status.Status)
 	}
 	return resp1.Resp, nil
 }
 
-func CallApi[Resp any](
+func CallAPI[Resp any](
 	w webFramework.WebFramework,
 	core requestCore.RequestCoreInterface,
 	method string,
 	param libCallApi.CallParam) (*Resp, error) {
-	result, err := CallApiInternal[WsResponse[Resp]](w, core, method, param)
+	result, err := CallAPIInternal[WsResponse[Resp]](w, core, method, param)
 	if result == nil {
 		return nil, err
 	}
 	return &result.Result, err
 }
 
-func CallApiWithReceipt[Resp any](
+func CallAPIWithReceipt[Resp any](
 	w webFramework.WebFramework,
 	core requestCore.RequestCoreInterface,
 	method string,
 	param libCallApi.CallParam) (*Resp, *response.Receipt, error) {
-	result, err := CallApiInternal[WsResponse[Resp]](w, core, method, param)
+	result, err := CallAPIInternal[WsResponse[Resp]](w, core, method, param)
 	if result == nil {
 		return nil, nil, err
 	}
 	return &result.Result, result.PrintReceipt, err
 }
 
-func CallApiJSON[Req any, Resp any](
+func CallAPIJSON[Req any, Resp any](
 	w webFramework.WebFramework,
 	_ requestCore.RequestCoreInterface,
 	method string,
 	param *libCallApi.RemoteCallParamData[Req, Resp],
 ) (Resp, error) {
-	webFramework.AddLog(w, CallApiLogEntry, slog.Any(method, param))
+	webFramework.AddLog(w, CallAPILogEntry, slog.Any(method, param))
 
 	param.BodyType = libCallApi.JSON
 	if param.Parser == nil {
@@ -104,20 +104,20 @@ func CallApiJSON[Req any, Resp any](
 	}
 	resp, err := libCallApi.RemoteCall(w, param)
 	if err != nil {
-		webFramework.AddLog(w, CallApiLogEntry, slog.Any(fmt.Sprintf("%s-error", method), err))
+		webFramework.AddLog(w, CallAPILogEntry, slog.Any(fmt.Sprintf("%s-error", method), err))
 		return *new(Resp), err
 	}
-	webFramework.AddLog(w, CallApiLogEntry, slog.Any(fmt.Sprintf("%s-resp", method), resp))
+	webFramework.AddLog(w, CallAPILogEntry, slog.Any(fmt.Sprintf("%s-resp", method), resp))
 	return *resp, nil
 }
 
-func CallApiForm[Req any, Resp any](
+func CallAPIForm[Req any, Resp any](
 	w webFramework.WebFramework,
 	_ requestCore.RequestCoreInterface,
 	method string,
 	param *libCallApi.RemoteCallParamData[Req, Resp],
 ) (Resp, error) {
-	webFramework.AddLog(w, CallApiLogEntry, slog.Any(method, param))
+	webFramework.AddLog(w, CallAPILogEntry, slog.Any(method, param))
 
 	param.BodyType = libCallApi.Form
 	if param.Parser == nil {
@@ -125,13 +125,13 @@ func CallApiForm[Req any, Resp any](
 	}
 	resp, err := libCallApi.RemoteCall(w, param)
 	if err != nil {
-		webFramework.AddLog(w, CallApiLogEntry, slog.Any(fmt.Sprintf("%s-error", method), err))
+		webFramework.AddLog(w, CallAPILogEntry, slog.Any(fmt.Sprintf("%s-error", method), err))
 		return *new(Resp), err
 	}
-	webFramework.AddLog(w, CallApiLogEntry, slog.Any(fmt.Sprintf("%s-resp", method), resp))
+	webFramework.AddLog(w, CallAPILogEntry, slog.Any(fmt.Sprintf("%s-resp", method), resp))
 	return *resp, nil
 }
-func callApiNoLog[Resp any](
+func callAPINoLog[Resp any](
 	w webFramework.WebFramework,
 	_ string,
 	param libCallApi.CallParam) (*Resp, error) {
@@ -153,37 +153,37 @@ func callApiNoLog[Resp any](
 	return resp1.Resp, nil
 }
 
-func CallApiNoLog[Resp any](
+func CallAPINoLog[Resp any](
 	w webFramework.WebFramework,
 	method string,
 	param libCallApi.CallParam) (*Resp, error) {
-	result, err := callApiNoLog[WsResponse[Resp]](w, method, param)
+	result, err := callAPINoLog[WsResponse[Resp]](w, method, param)
 	if result == nil {
 		return nil, err
 	}
 	return &result.Result, err
 }
 
-// ApiCallInfo is a compatibility alias for webFramework.TransactionInfo.
+// APICallInfo is a compatibility alias for webFramework.TransactionInfo.
 // New code should use webFramework.TransactionInfo directly.
-type ApiCallInfo = webFramework.TransactionInfo
+type APICallInfo = webFramework.TransactionInfo
 
-// CallApiLogKeys holds configurable log key templates for AddLog entries.
+// CallAPILogKeys holds configurable log key templates for AddLog entries.
 // When a field is empty, the corresponding default is used.
-type CallApiLogKeys struct {
+type CallAPILogKeys struct {
 	Request  string // default: <Method>
 	Response string // default: <Method>-resp
 	Failure  string // default: <Method>-error
 }
 
-// CallApiOptions holds optional parameters for CallApiJSONWithOpts.
-type CallApiOptions struct {
+// CallAPIOptions holds optional parameters for CallAPIJSONWithOpts.
+type CallAPIOptions struct {
 	Method  string        // log key, e.g. "soha-authorize"
 	Timeout time.Duration // server-side elapsed-time guard (0 = no guard)
 
 	// LogKeys, when set, overrides the default AddLog key templates.
 	// Empty fields fall back to the defaults.
-	LogKeys CallApiLogKeys
+	LogKeys CallAPILogKeys
 
 	// MetricsRecorder, if set, records Prometheus-style metrics for the call.
 	// If nil, the default global Prometheus recorder is used.
@@ -218,13 +218,13 @@ type CallApiOptions struct {
 	// ResponseBody (the result is stored in MaskedResponseBody) before
 	// TransactionLogger and OnComplete receive TransactionInfo. nil = no
 	// masking (raw values passed through). Must NOT mutate the outbound
-	// request or the typed response returned by CallApiJSONWithOpts. Never
+	// request or the typed response returned by CallAPIJSONWithOpts. Never
 	// applied to webFramework.AddLog attrs (AddLog uses
 	// RemoteCallParamData.LogValue which independently masks Authorization).
 	MaskFunc func(any) any
 }
 
-// CallApiJSONWithOpts is an enhanced version of CallApiJSON that adds:
+// CallAPIJSONWithOpts is an enhanced version of CallAPIJSON that adds:
 //   - Prometheus metrics recording via libTracing.RecordHTTPClientCallWithOutcome
 //   - A server-side elapsed-time timeout guard (in addition to the HTTP client timeout)
 //   - HTTP status code preservation via RemoteCallError (independently of the caller's builder)
@@ -239,11 +239,11 @@ type CallApiOptions struct {
 // after AddLog and never replaces it.
 //
 // Custom headers: set param.Headers directly (e.g. param.Headers["SIGNATURE"] = "...").
-func CallApiJSONWithOpts[Req any, Resp any](
+func CallAPIJSONWithOpts[Req any, Resp any](
 	w webFramework.WebFramework,
 	_ requestCore.RequestCoreInterface,
 	param *libCallApi.RemoteCallParamData[Req, Resp],
-	opts CallApiOptions,
+	opts CallAPIOptions,
 ) (Resp, error) {
 	param.BodyType = libCallApi.JSON
 	if param.Parser == nil {
@@ -298,10 +298,10 @@ func CallApiJSONWithOpts[Req any, Resp any](
 func executeSingleAttempt[Req any, Resp any](
 	w webFramework.WebFramework,
 	param *libCallApi.RemoteCallParamData[Req, Resp],
-	opts CallApiOptions,
+	opts CallAPIOptions,
 	reqKey, respKey, failKey string,
 ) (*Resp, int, error) {
-	webFramework.AddLog(w, CallApiLogEntry, slog.Any(reqKey, param))
+	webFramework.AddLog(w, CallAPILogEntry, slog.Any(reqKey, param))
 
 	// Wrap the builder in a closure to:
 	// 1. Capture the actual HTTP status code (RemoteCall does not expose it).
@@ -330,37 +330,37 @@ func executeSingleAttempt[Req any, Resp any](
 	elapsed := time.Since(start)
 
 	statusCode := resolveStatusCode(err, actualStatus)
-	requestURL := BuildRequestURL(param.Api.Domain, param.Path, param.Query)
+	requestURL := BuildRequestURL(param.API.Domain, param.Path, param.Query)
 	recorder := opts.MetricsRecorder
 	if recorder == nil {
 		recorder = libTracing.DefaultHTTPClientMetricsRecorder()
 	}
 
 	if err != nil {
-		webFramework.AddLog(w, CallApiLogEntry, slog.Any(failKey, err))
-		recorder.Record(param.Api.Name, param.Method, statusCode, elapsed, "failure")
+		webFramework.AddLog(w, CallAPILogEntry, slog.Any(failKey, err))
+		recorder.Record(param.API.Name, param.Method, statusCode, elapsed, "failure")
 		logTransactionAndCallback(w, opts, param, resp, err, statusCode, elapsed, requestURL)
 		return nil, statusCode, err
 	}
 
-	webFramework.AddLog(w, CallApiLogEntry, slog.Any(respKey, resp))
+	webFramework.AddLog(w, CallAPILogEntry, slog.Any(respKey, resp))
 
 	if opts.Timeout > 0 && elapsed >= opts.Timeout {
-		timeoutErr := BuildTimeoutError(param.Api.Domain, opts.TimeoutStatusCode)
-		webFramework.AddLog(w, CallApiLogEntry, slog.Any(failKey, timeoutErr))
-		recorder.Record(param.Api.Name, param.Method, statusCode, elapsed, "timeout")
+		timeoutErr := BuildTimeoutError(param.API.Domain, opts.TimeoutStatusCode)
+		webFramework.AddLog(w, CallAPILogEntry, slog.Any(failKey, timeoutErr))
+		recorder.Record(param.API.Name, param.Method, statusCode, elapsed, "timeout")
 		logTransactionAndCallback(w, opts, param, resp, timeoutErr, statusCode, elapsed, requestURL)
 		return nil, statusCode, timeoutErr
 	}
 
-	recorder.Record(param.Api.Name, param.Method, statusCode, elapsed, "success")
+	recorder.Record(param.API.Name, param.Method, statusCode, elapsed, "success")
 	logTransactionAndCallback(w, opts, param, resp, err, statusCode, elapsed, requestURL)
 	return resp, statusCode, nil
 }
 
 // resolveLogKeys returns the request, response, and failure log keys,
 // falling back to defaults for empty configured values.
-func resolveLogKeys(opts CallApiOptions) (string, string, string) {
+func resolveLogKeys(opts CallAPIOptions) (string, string, string) {
 	reqKey := opts.LogKeys.Request
 	if reqKey == "" {
 		reqKey = opts.Method
@@ -377,7 +377,7 @@ func resolveLogKeys(opts CallApiOptions) (string, string, string) {
 }
 
 // finalizeResult applies NormalizeError if set and returns the final result.
-func finalizeResult[Resp any](resp *Resp, err error, opts CallApiOptions) (Resp, error) {
+func finalizeResult[Resp any](resp *Resp, err error, opts CallAPIOptions) (Resp, error) {
 	if err != nil && opts.NormalizeError != nil {
 		err = opts.NormalizeError(err)
 	}
@@ -430,7 +430,7 @@ func BuildRequestURL(domain, path, query string) string {
 // This runs after webFramework.AddLog on each path and never bypasses it.
 func logTransactionAndCallback[Req any, Resp any](
 	w webFramework.WebFramework,
-	opts CallApiOptions,
+	opts CallAPIOptions,
 	param *libCallApi.RemoteCallParamData[Req, Resp],
 	resp *Resp,
 	err error,
@@ -461,7 +461,7 @@ func logTransactionAndCallback[Req any, Resp any](
 	}
 
 	info := webFramework.TransactionInfo{
-		ServiceName:        param.Api.Name,
+		ServiceName:        param.API.Name,
 		URL:                requestURL,
 		Endpoint:           param.Path,
 		Method:             param.Method,

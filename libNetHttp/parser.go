@@ -70,7 +70,7 @@ func (c NetHttpParser) GetHeaderValue(name string) string {
 	return c.Request.Header.Get(name)
 }
 
-func (c NetHttpParser) GetHttpHeader() http.Header {
+func (c NetHttpParser) GetHTTPHeader() http.Header {
 	return c.Request.Header
 }
 
@@ -91,7 +91,7 @@ func (c NetHttpParser) GetBody(target any) error {
 	return json.Unmarshal(body, target)
 }
 
-func (c NetHttpParser) GetUri(target any) error {
+func (c NetHttpParser) GetURI(target any) error {
 	// Parse URL parameters into target struct
 	// This is a simplified implementation
 	if target == nil {
@@ -103,7 +103,7 @@ func (c NetHttpParser) GetUri(target any) error {
 	return c.parseStructFromMap(target, c.Params)
 }
 
-func (c NetHttpParser) GetUrlQuery(target any) error {
+func (c NetHttpParser) GetURLQuery(target any) error {
 	if target == nil {
 		return nil
 	}
@@ -118,7 +118,7 @@ func (c NetHttpParser) GetUrlQuery(target any) error {
 	return c.parseStructFromMap(target, queryParams)
 }
 
-func (c NetHttpParser) GetRawUrlQuery() string {
+func (c NetHttpParser) GetRawURLQuery() string {
 	return c.Request.URL.RawQuery
 }
 
@@ -135,15 +135,15 @@ func (c NetHttpParser) GetLocalString(name string) string {
 	return ""
 }
 
-func (c NetHttpParser) GetUrlParam(name string) string {
+func (c NetHttpParser) GetURLParam(name string) string {
 	return c.Params[name]
 }
 
-func (c NetHttpParser) GetUrlParams() map[string]string {
+func (c NetHttpParser) GetURLParams() map[string]string {
 	return c.Params
 }
 
-func (c NetHttpParser) CheckUrlParam(name string) (string, bool) {
+func (c NetHttpParser) CheckURLParam(name string) (string, bool) {
 	value, exists := c.Params[name]
 	return value, exists
 }

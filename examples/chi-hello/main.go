@@ -21,7 +21,7 @@ func main() {
 
 	router.Get("/users/{id}", func(w http.ResponseWriter, r *http.Request) {
 		parser := libChi.InitParser(r, w)
-		id := parser.GetUrlParam("id")
+		id := parser.GetURLParam("id")
 		if err := parser.SendJSONRespBody(http.StatusOK, map[string]string{"id": id}); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 		}

@@ -41,7 +41,7 @@ func TestCall(t *testing.T) {
 	defer fakeServer.Close()
 
 	callParam := libCallApi.RemoteCallParamData[any, SimpleTestResponse]{
-		Api:        libCallApi.RemoteApi{Domain: fakeServer.URL() + "/api"},
+		API:        libCallApi.RemoteAPI{Domain: fakeServer.URL() + "/api"},
 		QueryStack: &[]string{"test1", "test2", "test3"},
 		Builder: func(status int, rawResp []byte, headers map[string]string) (*SimpleTestResponse, error) {
 			var resp SimpleTestResponse
@@ -116,7 +116,7 @@ func TestCallJSON(t *testing.T) {
 	defer fakeServer.Close()
 
 	callParam := libCallApi.RemoteCallParamData[any, SimpleTestResponse]{
-		Api:        libCallApi.RemoteApi{Domain: fakeServer.URL() + "/api"},
+		API:        libCallApi.RemoteAPI{Domain: fakeServer.URL() + "/api"},
 		QueryStack: &[]string{"test1", "test2", "test3"},
 		Builder: func(status int, rawResp []byte, headers map[string]string) (*SimpleTestResponse, error) {
 			var resp SimpleTestResponse

@@ -115,7 +115,7 @@ func (q OrmHandlerType[Row, Resp]) Handler(req HandlerRequest[Row, Resp]) (Resp,
 		if err != nil {
 			if ok, errData := response.Unwrap(err); ok {
 				if q.OnEmpty200 && errData.GetStatus() == http.StatusBadRequest &&
-					errData.GetDescription() == libQuery.NO_DATA_FOUND {
+					errData.GetDescription() == libQuery.NoDataFound {
 					rows = []Row{}
 				}
 			} else {

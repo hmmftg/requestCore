@@ -22,13 +22,13 @@ func GetQuery[R any](query string, core OrmInterface, args ...any) ([]R, error) 
 	if err != nil {
 		return nil, errors.Join(
 			err,
-			libError.NewWithDescription(status.InternalServerError, libQuery.DB_READ_ERROR, "unable to execute query"),
+			libError.NewWithDescription(status.InternalServerError, libQuery.DBReadError, "unable to execute query"),
 		)
 	}
 	if len(rows) == 0 {
 		return nil, libError.NewWithDescription(
 			http.StatusBadRequest,
-			libQuery.NO_DATA_FOUND,
+			libQuery.NoDataFound,
 			"no data found: %s,%v", query, args,
 		)
 	}
@@ -51,7 +51,7 @@ func QueryToStruct[Target any](db *gorm.DB, querySql string, args ...any) ([]Tar
 
 func Query[R any](command libQuery.CommandInterface, core OrmInterface, args ...any) ([]R, error) {
 	if command.GetType() == int(libQuery.QueryMap) {
-		return nil, libError.NewWithDescription(status.BadRequest, libQuery.DB_READ_ERROR, "unsupported command type")
+		return nil, libError.NewWithDescription(status.BadRequest, libQuery.DBReadError, "unsupported command type")
 	}
 	query := command.GetCommand(core.GetDbMode())
 	// Query
@@ -59,7 +59,7 @@ func Query[R any](command libQuery.CommandInterface, core OrmInterface, args ...
 	if err != nil {
 		return nil, errors.Join(
 			err,
-			libError.NewWithDescription(status.InternalServerError, libQuery.DB_READ_ERROR, "unable to execute query"),
+			libError.NewWithDescription(status.InternalServerError, libQuery.DBReadError, "unable to execute query"),
 		)
 	}
 	switch command.GetType() {
@@ -67,14 +67,14 @@ func Query[R any](command libQuery.CommandInterface, core OrmInterface, args ...
 		if len(rows) == 0 {
 			return nil, libError.NewWithDescription(
 				http.StatusBadRequest,
-				libQuery.NO_DATA_FOUND,
+				libQuery.NoDataFound,
 				"no data found: %s,%v", query, args,
 			)
 		}
 		if len(rows) > 1 {
 			return nil, libError.NewWithDescription(
 				http.StatusBadRequest,
-				libQuery.DUPLICATE_FOUND,
+				libQuery.DuplicateFound,
 				"duplicate data found: %s,%v,%v", query, args, rows,
 			)
 		}

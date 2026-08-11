@@ -6,7 +6,7 @@ import (
 	"github.com/hmmftg/requestCore/webFramework"
 )
 
-func (api *RemoteApi) EnsureAuthorization(w webFramework.WebFramework, headers map[string]string) libError.Error {
+func (api *RemoteAPI) EnsureAuthorization(w webFramework.WebFramework, headers map[string]string) libError.Error {
 	if headers == nil {
 		return libError.NewWithDescription(
 			status.InternalServerError,

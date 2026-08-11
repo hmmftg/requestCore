@@ -126,8 +126,8 @@ func (command DmlCommand) ExecuteWithContext(parser webFramework.RequestParser, 
 			if command.CustomError != nil {
 				return nil, command.CustomError
 			}
-			if ok, err := libError.Unwrap(err); ok && err.Action().Description == NO_DATA_FOUND {
-				return nil, errors.Join(err, fmt.Errorf("checkExists: %s=> %s", command.Name, NO_DATA_FOUND))
+			if ok, err := libError.Unwrap(err); ok && err.Action().Description == NoDataFound {
+				return nil, errors.Join(err, fmt.Errorf("checkExists: %s=> %s", command.Name, NoDataFound))
 			}
 			return nil, errors.Join(err, fmt.Errorf("checkExists: %s=> failed", command.Name))
 		}
@@ -135,12 +135,12 @@ func (command DmlCommand) ExecuteWithContext(parser webFramework.RequestParser, 
 	case QueryCheckNotExists:
 		_, err := Query[QueryData](command, core, GetLocalArgs(parser, command.Args)...)
 		if err != nil {
-			if ok, err := libError.Unwrap(err); ok && err.Action().Description == NO_DATA_FOUND {
+			if ok, err := libError.Unwrap(err); ok && err.Action().Description == NoDataFound {
 				return nil, nil
 			}
 			return nil, errors.Join(err, fmt.Errorf("CheckNotExists: %s=> failed", command.Name))
 		}
-		return nil, response.ToError(DUPLICATE_FOUND, DUPLICATE_FOUND_DESC, fmt.Errorf("CheckNotExists: %s=> %s", command.Name, DUPLICATE_FOUND))
+		return nil, response.ToError(DuplicateFound, DuplicateFoundDesc, fmt.Errorf("CheckNotExists: %s=> %s", command.Name, DuplicateFound))
 	case Insert:
 		resp, err := core.Dml(w, moduleName, methodName, command.GetCommand(core.GetDbMode()), GetLocalArgs(parser, command.Args)...)
 		if err != nil {

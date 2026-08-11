@@ -79,7 +79,7 @@ func TestDMLHandler(t *testing.T) {
 	testCases := []testingtools.TestCase{
 		{
 			Name:      "Valid",
-			Url:       "/",
+			URL:       "/",
 			Request:   testDMLReq{ID: "1"},
 			Status:    200,
 			CheckBody: []string{Ins1, "rowsAffected", `:1`},
@@ -97,7 +97,7 @@ func TestDMLHandler(t *testing.T) {
 		},
 		{
 			Name:    "Precontrol failed",
-			Url:     "/",
+			URL:     "/",
 			Request: testDMLReq{ID: "1"},
 			Status:  500,
 			// Safe error response: internal message (PreControl: pre1) no longer exposed; expect errors and safe description

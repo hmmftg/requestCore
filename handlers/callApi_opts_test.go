@@ -45,25 +45,25 @@ func setupOptsTest(t *testing.T) (*libCallApi.FakeAPIServer, *libCallApi.RemoteC
 	t.Cleanup(fakeServer.Close)
 
 	param := &libCallApi.RemoteCallParamData[any, optsTestResponse]{
-		Api:    libCallApi.RemoteApi{Domain: fakeServer.URL() + "/api"},
+		API:    libCallApi.RemoteAPI{Domain: fakeServer.URL() + "/api"},
 		Method: "GET",
 		Path:   "test1",
 	}
 	return fakeServer, param
 }
 
-func TestCallApiJSONWithOpts_Success(t *testing.T) {
+func TestCallAPIJSONWithOpts_Success(t *testing.T) {
 	fakeServer, param := setupOptsTest(t)
 	w := libContext.InitContextNoAuditTrail(t)
 
 	var onCompleteCalled bool
-	var capturedInfo handlers.ApiCallInfo
+	var capturedInfo handlers.APICallInfo
 
-	resp, err := handlers.CallApiJSONWithOpts(
+	resp, err := handlers.CallAPIJSONWithOpts(
 		w, nil, param,
-		handlers.CallApiOptions{
+		handlers.CallAPIOptions{
 			Method: "test-success",
-			OnComplete: func(info handlers.ApiCallInfo) {
+			OnComplete: func(info handlers.APICallInfo) {
 				onCompleteCalled = true
 				capturedInfo = info
 			},
@@ -91,20 +91,20 @@ func TestCallApiJSONWithOpts_Success(t *testing.T) {
 	assert.Equal(t, logArr[1].Key, "test-success-resp")
 }
 
-func TestCallApiJSONWithOpts_Error(t *testing.T) {
+func TestCallAPIJSONWithOpts_Error(t *testing.T) {
 	_, param := setupOptsTest(t)
 	param.Path = "nonexistent-path-for-error"
-	param.Api.Domain = "http://localhost:1" // unreachable port to force error
+	param.API.Domain = "http://localhost:1" // unreachable port to force error
 	w := libContext.InitContextNoAuditTrail(t)
 
 	var onCompleteCalled bool
-	var capturedInfo handlers.ApiCallInfo
+	var capturedInfo handlers.APICallInfo
 
-	_, err := handlers.CallApiJSONWithOpts(
+	_, err := handlers.CallAPIJSONWithOpts(
 		w, nil, param,
-		handlers.CallApiOptions{
+		handlers.CallAPIOptions{
 			Method: "test-error",
-			OnComplete: func(info handlers.ApiCallInfo) {
+			OnComplete: func(info handlers.APICallInfo) {
 				onCompleteCalled = true
 				capturedInfo = info
 			},
@@ -113,7 +113,7 @@ func TestCallApiJSONWithOpts_Error(t *testing.T) {
 
 	assert.Assert(t, err != nil, "should return error for unreachable server")
 	assert.Assert(t, onCompleteCalled, "OnComplete should be called on error")
-	assert.Assert(t, capturedInfo.Error != nil, "error should be set in ApiCallInfo")
+	assert.Assert(t, capturedInfo.Error != nil, "error should be set in APICallInfo")
 	assert.Equal(t, capturedInfo.StatusCode, 0, "statusCode should be 0 for connection error")
 
 	// Verify webFramework.AddLog: request log + error log = 2 entries
@@ -126,15 +126,15 @@ func TestCallApiJSONWithOpts_Error(t *testing.T) {
 	assert.Equal(t, logArr[1].Key, "test-error-error")
 }
 
-func TestCallApiJSONWithOpts_Timeout(t *testing.T) {
+func TestCallAPIJSONWithOpts_Timeout(t *testing.T) {
 	fakeServer, param := setupOptsTest(t)
 	param.Path = "slow"
-	param.Api.Domain = fakeServer.URL() + "/api"
+	param.API.Domain = fakeServer.URL() + "/api"
 	w := libContext.InitContextNoAuditTrail(t)
 
-	_, err := handlers.CallApiJSONWithOpts(
+	_, err := handlers.CallAPIJSONWithOpts(
 		w, nil, param,
-		handlers.CallApiOptions{
+		handlers.CallAPIOptions{
 			Method:  "test-timeout",
 			Timeout: 10 * time.Millisecond, // slow endpoint sleeps 50ms
 		},
@@ -159,14 +159,14 @@ func TestCallApiJSONWithOpts_Timeout(t *testing.T) {
 	assert.Equal(t, logArr[2].Key, "test-timeout-error")
 }
 
-func TestCallApiJSONWithOpts_HTTP403(t *testing.T) {
+func TestCallAPIJSONWithOpts_HTTP403(t *testing.T) {
 	_, param := setupOptsTest(t)
 	param.Path = "forbidden"
 	w := libContext.InitContextNoAuditTrail(t)
 
-	_, err := handlers.CallApiJSONWithOpts(
+	_, err := handlers.CallAPIJSONWithOpts(
 		w, nil, param,
-		handlers.CallApiOptions{
+		handlers.CallAPIOptions{
 			Method: "test-403",
 		},
 	)
@@ -180,14 +180,14 @@ func TestCallApiJSONWithOpts_HTTP403(t *testing.T) {
 	assert.Assert(t, len(rce.Body) > 0, "body should be preserved")
 }
 
-func TestCallApiJSONWithOpts_HTTP401(t *testing.T) {
+func TestCallAPIJSONWithOpts_HTTP401(t *testing.T) {
 	_, param := setupOptsTest(t)
 	param.Path = "unauthorized"
 	w := libContext.InitContextNoAuditTrail(t)
 
-	_, err := handlers.CallApiJSONWithOpts(
+	_, err := handlers.CallAPIJSONWithOpts(
 		w, nil, param,
-		handlers.CallApiOptions{
+		handlers.CallAPIOptions{
 			Method: "test-401",
 		},
 	)
@@ -200,14 +200,14 @@ func TestCallApiJSONWithOpts_HTTP401(t *testing.T) {
 	assert.Equal(t, rce.Status, http.StatusUnauthorized)
 }
 
-func TestCallApiJSONWithOpts_HTTP500(t *testing.T) {
+func TestCallAPIJSONWithOpts_HTTP500(t *testing.T) {
 	_, param := setupOptsTest(t)
 	param.Path = "server-error"
 	w := libContext.InitContextNoAuditTrail(t)
 
-	_, err := handlers.CallApiJSONWithOpts(
+	_, err := handlers.CallAPIJSONWithOpts(
 		w, nil, param,
-		handlers.CallApiOptions{
+		handlers.CallAPIOptions{
 			Method: "test-500",
 		},
 	)
@@ -220,17 +220,17 @@ func TestCallApiJSONWithOpts_HTTP500(t *testing.T) {
 	assert.Equal(t, rce.Status, http.StatusInternalServerError)
 }
 
-func TestCallApiJSONWithOpts_OnCompleteOnError(t *testing.T) {
+func TestCallAPIJSONWithOpts_OnCompleteOnError(t *testing.T) {
 	fakeServer, param := setupOptsTest(t)
 	param.Path = "forbidden"
 	w := libContext.InitContextNoAuditTrail(t)
 
-	var capturedInfo handlers.ApiCallInfo
-	_, err := handlers.CallApiJSONWithOpts(
+	var capturedInfo handlers.APICallInfo
+	_, err := handlers.CallAPIJSONWithOpts(
 		w, nil, param,
-		handlers.CallApiOptions{
+		handlers.CallAPIOptions{
 			Method: "test-oncomplete-error",
-			OnComplete: func(info handlers.ApiCallInfo) {
+			OnComplete: func(info handlers.APICallInfo) {
 				capturedInfo = info
 			},
 		},
@@ -244,14 +244,14 @@ func TestCallApiJSONWithOpts_OnCompleteOnError(t *testing.T) {
 	assert.Assert(t, strings.Contains(string(capturedInfo.ResponseBody), "forbidden"), "ResponseBody should contain 'forbidden'")
 }
 
-func TestCallApiJSONWithOpts_NoOnComplete(t *testing.T) {
+func TestCallAPIJSONWithOpts_NoOnComplete(t *testing.T) {
 	_, param := setupOptsTest(t)
 	w := libContext.InitContextNoAuditTrail(t)
 
 	// Should not panic when OnComplete is nil
-	resp, err := handlers.CallApiJSONWithOpts(
+	resp, err := handlers.CallAPIJSONWithOpts(
 		w, nil, param,
-		handlers.CallApiOptions{
+		handlers.CallAPIOptions{
 			Method: "test-no-callback",
 		},
 	)
@@ -260,17 +260,17 @@ func TestCallApiJSONWithOpts_NoOnComplete(t *testing.T) {
 	assert.Equal(t, resp.Status, "success")
 }
 
-func TestCallApiJSONWithOpts_201Created(t *testing.T) {
+func TestCallAPIJSONWithOpts_201Created(t *testing.T) {
 	_, param := setupOptsTest(t)
 	param.Path = "created"
 	w := libContext.InitContextNoAuditTrail(t)
 
-	var capturedInfo handlers.ApiCallInfo
-	resp, err := handlers.CallApiJSONWithOpts(
+	var capturedInfo handlers.APICallInfo
+	resp, err := handlers.CallAPIJSONWithOpts(
 		w, nil, param,
-		handlers.CallApiOptions{
+		handlers.CallAPIOptions{
 			Method: "test-201",
-			OnComplete: func(info handlers.ApiCallInfo) {
+			OnComplete: func(info handlers.APICallInfo) {
 				capturedInfo = info
 			},
 		},
@@ -281,17 +281,17 @@ func TestCallApiJSONWithOpts_201Created(t *testing.T) {
 	_ = resp
 }
 
-func TestCallApiJSONWithOpts_204NoContent(t *testing.T) {
+func TestCallAPIJSONWithOpts_204NoContent(t *testing.T) {
 	_, param := setupOptsTest(t)
 	param.Path = "no-content"
 	w := libContext.InitContextNoAuditTrail(t)
 
-	var capturedInfo handlers.ApiCallInfo
-	_, err := handlers.CallApiJSONWithOpts(
+	var capturedInfo handlers.APICallInfo
+	_, err := handlers.CallAPIJSONWithOpts(
 		w, nil, param,
-		handlers.CallApiOptions{
+		handlers.CallAPIOptions{
 			Method: "test-204",
-			OnComplete: func(info handlers.ApiCallInfo) {
+			OnComplete: func(info handlers.APICallInfo) {
 				capturedInfo = info
 			},
 		},
@@ -301,14 +301,14 @@ func TestCallApiJSONWithOpts_204NoContent(t *testing.T) {
 	assert.Equal(t, capturedInfo.StatusCode, http.StatusNoContent)
 }
 
-func TestCallApiJSONWithOpts_MetricsRecorded(t *testing.T) {
+func TestCallAPIJSONWithOpts_MetricsRecorded(t *testing.T) {
 	_, param := setupOptsTest(t)
 	w := libContext.InitContextNoAuditTrail(t)
 
 	recorder := &fakeMetricsRecorder{}
-	_, err := handlers.CallApiJSONWithOpts(
+	_, err := handlers.CallAPIJSONWithOpts(
 		w, nil, param,
-		handlers.CallApiOptions{
+		handlers.CallAPIOptions{
 			Method:          "test-metrics",
 			MetricsRecorder: recorder,
 		},
@@ -322,15 +322,15 @@ func TestCallApiJSONWithOpts_MetricsRecorded(t *testing.T) {
 	assert.Assert(t, recorder.calls[0].duration >= 0, "duration should be non-negative")
 }
 
-func TestCallApiJSONWithOpts_MetricsFailureOn403(t *testing.T) {
+func TestCallAPIJSONWithOpts_MetricsFailureOn403(t *testing.T) {
 	_, param := setupOptsTest(t)
 	param.Path = "forbidden"
 	w := libContext.InitContextNoAuditTrail(t)
 
 	recorder := &fakeMetricsRecorder{}
-	_, err := handlers.CallApiJSONWithOpts(
+	_, err := handlers.CallAPIJSONWithOpts(
 		w, nil, param,
-		handlers.CallApiOptions{
+		handlers.CallAPIOptions{
 			Method:          "test-metrics-403",
 			MetricsRecorder: recorder,
 		},
@@ -342,16 +342,16 @@ func TestCallApiJSONWithOpts_MetricsFailureOn403(t *testing.T) {
 	assert.Equal(t, recorder.calls[0].outcome, "failure")
 }
 
-func TestCallApiJSONWithOpts_MetricsTimeoutOutcome(t *testing.T) {
+func TestCallAPIJSONWithOpts_MetricsTimeoutOutcome(t *testing.T) {
 	fakeServer, param := setupOptsTest(t)
 	param.Path = "slow"
-	param.Api.Domain = fakeServer.URL() + "/api"
+	param.API.Domain = fakeServer.URL() + "/api"
 	w := libContext.InitContextNoAuditTrail(t)
 
 	recorder := &fakeMetricsRecorder{}
-	_, err := handlers.CallApiJSONWithOpts(
+	_, err := handlers.CallAPIJSONWithOpts(
 		w, nil, param,
-		handlers.CallApiOptions{
+		handlers.CallAPIOptions{
 			Method:          "test-metrics-timeout",
 			Timeout:         10 * time.Millisecond,
 			MetricsRecorder: recorder,
@@ -365,7 +365,7 @@ func TestCallApiJSONWithOpts_MetricsTimeoutOutcome(t *testing.T) {
 		"timeout should still record actual HTTP status, got: %d", recorder.calls[0].statusCode)
 }
 
-func TestCallApiJSONWithOpts_CustomBuilderNon2xx(t *testing.T) {
+func TestCallAPIJSONWithOpts_CustomBuilderNon2xx(t *testing.T) {
 	_, param := setupOptsTest(t)
 	param.Path = "forbidden"
 	w := libContext.InitContextNoAuditTrail(t)
@@ -376,9 +376,9 @@ func TestCallApiJSONWithOpts_CustomBuilderNon2xx(t *testing.T) {
 		return &optsTestResponse{}, nil
 	}
 
-	_, err := handlers.CallApiJSONWithOpts(
+	_, err := handlers.CallAPIJSONWithOpts(
 		w, nil, param,
-		handlers.CallApiOptions{
+		handlers.CallAPIOptions{
 			Method: "test-custom-builder-403",
 		},
 	)
@@ -392,16 +392,16 @@ func TestCallApiJSONWithOpts_CustomBuilderNon2xx(t *testing.T) {
 	assert.Equal(t, libCallApi.IsForbidden(err), true)
 }
 
-func TestCallApiJSONWithOpts_TransactionLogger(t *testing.T) {
+func TestCallAPIJSONWithOpts_TransactionLogger(t *testing.T) {
 	fakeServer, param := setupOptsTest(t)
 	w := libContext.InitContextNoAuditTrail(t)
 
 	logger := &fakeTransactionLogger{}
 	w.Parser.SetLocal(webFramework.TransactionLoggerLocalKey, logger)
 
-	resp, err := handlers.CallApiJSONWithOpts(
+	resp, err := handlers.CallAPIJSONWithOpts(
 		w, nil, param,
-		handlers.CallApiOptions{
+		handlers.CallAPIOptions{
 			Method: "test-tx-logger",
 		},
 	)
@@ -416,7 +416,7 @@ func TestCallApiJSONWithOpts_TransactionLogger(t *testing.T) {
 	assert.Assert(t, logger.calls[0].Duration >= 0, "duration should be non-negative")
 }
 
-func TestCallApiJSONWithOpts_TransactionLoggerOnError(t *testing.T) {
+func TestCallAPIJSONWithOpts_TransactionLoggerOnError(t *testing.T) {
 	_, param := setupOptsTest(t)
 	param.Path = "forbidden"
 	w := libContext.InitContextNoAuditTrail(t)
@@ -424,9 +424,9 @@ func TestCallApiJSONWithOpts_TransactionLoggerOnError(t *testing.T) {
 	logger := &fakeTransactionLogger{}
 	w.Parser.SetLocal(webFramework.TransactionLoggerLocalKey, logger)
 
-	_, err := handlers.CallApiJSONWithOpts(
+	_, err := handlers.CallAPIJSONWithOpts(
 		w, nil, param,
-		handlers.CallApiOptions{
+		handlers.CallAPIOptions{
 			Method: "test-tx-logger-error",
 		},
 	)
@@ -438,18 +438,18 @@ func TestCallApiJSONWithOpts_TransactionLoggerOnError(t *testing.T) {
 	assert.Assert(t, len(logger.calls[0].ResponseBody) > 0, "ResponseBody should contain raw error body")
 }
 
-func TestCallApiJSONWithOpts_TransactionLoggerOnTimeout(t *testing.T) {
+func TestCallAPIJSONWithOpts_TransactionLoggerOnTimeout(t *testing.T) {
 	fakeServer, param := setupOptsTest(t)
 	param.Path = "slow"
-	param.Api.Domain = fakeServer.URL() + "/api"
+	param.API.Domain = fakeServer.URL() + "/api"
 	w := libContext.InitContextNoAuditTrail(t)
 
 	logger := &fakeTransactionLogger{}
 	w.Parser.SetLocal(webFramework.TransactionLoggerLocalKey, logger)
 
-	_, err := handlers.CallApiJSONWithOpts(
+	_, err := handlers.CallAPIJSONWithOpts(
 		w, nil, param,
-		handlers.CallApiOptions{
+		handlers.CallAPIOptions{
 			Method:  "test-tx-logger-timeout",
 			Timeout: 10 * time.Millisecond,
 		},
@@ -461,14 +461,14 @@ func TestCallApiJSONWithOpts_TransactionLoggerOnTimeout(t *testing.T) {
 	assert.Assert(t, strings.Contains(logger.calls[0].Error.Error(), "timeout"), "timeout error should contain 'timeout'")
 }
 
-func TestCallApiJSONWithOpts_TransactionLoggerAbsent(t *testing.T) {
+func TestCallAPIJSONWithOpts_TransactionLoggerAbsent(t *testing.T) {
 	_, param := setupOptsTest(t)
 	w := libContext.InitContextNoAuditTrail(t)
 
 	// No TransactionLogger registered — should not panic
-	resp, err := handlers.CallApiJSONWithOpts(
+	resp, err := handlers.CallAPIJSONWithOpts(
 		w, nil, param,
-		handlers.CallApiOptions{
+		handlers.CallAPIOptions{
 			Method: "test-no-tx-logger",
 		},
 	)
@@ -477,17 +477,17 @@ func TestCallApiJSONWithOpts_TransactionLoggerAbsent(t *testing.T) {
 	assert.Equal(t, resp.Status, "success")
 }
 
-func TestCallApiJSONWithOpts_QueryInURL(t *testing.T) {
+func TestCallAPIJSONWithOpts_QueryInURL(t *testing.T) {
 	fakeServer, param := setupOptsTest(t)
 	param.Query = "?page=1&limit=10"
 	w := libContext.InitContextNoAuditTrail(t)
 
-	var capturedInfo handlers.ApiCallInfo
-	_, err := handlers.CallApiJSONWithOpts(
+	var capturedInfo handlers.APICallInfo
+	_, err := handlers.CallAPIJSONWithOpts(
 		w, nil, param,
-		handlers.CallApiOptions{
+		handlers.CallAPIOptions{
 			Method: "test-query-url",
-			OnComplete: func(info handlers.ApiCallInfo) {
+			OnComplete: func(info handlers.APICallInfo) {
 				capturedInfo = info
 			},
 		},
@@ -497,18 +497,18 @@ func TestCallApiJSONWithOpts_QueryInURL(t *testing.T) {
 	assert.Equal(t, capturedInfo.URL, fakeServer.URL()+"/api/test1?page=1&limit=10")
 }
 
-func TestCallApiJSONWithOpts_QueryStackInURL(t *testing.T) {
+func TestCallAPIJSONWithOpts_QueryStackInURL(t *testing.T) {
 	fakeServer, param := setupOptsTest(t)
 	param.Query = ""
 	param.QueryStack = &[]string{"?page=2"}
 	w := libContext.InitContextNoAuditTrail(t)
 
-	var capturedInfo handlers.ApiCallInfo
-	_, err := handlers.CallApiJSONWithOpts(
+	var capturedInfo handlers.APICallInfo
+	_, err := handlers.CallAPIJSONWithOpts(
 		w, nil, param,
-		handlers.CallApiOptions{
+		handlers.CallAPIOptions{
 			Method: "test-querystack-url",
-			OnComplete: func(info handlers.ApiCallInfo) {
+			OnComplete: func(info handlers.APICallInfo) {
 				capturedInfo = info
 			},
 		},
@@ -549,7 +549,7 @@ func TestInitHTTPClientMetricsNoPanic(_ *testing.T) {
 	libTracing.InitHTTPClientMetrics()
 }
 
-func TestCallApiJSONWithOpts_Malformed2xxPreservesStatus(t *testing.T) {
+func TestCallAPIJSONWithOpts_Malformed2xxPreservesStatus(t *testing.T) {
 	_, param := setupOptsTest(t)
 	// Add a malformed endpoint to the fake server
 	w := libContext.InitContextNoAuditTrail(t)
@@ -563,9 +563,9 @@ func TestCallApiJSONWithOpts_Malformed2xxPreservesStatus(t *testing.T) {
 		return nil, fmt.Errorf("custom parse error")
 	}
 
-	_, err := handlers.CallApiJSONWithOpts(
+	_, err := handlers.CallAPIJSONWithOpts(
 		w, nil, param,
-		handlers.CallApiOptions{
+		handlers.CallAPIOptions{
 			Method:          "test-malformed-200",
 			MetricsRecorder: recorder,
 		},
@@ -580,17 +580,17 @@ func TestCallApiJSONWithOpts_Malformed2xxPreservesStatus(t *testing.T) {
 		"TransactionInfo should preserve actual HTTP status 200")
 }
 
-func TestCallApiJSONWithOpts_URLMatchesActualRequest(t *testing.T) {
+func TestCallAPIJSONWithOpts_URLMatchesActualRequest(t *testing.T) {
 	fakeServer, param := setupOptsTest(t)
 	param.Query = "?page=1&limit=10"
 	w := libContext.InitContextNoAuditTrail(t)
 
-	var capturedInfo handlers.ApiCallInfo
-	_, err := handlers.CallApiJSONWithOpts(
+	var capturedInfo handlers.APICallInfo
+	_, err := handlers.CallAPIJSONWithOpts(
 		w, nil, param,
-		handlers.CallApiOptions{
+		handlers.CallAPIOptions{
 			Method: "test-url-match",
-			OnComplete: func(info handlers.ApiCallInfo) {
+			OnComplete: func(info handlers.APICallInfo) {
 				capturedInfo = info
 			},
 		},
@@ -630,15 +630,15 @@ func (l *fakeTransactionLogger) LogTransaction(info webFramework.TransactionInfo
 	l.calls = append(l.calls, info)
 }
 
-func TestCallApiJSONWithOpts_ConfigurableLogKeys(t *testing.T) {
+func TestCallAPIJSONWithOpts_ConfigurableLogKeys(t *testing.T) {
 	_, param := setupOptsTest(t)
 	w := libContext.InitContextNoAuditTrail(t)
 
-	_, err := handlers.CallApiJSONWithOpts(
+	_, err := handlers.CallAPIJSONWithOpts(
 		w, nil, param,
-		handlers.CallApiOptions{
+		handlers.CallAPIOptions{
 			Method: "test-default",
-			LogKeys: handlers.CallApiLogKeys{
+			LogKeys: handlers.CallAPILogKeys{
 				Request:  "svc-test-req",
 				Response: "svc-test-resp",
 				Failure:  "svc-test-fail",
@@ -656,16 +656,16 @@ func TestCallApiJSONWithOpts_ConfigurableLogKeys(t *testing.T) {
 	assert.Equal(t, logArr[1].Key, "svc-test-resp")
 }
 
-func TestCallApiJSONWithOpts_ConfigurableLogKeysFailure(t *testing.T) {
+func TestCallAPIJSONWithOpts_ConfigurableLogKeysFailure(t *testing.T) {
 	_, param := setupOptsTest(t)
 	param.Path = "forbidden"
 	w := libContext.InitContextNoAuditTrail(t)
 
-	_, err := handlers.CallApiJSONWithOpts(
+	_, err := handlers.CallAPIJSONWithOpts(
 		w, nil, param,
-		handlers.CallApiOptions{
+		handlers.CallAPIOptions{
 			Method: "test-fail",
-			LogKeys: handlers.CallApiLogKeys{
+			LogKeys: handlers.CallAPILogKeys{
 				Request:  "svc-test-req",
 				Response: "svc-test-resp",
 				Failure:  "svc-test-fail",
@@ -682,15 +682,15 @@ func TestCallApiJSONWithOpts_ConfigurableLogKeysFailure(t *testing.T) {
 	assert.Equal(t, logArr[1].Key, "svc-test-fail")
 }
 
-func TestCallApiJSONWithOpts_ConfigurableLogKeysEmptyFallback(t *testing.T) {
+func TestCallAPIJSONWithOpts_ConfigurableLogKeysEmptyFallback(t *testing.T) {
 	_, param := setupOptsTest(t)
 	w := libContext.InitContextNoAuditTrail(t)
 
-	_, err := handlers.CallApiJSONWithOpts(
+	_, err := handlers.CallAPIJSONWithOpts(
 		w, nil, param,
-		handlers.CallApiOptions{
+		handlers.CallAPIOptions{
 			Method: "test-fallback",
-			LogKeys: handlers.CallApiLogKeys{
+			LogKeys: handlers.CallAPILogKeys{
 				Request: "",
 			},
 		},
@@ -704,7 +704,7 @@ func TestCallApiJSONWithOpts_ConfigurableLogKeysEmptyFallback(t *testing.T) {
 	assert.Equal(t, logArr[1].Key, "test-fallback-resp", "empty Response key should fall back to default")
 }
 
-func TestCallApiJSONWithOpts_NormalizeErrorOptIn(t *testing.T) {
+func TestCallAPIJSONWithOpts_NormalizeErrorOptIn(t *testing.T) {
 	_, param := setupOptsTest(t)
 	param.Path = "forbidden"
 	w := libContext.InitContextNoAuditTrail(t)
@@ -713,9 +713,9 @@ func TestCallApiJSONWithOpts_NormalizeErrorOptIn(t *testing.T) {
 	logger := &fakeTransactionLogger{}
 	w.Parser.SetLocal(webFramework.TransactionLoggerLocalKey, logger)
 
-	_, err := handlers.CallApiJSONWithOpts(
+	_, err := handlers.CallAPIJSONWithOpts(
 		w, nil, param,
-		handlers.CallApiOptions{
+		handlers.CallAPIOptions{
 			Method:          "test-normalize",
 			MetricsRecorder: recorder,
 			NormalizeError:  handlers.NormalizeCallError,
@@ -736,14 +736,14 @@ func TestCallApiJSONWithOpts_NormalizeErrorOptIn(t *testing.T) {
 		"transaction logger should retain original RemoteCallError")
 }
 
-func TestCallApiJSONWithOpts_NormalizeErrorDefault(t *testing.T) {
+func TestCallAPIJSONWithOpts_NormalizeErrorDefault(t *testing.T) {
 	_, param := setupOptsTest(t)
 	param.Path = "forbidden"
 	w := libContext.InitContextNoAuditTrail(t)
 
-	_, err := handlers.CallApiJSONWithOpts(
+	_, err := handlers.CallAPIJSONWithOpts(
 		w, nil, param,
-		handlers.CallApiOptions{
+		handlers.CallAPIOptions{
 			Method: "test-no-normalize",
 		},
 	)
@@ -754,7 +754,7 @@ func TestCallApiJSONWithOpts_NormalizeErrorDefault(t *testing.T) {
 	assert.Equal(t, rce.Status, http.StatusForbidden)
 }
 
-func TestCallApiJSONWithOpts_RetrySuccessOnSecondAttempt(t *testing.T) {
+func TestCallAPIJSONWithOpts_RetrySuccessOnSecondAttempt(t *testing.T) {
 	setupOptsTest(t) // for env setup
 	w := libContext.InitContextNoAuditTrail(t)
 
@@ -775,15 +775,15 @@ func TestCallApiJSONWithOpts_RetrySuccessOnSecondAttempt(t *testing.T) {
 	t.Cleanup(srv.Close)
 
 	param := &libCallApi.RemoteCallParamData[any, optsTestResponse]{
-		Api:    libCallApi.RemoteApi{Domain: srv.URL + "/api"},
+		API:    libCallApi.RemoteAPI{Domain: srv.URL + "/api"},
 		Method: "GET",
 		Path:   "test1",
 	}
 
 	recorder := &fakeMetricsRecorder{}
-	_, err := handlers.CallApiJSONWithOpts(
+	_, err := handlers.CallAPIJSONWithOpts(
 		w, nil, param,
-		handlers.CallApiOptions{
+		handlers.CallAPIOptions{
 			Method:          "test-retry",
 			MetricsRecorder: recorder,
 			RetryPolicy: &libRetry.RetryPolicy{
@@ -803,7 +803,7 @@ func TestCallApiJSONWithOpts_RetrySuccessOnSecondAttempt(t *testing.T) {
 	assert.Equal(t, recorder.calls[1].statusCode, http.StatusOK)
 }
 
-func TestCallApiJSONWithOpts_RetryLogKeysPerAttempt(t *testing.T) {
+func TestCallAPIJSONWithOpts_RetryLogKeysPerAttempt(t *testing.T) {
 	setupOptsTest(t)
 	w := libContext.InitContextNoAuditTrail(t)
 
@@ -824,14 +824,14 @@ func TestCallApiJSONWithOpts_RetryLogKeysPerAttempt(t *testing.T) {
 	t.Cleanup(srv.Close)
 
 	param := &libCallApi.RemoteCallParamData[any, optsTestResponse]{
-		Api:    libCallApi.RemoteApi{Domain: srv.URL + "/api"},
+		API:    libCallApi.RemoteAPI{Domain: srv.URL + "/api"},
 		Method: "GET",
 		Path:   "test1",
 	}
 
-	_, err := handlers.CallApiJSONWithOpts(
+	_, err := handlers.CallAPIJSONWithOpts(
 		w, nil, param,
-		handlers.CallApiOptions{
+		handlers.CallAPIOptions{
 			Method: "svc-call",
 			RetryPolicy: &libRetry.RetryPolicy{
 				MaxRetries:    1,
@@ -854,7 +854,7 @@ func TestCallApiJSONWithOpts_RetryLogKeysPerAttempt(t *testing.T) {
 	assert.Equal(t, logArr[3].Key, "svc-call-retry-1-resp")
 }
 
-func TestCallApiJSONWithOpts_RetryExhausted(t *testing.T) {
+func TestCallAPIJSONWithOpts_RetryExhausted(t *testing.T) {
 	setupOptsTest(t)
 	w := libContext.InitContextNoAuditTrail(t)
 
@@ -869,14 +869,14 @@ func TestCallApiJSONWithOpts_RetryExhausted(t *testing.T) {
 	t.Cleanup(srv.Close)
 
 	param := &libCallApi.RemoteCallParamData[any, optsTestResponse]{
-		Api:    libCallApi.RemoteApi{Domain: srv.URL + "/api"},
+		API:    libCallApi.RemoteAPI{Domain: srv.URL + "/api"},
 		Method: "GET",
 		Path:   "test1",
 	}
 
-	_, err := handlers.CallApiJSONWithOpts(
+	_, err := handlers.CallAPIJSONWithOpts(
 		w, nil, param,
-		handlers.CallApiOptions{
+		handlers.CallAPIOptions{
 			Method: "svc-call",
 			RetryPolicy: &libRetry.RetryPolicy{
 				MaxRetries:    2,
@@ -890,7 +890,7 @@ func TestCallApiJSONWithOpts_RetryExhausted(t *testing.T) {
 	assert.Equal(t, atomic.LoadInt32(&serverAttempts), int32(3), "server should be called 3 times")
 }
 
-func TestCallApiJSONWithOpts_RetryQueryStackPinned(t *testing.T) {
+func TestCallAPIJSONWithOpts_RetryQueryStackPinned(t *testing.T) {
 	setupOptsTest(t)
 	w := libContext.InitContextNoAuditTrail(t)
 
@@ -913,15 +913,15 @@ func TestCallApiJSONWithOpts_RetryQueryStackPinned(t *testing.T) {
 	t.Cleanup(srv.Close)
 
 	param := &libCallApi.RemoteCallParamData[any, optsTestResponse]{
-		Api:        libCallApi.RemoteApi{Domain: srv.URL + "/api"},
+		API:        libCallApi.RemoteAPI{Domain: srv.URL + "/api"},
 		Method:     "GET",
 		Path:       "test1",
 		QueryStack: &[]string{"?page=2&limit=5"},
 	}
 
-	_, err := handlers.CallApiJSONWithOpts(
+	_, err := handlers.CallAPIJSONWithOpts(
 		w, nil, param,
-		handlers.CallApiOptions{
+		handlers.CallAPIOptions{
 			Method: "svc-call",
 			RetryPolicy: &libRetry.RetryPolicy{
 				MaxRetries:    1,
@@ -937,15 +937,15 @@ func TestCallApiJSONWithOpts_RetryQueryStackPinned(t *testing.T) {
 	assert.Equal(t, capturedQueries[1], "page=2&limit=5", "second attempt should use same pinned query")
 }
 
-func TestCallApiJSONWithOpts_TimeoutErrorErrorsIs(t *testing.T) {
+func TestCallAPIJSONWithOpts_TimeoutErrorErrorsIs(t *testing.T) {
 	fakeServer, param := setupOptsTest(t)
 	param.Path = "slow"
-	param.Api.Domain = fakeServer.URL() + "/api"
+	param.API.Domain = fakeServer.URL() + "/api"
 	w := libContext.InitContextNoAuditTrail(t)
 
-	_, err := handlers.CallApiJSONWithOpts(
+	_, err := handlers.CallAPIJSONWithOpts(
 		w, nil, param,
-		handlers.CallApiOptions{
+		handlers.CallAPIOptions{
 			Method:  "test-timeout",
 			Timeout: 10 * time.Millisecond,
 		},
@@ -956,7 +956,7 @@ func TestCallApiJSONWithOpts_TimeoutErrorErrorsIs(t *testing.T) {
 		"timeout error should match ErrServerTimeout sentinel")
 }
 
-func TestCallApiJSONWithOpts_RetryWithFailedSuffix(t *testing.T) {
+func TestCallAPIJSONWithOpts_RetryWithFailedSuffix(t *testing.T) {
 	setupOptsTest(t)
 	w := libContext.InitContextNoAuditTrail(t)
 
@@ -977,16 +977,16 @@ func TestCallApiJSONWithOpts_RetryWithFailedSuffix(t *testing.T) {
 	t.Cleanup(srv.Close)
 
 	param := &libCallApi.RemoteCallParamData[any, optsTestResponse]{
-		Api:    libCallApi.RemoteApi{Domain: srv.URL + "/api"},
+		API:    libCallApi.RemoteAPI{Domain: srv.URL + "/api"},
 		Method: "GET",
 		Path:   "test1",
 	}
 
-	_, err := handlers.CallApiJSONWithOpts(
+	_, err := handlers.CallAPIJSONWithOpts(
 		w, nil, param,
-		handlers.CallApiOptions{
+		handlers.CallAPIOptions{
 			Method: "svc-call",
-			LogKeys: handlers.CallApiLogKeys{
+			LogKeys: handlers.CallAPILogKeys{
 				Request:  "svc-call-req",
 				Response: "svc-call-req-resp",
 				Failure:  "svc-call-req-failed",
@@ -1012,15 +1012,15 @@ func TestCallApiJSONWithOpts_RetryWithFailedSuffix(t *testing.T) {
 	assert.Equal(t, logArr[3].Key, "svc-call-req-retry-1-resp")
 }
 
-func TestCallApiJSONWithOpts_TimeoutWithCustomStatus(t *testing.T) {
+func TestCallAPIJSONWithOpts_TimeoutWithCustomStatus(t *testing.T) {
 	fakeServer, param := setupOptsTest(t)
 	param.Path = "slow"
-	param.Api.Domain = fakeServer.URL() + "/api"
+	param.API.Domain = fakeServer.URL() + "/api"
 	w := libContext.InitContextNoAuditTrail(t)
 
-	_, err := handlers.CallApiJSONWithOpts(
+	_, err := handlers.CallAPIJSONWithOpts(
 		w, nil, param,
-		handlers.CallApiOptions{
+		handlers.CallAPIOptions{
 			Method:            "test-timeout-500",
 			Timeout:           10 * time.Millisecond,
 			TimeoutStatusCode: http.StatusInternalServerError,
@@ -1035,15 +1035,15 @@ func TestCallApiJSONWithOpts_TimeoutWithCustomStatus(t *testing.T) {
 	assert.Assert(t, errors.Is(err, handlers.ErrServerTimeout), "should still match sentinel")
 }
 
-func TestCallApiJSONWithOpts_TimeoutDefaultStatus(t *testing.T) {
+func TestCallAPIJSONWithOpts_TimeoutDefaultStatus(t *testing.T) {
 	fakeServer, param := setupOptsTest(t)
 	param.Path = "slow"
-	param.Api.Domain = fakeServer.URL() + "/api"
+	param.API.Domain = fakeServer.URL() + "/api"
 	w := libContext.InitContextNoAuditTrail(t)
 
-	_, err := handlers.CallApiJSONWithOpts(
+	_, err := handlers.CallAPIJSONWithOpts(
 		w, nil, param,
-		handlers.CallApiOptions{
+		handlers.CallAPIOptions{
 			Method:            "test-timeout-default",
 			Timeout:           10 * time.Millisecond,
 			TimeoutStatusCode: 0,
@@ -1057,25 +1057,25 @@ func TestCallApiJSONWithOpts_TimeoutDefaultStatus(t *testing.T) {
 		"zero TimeoutStatusCode should default to 408")
 }
 
-func TestCallApiJSONWithOpts_TimeoutStatusDoesNotOverrideObserved(t *testing.T) {
+func TestCallAPIJSONWithOpts_TimeoutStatusDoesNotOverrideObserved(t *testing.T) {
 	fakeServer, param := setupOptsTest(t)
 	param.Path = "slow"
-	param.Api.Domain = fakeServer.URL() + "/api"
+	param.API.Domain = fakeServer.URL() + "/api"
 	w := libContext.InitContextNoAuditTrail(t)
 
 	recorder := &fakeMetricsRecorder{}
 	logger := &fakeTransactionLogger{}
 	w.Parser.SetLocal(webFramework.TransactionLoggerLocalKey, logger)
 
-	var onCompleteInfo handlers.ApiCallInfo
-	_, err := handlers.CallApiJSONWithOpts(
+	var onCompleteInfo handlers.APICallInfo
+	_, err := handlers.CallAPIJSONWithOpts(
 		w, nil, param,
-		handlers.CallApiOptions{
+		handlers.CallAPIOptions{
 			Method:            "test-timeout-observed",
 			Timeout:           10 * time.Millisecond,
 			TimeoutStatusCode: http.StatusInternalServerError,
 			MetricsRecorder:   recorder,
-			OnComplete: func(info handlers.ApiCallInfo) {
+			OnComplete: func(info handlers.APICallInfo) {
 				onCompleteInfo = info
 			},
 		},
@@ -1111,7 +1111,7 @@ type maskTestRequest struct {
 
 // maskTestResponse is a response body type with a sensitive string field used
 // to verify MaskFunc transforms TransactionInfo.Response without affecting
-// the typed response returned by CallApiJSONWithOpts.
+// the typed response returned by CallAPIJSONWithOpts.
 type maskTestResponse struct {
 	Token   string `json:"token"`
 	Status  string `json:"status"`
@@ -1140,7 +1140,7 @@ func maskFunc(v any) any {
 	}
 }
 
-func TestCallApiJSONWithOpts_MaskFuncApplied(t *testing.T) {
+func TestCallAPIJSONWithOpts_MaskFuncApplied(t *testing.T) {
 	setupOptsTest(t)
 	w := libContext.InitContextNoAuditTrail(t)
 
@@ -1155,19 +1155,19 @@ func TestCallApiJSONWithOpts_MaskFuncApplied(t *testing.T) {
 
 	reqBody := maskTestRequest{PAN: "1234567890123456", Name: "alice"}
 	param := &libCallApi.RemoteCallParamData[maskTestRequest, maskTestResponse]{
-		Api:      libCallApi.RemoteApi{Domain: srv.URL + "/api"},
+		API:      libCallApi.RemoteAPI{Domain: srv.URL + "/api"},
 		Method:   "POST",
 		Path:     "mask",
 		JsonBody: reqBody,
 	}
 
-	var capturedInfo handlers.ApiCallInfo
-	resp, err := handlers.CallApiJSONWithOpts(
+	var capturedInfo handlers.APICallInfo
+	resp, err := handlers.CallAPIJSONWithOpts(
 		w, nil, param,
-		handlers.CallApiOptions{
+		handlers.CallAPIOptions{
 			Method:   "test-mask",
 			MaskFunc: maskFunc,
-			OnComplete: func(info handlers.ApiCallInfo) {
+			OnComplete: func(info handlers.APICallInfo) {
 				capturedInfo = info
 			},
 		},
@@ -1183,11 +1183,11 @@ func TestCallApiJSONWithOpts_MaskFuncApplied(t *testing.T) {
 	assert.Assert(t, ok, "Response should be maskTestResponse")
 	assert.Equal(t, maskedResp.Token, "***secret-token***", "Response.Token should be masked")
 
-	// The typed response returned by CallApiJSONWithOpts should be unmasked.
+	// The typed response returned by CallAPIJSONWithOpts should be unmasked.
 	assert.Equal(t, resp.Token, "secret-token", "returned response should be unmasked")
 }
 
-func TestCallApiJSONWithOpts_MaskFuncNil(t *testing.T) {
+func TestCallAPIJSONWithOpts_MaskFuncNil(t *testing.T) {
 	setupOptsTest(t)
 	w := libContext.InitContextNoAuditTrail(t)
 
@@ -1202,18 +1202,18 @@ func TestCallApiJSONWithOpts_MaskFuncNil(t *testing.T) {
 
 	reqBody := maskTestRequest{PAN: "1234567890123456", Name: "alice"}
 	param := &libCallApi.RemoteCallParamData[maskTestRequest, maskTestResponse]{
-		Api:      libCallApi.RemoteApi{Domain: srv.URL + "/api"},
+		API:      libCallApi.RemoteAPI{Domain: srv.URL + "/api"},
 		Method:   "POST",
 		Path:     "mask",
 		JsonBody: reqBody,
 	}
 
-	var capturedInfo handlers.ApiCallInfo
-	_, err := handlers.CallApiJSONWithOpts(
+	var capturedInfo handlers.APICallInfo
+	_, err := handlers.CallAPIJSONWithOpts(
 		w, nil, param,
-		handlers.CallApiOptions{
+		handlers.CallAPIOptions{
 			Method: "test-mask-nil",
-			OnComplete: func(info handlers.ApiCallInfo) {
+			OnComplete: func(info handlers.APICallInfo) {
 				capturedInfo = info
 			},
 		},
@@ -1230,7 +1230,7 @@ func TestCallApiJSONWithOpts_MaskFuncNil(t *testing.T) {
 	assert.Assert(t, capturedInfo.MaskedResponseBody == nil, "MaskedResponseBody should be nil when MaskFunc is nil")
 }
 
-func TestCallApiJSONWithOpts_MaskFuncAppliedOnError(t *testing.T) {
+func TestCallAPIJSONWithOpts_MaskFuncAppliedOnError(t *testing.T) {
 	_, param := setupOptsTest(t)
 	param.Path = "forbidden"
 	w := libContext.InitContextNoAuditTrail(t)
@@ -1238,13 +1238,13 @@ func TestCallApiJSONWithOpts_MaskFuncAppliedOnError(t *testing.T) {
 	reqBody := maskTestRequest{PAN: "1234567890123456", Name: "alice"}
 	param.JsonBody = reqBody
 
-	var capturedInfo handlers.ApiCallInfo
-	_, err := handlers.CallApiJSONWithOpts(
+	var capturedInfo handlers.APICallInfo
+	_, err := handlers.CallAPIJSONWithOpts(
 		w, nil, param,
-		handlers.CallApiOptions{
+		handlers.CallAPIOptions{
 			Method:   "test-mask-error",
 			MaskFunc: maskFunc,
-			OnComplete: func(info handlers.ApiCallInfo) {
+			OnComplete: func(info handlers.APICallInfo) {
 				capturedInfo = info
 			},
 		},
@@ -1272,7 +1272,7 @@ func TestCallApiJSONWithOpts_MaskFuncAppliedOnError(t *testing.T) {
 		"MaskedResponseBody should still contain original content")
 }
 
-func TestCallApiJSONWithOpts_MaskFuncNotAppliedToAddLog(t *testing.T) {
+func TestCallAPIJSONWithOpts_MaskFuncNotAppliedToAddLog(t *testing.T) {
 	setupOptsTest(t)
 	w := libContext.InitContextNoAuditTrail(t)
 
@@ -1287,16 +1287,16 @@ func TestCallApiJSONWithOpts_MaskFuncNotAppliedToAddLog(t *testing.T) {
 
 	reqBody := maskTestRequest{PAN: "1234567890123456", Name: "alice"}
 	param := &libCallApi.RemoteCallParamData[maskTestRequest, maskTestResponse]{
-		Api:      libCallApi.RemoteApi{Domain: srv.URL + "/api"},
+		API:      libCallApi.RemoteAPI{Domain: srv.URL + "/api"},
 		Method:   "POST",
 		Path:     "mask",
 		JsonBody: reqBody,
 		Headers:  map[string]string{"Authorization": "Bearer super-secret"},
 	}
 
-	_, err := handlers.CallApiJSONWithOpts(
+	_, err := handlers.CallAPIJSONWithOpts(
 		w, nil, param,
-		handlers.CallApiOptions{
+		handlers.CallAPIOptions{
 			Method:   "test-mask-addlog",
 			MaskFunc: maskFunc,
 		},
@@ -1353,7 +1353,7 @@ func TestCallApiJSONWithOpts_MaskFuncNotAppliedToAddLog(t *testing.T) {
 		"LogValue() should mask Authorization independently of MaskFunc")
 }
 
-func TestCallApiJSONWithOpts_MaskFuncReturnedResponseIsolated(t *testing.T) {
+func TestCallAPIJSONWithOpts_MaskFuncReturnedResponseIsolated(t *testing.T) {
 	setupOptsTest(t)
 	w := libContext.InitContextNoAuditTrail(t)
 
@@ -1368,29 +1368,29 @@ func TestCallApiJSONWithOpts_MaskFuncReturnedResponseIsolated(t *testing.T) {
 
 	reqBody := maskTestRequest{PAN: "1234567890123456", Name: "alice"}
 	param := &libCallApi.RemoteCallParamData[maskTestRequest, maskTestResponse]{
-		Api:      libCallApi.RemoteApi{Domain: srv.URL + "/api"},
+		API:      libCallApi.RemoteAPI{Domain: srv.URL + "/api"},
 		Method:   "POST",
 		Path:     "mask",
 		JsonBody: reqBody,
 	}
 
-	resp, err := handlers.CallApiJSONWithOpts(
+	resp, err := handlers.CallAPIJSONWithOpts(
 		w, nil, param,
-		handlers.CallApiOptions{
+		handlers.CallAPIOptions{
 			Method:   "test-mask-isolation",
 			MaskFunc: maskFunc,
 		},
 	)
 
 	assert.NilError(t, err)
-	// The typed response returned by CallApiJSONWithOpts must be the original
+	// The typed response returned by CallAPIJSONWithOpts must be the original
 	// unmasked value, even though MaskFunc transformed TransactionInfo.Response.
 	assert.Equal(t, resp.Token, "secret-token",
 		"returned typed response should be unmasked (MaskFunc must not mutate it)")
 	assert.Equal(t, resp.Status, "ok")
 }
 
-func TestCallApiJSONWithOpts_MaskFuncLoggerAndCallbackReceiveMasked(t *testing.T) {
+func TestCallAPIJSONWithOpts_MaskFuncLoggerAndCallbackReceiveMasked(t *testing.T) {
 	setupOptsTest(t)
 	w := libContext.InitContextNoAuditTrail(t)
 
@@ -1405,7 +1405,7 @@ func TestCallApiJSONWithOpts_MaskFuncLoggerAndCallbackReceiveMasked(t *testing.T
 
 	reqBody := maskTestRequest{PAN: "1234567890123456", Name: "alice"}
 	param := &libCallApi.RemoteCallParamData[maskTestRequest, maskTestResponse]{
-		Api:      libCallApi.RemoteApi{Domain: srv.URL + "/api"},
+		API:      libCallApi.RemoteAPI{Domain: srv.URL + "/api"},
 		Method:   "POST",
 		Path:     "mask",
 		JsonBody: reqBody,
@@ -1414,13 +1414,13 @@ func TestCallApiJSONWithOpts_MaskFuncLoggerAndCallbackReceiveMasked(t *testing.T
 	logger := &fakeTransactionLogger{}
 	w.Parser.SetLocal(webFramework.TransactionLoggerLocalKey, logger)
 
-	var callbackInfo handlers.ApiCallInfo
-	_, err := handlers.CallApiJSONWithOpts(
+	var callbackInfo handlers.APICallInfo
+	_, err := handlers.CallAPIJSONWithOpts(
 		w, nil, param,
-		handlers.CallApiOptions{
+		handlers.CallAPIOptions{
 			Method:   "test-mask-logger-callback",
 			MaskFunc: maskFunc,
-			OnComplete: func(info handlers.ApiCallInfo) {
+			OnComplete: func(info handlers.APICallInfo) {
 				callbackInfo = info
 			},
 		},

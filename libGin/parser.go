@@ -34,16 +34,16 @@ func (c GinParser) GetHeader(target webFramework.HeaderInterface) error {
 func (c GinParser) GetHeaderValue(name string) string {
 	return c.Ctx.Request.Header.Get(name)
 }
-func (c GinParser) GetRawUrlQuery() string {
+func (c GinParser) GetRawURLQuery() string {
 	return c.Ctx.Request.URL.RawQuery
 }
 func (c GinParser) GetBody(target any) error {
 	return c.Ctx.ShouldBindJSON(target)
 }
-func (c GinParser) GetUri(target any) error {
+func (c GinParser) GetURI(target any) error {
 	return c.Ctx.ShouldBindUri(target)
 }
-func (c GinParser) GetUrlQuery(target any) error {
+func (c GinParser) GetURLQuery(target any) error {
 	return c.Ctx.ShouldBindQuery(target)
 }
 func (c GinParser) GetLocal(name string) any {
@@ -53,10 +53,10 @@ func (c GinParser) GetLocal(name string) any {
 func (c GinParser) GetLocalString(name string) string {
 	return c.Ctx.GetString(name)
 }
-func (c GinParser) GetUrlParam(name string) string {
+func (c GinParser) GetURLParam(name string) string {
 	return c.Ctx.Params.ByName(name)
 }
-func (c GinParser) GetUrlParams() map[string]string {
+func (c GinParser) GetURLParams() map[string]string {
 	ginParams := c.Ctx.Params
 	result := make(map[string]string, 0)
 	for _, param := range ginParams {
@@ -64,7 +64,7 @@ func (c GinParser) GetUrlParams() map[string]string {
 	}
 	return result
 }
-func (c GinParser) CheckUrlParam(name string) (string, bool) {
+func (c GinParser) CheckURLParam(name string) (string, bool) {
 	return c.Ctx.Params.Get(name)
 }
 
@@ -124,7 +124,7 @@ func (c GinParser) ParseCommand(command, title string, request webFramework.Reco
 		c.Ctx.GetString(title), request.GetValueMap(), parser)
 }
 
-func (c GinParser) GetHttpHeader() http.Header {
+func (c GinParser) GetHTTPHeader() http.Header {
 	return c.Ctx.Request.Header
 }
 

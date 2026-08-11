@@ -17,8 +17,8 @@ type FakeParser struct {
 	ReqHeader   map[string]string
 	RespHeader  map[string]string
 	Body        any
-	Uri         any
-	UrlQuery    any
+	URI         any
+	URLQuery    any
 	RawUrlQuery string
 	Locals      map[string]any
 	Args        map[string]string
@@ -38,22 +38,22 @@ func (f FakeParser) GetHeader(target HeaderInterface) error {
 func (f FakeParser) GetHeaderValue(name string) string {
 	return f.ReqHeader[name]
 }
-func (f FakeParser) GetHttpHeader() http.Header {
+func (f FakeParser) GetHTTPHeader() http.Header {
 	return f.HttpHeader
 }
 func (f FakeParser) GetBody(target any) error {
 	_ = target
 	return nil
 }
-func (f FakeParser) GetUri(target any) error {
+func (f FakeParser) GetURI(target any) error {
 	_ = target
 	return nil
 }
-func (f FakeParser) GetUrlQuery(target any) error {
+func (f FakeParser) GetURLQuery(target any) error {
 	_ = target
 	return nil
 }
-func (f FakeParser) GetRawUrlQuery() string {
+func (f FakeParser) GetRawURLQuery() string {
 	return f.RawUrlQuery
 }
 func (f FakeParser) GetLocal(name string) any {
@@ -62,13 +62,13 @@ func (f FakeParser) GetLocal(name string) any {
 func (f FakeParser) GetLocalString(name string) string {
 	return fmt.Sprintf("%v", f.Locals[name])
 }
-func (f FakeParser) GetUrlParam(name string) string {
+func (f FakeParser) GetURLParam(name string) string {
 	return f.Urlparams[name]
 }
-func (f FakeParser) GetUrlParams() map[string]string {
+func (f FakeParser) GetURLParams() map[string]string {
 	return f.Urlparams
 }
-func (f FakeParser) CheckUrlParam(name string) (string, bool) {
+func (f FakeParser) CheckURLParam(name string) (string, bool) {
 	p, ok := f.Urlparams[name]
 	return p, ok
 }

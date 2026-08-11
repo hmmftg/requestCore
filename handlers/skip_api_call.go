@@ -4,9 +4,9 @@ import (
 	"strings"
 )
 
-// ShouldSkipApiCall reports whether an endpoint matches one of the supplied
+// ShouldSkipAPICall reports whether an endpoint matches one of the supplied
 // skip patterns. It is an application-layer decision helper only: it must not
-// be invoked by CallApiJSONWithOpts to control webFramework.AddLog, and a
+// be invoked by CallAPIJSONWithOpts to control webFramework.AddLog, and a
 // match must never be used to suppress the mandatory request, success, or
 // failure framework logs.
 //
@@ -27,7 +27,7 @@ import (
 //   - Leading and trailing slashes are normalized away from both the endpoint
 //     and the pattern endpoint before comparison, so "/api/card/",
 //     "api/card", and "/api/card" are equivalent.
-func ShouldSkipApiCall(endpoint, method string, skipPatterns []string) bool {
+func ShouldSkipAPICall(endpoint, method string, skipPatterns []string) bool {
 	normalizedEndpoint := normalizePath(endpoint)
 	for _, raw := range skipPatterns {
 		pattern := strings.TrimSpace(raw)

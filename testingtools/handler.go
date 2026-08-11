@@ -83,7 +83,7 @@ func createTestRequest(t *testing.T, tc *TestCase, method string) (*httptest.Res
 	body := bytes.NewReader(bodyJSON)
 
 	w := httptest.NewRecorder()
-	r := httptest.NewRequest(method, tc.Url, body)
+	r := httptest.NewRequest(method, tc.URL, body)
 
 	tc.Header.setHeaders(r)
 

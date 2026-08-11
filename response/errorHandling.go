@@ -4,7 +4,7 @@
 //   - Do not put string(rawResp) or full upstream response bodies in libError descriptions;
 //     use size/status/hash and log details separately (see libCallApi).
 //   - Do not use %+v on whole response structs in error messages that can become client-visible.
-//   - Use only codes from a fixed catalog and ensure they are seeded/localized (e.g. SYSTEM_FAULT, API_*);
+//   - Use only codes from a fixed catalog and ensure they are seeded/localized (e.g. SystemFault, API_*);
 //     avoid dynamic values as public error codes.
 package response
 

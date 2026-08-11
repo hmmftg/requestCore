@@ -7,10 +7,10 @@ import (
 )
 
 func HandleCheckDuplicate(code int, desc, dupDesc string, record []QueryData, err error) (int, string, error) {
-	if desc != NO_DATA_FOUND && len(record) != 0 {
+	if desc != NoDataFound && len(record) != 0 {
 		return http.StatusBadRequest, dupDesc, fmt.Errorf("check duplicate faile: %s", dupDesc)
 	}
-	if desc != NO_DATA_FOUND && err != nil {
+	if desc != NoDataFound && err != nil {
 		return code, desc, err
 	}
 	return http.StatusOK, "", nil
@@ -18,7 +18,7 @@ func HandleCheckDuplicate(code int, desc, dupDesc string, record []QueryData, er
 
 func HandleCheckExistence(code int, desc, notExistDesc string, record []QueryData, err error) (int, string, error) {
 	if err != nil {
-		if desc == NO_DATA_FOUND || len(record) == 0 {
+		if desc == NoDataFound || len(record) == 0 {
 			return http.StatusBadRequest, notExistDesc, fmt.Errorf("check existence failed: %s", notExistDesc)
 		}
 		return code, desc, err

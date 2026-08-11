@@ -82,8 +82,8 @@ func GetDMLModel(t *testing.T, m Model) libQuery.QueryRunnerModel {
 	}
 }
 
-func TestAPIList() map[string]libCallApi.RemoteApi {
-	return map[string]libCallApi.RemoteApi{
+func TestAPIList() map[string]libCallApi.RemoteAPI {
+	return map[string]libCallApi.RemoteAPI{
 		"api": {
 			Domain: "https://api.github.com",
 			Name:   "test api",

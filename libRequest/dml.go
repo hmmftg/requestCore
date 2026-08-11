@@ -15,7 +15,7 @@ import (
 func (m RequestModel) CheckDuplicateRequest(request RequestPtr) error {
 	result, err := libQuery.GetQuery[RequestPtr](m.QueryInDb, m.QueryInterface, request.Header.GetId())
 	if err != nil {
-		if ok, err := libError.Unwrap(err); ok && err.Action().Description == libQuery.NO_DATA_FOUND {
+		if ok, err := libError.Unwrap(err); ok && err.Action().Description == libQuery.NoDataFound {
 			return nil
 		}
 		return errors.Join(err,
@@ -29,7 +29,7 @@ func (m RequestModel) CheckDuplicateRequest(request RequestPtr) error {
 		return errors.Join(err,
 			libError.NewWithDescription(
 				status.InternalServerError,
-				libQuery.DUPLICATE_FOUND,
+				libQuery.DuplicateFound,
 				"duplicate Request: id: %s", request.Header.GetId(),
 			))
 	}

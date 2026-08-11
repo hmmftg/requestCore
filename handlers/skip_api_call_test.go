@@ -8,7 +8,7 @@ import (
 	"github.com/hmmftg/requestCore/handlers"
 )
 
-func TestShouldSkipApiCall(t *testing.T) {
+func TestShouldSkipAPICall(t *testing.T) {
 	cases := []struct {
 		name     string
 		endpoint string
@@ -153,7 +153,7 @@ func TestShouldSkipApiCall(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			got := handlers.ShouldSkipApiCall(tc.endpoint, tc.method, tc.patterns)
+			got := handlers.ShouldSkipAPICall(tc.endpoint, tc.method, tc.patterns)
 			assert.Equal(t, got, tc.want)
 		})
 	}

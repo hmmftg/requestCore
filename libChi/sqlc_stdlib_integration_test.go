@@ -44,7 +44,7 @@ func TestChiStdlibSqlcStyleWithSQLDB(t *testing.T) {
 	router := chi.NewRouter()
 	router.Get("/users/{id}", func(w http.ResponseWriter, r *http.Request) {
 		parser := libChi.InitParser(r, w)
-		id := parser.GetUrlParam("id")
+		id := parser.GetURLParam("id")
 		name, err := queries.GetUserName(r.Context(), id)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)

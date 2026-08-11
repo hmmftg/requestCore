@@ -21,7 +21,7 @@ type ApplicationParams[SpecialParams any] struct {
 	Logging               LogParams                       `yaml:"logging"`
 	DB                    map[string]DbParams             `yaml:"db"`                    // Database connection strings
 	SecurityModule        map[string]SecurityModule       `yaml:"securityModule"`        // Security modules if exists
-	RemoteApis            map[string]libCallApi.RemoteApi `yaml:"remoteApis"`            // List of remote-api definition
+	RemoteAPIs            map[string]libCallApi.RemoteAPI `yaml:"remoteApis"`            // List of remote-api definition
 	Constants             map[string]Constants            `yaml:"constants"`             // Constants used in app [response constants should be placed here]
 	ParameterGroups       map[string]ParametersMap        `yaml:"parameterGroups"`       // Simple string parameters groupped by names
 	SecureParameterGroups map[string]SecureParametersMap  `yaml:"secureParameterGroups"` // Encrypted string parameters, will be parsed at startup
@@ -35,15 +35,15 @@ type ParamInterface interface {
 	GetDB(name string) *DbParams
 	SetDB(name string, db *DbParams)
 	GetSecurityModule(name string) *SecurityModule
-	GetRemoteApi(name string) *libCallApi.RemoteApi
+	GetRemoteAPI(name string) *libCallApi.RemoteAPI
 	GetParam(group, name string) *string
 	GetSecureParam(group, name string) *SecurityParam
 	GetConstants(name string) *Constants
 	GetSpecificParams(name string) any
 }
 
-func (m ApplicationParams[SpecialParams]) GetRemoteApi(name string) *libCallApi.RemoteApi {
-	return GetValueFromMap(name, m.RemoteApis)
+func (m ApplicationParams[SpecialParams]) GetRemoteAPI(name string) *libCallApi.RemoteAPI {
+	return GetValueFromMap(name, m.RemoteAPIs)
 }
 
 func (m ApplicationParams[SpecialParams]) GetParam(group, name string) *string {

@@ -16,13 +16,13 @@ type CallParamData struct {
 	HttpClient  *http.Client
 	Parameters  map[string]any
 	Headers     map[string]string
-	Api         RemoteApi
+	API         RemoteAPI
 	Timeout     time.Duration
 	Method      string
 	Path        string
 	Query       string
 	QueryStack  *[]string
-	ValidateTls bool
+	ValidateTLS bool
 	EnableLog   bool
 	JsonBody    any
 	Parser      webFramework.RequestParser `json:"-"` // Parser for distributed tracing and request cancellation
@@ -30,8 +30,8 @@ type CallParamData struct {
 
 func (r CallParamData) LogValue() slog.Value {
 	return slog.GroupValue(
-		slog.String("api", r.Api.Name),
-		slog.String("domain", r.Api.Domain),
+		slog.String("api", r.API.Name),
+		slog.String("domain", r.API.Domain),
 		slog.String("method", r.Method),
 		slog.String("path", r.Path),
 		slog.String("query", r.Query),
@@ -47,13 +47,13 @@ type RemoteCallParamData[Req, Resp any] struct {
 	HttpClient  *http.Client
 	Parameters  map[string]any             `json:"-"`
 	Headers     map[string]string          `json:"-"`
-	Api         RemoteApi                  `json:"api"`
+	API         RemoteAPI                  `json:"api"`
 	Timeout     time.Duration              `json:"-"`
 	Method      string                     `json:"method"`
 	Path        string                     `json:"path"`
 	Query       string                     `json:"-"`
 	QueryStack  *[]string                  `json:"-"`
-	ValidateTls bool                       `json:"-"`
+	ValidateTLS bool                       `json:"-"`
 	EnableLog   bool                       `json:"-"`
 	JsonBody    Req                        `json:"body"`
 	BodyType    RequestBodyType            `json:"-"`
@@ -68,8 +68,8 @@ func (r RemoteCallParamData[Req, Resp]) LogValue() slog.Value {
 	}
 	headers["Authorization"] = "[masked]"
 	return slog.GroupValue(
-		slog.String("api", r.Api.Name),
-		slog.String("domain", r.Api.Domain),
+		slog.String("api", r.API.Name),
+		slog.String("domain", r.API.Domain),
 		slog.String("method", r.Method),
 		slog.String("path", r.Path),
 		slog.String("query", r.Query),
@@ -103,11 +103,11 @@ func Call[RespType any](w webFramework.WebFramework, param CallParam) CallResult
 	}
 
 	callData := CallData[RespType]{
-		Api:        param.Api,
+		API:        param.API,
 		Path:       param.Path + param.Query,
 		Method:     param.Method,
 		Headers:    param.Headers,
-		SslVerify:  !param.ValidateTls,
+		SSLVerify:  !param.ValidateTLS,
 		EnableLog:  param.EnableLog,
 		Timeout:    param.Timeout,
 		Req:        param.JsonBody,
@@ -131,11 +131,11 @@ func RemoteCall[Req, Resp any](w webFramework.WebFramework, param *RemoteCallPar
 	}
 
 	callData := CallData[Resp]{
-		Api:        param.Api,
+		API:        param.API,
 		Path:       param.Path + param.Query,
 		Method:     param.Method,
 		Headers:    param.Headers,
-		SslVerify:  !param.ValidateTls,
+		SSLVerify:  !param.ValidateTLS,
 		EnableLog:  param.EnableLog,
 		Timeout:    param.Timeout,
 		Req:        param.JsonBody,

@@ -51,17 +51,17 @@ type AuthSystem interface {
 	Refresh(w webFramework.WebFramework, refreshToken string) (*TokenCache, libError.Error)
 }
 
-func (api RemoteApi) GetBasicAuthHeader() string {
+func (api RemoteAPI) GetBasicAuthHeader() string {
 	usr := fmt.Sprintf("%s:%s", api.AuthData.User, api.AuthData.Password)
 	return fmt.Sprintf("Basic %s", base64.StdEncoding.EncodeToString([]byte(usr)))
 }
 
-func (api RemoteApi) AddBasicAuthHeader(headers map[string]string) map[string]string {
+func (api RemoteAPI) AddBasicAuthHeader(headers map[string]string) map[string]string {
 	headers["Authorization"] = api.GetBasicAuthHeader()
 	return headers
 }
 
-func (api RemoteApi) GetAuthHeader() (string, error) {
+func (api RemoteAPI) GetAuthHeader() (string, error) {
 	if api.TokenCache == nil {
 		return "", fmt.Errorf("empty token cache")
 	}
@@ -74,7 +74,7 @@ func (api RemoteApi) GetAuthHeader() (string, error) {
 	return fmt.Sprintf("%s %s", api.TokenCache.AccessToken.Type, api.TokenCache.AccessToken.Token), nil
 }
 
-func (api *RemoteApi) handleToken(w webFramework.WebFramework) libError.Error {
+func (api *RemoteAPI) handleToken(w webFramework.WebFramework) libError.Error {
 	api.TokenCacheLock.Lock()
 	defer api.TokenCacheLock.Unlock()
 
@@ -114,7 +114,7 @@ func (api *RemoteApi) handleToken(w webFramework.WebFramework) libError.Error {
 	return nil
 }
 
-func (api *RemoteApi) Authenticate(w webFramework.WebFramework) libError.Error {
+func (api *RemoteAPI) Authenticate(w webFramework.WebFramework) libError.Error {
 	if api.TokenCacheLock == nil {
 		return libError.NewWithDescription(status.InternalServerError, "TOKEN_CACHE_NOT_INITIALIZED", "token cache lock of api %s is null", api.Name)
 	}

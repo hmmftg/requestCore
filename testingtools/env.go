@@ -33,7 +33,7 @@ func GetEnv[Env any, PT interface {
 	SetInterface(requestCore.RequestCoreInterface)
 	SetParams(libParams.ParamInterface)
 	*Env
-}](t *testing.T, defaultAPIList func() map[string]libCallApi.RemoteApi) PT {
+}](t *testing.T, defaultAPIList func() map[string]libCallApi.RemoteAPI) PT {
 	return GetEnvWithDB[Env, PT](DefaultDB(t), defaultAPIList)
 }
 
@@ -43,7 +43,7 @@ func GetEnvWithDB[Env any, PT interface {
 	SetInterface(requestCore.RequestCoreInterface)
 	SetParams(libParams.ParamInterface)
 	*Env
-}](db *sql.DB, defaultAPIList func() map[string]libCallApi.RemoteApi) PT {
+}](db *sql.DB, defaultAPIList func() map[string]libCallApi.RemoteAPI) PT {
 	model, wsParams := InitTestingWithDB(
 		DefaultErrorDesc(),
 		defaultAPIList(),

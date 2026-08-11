@@ -7,7 +7,7 @@ import (
 	"time"
 )
 
-type RemoteApi struct {
+type RemoteAPI struct {
 	Domain         string            `yaml:"domain" json:"domain"`
 	Name           string            `yaml:"name" json:"name"`
 	AuthData       Auth              `yaml:"auth" json:"-"`
@@ -17,12 +17,12 @@ type RemoteApi struct {
 	TokenCache     *TokenCache       `yaml:"-" json:"-"`
 }
 
-type RemoteApiModel struct {
-	RemoteApiList map[string]RemoteApi
+type RemoteAPIModel struct {
+	RemoteAPIList map[string]RemoteAPI
 }
 
-type CallApiInterface interface {
-	GetApi(apiName string) RemoteApi
+type CallAPIInterface interface {
+	GetAPI(apiName string) RemoteAPI
 }
 
 const defaultTimeOut = 30 * time.Second

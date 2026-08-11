@@ -40,7 +40,7 @@ type TestOptions struct {
 
 type TestCase struct {
 	Name           string
-	Url            string
+	URL            string
 	Header         Header
 	Model          libQuery.QueryRunnerModel
 	Request        any
@@ -145,7 +145,7 @@ func (h Header) setHeaders(r *http.Request) {
 }
 
 type TestingWsParams struct {
-	RemoteApis  map[string]libCallApi.RemoteApi `yaml:"remoteApis"`
+	RemoteAPIs  map[string]libCallApi.RemoteAPI `yaml:"remoteApis"`
 	ErrorDesc   map[string]string               `yaml:"errorDesc"`
 	MessageDesc map[string]string               `yaml:"messageDesc"`
 	AccessRoles map[string]string               `yaml:"accessRoles"`

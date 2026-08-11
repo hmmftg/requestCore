@@ -110,7 +110,7 @@ func runPersistenceHandlerTest(
 	gin.SetMode(gin.ReleaseMode)
 	testingtools.TestDB(t, &testingtools.TestCase{
 		Name:      "persistence",
-		Url:       "/",
+		URL:       "/",
 		Request:   request,
 		Status:    expectedStatus,
 		CheckBody: nil,
@@ -128,14 +128,14 @@ func TestBaseHandler(t *testing.T) {
 	testCases := []testingtools.TestCase{
 		{
 			Name:      "Valid",
-			Url:       "/",
+			URL:       "/",
 			Request:   testReq{ID: "1"},
 			Status:    200,
 			CheckBody: []string{"result", `"a"`},
 		},
 		{
 			Name:    "Invalid Request",
-			Url:     "/",
+			URL:     "/",
 			Request: map[string]any{"ss": "a"},
 			Status:  400,
 		},
@@ -297,7 +297,7 @@ func TestBaseHandlerNoPersistence(t *testing.T) {
 	gin.SetMode(gin.ReleaseMode)
 	testingtools.TestDB(t, &testingtools.TestCase{
 		Name:      "Valid",
-		Url:       "/",
+		URL:       "/",
 		Request:   testReq{ID: "1"},
 		Status:    200,
 		CheckBody: []string{"result", `"a"`},

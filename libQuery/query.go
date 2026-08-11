@@ -22,13 +22,13 @@ func GetQuery[R any](query string, core QueryRunnerInterface, args ...any) ([]R,
 	if err != nil {
 		return nil, errors.Join(
 			err,
-			libError.NewWithDescription(status.InternalServerError, DB_READ_ERROR, "unable to execute query"),
+			libError.NewWithDescription(status.InternalServerError, DBReadError, "unable to execute query"),
 		)
 	}
 	if len(rows) == 0 {
 		return nil, libError.NewWithDescription(
 			http.StatusBadRequest,
-			NO_DATA_FOUND,
+			NoDataFound,
 			"no data found: %s,%v", query, args,
 		)
 	}
@@ -113,7 +113,7 @@ func QueryToStruct[Target any](q QueryRunnerInterface, querySql string, args ...
 }
 func Query[R any](command CommandInterface, core QueryRunnerInterface, args ...any) ([]R, error) {
 	if command.GetType() == int(QueryMap) {
-		return nil, libError.NewWithDescription(status.BadRequest, DB_READ_ERROR, "unsupported command type")
+		return nil, libError.NewWithDescription(status.BadRequest, DBReadError, "unsupported command type")
 	}
 	query := command.GetCommand(core.GetDbMode())
 	//Query
@@ -121,7 +121,7 @@ func Query[R any](command CommandInterface, core QueryRunnerInterface, args ...a
 	if err != nil {
 		return nil, errors.Join(
 			err,
-			libError.NewWithDescription(status.InternalServerError, DB_READ_ERROR, "unable to execute query"),
+			libError.NewWithDescription(status.InternalServerError, DBReadError, "unable to execute query"),
 		)
 	}
 	switch command.GetType() {
@@ -129,14 +129,14 @@ func Query[R any](command CommandInterface, core QueryRunnerInterface, args ...a
 		if len(rows) == 0 {
 			return nil, libError.NewWithDescription(
 				http.StatusBadRequest,
-				NO_DATA_FOUND,
+				NoDataFound,
 				"no data found: %s,%v", query, args,
 			)
 		}
 		if len(rows) > 1 {
 			return nil, libError.NewWithDescription(
 				http.StatusBadRequest,
-				DUPLICATE_FOUND,
+				DuplicateFound,
 				"duplicate data found: %s,%v,%v", query, args, rows,
 			)
 		}

@@ -33,8 +33,8 @@ func TestNetHttpParser(t *testing.T) {
 		t.Errorf("Expected User-Id header to be test-user, got %s", parser.GetHeaderValue("User-Id"))
 	}
 
-	if parser.GetRawUrlQuery() != "param=value" {
-		t.Errorf("Expected query param=value, got %s", parser.GetRawUrlQuery())
+	if parser.GetRawURLQuery() != "param=value" {
+		t.Errorf("Expected query param=value, got %s", parser.GetRawURLQuery())
 	}
 }
 

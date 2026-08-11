@@ -42,13 +42,13 @@ func (c FiberParser) GetHeaderValue(name string) string {
 func (c FiberParser) GetBody(target any) error {
 	return c.Ctx.BodyParser(target)
 }
-func (c FiberParser) GetUri(target any) error {
+func (c FiberParser) GetURI(target any) error {
 	return c.Ctx.ParamsParser(target)
 }
-func (c FiberParser) GetUrlQuery(target any) error {
+func (c FiberParser) GetURLQuery(target any) error {
 	return c.Ctx.BodyParser(target)
 }
-func (c FiberParser) GetRawUrlQuery() string {
+func (c FiberParser) GetRawURLQuery() string {
 	return string(c.Ctx.Request().URI().QueryString())
 }
 func (c FiberParser) GetLocal(name string) any {
@@ -67,13 +67,13 @@ func (c FiberParser) AddCustomAttributes(attr slog.Attr) {
 	slogfiber.AddCustomAttributes(c.Ctx, attr)
 }
 
-func (c FiberParser) GetUrlParam(name string) string {
+func (c FiberParser) GetURLParam(name string) string {
 	return c.Ctx.Params(name)
 }
-func (c FiberParser) GetUrlParams() map[string]string {
+func (c FiberParser) GetURLParams() map[string]string {
 	return c.Ctx.AllParams()
 }
-func (c FiberParser) CheckUrlParam(name string) (string, bool) {
+func (c FiberParser) CheckURLParam(name string) (string, bool) {
 	value := c.Ctx.Params(name)
 	return value, len(value) > 0
 }
@@ -122,7 +122,7 @@ func (c FiberParser) ParseCommand(command, title string, request webFramework.Re
 		request.GetValueMap(), parser)
 }
 
-func (c FiberParser) GetHttpHeader() http.Header {
+func (c FiberParser) GetHTTPHeader() http.Header {
 	return c.Ctx.GetReqHeaders()
 }
 
