@@ -1,3 +1,4 @@
+// Package main implements a chi-based HTTP server example using requestCore.
 package main
 
 import (

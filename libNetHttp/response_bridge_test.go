@@ -11,8 +11,8 @@ import (
 	"github.com/hmmftg/requestCore/libNetHttp"
 )
 
-func TestNetHttpHandlerBridgesRequestResponseIntoContext(t *testing.T) {
-	handler := libNetHttp.NetHttpHandler(func(ctx context.Context) {
+func TestNetHTTPHandlerBridgesRequestResponseIntoContext(t *testing.T) {
+	handler := libNetHttp.NetHTTPHandler(func(ctx context.Context) {
 		wf := libContext.InitContext(ctx)
 		err := wf.Parser.SendJSONRespBody(http.StatusOK, map[string]string{"status": "ok"})
 		if err != nil {

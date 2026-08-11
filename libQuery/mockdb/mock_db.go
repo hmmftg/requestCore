@@ -14,14 +14,14 @@ import (
 	"github.com/hmmftg/requestCore/libQuery/liborm"
 )
 
-// MockDBHelper provides a simplified interface for creating mock databases
+// MockDBHelper provides a simplified interface for creating mock databases.
 type MockDBHelper struct {
 	DB    *gorm.DB
 	Mock  sqlmock.Sqlmock
 	RawDB *sql.DB
 }
 
-// NewMockDBHelper creates a new mock database helper
+// NewMockDBHelper creates a new mock database helper.
 func NewMockDBHelper(t *testing.T) *MockDBHelper {
 	db, mock, err := sqlmock.New()
 	if err != nil {
@@ -40,12 +40,12 @@ func NewMockDBHelper(t *testing.T) *MockDBHelper {
 	}
 }
 
-// Close closes the mock database connection
+// Close closes the mock database connection.
 func (m *MockDBHelper) Close() {
 	_ = m.RawDB.Close()
 }
 
-// ExpectQuery sets up a mock query expectation
+// ExpectQuery sets up a mock query expectation.
 func (m *MockDBHelper) ExpectQuery(sqlRegex string, columns []string, values ...driver.Value) {
 	rows := sqlmock.NewRows(columns)
 	if len(values) > 0 {
@@ -54,47 +54,47 @@ func (m *MockDBHelper) ExpectQuery(sqlRegex string, columns []string, values ...
 	m.Mock.ExpectQuery(sqlRegex).WillReturnRows(rows)
 }
 
-// ExpectExec sets up a mock execution expectation with flexible matching
+// ExpectExec sets up a mock execution expectation with flexible matching.
 func (m *MockDBHelper) ExpectExec(sqlRegex string) {
 	m.Mock.ExpectExec(sqlRegex).WillReturnResult(sqlmock.NewResult(1, 1))
 }
 
-// ExpectExecFlexible sets up a mock execution expectation that matches any SQL
+// ExpectExecFlexible sets up a mock execution expectation that matches any SQL.
 func (m *MockDBHelper) ExpectExecFlexible() {
 	m.Mock.ExpectExec(".*").WillReturnResult(sqlmock.NewResult(1, 1))
 }
 
-// ExpectBegin sets up a mock transaction begin expectation
+// ExpectBegin sets up a mock transaction begin expectation.
 func (m *MockDBHelper) ExpectBegin() {
 	m.Mock.ExpectBegin()
 }
 
-// ExpectCommit sets up a mock transaction commit expectation
+// ExpectCommit sets up a mock transaction commit expectation.
 func (m *MockDBHelper) ExpectCommit() {
 	m.Mock.ExpectCommit()
 }
 
-// ExpectRollback sets up a mock transaction rollback expectation
+// ExpectRollback sets up a mock transaction rollback expectation.
 func (m *MockDBHelper) ExpectRollback() {
 	m.Mock.ExpectRollback()
 }
 
-// ExpectPrepare sets up a mock prepared statement expectation
+// ExpectPrepare sets up a mock prepared statement expectation.
 func (m *MockDBHelper) ExpectPrepare(sqlRegex string) {
 	m.Mock.ExpectPrepare(sqlRegex)
 }
 
-// GetOrmModel returns an OrmModel with the mock database
+// GetOrmModel returns an OrmModel with the mock database.
 func (m *MockDBHelper) GetOrmModel() *liborm.OrmModel {
 	return &liborm.OrmModel{DB: m.DB}
 }
 
-// GetQueryRunnerModel returns a QueryRunnerModel with the mock database
+// GetQueryRunnerModel returns a QueryRunnerModel with the mock database.
 func (m *MockDBHelper) GetQueryRunnerModel() libQuery.QueryRunnerModel {
 	return libQuery.QueryRunnerModel{DB: m.RawDB}
 }
 
-// SimpleTestData represents simplified test data for libQuery tests
+// SimpleTestData represents simplified test data for libQuery tests.
 type SimpleTestData struct {
 	ID     int     `db:"id"`
 	Name   string  `db:"name"`
@@ -110,48 +110,48 @@ func (s SimpleTestData) GetID() string { return "" }
 // GetValue returns the value of the test data.
 func (s SimpleTestData) GetValue() any { return "" }
 
-// MockQueryExpectations provides common query expectations for testing
+// MockQueryExpectations provides common query expectations for testing.
 type MockQueryExpectations struct {
 	helper *MockDBHelper
 }
 
-// NewMockQueryExpectations creates a new mock query expectations helper
+// NewMockQueryExpectations creates a new mock query expectations helper.
 func NewMockQueryExpectations(helper *MockDBHelper) *MockQueryExpectations {
 	return &MockQueryExpectations{helper: helper}
 }
 
-// SetupSelectQuery sets up a mock SELECT query expectation
+// SetupSelectQuery sets up a mock SELECT query expectation.
 func (m *MockQueryExpectations) SetupSelectQuery(tableName string, columns []string, values ...driver.Value) {
 	sqlRegex := "SELECT \\* FROM " + tableName
 	m.helper.ExpectQuery(sqlRegex, columns, values...)
 }
 
-// SetupInsertQuery sets up a mock INSERT query expectation
+// SetupInsertQuery sets up a mock INSERT query expectation.
 func (m *MockQueryExpectations) SetupInsertQuery(tableName string) {
 	sqlRegex := "INSERT INTO " + tableName
 	m.helper.ExpectExec(sqlRegex)
 }
 
-// SetupUpdateQuery sets up a mock UPDATE query expectation
+// SetupUpdateQuery sets up a mock UPDATE query expectation.
 func (m *MockQueryExpectations) SetupUpdateQuery(tableName string) {
 	sqlRegex := "UPDATE " + tableName
 	m.helper.ExpectExec(sqlRegex)
 }
 
-// SetupDeleteQuery sets up a mock DELETE query expectation
+// SetupDeleteQuery sets up a mock DELETE query expectation.
 func (m *MockQueryExpectations) SetupDeleteQuery(tableName string) {
 	sqlRegex := "DELETE FROM " + tableName
 	m.helper.ExpectExec(sqlRegex)
 }
 
-// SetupSetConfigQuery sets up a mock set_config query expectation
+// SetupSetConfigQuery sets up a mock set_config query expectation.
 func (m *MockQueryExpectations) SetupSetConfigQuery() {
 	// The actual SQL pattern used by the application
 	sqlRegex := "SELECT set_config\\$\\$1,\\$2, true\\$;"
 	m.helper.ExpectExec(sqlRegex)
 }
 
-// SetupTransaction sets up a complete transaction expectation
+// SetupTransaction sets up a complete transaction expectation.
 func (m *MockQueryExpectations) SetupTransaction(queries ...func()) {
 	m.helper.ExpectBegin()
 	for _, query := range queries {
@@ -160,7 +160,7 @@ func (m *MockQueryExpectations) SetupTransaction(queries ...func()) {
 	m.helper.ExpectCommit()
 }
 
-// CommonTestData provides common test data for libQuery tests
+// CommonTestData provides common test data for libQuery tests.
 var CommonTestData = struct {
 	SimpleColumns []string
 	SimpleValues  []driver.Value

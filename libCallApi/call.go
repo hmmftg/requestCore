@@ -16,7 +16,7 @@ type CallParam *CallParamData
 
 // CallParamData holds the parameters for a generic remote API call.
 type CallParamData struct {
-	HttpClient  *http.Client
+	HTTPClient  *http.Client
 	Parameters  map[string]any
 	Headers     map[string]string
 	API         RemoteAPI
@@ -27,7 +27,7 @@ type CallParamData struct {
 	QueryStack  *[]string
 	ValidateTLS bool
 	EnableLog   bool
-	JsonBody    any
+	JSONBody    any
 	Parser      webFramework.RequestParser `json:"-"` // Parser for distributed tracing and request cancellation
 }
 
@@ -41,7 +41,7 @@ func (r CallParamData) LogValue() slog.Value {
 		slog.String("query", r.Query),
 		slog.Any("params", r.Parameters),
 		slog.Any("headers", r.Headers),
-		slog.Any("request", r.JsonBody),
+		slog.Any("request", r.JSONBody),
 	)
 }
 
@@ -50,7 +50,7 @@ type BuilerFunc[Resp any] func(status int, rawResp []byte, headers map[string]st
 
 // RemoteCallParamData holds the parameters for a typed remote API call.
 type RemoteCallParamData[Req, Resp any] struct {
-	HttpClient  *http.Client
+	HTTPClient  *http.Client
 	Parameters  map[string]any             `json:"-"`
 	Headers     map[string]string          `json:"-"`
 	API         RemoteAPI                  `json:"api"`
@@ -61,7 +61,7 @@ type RemoteCallParamData[Req, Resp any] struct {
 	QueryStack  *[]string                  `json:"-"`
 	ValidateTLS bool                       `json:"-"`
 	EnableLog   bool                       `json:"-"`
-	JsonBody    Req                        `json:"body"`
+	JSONBody    Req                        `json:"body"`
 	BodyType    RequestBodyType            `json:"-"`
 	Builder     BuilerFunc[Resp]           `json:"-"`
 	Parser      webFramework.RequestParser `json:"-"` // Parser for distributed tracing and request cancellation
@@ -82,7 +82,7 @@ func (r RemoteCallParamData[Req, Resp]) LogValue() slog.Value {
 		slog.String("query", r.Query),
 		slog.Any("params", r.Parameters),
 		slog.Any("headers", headers),
-		slog.Any("request", r.JsonBody),
+		slog.Any("request", r.JSONBody),
 	)
 }
 
@@ -119,10 +119,10 @@ func Call[RespType any](w webFramework.WebFramework, param CallParam) CallResult
 		SSLVerify:  !param.ValidateTLS,
 		EnableLog:  param.EnableLog,
 		Timeout:    param.Timeout,
-		Req:        param.JsonBody,
+		Req:        param.JSONBody,
 		Context:    ctx,
 		LogValue:   (*CallParamData)(param).LogValue(),
-		httpClient: param.HttpClient,
+		httpClient: param.HTTPClient,
 	}
 
 	resp, wsResp, callResp, err := ConsumeRest(w, callData)
@@ -148,12 +148,12 @@ func RemoteCall[Req, Resp any](w webFramework.WebFramework, param *RemoteCallPar
 		SSLVerify:  !param.ValidateTLS,
 		EnableLog:  param.EnableLog,
 		Timeout:    param.Timeout,
-		Req:        param.JsonBody,
+		Req:        param.JSONBody,
 		BodyType:   param.BodyType,
 		Builder:    param.Builder,
 		Context:    w.Ctx,
 		LogValue:   param.LogValue(),
-		httpClient: param.HttpClient,
+		httpClient: param.HTTPClient,
 	}
 
 	return ConsumeRestJSON(w, &callData)

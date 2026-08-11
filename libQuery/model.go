@@ -193,16 +193,16 @@ type QueryData struct {
 
 // RecordDataGet defines the interface for reading record data from query results.
 type RecordDataGet interface {
-	GetId() string
-	GetControlId(string) string
-	GetIdList() []any
+	GetID() string
+	GetControlID(string) string
+	GetIDList() []any
 	GetSubCategory() string
 	GetValue() any
 }
 
 // RecordDataDml defines the interface for DML operations on record data.
 type RecordDataDml interface {
-	SetId(string)
+	SetID(string)
 	CheckDuplicate(core QueryRunnerInterface) (int, string, error)
 	Filler(headers map[string][]string, core QueryRunnerInterface, args ...any) (string, error)
 	Post(core QueryRunnerInterface, args map[string]string) (DmlResult, int, string, error)

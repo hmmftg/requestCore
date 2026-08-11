@@ -197,7 +197,7 @@ func (q QueryHandlerType[Row, Resp]) Parameters() HandlerParameters[Row, Resp] {
 }
 
 // Initializer is a no-op initializer for the QueryHandlerType.
-func (q QueryHandlerType[Row, Resp]) Initializer(req HandlerRequest[Row, Resp]) error {
+func (q QueryHandlerType[Row, Resp]) Initializer(_ HandlerRequest[Row, Resp]) error {
 	return nil
 }
 
@@ -304,7 +304,7 @@ func (q QueryHandlerType[Req, Resp]) Simulation(req HandlerRequest[Req, Resp]) (
 }
 
 // Finalizer is a no-op finalizer for the QueryHandlerType.
-func (q QueryHandlerType[Req, Resp]) Finalizer(req HandlerRequest[Req, Resp]) {
+func (q QueryHandlerType[Req, Resp]) Finalizer(_ HandlerRequest[Req, Resp]) {
 }
 
 // Query returns a base handler that executes a database query.

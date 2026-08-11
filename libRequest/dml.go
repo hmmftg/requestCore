@@ -14,7 +14,7 @@ import (
 
 // CheckDuplicateRequest queries the database to verify the request ID is not a duplicate.
 func (m RequestModel) CheckDuplicateRequest(request RequestPtr) error {
-	result, err := libQuery.GetQuery[RequestPtr](m.QueryInDb, m.QueryInterface, request.Header.GetId())
+	result, err := libQuery.GetQuery[RequestPtr](m.QueryInDb, m.QueryInterface, request.Header.GetID())
 	if err != nil {
 		if ok, err := libError.Unwrap(err); ok && err.Action().Description == libQuery.NoDataFound {
 			return nil
@@ -23,7 +23,7 @@ func (m RequestModel) CheckDuplicateRequest(request RequestPtr) error {
 			libError.NewWithDescription(
 				status.InternalServerError,
 				"ERROR_IN_CHECK_DUPLICATE_REQUEST",
-				"duplicate Request: id: %s", request.Header.GetId(),
+				"duplicate Request: id: %s", request.Header.GetID(),
 			))
 	}
 	if len(result) > 0 {
@@ -31,7 +31,7 @@ func (m RequestModel) CheckDuplicateRequest(request RequestPtr) error {
 			libError.NewWithDescription(
 				status.InternalServerError,
 				libQuery.DuplicateFound,
-				"duplicate Request: id: %s", request.Header.GetId(),
+				"duplicate Request: id: %s", request.Header.GetID(),
 			))
 	}
 	return nil
@@ -74,7 +74,7 @@ func (m RequestModel) UpdateRequest(request RequestPtr) error {
 func (m RequestModel) UpdateRequestWithContext(ctx context.Context, request RequestPtr) error {
 	requestBytes, _ := json.Marshal(request)
 	args := []any{string(requestBytes)}
-	args = append(args, request.Id)
+	args = append(args, request.ID)
 	if strings.Contains(m.UpdateInDb, "$3") || strings.Contains(m.UpdateInDb, ":3") {
 		args = append(args, request.Resp)
 	}

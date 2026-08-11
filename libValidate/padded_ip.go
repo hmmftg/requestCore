@@ -5,17 +5,17 @@ import (
 	"github.com/go-playground/validator/v10"
 )
 
-// RegisterPaddedIpValidator registers the padded_ip validator.
+// RegisterPaddedIPValidator registers the padded_ip validator.
 // This must be called after Init() to register the padded_ip validator.
 // Example:
 //
 //	libValidate.Init()
-//	err := libValidate.RegisterPaddedIpValidator()
+//	err := libValidate.RegisterPaddedIPValidator()
 //	if err != nil {
 //		log.Fatalf("failed to register padded_ip validator: %v", err)
 //	}
-func RegisterPaddedIpValidator() error {
-	return RegisterValidation("padded_ip", PaddedIpValidator).
+func RegisterPaddedIPValidator() error {
+	return RegisterValidation("padded_ip", PaddedIPValidator).
 		WithTranslation(
 			func(ut ut.Translator) error {
 				return ut.Add("padded_ip", "{0} بایستی به فرمت 000.000.000.000 باشد", true)

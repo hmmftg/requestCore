@@ -31,7 +31,7 @@ func (p *captureParser) GetURI(any) error                    { return nil }
 func (p *captureParser) GetURLQuery(any) error               { return nil }
 func (p *captureParser) GetRawURLQuery() string              { return "" }
 func (p *captureParser) GetLocal(name string) any            { return p.locals[name] }
-func (p *captureParser) GetLocalString(name string) string   { return "" }
+func (p *captureParser) GetLocalString(_ string) string      { return "" }
 func (p *captureParser) GetURLParam(string) string           { return "" }
 func (p *captureParser) GetURLParams() map[string]string     { return nil }
 func (p *captureParser) CheckURLParam(string) (string, bool) { return "", false }

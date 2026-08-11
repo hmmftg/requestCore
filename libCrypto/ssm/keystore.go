@@ -59,8 +59,8 @@ func Zeroing(buf []byte) {
 }
 
 // EncryptRsa encrypts base64-encoded data using the RSA public key from the given keystore entry.
-func EncryptRsa(ks1 keystore.KeyStore, keyId, data string) (string, error) {
-	certBytes, err := ks1.GetTrustedCertificateEntry(keyId)
+func EncryptRsa(ks1 keystore.KeyStore, keyID, data string) (string, error) {
+	certBytes, err := ks1.GetTrustedCertificateEntry(keyID)
 	if err != nil {
 		return "Get Certificate", err
 	}
@@ -82,8 +82,8 @@ func EncryptRsa(ks1 keystore.KeyStore, keyId, data string) (string, error) {
 }
 
 // DecryptRsa decrypts base64-encoded RSA ciphertext using the private key from the given keystore entry.
-func DecryptRsa(ks1 keystore.KeyStore, keyId, pass, data string) (string, error) {
-	prvBytes, err := ks1.GetPrivateKeyEntry(keyId, []byte(pass))
+func DecryptRsa(ks1 keystore.KeyStore, keyID, pass, data string) (string, error) {
+	prvBytes, err := ks1.GetPrivateKeyEntry(keyID, []byte(pass))
 	if err != nil {
 		return "Get PrivateKey", err
 	}

@@ -16,14 +16,14 @@ import (
 type ContextKey string
 
 const (
-	// APP is the context key for the application/program identifier in audit trail variables.
-	APP = "request.APP"
-	// USER is the context key for the user identifier in audit trail variables.
-	USER = "request.USER"
-	// MODULE is the context key for the module name in audit trail variables.
-	MODULE = "request.MODULE"
-	// METHOD is the context key for the method name in audit trail variables.
-	METHOD = "request.METHOD"
+	// App is the context key for the application/program identifier in audit trail variables.
+	App = "request.APP"
+	// User is the context key for the user identifier in audit trail variables.
+	User = "request.USER"
+	// Module is the context key for the module name in audit trail variables.
+	Module = "request.MODULE"
+	// Method is the context key for the method name in audit trail variables.
+	Method = "request.METHOD"
 	// SetCommandError is the error description format for SetTrxVariable failures.
 	SetCommandError = "error in Dml->SetTrxVariable(%s,%s,%s)"
 	// ErrorExecuteDML is the error code for DML execution failures.
@@ -42,7 +42,7 @@ const (
 )
 
 // SetVariable executes the given command to set a transaction variable (key/value) in the database.
-func SetVariable(ctx context.Context, tx *gorm.DB, command, key, value string) error {
+func SetVariable(_ context.Context, tx *gorm.DB, command, key, value string) error {
 	if command == "none" {
 		return nil
 	}
@@ -107,18 +107,18 @@ func (m OrmModel) SetModifVariables(ctx context.Context, moduleName, methodName 
 	}
 
 	variables := map[string]string{
-		APP:    fmt.Sprintf("%s.%s", m.ProgramName, m.ModuleName),
-		USER:   "",
-		MODULE: moduleName,
-		METHOD: methodName,
+		App:    fmt.Sprintf("%s.%s", m.ProgramName, m.ModuleName),
+		User:   "",
+		Module: moduleName,
+		Method: methodName,
 	}
 
-	user := ctx.Value(ContextKey(USER))
+	user := ctx.Value(ContextKey(User))
 	switch userCasted := user.(type) {
 	case string:
-		variables[USER] = userCasted
+		variables[User] = userCasted
 	default:
-		variables[USER] = ""
+		variables[User] = ""
 	}
 
 	for key, value := range variables {

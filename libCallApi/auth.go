@@ -44,8 +44,8 @@ func (t TokenCache) Expired() bool {
 	return time.Now().After(t.AccessToken.TimeTaken.Add(t.AccessToken.ValidUntil))
 }
 
-// initilaizes a token cache which will be used across all APIs
-// should be called once per remote-api
+// InitTokenCache initializes a token cache which will be used across all APIs.
+// It should be called once per remote-api.
 func InitTokenCache() (*TokenCache, *sync.Mutex) {
 	return &TokenCache{}, &sync.Mutex{}
 }

@@ -12,14 +12,14 @@ import (
 type ContextKey string
 
 const (
-	// APP is the context key for the application name in audit trail variables.
-	APP = "request.APP"
-	// USER is the context key for the user name in audit trail variables.
-	USER = "request.USER"
-	// MODULE is the context key for the module name in audit trail variables.
-	MODULE = "request.MODULE"
-	// METHOD is the context key for the method name in audit trail variables.
-	METHOD = "request.METHOD"
+	// App is the context key for the application name in audit trail variables.
+	App = "request.APP"
+	// User is the context key for the user name in audit trail variables.
+	User = "request.USER"
+	// Module is the context key for the module name in audit trail variables.
+	Module = "request.MODULE"
+	// Method is the context key for the method name in audit trail variables.
+	Method = "request.METHOD"
 	// SetCommandError is the error format for set variable command failures.
 	SetCommandError = "error in Dml->SetTrxVariable(%s,%s,%s)"
 	// ErrorExecuteDML is the error description for DML execution failures.
@@ -45,11 +45,11 @@ func SetVariable(ctx context.Context, tx *sql.Tx, command, key, value string) er
 // SetModifVariables sets audit trail modification variables on the transaction.
 func (m QueryRunnerModel) SetModifVariables(ctx context.Context, moduleName, methodName string, tx *sql.Tx) error {
 	command := m.SetVariable
-	err := SetVariable(ctx, tx, command, APP, fmt.Sprintf("%s.%s", m.ProgramName, m.ModuleName))
+	err := SetVariable(ctx, tx, command, App, fmt.Sprintf("%s.%s", m.ProgramName, m.ModuleName))
 	if err != nil {
 		return err
 	}
-	user := ctx.Value(ContextKey(USER))
+	user := ctx.Value(ContextKey(User))
 	var userString string
 	switch userCasted := user.(type) {
 	case string:
@@ -57,15 +57,15 @@ func (m QueryRunnerModel) SetModifVariables(ctx context.Context, moduleName, met
 	default:
 		userString = ""
 	}
-	err = SetVariable(ctx, tx, command, USER, userString)
+	err = SetVariable(ctx, tx, command, User, userString)
 	if err != nil {
 		return err
 	}
-	err = SetVariable(ctx, tx, command, MODULE, moduleName)
+	err = SetVariable(ctx, tx, command, Module, moduleName)
 	if err != nil {
 		return err
 	}
-	err = SetVariable(ctx, tx, command, METHOD, methodName)
+	err = SetVariable(ctx, tx, command, Method, methodName)
 	if err != nil {
 		return err
 	}

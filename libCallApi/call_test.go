@@ -25,8 +25,8 @@ type SimpleTestResponse struct {
 	Count  int              `json:"count"`
 }
 
-func (s SimpleTestResponse) SetStatus(a int)                {}
-func (s SimpleTestResponse) SetHeaders(a map[string]string) {}
+func (s SimpleTestResponse) SetStatus(_ int)                {}
+func (s SimpleTestResponse) SetHeaders(_ map[string]string) {}
 
 func TestCall(t *testing.T) {
 	type TestCase struct {
@@ -43,7 +43,7 @@ func TestCall(t *testing.T) {
 	callParam := libCallApi.RemoteCallParamData[any, SimpleTestResponse]{
 		API:        libCallApi.RemoteAPI{Domain: fakeServer.URL() + "/api"},
 		QueryStack: &[]string{"test1", "test2", "test3"},
-		Builder: func(status int, rawResp []byte, headers map[string]string) (*SimpleTestResponse, error) {
+		Builder: func(_ int, rawResp []byte, _ map[string]string) (*SimpleTestResponse, error) {
 			var resp SimpleTestResponse
 			err := json.Unmarshal(rawResp, &resp)
 			if err != nil {
@@ -118,7 +118,7 @@ func TestCallJSON(t *testing.T) {
 	callParam := libCallApi.RemoteCallParamData[any, SimpleTestResponse]{
 		API:        libCallApi.RemoteAPI{Domain: fakeServer.URL() + "/api"},
 		QueryStack: &[]string{"test1", "test2", "test3"},
-		Builder: func(status int, rawResp []byte, headers map[string]string) (*SimpleTestResponse, error) {
+		Builder: func(_ int, rawResp []byte, _ map[string]string) (*SimpleTestResponse, error) {
 			var resp SimpleTestResponse
 			err := json.Unmarshal(rawResp, &resp)
 			if err != nil {

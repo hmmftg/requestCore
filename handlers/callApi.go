@@ -461,7 +461,7 @@ func logTransactionAndCallback[Req any, Resp any](
 		}
 	}
 
-	requestField := any(param.JsonBody)
+	requestField := any(param.JSONBody)
 	var maskedBody any
 	if opts.MaskFunc != nil {
 		requestField = opts.MaskFunc(requestField)

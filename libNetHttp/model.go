@@ -2,8 +2,8 @@ package libNetHttp
 
 import "net/http"
 
-// NetHttpParser implements the webFramework.RequestParser interface for net/http.
-type NetHttpParser struct {
+// NetHTTPParser implements the webFramework.RequestParser interface for net/http.
+type NetHTTPParser struct {
 	Request  *http.Request
 	Response http.ResponseWriter
 	Locals   map[string]any

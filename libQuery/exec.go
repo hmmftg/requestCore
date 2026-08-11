@@ -19,8 +19,8 @@ func (m QueryRunnerModel) SetVariableCommand() string {
 }
 
 const (
-	// ERROR_CALLING_DB_FUNCTION is the error description for database function call failures.
-	ERROR_CALLING_DB_FUNCTION = "ERROR_CALLING_DB_FUNCTION"
+	// ErrorCallingDBFunction is the error description for database function call failures.
+	ErrorCallingDBFunction = "ERROR_CALLING_DB_FUNCTION"
 )
 
 // CallDbFunction executes a database function with the given call string and arguments.
@@ -31,7 +31,7 @@ func (m QueryRunnerModel) CallDbFunction(callString string, args ...any) (int, s
 	}
 	_, err := m.DB.Exec(callString, args...)
 	if err != nil {
-		return -3, ERROR_CALLING_DB_FUNCTION, libError.Join(err, "CallDbFunction[Exec](%s,%v)", callString, args)
+		return -3, ErrorCallingDBFunction, libError.Join(err, "CallDbFunction[Exec](%s,%v)", callString, args)
 	}
 
 	return 0, "OK", nil
@@ -52,7 +52,7 @@ const (
 
 // Execute runs the DML command using a background context.
 func (command DmlCommand) Execute(core QueryRunnerInterface, moduleName, methodName string) (any, error) {
-	return command.ExecuteWithContext(nil, context.Background(), moduleName, methodName, core)
+	return command.ExecuteWithContext(context.Background(), nil, moduleName, methodName, core)
 }
 
 // GetDmlResult builds a DmlResult from a SQL result and output parameter rows.
@@ -131,7 +131,7 @@ func GetOutArgs(parser webFramework.RequestParser, args ...any) map[string]strin
 }
 
 // ExecuteWithContext runs the DML command with the given context, parser, and query runner.
-func (command DmlCommand) ExecuteWithContext(parser webFramework.RequestParser, w context.Context, moduleName, methodName string, core QueryRunnerInterface) (any, error) {
+func (command DmlCommand) ExecuteWithContext(w context.Context, parser webFramework.RequestParser, moduleName, methodName string, core QueryRunnerInterface) (any, error) {
 	switch command.Type {
 	case QueryCheckExists:
 		result, err := Query[QueryData](command, core, GetLocalArgs(parser, command.Args)...)

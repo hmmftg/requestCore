@@ -29,14 +29,14 @@ const (
 	Gin = "gin"
 	// Fiber identifies the Fiber web framework.
 	Fiber = "fiber"
-	// NetHttp identifies the net/http web framework.
-	NetHttp = "nethttp"
+	// NetHTTP identifies the net/http web framework.
+	NetHTTP = "nethttp"
 	// Testing identifies the testing framework.
 	Testing = "testing"
-	// UserIdHeader is the HTTP header name for the user identifier.
-	UserIdHeader = "User-Id"
-	// UserIdLocal is the local storage key for the user identifier.
-	UserIdLocal = "userId"
+	// UserIDHeader is the HTTP header name for the user identifier.
+	UserIDHeader = "User-Id"
+	// UserIDLocal is the local storage key for the user identifier.
+	UserIDLocal = "userId"
 	// UnknownUser is the default user identifier when none is provided.
 	UnknownUser = "unknown"
 )
@@ -46,7 +46,8 @@ func InitContext(c any) webFramework.WebFramework {
 	return initContext(c, false)
 }
 
-// useful in Get handlers which mostly don't have audit trail
+// InitContextNoAuditTrail initializes a webFramework.WebFramework without audit trail.
+// It is useful in Get handlers which mostly don't have audit trail.
 func InitContextNoAuditTrail(c any) webFramework.WebFramework {
 	return initContext(c, true)
 }
@@ -57,7 +58,7 @@ func initContext(c any, unknownUser bool) webFramework.WebFramework {
 	switch ctx := c.(type) {
 	case *gin.Context:
 		if unknownUser {
-			ctx.Set(UserIdLocal, UnknownUser)
+			ctx.Set(UserIDLocal, UnknownUser)
 		}
 		w.Ctx = context.WithValue(ctx, WebFrameworkKey, Gin)
 		w.Parser = libGin.InitContext(c)
@@ -65,7 +66,7 @@ func initContext(c any, unknownUser bool) webFramework.WebFramework {
 		span = trace.SpanFromContext(ctx)
 	case *fiber.Ctx:
 		if unknownUser {
-			ctx.Locals(UserIdLocal, UnknownUser)
+			ctx.Locals(UserIDLocal, UnknownUser)
 		}
 		w.Ctx = context.WithValue(ctx.Context(), WebFrameworkKey, Fiber)
 		w.Parser = libFiber.InitContext(ctx)
@@ -78,7 +79,7 @@ func initContext(c any, unknownUser bool) webFramework.WebFramework {
 			log.Fatalf("error in InitContext: unable to parse fiber ctx %T, Stack: %s", ctx.UserValue(libFiber.FiberCtxKey), stack)
 		}
 		if unknownUser {
-			fiberCtx.Locals(UserIdLocal, UnknownUser)
+			fiberCtx.Locals(UserIDLocal, UnknownUser)
 		}
 		w.Ctx = context.WithValue(ctx, WebFrameworkKey, Fiber)
 		w.Parser = libFiber.InitContext(fiberCtx)
@@ -93,7 +94,7 @@ func initContext(c any, unknownUser bool) webFramework.WebFramework {
 		req, okReq := libNetHttp.RequestFromContext(ctx)
 		writer, okWriter := libNetHttp.ResponseWriterFromContext(ctx)
 		if okReq && okWriter {
-			return InitNetHttpContext(req, writer, unknownUser)
+			return InitNetHTTPContext(req, writer, unknownUser)
 		}
 		stack := response.GetStack(1, "libContext/init.go")
 		log.Fatalf("error in InitContext: context missing net/http request/response data %T, Stack: %s", ctx, stack)
@@ -105,21 +106,21 @@ func initContext(c any, unknownUser bool) webFramework.WebFramework {
 	// Set span in WebFramework
 	w.Span = span
 
-	userId := w.Parser.GetHeaderValue(UserIdHeader)
-	if len(userId) == 0 {
-		userId = w.Parser.GetLocalString(UserIdLocal)
+	userID := w.Parser.GetHeaderValue(UserIDHeader)
+	if len(userID) == 0 {
+		userID = w.Parser.GetLocalString(UserIDLocal)
 	}
-	if len(userId) == 0 {
+	if len(userID) == 0 {
 		stack := response.GetStack(1, "libContext/init.go")
 		webFramework.AddLog(w, webFramework.HandlerLogTag,
 			slog.Group("unable to find userId in header and locals => audit trail will fail", slog.String("title", stack)))
 	}
-	w.Ctx = context.WithValue(w.Ctx, libQuery.ContextKey(libQuery.USER), userId)
+	w.Ctx = context.WithValue(w.Ctx, libQuery.ContextKey(libQuery.User), userID)
 
 	// Add tracing attributes if span is available
 	if span != nil && span.IsRecording() {
 		span.SetAttributes(
-			attribute.String("user.id", userId),
+			attribute.String("user.id", userID),
 			attribute.String("framework", getFrameworkName(c)),
 		)
 	}
@@ -128,47 +129,47 @@ func initContext(c any, unknownUser bool) webFramework.WebFramework {
 }
 
 // InitContextWithHandler initializes a webFramework.WebFramework from the given context and response handler.
-func InitContextWithHandler(c context.Context, handler response.ResponseHandler) webFramework.WebFramework {
+func InitContextWithHandler(c context.Context, _ response.ResponseHandler) webFramework.WebFramework {
 	return InitContext(c)
 }
 
-// InitNetHttpContext initializes context for net/http framework
-func InitNetHttpContext(r *http.Request, w http.ResponseWriter, unknownUser bool) webFramework.WebFramework {
+// InitNetHTTPContext initializes a webFramework.WebFramework for the net/http framework.
+func InitNetHTTPContext(r *http.Request, w http.ResponseWriter, unknownUser bool) webFramework.WebFramework {
 	wf := webFramework.WebFramework{}
 
 	// Create net/http parser
-	netHttpCtx := libNetHttp.InitContext(r, w)
+	netHTTPCtx := libNetHttp.InitContext(r, w)
 
 	// Set unknown user if needed
 	if unknownUser {
-		netHttpCtx.SetLocal(UserIdLocal, UnknownUser)
+		netHTTPCtx.SetLocal(UserIDLocal, UnknownUser)
 	}
 
 	// Set framework context
-	wf.Ctx = context.WithValue(r.Context(), WebFrameworkKey, NetHttp)
-	wf.Parser = netHttpCtx
+	wf.Ctx = context.WithValue(r.Context(), WebFrameworkKey, NetHTTP)
+	wf.Parser = netHTTPCtx
 
 	// Extract trace context from request
 	span := trace.SpanFromContext(r.Context())
 	wf.Span = span
 
 	// Extract user ID
-	userId := wf.Parser.GetHeaderValue(UserIdHeader)
-	if len(userId) == 0 {
-		userId = wf.Parser.GetLocalString(UserIdLocal)
+	userID := wf.Parser.GetHeaderValue(UserIDHeader)
+	if len(userID) == 0 {
+		userID = wf.Parser.GetLocalString(UserIDLocal)
 	}
-	if len(userId) == 0 {
+	if len(userID) == 0 {
 		stack := response.GetStack(1, "libContext/init.go")
 		webFramework.AddLog(wf, webFramework.HandlerLogTag,
 			slog.Group("unable to find userId in header and locals => audit trail will fail", slog.String("title", stack)))
 	}
-	wf.Ctx = context.WithValue(wf.Ctx, libQuery.ContextKey(libQuery.USER), userId)
+	wf.Ctx = context.WithValue(wf.Ctx, libQuery.ContextKey(libQuery.User), userID)
 
 	// Add tracing attributes if span is available
 	if span != nil && span.IsRecording() {
 		span.SetAttributes(
-			attribute.String("user.id", userId),
-			attribute.String("framework", NetHttp),
+			attribute.String("user.id", userID),
+			attribute.String("framework", NetHTTP),
 		)
 	}
 

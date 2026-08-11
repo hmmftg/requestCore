@@ -111,7 +111,7 @@ func TestWsResponse(t *testing.T) {
 		},
 		{
 			Name:    "filledReceipt",
-			Resp:    WsResponse{Status: 1, Description: "aa", Result: "bb", ErrorData: nil, PrintReceipt: &Receipt{Id: "pp", Title: "rr"}},
+			Resp:    WsResponse{Status: 1, Description: "aa", Result: "bb", ErrorData: nil, PrintReceipt: &Receipt{ID: "pp", Title: "rr"}},
 			Desired: `{"status":1,"description":"aa","result":"bb","printReceipt":{"id":"pp","title":"rr","rows":null}}`,
 		},
 	}

@@ -13,7 +13,7 @@ import (
 )
 
 // Connect creates a PostgreSQL database connection with a notification handler for LISTEN/NOTIFY.
-func Connect(connectionString string, channel chan string) *sql.DB {
+func Connect(connectionString string, _ chan string) *sql.DB {
 	base, err := pq.NewConnector(connectionString)
 	if err != nil {
 		log.Fatal(err)

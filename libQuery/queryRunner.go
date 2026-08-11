@@ -23,14 +23,14 @@ func (m QueryRunnerModel) GetDbMode() DBMode {
 }
 
 const (
-	// PREPARE_ERROR is the error code for statement preparation failures.
-	PREPARE_ERROR = -1
-	// QUERY_ERROR is the error code for query execution failures.
-	QUERY_ERROR = -2
-	// PARSE_ERROR is the error code for result parsing failures.
-	PARSE_ERROR = -3
-	// SCAN_ERROR is the error code for row scanning failures.
-	SCAN_ERROR = -4
+	// PrepareError is the error code for statement preparation failures.
+	PrepareError = -1
+	// QueryError is the error code for query execution failures.
+	QueryError = -2
+	// ParseError is the error code for result parsing failures.
+	ParseError = -3
+	// ScanError is the error code for row scanning failures.
+	ScanError = -4
 )
 
 // NewStatement prepares a SQL statement on the database.

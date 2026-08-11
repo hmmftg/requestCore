@@ -23,7 +23,7 @@ type countingAuth struct {
 	refreshes atomic.Int32
 }
 
-func (a *countingAuth) Login(w webFramework.WebFramework) (*libCallApi.TokenCache, libError.Error) {
+func (a *countingAuth) Login(_ webFramework.WebFramework) (*libCallApi.TokenCache, libError.Error) {
 	a.logins.Add(1)
 	return &libCallApi.TokenCache{
 		AccessToken: &libCallApi.OAuth2Token{
@@ -35,7 +35,7 @@ func (a *countingAuth) Login(w webFramework.WebFramework) (*libCallApi.TokenCach
 	}, nil
 }
 
-func (a *countingAuth) Refresh(w webFramework.WebFramework, refreshToken string) (*libCallApi.TokenCache, libError.Error) {
+func (a *countingAuth) Refresh(_ webFramework.WebFramework, refreshToken string) (*libCallApi.TokenCache, libError.Error) {
 	a.refreshes.Add(1)
 	return &libCallApi.TokenCache{
 		AccessToken: &libCallApi.OAuth2Token{
@@ -164,7 +164,7 @@ func TestEnsureAuthorization_BasicAuthFallback(t *testing.T) {
 
 func TestPrepareCall_OAuthAuthorizationHeader(t *testing.T) {
 	var tokenCalls atomic.Int32
-	tokenServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	tokenServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		tokenCalls.Add(1)
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(map[string]any{

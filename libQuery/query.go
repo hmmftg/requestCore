@@ -38,14 +38,14 @@ func GetQuery[R any](query string, core QueryRunnerInterface, args ...any) ([]R,
 }
 
 // QueryToStruct executes a SQL query and scans the results into a slice of the target type.
-func QueryToStruct[Target any](q QueryRunnerInterface, querySql string, args ...any) ([]Target, error) {
-	stmt, err := q.NewStatement(querySql)
+func QueryToStruct[Target any](q QueryRunnerInterface, querySQL string, args ...any) ([]Target, error) {
+	stmt, err := q.NewStatement(querySQL)
 	if err != nil {
 		return nil, errors.Join(err,
 			libError.NewWithDescription(
 				status.InternalServerError,
 				"UNABLE_TO_INITIALIZE_STATEMENT",
-				"queryRunner[prepare](%s,%v)", querySql, args,
+				"queryRunner[prepare](%s,%v)", querySQL, args,
 			))
 	}
 	defer func() { _ = stmt.Close() }()
@@ -55,7 +55,7 @@ func QueryToStruct[Target any](q QueryRunnerInterface, querySql string, args ...
 			libError.NewWithDescription(
 				status.InternalServerError,
 				"UNABLE_TO_QUERY_STATEMENT",
-				"queryRunner[query](%s,%v)", querySql, args,
+				"queryRunner[query](%s,%v)", querySQL, args,
 			))
 	}
 	defer func() { _ = rows.Close() }()
@@ -67,7 +67,7 @@ func QueryToStruct[Target any](q QueryRunnerInterface, querySql string, args ...
 			libError.NewWithDescription(
 				status.InternalServerError,
 				"UNABLE_TO_GET_COLUMN_TYPES",
-				"queryRunner[ColumnTypes](%s,%v)", querySql, args,
+				"queryRunner[ColumnTypes](%s,%v)", querySQL, args,
 			))
 	}
 
@@ -90,7 +90,7 @@ func QueryToStruct[Target any](q QueryRunnerInterface, querySql string, args ...
 				libError.NewWithDescription(
 					status.InternalServerError,
 					"UNABLE_TO_GET_SCAN_ROW",
-					"queryRunner[Scan](%s,%v)", querySql, scanArgs,
+					"queryRunner[Scan](%s,%v)", querySQL, scanArgs,
 				))
 		}
 
@@ -106,7 +106,7 @@ func QueryToStruct[Target any](q QueryRunnerInterface, querySql string, args ...
 				libError.NewWithDescription(
 					status.InternalServerError,
 					"UNABLE_TO_GET_SCAN_ROW",
-					"queryRunner[parse](%s,%v)", querySql, masterData,
+					"queryRunner[parse](%s,%v)", querySQL, masterData,
 				))
 		}
 		finalRows = append(finalRows, *parsed)

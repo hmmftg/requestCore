@@ -17,7 +17,7 @@ type SecureParametersMap struct {
 	SecureParams map[string]SecurityParam `yaml:"secureParams"`
 }
 
-// Application can be designed with below params as default
+// ApplicationParams holds the default application parameters.
 type ApplicationParams[SpecialParams any] struct {
 	Network               map[string]NetworkParams        `yaml:"networks"` // Definition of all networks, all networks will be started at startup
 	Logging               LogParams                       `yaml:"logging"`

@@ -20,7 +20,7 @@ func (t testLogger) GetLogCompress() bool   { return t.LogCompress }
 func (t testLogger) GetSkipPaths() []string { return t.SkipPaths }
 func (t testLogger) GetHeaderName() string  { return t.HeaderName }
 
-func TestFiberLogger(t *testing.T) {
+func TestFiberLogger(_ *testing.T) {
 	configs := []testLogger{
 		{LogPath: "test1.log", LogSize: 1, LogCompress: true},
 		{LogPath: "test2.log", LogSize: 2, LogCompress: false},

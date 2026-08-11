@@ -59,8 +59,8 @@ var (
 	useDefaultSystemValidators  = true
 )
 
-// RegexPaddedIp is the regular expression for validating padded IP addresses.
-const RegexPaddedIp string = `^((25[0-5]|2[0-4]\d|1\d\d|0\d\d)\.?\b){4}$` //^((25[0-5]|2[0-4]\d|1\d\d|0\d\d)\.?\b){4}$
+// RegexPaddedIP is the regular expression for validating padded IP addresses.
+const RegexPaddedIP string = `^((25[0-5]|2[0-4]\d|1\d\d|0\d\d)\.?\b){4}$` //^((25[0-5]|2[0-4]\d|1\d\d|0\d\d)\.?\b){4}$
 
 // Error code constants
 const (
@@ -70,15 +70,15 @@ const (
 	ErrorCodeInvalidInputData = "INVALID-INPUT-DATA"
 )
 
-// PaddedIpValidator validates that a field contains a properly padded IP address.
-func PaddedIpValidator(fl validator.FieldLevel) bool {
+// PaddedIPValidator validates that a field contains a properly padded IP address.
+func PaddedIPValidator(fl validator.FieldLevel) bool {
 	st := fl.Field().String()
 
 	if len(st) != 15 {
 		return false
 	}
 
-	re := regexp.MustCompile(RegexPaddedIp)
+	re := regexp.MustCompile(RegexPaddedIP)
 	return re.MatchString(st)
 }
 

@@ -35,7 +35,7 @@ import (
 )
 
 // ConsumeRestBasicAuthAPI calls a remote REST API using basic authentication.
-func (m RemoteAPIModel) ConsumeRestBasicAuthAPI(w webFramework.WebFramework, requestJson []byte, apiName, path, contentType, method string, headers map[string]string) ([]byte, string, error) {
+func (m RemoteAPIModel) ConsumeRestBasicAuthAPI(w webFramework.WebFramework, requestJSON []byte, apiName, path, contentType, method string, headers map[string]string) ([]byte, string, error) {
 	if timeOutString, ok := headers["Time-Out"]; ok {
 		timeoutSeconds, _ := strconv.Atoi(timeOutString)
 		httpClient.Timeout = time.Duration(timeoutSeconds * int(time.Second))
@@ -47,7 +47,7 @@ func (m RemoteAPIModel) ConsumeRestBasicAuthAPI(w webFramework.WebFramework, req
 	if err := api.EnsureAuthorization(w, headers); err != nil {
 		return nil, "AUTH_FAILED", err
 	}
-	req, err := http.NewRequest(method, api.Domain+"/"+path, bytes.NewBuffer(requestJson))
+	req, err := http.NewRequest(method, api.Domain+"/"+path, bytes.NewBuffer(requestJSON))
 	if err != nil {
 		return nil, "Generate Request Failed", err
 	}
@@ -74,8 +74,8 @@ func (m RemoteAPIModel) ConsumeRestBasicAuthAPI(w webFramework.WebFramework, req
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		var respJson response.WsRemoteResponse
-		if json.Unmarshal(responseData, &respJson) == nil {
+		var respJSON response.WsRemoteResponse
+		if json.Unmarshal(responseData, &respJSON) == nil {
 			return responseData, resp.Status, nil
 		}
 		errorDesc := fmt.Sprintf("API_NOK#%s#%s#%s#", apiName, m.RemoteAPIList[apiName].Name, resp.Status)
@@ -85,13 +85,13 @@ func (m RemoteAPIModel) ConsumeRestBasicAuthAPI(w webFramework.WebFramework, req
 	return responseData, resp.Status, nil
 }
 
-// GetApi returns the RemoteAPI registered under the given name.
-func (m RemoteAPIModel) GetApi(apiName string) RemoteAPI {
+// GetAPI returns the RemoteAPI registered under the given name.
+func (m RemoteAPIModel) GetAPI(apiName string) RemoteAPI {
 	return m.RemoteAPIList[apiName]
 }
 
 // ConsumeRestAPI calls a remote REST API and returns the response body, status text, status code, and error.
-func (m RemoteAPIModel) ConsumeRestAPI(w webFramework.WebFramework, requestJson []byte, apiName, path, contentType, method string, headers map[string]string) ([]byte, string, int, error) {
+func (m RemoteAPIModel) ConsumeRestAPI(w webFramework.WebFramework, requestJSON []byte, apiName, path, contentType, method string, headers map[string]string) ([]byte, string, int, error) {
 	if timeOutString, ok := headers["Time-Out"]; ok {
 		timeoutSeconds, _ := strconv.Atoi(timeOutString)
 		httpClient.Timeout = time.Duration(timeoutSeconds * int(time.Second))
@@ -103,7 +103,7 @@ func (m RemoteAPIModel) ConsumeRestAPI(w webFramework.WebFramework, requestJson 
 	if err := api.EnsureAuthorization(w, headers); err != nil {
 		return nil, "AUTH_FAILED", http.StatusInternalServerError, err
 	}
-	req, err := http.NewRequest(method, api.Domain+"/"+path, bytes.NewBuffer(requestJson))
+	req, err := http.NewRequest(method, api.Domain+"/"+path, bytes.NewBuffer(requestJSON))
 	if err != nil {
 		return nil, "Generate Request Failed", http.StatusInternalServerError, err
 	}
@@ -130,8 +130,8 @@ func (m RemoteAPIModel) ConsumeRestAPI(w webFramework.WebFramework, requestJson 
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		var respJson response.WsRemoteResponse
-		if json.Unmarshal(responseData, &respJson) == nil {
+		var respJSON response.WsRemoteResponse
+		if json.Unmarshal(responseData, &respJSON) == nil {
 			return responseData, resp.Status, resp.StatusCode, nil
 		}
 		errorDesc := fmt.Sprintf("API_NOK#%s#%s#%s#", apiName, m.RemoteAPIList[apiName].Name, resp.Status)
@@ -200,6 +200,7 @@ type CallResp struct {
 	Status  int
 }
 
+// GetResp reads and parses an HTTP response into typed result and error values.
 // TODO replace response.Error with errors.Join(err, libError.New
 func GetResp[Resp any, Error any](api RemoteAPI, resp *http.Response) (*Resp, *Error, *CallResp, error) {
 	responseData, err := io.ReadAll(resp.Body)
@@ -209,17 +210,17 @@ func GetResp[Resp any, Error any](api RemoteAPI, resp *http.Response) (*Resp, *E
 		}
 		return nil, nil, nil, errors.Join(err, libError.NewWithDescription(http.StatusInternalServerError, "API_UNABLE_TO_READ", "error in GetResp.ReadAll(%s)", api.Name))
 	}
-	var respJson Resp
-	var errJson Error
+	var respJSON Resp
+	var errJSON Error
 	switch resp.StatusCode {
 	case http.StatusOK:
-		err = json.Unmarshal(responseData, &respJson)
+		err = json.Unmarshal(responseData, &respJSON)
 		if err != nil {
 			logResponseBodyForDebug(api.Name, "API_OK_RESP_JSON", responseData)
 			return nil, nil, nil, errors.Join(err, libError.NewWithDescription(http.StatusInternalServerError, "API_OK_RESP_JSON", "error in %s GetResp.Unmarshal: %s", api.Name, responseBodySummary(responseData, resp.StatusCode)))
 		}
 	default:
-		err = json.Unmarshal(responseData, &errJson)
+		err = json.Unmarshal(responseData, &errJSON)
 		if err != nil {
 			logResponseBodyForDebug(api.Name, "API_NOK_RESP_JSON", responseData)
 			return nil, nil, nil, errors.Join(err, libError.NewWithDescription(status.StatusCode(resp.StatusCode), "API_NOK_RESP_JSON", "error in %s GetResp.Unmarshal: %s", api.Name, responseBodySummary(responseData, resp.StatusCode)))
@@ -229,7 +230,7 @@ func GetResp[Resp any, Error any](api RemoteAPI, resp *http.Response) (*Resp, *E
 	for key, header := range resp.Header {
 		headerMap[key] = header[0]
 	}
-	return &respJson, &errJson, &CallResp{Status: resp.StatusCode, Headers: headerMap}, nil
+	return &respJSON, &errJSON, &CallResp{Status: resp.StatusCode, Headers: headerMap}, nil
 }
 
 // GetJSONResp reads and parses an HTTP response into a typed result using an optional builder.
@@ -440,10 +441,10 @@ func ConsumeRest[Resp any](w webFramework.WebFramework, c CallData[Resp]) (*Resp
 		}
 	}
 
-	var respJson *Resp
+	var respJSON *Resp
 	var errResp *response.WsRemoteResponse
 
-	respJson, errResp, callResp, err := GetResp[Resp, response.WsRemoteResponse](c.API, resp)
+	respJSON, errResp, callResp, err := GetResp[Resp, response.WsRemoteResponse](c.API, resp)
 	if err != nil {
 		// Record parsing/response errors
 		if span := trace.SpanFromContext(traceCtx); span.IsRecording() {
@@ -458,11 +459,11 @@ func ConsumeRest[Resp any](w webFramework.WebFramework, c CallData[Resp]) (*Resp
 		return nil, nil, nil, err
 	}
 
-	return respJson, errResp, callResp, nil
+	return respJSON, errResp, callResp, nil
 }
 
 // DefaultBuilderfunc is the default response builder that unmarshals JSON into the result type.
-func DefaultBuilderfunc[Resp any](stat int, rawResp []byte, headers map[string]string) (*Resp, error) {
+func DefaultBuilderfunc[Resp any](stat int, rawResp []byte, _ map[string]string) (*Resp, error) {
 	if stat != http.StatusOK {
 		return nil, libError.NewWithDescription(status.StatusCode(stat), "API_RESP_NOK", "build request failed, status %d", stat)
 	}
@@ -554,7 +555,7 @@ func ConsumeRestJSON[Resp any](w webFramework.WebFramework, c *CallData[Resp]) (
 		c.Builder = DefaultBuilderfunc[Resp]
 	}
 
-	respJson, err := GetJSONResp(c.API, resp, c.Builder)
+	respJSON, err := GetJSONResp(c.API, resp, c.Builder)
 	if err != nil {
 		// Record parsing/response errors
 		if span := trace.SpanFromContext(traceCtx); span.IsRecording() {
@@ -569,7 +570,7 @@ func ConsumeRestJSON[Resp any](w webFramework.WebFramework, c *CallData[Resp]) (
 		return nil, err
 	}
 
-	return respJson, nil
+	return respJSON, nil
 }
 
 // TransmitRequestWithAuth sends a request through a consume handler and parses the remote response.
@@ -585,11 +586,11 @@ func TransmitRequestWithAuth(
 	if err != nil {
 		return status, map[string]string{"desc": desc, "message": desc}, resp, err
 	}
-	status, result, respApi, err := parseRemoteResp(respBytes, desc, status)
+	status, result, respAPI, err := parseRemoteResp(respBytes, desc, status)
 	if err != nil || status != http.StatusOK {
-		return status, result, respApi, err
+		return status, result, respAPI, err
 	}
-	return http.StatusOK, nil, respApi, nil
+	return http.StatusOK, nil, respAPI, nil
 }
 
 // BasicAuth returns the base64-encoded basic authentication string for the given credentials.
@@ -599,7 +600,7 @@ func BasicAuth(username, password string) string {
 }
 
 // TransmitSoap sends a SOAP request to the given URL and parses the XML response.
-func TransmitSoap[Resp any](request any, url string, debug bool, timeout time.Duration) (*Resp, error) {
+func TransmitSoap[Resp any](request any, url string, debug bool, _ time.Duration) (*Resp, error) {
 	requestBytes, _ := xml.MarshalIndent(&request, " ", "  ")
 	req, requestErr := http.NewRequest(
 		http.MethodPost,
@@ -624,10 +625,10 @@ func TransmitSoap[Resp any](request any, url string, debug bool, timeout time.Du
 	if debug {
 		log.Println(string(result))
 	}
-	var respXml Resp
-	err = xml.Unmarshal(result, &respXml)
+	var respXML Resp
+	err = xml.Unmarshal(result, &respXML)
 	if err != nil {
 		return nil, err
 	}
-	return &respXml, nil
+	return &respXML, nil
 }

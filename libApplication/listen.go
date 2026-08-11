@@ -14,11 +14,11 @@ import (
 // Listen starts the Gin engine on the configured HTTP or HTTPS port.
 func Listen(netParams *libParams.NetworkParams, app *gin.Engine) {
 	listenLog := ""
-	if len(netParams.TlsPort) > 0 {
-		listenLog = fmt.Sprintf("About to tls listen on %s", netParams.TlsPort)
+	if len(netParams.TLSPort) > 0 {
+		listenLog = fmt.Sprintf("About to tls listen on %s", netParams.TLSPort)
 		webFramework.AddStartUpLog(slog.String("listen", listenLog))
 		webFramework.CollectStartUpLogs()
-		errHTTP := app.RunTLS(":"+netParams.TlsPort, netParams.TlsCert, netParams.TlsKey)
+		errHTTP := app.RunTLS(":"+netParams.TLSPort, netParams.TLSCert, netParams.TLSKey)
 		if errHTTP != nil {
 			log.Fatal("Web server (HTTPS): ", errHTTP)
 		}

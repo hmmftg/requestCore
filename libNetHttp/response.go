@@ -40,14 +40,14 @@ func ResponseWriterFromContext(ctx context.Context) (http.ResponseWriter, bool) 
 	return writer, ok
 }
 
-// NetHttpErrorHandler returns an http.HandlerFunc that handles common HTTP errors for the given path.
-func NetHttpErrorHandler(path, title string, handler ContextInitiator) http.HandlerFunc {
+// NetHTTPErrorHandler returns an http.HandlerFunc that handles common HTTP errors for the given path.
+func NetHTTPErrorHandler(path, title string, handler ContextInitiator) http.HandlerFunc {
 	log.Println("ErrorHandler: ", path, title)
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Create a custom error context
-		netHttpCtx := InitContext(r, w)
+		netHTTPCtx := InitContext(r, w)
 		wf := webFramework.WebFramework{
-			Parser: netHttpCtx,
+			Parser: netHTTPCtx,
 		}
 
 		// Handle different types of errors
@@ -71,8 +71,8 @@ func NetHttpErrorHandler(path, title string, handler ContextInitiator) http.Hand
 	}
 }
 
-// NetHttpHandler wraps a handler function to work with net/http
-func NetHttpHandler(handler any) http.HandlerFunc {
+// NetHTTPHandler wraps a handler function to work with net/http
+func NetHTTPHandler(handler any) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Convert the handler to work with net/http context
 		// The handler expects a context.Context, so we pass the request context

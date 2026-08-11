@@ -16,7 +16,7 @@ import (
 type AnyString string
 
 // Match satisfies sqlmock.Argument interface
-func (a AnyString) Match(v driver.Value) bool {
+func (a AnyString) Match(_ driver.Value) bool {
 	return true
 }
 
@@ -134,7 +134,7 @@ func TestExecuteWithContext(t *testing.T) {
 		Error: &response.ErrorData{Description: "eeeerrr", Status: 1, Message: "mmm"},
 	}}
 	for _, testCase := range testCases {
-		result, err := testCase.Command.ExecuteWithContext(webFramework.FakeParser{}, testCase.Context, "", "", testCase.Model)
+		result, err := testCase.Command.ExecuteWithContext(testCase.Context, webFramework.FakeParser{}, "", "", testCase.Model)
 		assert.DeepEqual(t, result, testCase.Result)
 		if err == nil && testCase.Error != nil {
 			t.Fatal("error wanted", testCase.Error, "got", err)

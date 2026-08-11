@@ -46,7 +46,7 @@ type EventData struct {
 
 // RequestHeader holds the standard HTTP request headers for requestCore.
 type RequestHeader struct {
-	RequestId string `header:"Request-Id" reqHeader:"Request-Id" validate:"required,min=10,max=64"`
+	RequestID string `header:"Request-Id" reqHeader:"Request-Id" validate:"required,min=10,max=64"`
 	Program   string `header:"Program-Id" reqHeader:"Program-Id"`
 	Module    string `header:"Module-Id"  reqHeader:"Module-Id"`
 	Method    string `header:"Method-Id"  reqHeader:"Method-Id"`
@@ -56,9 +56,9 @@ type RequestHeader struct {
 	Person    string `header:"Person-Id"  reqHeader:"Person-Id"`
 }
 
-// GetId returns the request ID.
-func (r RequestHeader) GetId() string {
-	return r.RequestId
+// GetID returns the request ID.
+func (r RequestHeader) GetID() string {
+	return r.RequestID
 }
 
 // GetUser returns the user ID from the header.
@@ -137,8 +137,8 @@ type RequestPtr *Request
 // Request holds the full request lifecycle data including header, body, and tracing context.
 type Request struct {
 	Header    webFramework.HeaderInterface `json:"header"`
-	Id        string                       `json:"id"`
-	RequestId string                       `json:"request_id"`
+	ID        string                       `json:"id"`
+	RequestID string                       `json:"request_id"`
 	Time      time.Time                    `json:"dt"`
 	Incoming  any                          `json:"incoming"`
 	Req       string                       `json:"req"`

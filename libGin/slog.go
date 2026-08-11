@@ -46,8 +46,9 @@ var (
 		"set-cookie": {},
 	}
 
-	// Formatted with http.CanonicalHeaderKey
-	RequestIDHeaderKey  = "X-Request-Id"
+	// RequestIDHeaderKey is the canonical HTTP header key for the request ID.
+	RequestIDHeaderKey = "X-Request-Id"
+	// RequestIDContextKey is the gin context key for storing the request ID.
 	RequestIDContextKey = "slog-gin.request-id"
 )
 

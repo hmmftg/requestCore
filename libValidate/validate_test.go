@@ -123,7 +123,7 @@ func TestRegisterValidationWithEmptyErrorCode(t *testing.T) {
 	testTag := "test_validator_empty_code"
 
 	err := libValidate.RegisterValidation(testTag,
-		func(fl validator.FieldLevel) bool {
+		func(_ validator.FieldLevel) bool {
 			return true
 		}).
 		WithTranslation(
@@ -216,7 +216,7 @@ func TestGetErrorCodeForRegisteredValidator(t *testing.T) {
 	customErrorCode := libValidate.ErrorCodeRequiredField
 
 	err := libValidate.RegisterValidation(customTag,
-		func(fl validator.FieldLevel) bool {
+		func(_ validator.FieldLevel) bool {
 			return true
 		}).
 		WithTranslation(
@@ -286,14 +286,14 @@ func TestIsCustomValidator(t *testing.T) {
 	}
 }
 
-// TestPaddedIpValidator tests the padded_ip validator registration
-func TestPaddedIpValidator(t *testing.T) {
+// TestPaddedIPValidator tests the padded_ip validator registration
+func TestPaddedIPValidator(t *testing.T) {
 	libValidate.Init()
 
 	// Register padded_ip validator
-	err := libValidate.RegisterPaddedIpValidator()
+	err := libValidate.RegisterPaddedIPValidator()
 	if err != nil {
-		t.Fatalf("RegisterPaddedIpValidator failed: %v", err)
+		t.Fatalf("RegisterPaddedIPValidator failed: %v", err)
 	}
 
 	// Test that padded_ip is registered
@@ -354,7 +354,7 @@ func TestRegisterValidationConcurrent(t *testing.T) {
 	for _, tag := range tags {
 		go func(tag string) {
 			err := libValidate.RegisterValidation(tag,
-				func(fl validator.FieldLevel) bool {
+				func(_ validator.FieldLevel) bool {
 					return true
 				}).
 				WithTranslation(
@@ -413,9 +413,9 @@ func TestValidatorRegistry(t *testing.T) {
 	}
 
 	// Test custom validator (padded_ip) - register it first
-	err := libValidate.RegisterPaddedIpValidator()
+	err := libValidate.RegisterPaddedIPValidator()
 	if err != nil {
-		t.Fatalf("RegisterPaddedIpValidator failed: %v", err)
+		t.Fatalf("RegisterPaddedIPValidator failed: %v", err)
 	}
 
 	paddedIPInfo := libValidate.GetValidatorInfo("padded_ip")

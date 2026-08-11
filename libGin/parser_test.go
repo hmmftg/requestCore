@@ -53,7 +53,7 @@ type Header struct {
 	ID string `header:"id" reqHeader:"id" json:"id"`
 }
 
-func (h Header) GetId() string      { return h.ID }
+func (h Header) GetID() string      { return h.ID }
 func (h Header) GetUser() string    { return h.ID }
 func (h Header) GetBranch() string  { return h.ID }
 func (h Header) GetBank() string    { return h.ID }
@@ -87,7 +87,7 @@ func TestGetHeader(t *testing.T) {
 		w := httptest.NewRecorder()
 		c, _ := gin.CreateTestContext(w)
 		c.Request, _ = http.NewRequest("POST", "/", nil)
-		c.Request.Header.Add("id", v.Header.GetId())
+		c.Request.Header.Add("id", v.Header.GetID())
 		ctx := InitContext(c)
 		var sampleType Header
 		err := ctx.GetHeader(&sampleType)

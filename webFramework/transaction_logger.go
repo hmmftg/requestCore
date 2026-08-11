@@ -17,7 +17,7 @@ type TransactionInfo struct {
 	StatusCode         int           // actual HTTP status (0 if request failed before getting a response)
 	Duration           time.Duration // elapsed time
 	Error              error         // nil on success
-	Request            any           // param.JsonBody (caller may mask sensitive fields via CallAPIOptions.MaskFunc)
+	Request            any           // param.JSONBody (caller may mask sensitive fields via CallAPIOptions.MaskFunc)
 	Response           any           // parsed response (nil on error; caller may mask via MaskFunc)
 	ResponseBody       []byte        // raw response body from RemoteCallError on error, nil on success; preserved raw for diagnostics — may contain sensitive data
 	MaskedResponseBody any           // MaskFunc(ResponseBody) on error paths when CallAPIOptions.MaskFunc is set; nil when MaskFunc is nil or on success. Transaction loggers should emit this field by default and use ResponseBody only when the raw bytes are explicitly required.

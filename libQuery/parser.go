@@ -231,8 +231,8 @@ func ParseMap[Target any](input map[string]any) (*Target, error) {
 	return result, err
 }
 
-// ConvertJsonToStruct unmarshals a JSON string into the target type.
-func ConvertJsonToStruct[Q any](row string) (Q, error) {
+// ConvertJSONToStruct unmarshals a JSON string into the target type.
+func ConvertJSONToStruct[Q any](row string) (Q, error) {
 	var rowObj Q
 	err := json.Unmarshal([]byte(row), &rowObj)
 	if err != nil {

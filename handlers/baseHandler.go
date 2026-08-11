@@ -84,7 +84,7 @@ func (trx *HandlerRequest[Req, Resp]) SetOutcome(err error, httpStatus int) {
 	trx.Outcome.HTTPStatus = httpStatus
 }
 
-// Tracing methods for HandlerRequest
+// AddSpanAttribute adds a string key-value attribute to the request's span.
 func (trx *HandlerRequest[Req, Resp]) AddSpanAttribute(key, value string) {
 	if trx.Span != nil && trx.Span.IsRecording() {
 		trx.Span.SetAttributes(attribute.String(key, value))
@@ -132,7 +132,7 @@ func (trx *HandlerRequest[Req, Resp]) StartChildSpan(name string, attrs map[stri
 	return tm.StartSpanWithAttributes(trx.SpanCtx, name, attrs)
 }
 
-// GetParser returns the RequestParser from WebFramework for tracing
+// GetParser returns the RequestParser from WebFramework for tracing.
 func (trx HandlerRequest[Req, Resp]) GetParser() webFramework.RequestParser {
 	return trx.W.Parser
 }

@@ -23,7 +23,7 @@ const (
 )
 
 // ZeroIv is an 8-byte zero initialization vector used for DES operations.
-var ZeroIv []byte = []byte{0, 0, 0, 0, 0, 0, 0, 0}
+var ZeroIv = []byte{0, 0, 0, 0, 0, 0, 0, 0}
 
 // EncryptDes encrypts base64-encoded plaintext with DES/Triple-DES using a base64-encoded key.
 func EncryptDes(textB64, keyB64 string) (string, error) {

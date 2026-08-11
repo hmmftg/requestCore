@@ -62,7 +62,7 @@ func (m WebHanlder) errorhandler(w webFramework.WebFramework, err error) {
 			}}
 			m.respond(RespData{
 				Code: newError.ActionData.Status.Int(), Status: 1, Message: newError.ActionData.Description,
-				Type: JsonWithReceipt, PreBuiltErrors: &errs,
+				Type: JSONWithReceipt, PreBuiltErrors: &errs,
 			}, true, w)
 			return
 		}
@@ -123,7 +123,7 @@ func (m WebHanlder) RespondWithReceipt(code, status int, message string, data an
 		Code:      code,
 		Status:    status,
 		Message:   message,
-		Type:      JsonWithReceipt,
+		Type:      JSONWithReceipt,
 		JSON:      data,
 		PrintData: printData,
 	}
@@ -155,10 +155,10 @@ func (m WebHanlder) respond(data RespData, abort bool, w webFramework.WebFramewo
 		switch data.Type {
 		case FileAttachment:
 			w.Parser.FileAttachment(data.Attachment.Path, data.Attachment.FileName)
-		case JsonWithReceipt:
+		case JSONWithReceipt:
 			resp.PrintReceipt = data.PrintData
 			fallthrough
-		case Json:
+		case JSON:
 			resp.Result = data.JSON
 
 			err := w.Parser.SendJSONRespBody(data.Code, resp)

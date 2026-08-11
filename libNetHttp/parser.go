@@ -20,9 +20,9 @@ import (
 	"github.com/hmmftg/requestCore/webFramework"
 )
 
-// InitContext creates a new NetHttpParser from the given HTTP request and response writer.
-func InitContext(r *http.Request, w http.ResponseWriter) *NetHttpParser {
-	parser := &NetHttpParser{
+// InitContext creates a new NetHTTPParser from the given HTTP request and response writer.
+func InitContext(r *http.Request, w http.ResponseWriter) *NetHTTPParser {
+	parser := &NetHTTPParser{
 		Request:  r,
 		Response: w,
 		Locals:   make(map[string]any),
@@ -35,17 +35,17 @@ func InitContext(r *http.Request, w http.ResponseWriter) *NetHttpParser {
 }
 
 // GetMethod returns the HTTP method of the request.
-func (c NetHttpParser) GetMethod() string {
+func (c NetHTTPParser) GetMethod() string {
 	return c.Request.Method
 }
 
 // GetPath returns the URL path of the request.
-func (c NetHttpParser) GetPath() string {
+func (c NetHTTPParser) GetPath() string {
 	return c.Request.URL.Path
 }
 
 // GetHeader populates the target struct with header values from the request.
-func (c NetHttpParser) GetHeader(target webFramework.HeaderInterface) error {
+func (c NetHTTPParser) GetHeader(target webFramework.HeaderInterface) error {
 	// Parse headers into target struct
 	// This is a simplified implementation - you might want to use a more sophisticated header parsing
 	// For now, we'll manually map common headers
@@ -71,17 +71,17 @@ func (c NetHttpParser) GetHeader(target webFramework.HeaderInterface) error {
 }
 
 // GetHeaderValue returns the value of a single request header by name.
-func (c NetHttpParser) GetHeaderValue(name string) string {
+func (c NetHTTPParser) GetHeaderValue(name string) string {
 	return c.Request.Header.Get(name)
 }
 
 // GetHTTPHeader returns the full HTTP header map from the request.
-func (c NetHttpParser) GetHTTPHeader() http.Header {
+func (c NetHTTPParser) GetHTTPHeader() http.Header {
 	return c.Request.Header
 }
 
 // GetBody reads and unmarshals the request body into the target.
-func (c NetHttpParser) GetBody(target any) error {
+func (c NetHTTPParser) GetBody(target any) error {
 	if c.Request.Body == nil {
 		return nil
 	}
@@ -99,7 +99,7 @@ func (c NetHttpParser) GetBody(target any) error {
 }
 
 // GetURI parses URL path parameters into the target struct.
-func (c NetHttpParser) GetURI(target any) error {
+func (c NetHTTPParser) GetURI(target any) error {
 	// Parse URL parameters into target struct
 	// This is a simplified implementation
 	if target == nil {
@@ -112,7 +112,7 @@ func (c NetHttpParser) GetURI(target any) error {
 }
 
 // GetURLQuery parses URL query parameters into the target struct.
-func (c NetHttpParser) GetURLQuery(target any) error {
+func (c NetHTTPParser) GetURLQuery(target any) error {
 	if target == nil {
 		return nil
 	}
@@ -128,17 +128,17 @@ func (c NetHttpParser) GetURLQuery(target any) error {
 }
 
 // GetRawURLQuery returns the raw query string from the request URL.
-func (c NetHttpParser) GetRawURLQuery() string {
+func (c NetHTTPParser) GetRawURLQuery() string {
 	return c.Request.URL.RawQuery
 }
 
 // GetLocal returns a value stored in the parser's local map by name.
-func (c NetHttpParser) GetLocal(name string) any {
+func (c NetHTTPParser) GetLocal(name string) any {
 	return c.Locals[name]
 }
 
 // GetLocalString returns a string value stored in the parser's local map by name.
-func (c NetHttpParser) GetLocalString(name string) string {
+func (c NetHTTPParser) GetLocalString(name string) string {
 	if value, exists := c.Locals[name]; exists {
 		if str, ok := value.(string); ok {
 			return str
@@ -148,39 +148,39 @@ func (c NetHttpParser) GetLocalString(name string) string {
 }
 
 // GetURLParam returns a single URL path parameter by name.
-func (c NetHttpParser) GetURLParam(name string) string {
+func (c NetHTTPParser) GetURLParam(name string) string {
 	return c.Params[name]
 }
 
 // GetURLParams returns all URL path parameters as a map.
-func (c NetHttpParser) GetURLParams() map[string]string {
+func (c NetHTTPParser) GetURLParams() map[string]string {
 	return c.Params
 }
 
 // CheckURLParam returns a URL path parameter by name and whether it exists.
-func (c NetHttpParser) CheckURLParam(name string) (string, bool) {
+func (c NetHTTPParser) CheckURLParam(name string) (string, bool) {
 	value, exists := c.Params[name]
 	return value, exists
 }
 
 // SetLocal stores a value in the parser's local map by name.
-func (c NetHttpParser) SetLocal(name string, value any) {
+func (c NetHTTPParser) SetLocal(name string, value any) {
 	c.Locals[name] = value
 }
 
 // SetReqHeader sets a request header value by name.
-func (c NetHttpParser) SetReqHeader(name string, value string) {
+func (c NetHTTPParser) SetReqHeader(name string, value string) {
 	c.Request.Header.Set(name, value)
 }
 
 // SetRespHeader sets a response header value by name.
-func (c NetHttpParser) SetRespHeader(name string, value string) {
+func (c NetHTTPParser) SetRespHeader(name string, value string) {
 	c.Response.Header().Set(name, value)
 }
 
 // GetArgs returns a map of common request arguments including user, app, action, and path.
-func (c NetHttpParser) GetArgs(args ...any) map[string]string {
-	netHttpArgs := map[string]string{
+func (c NetHTTPParser) GetArgs(args ...any) map[string]string {
+	netHTTPArgs := map[string]string{
 		"userId":   c.GetLocalString("userId"),
 		"userName": c.GetLocalString("userName"),
 		"appName":  c.GetLocalString("appName"),
@@ -191,15 +191,15 @@ func (c NetHttpParser) GetArgs(args ...any) map[string]string {
 
 	for _, arg := range args {
 		if argStr, ok := arg.(string); ok {
-			netHttpArgs[argStr] = c.Params[argStr]
+			netHTTPArgs[argStr] = c.Params[argStr]
 		}
 	}
 
-	return netHttpArgs
+	return netHTTPArgs
 }
 
 // ParseCommand parses a DML command template using local values and the provided request data.
-func (c NetHttpParser) ParseCommand(command, title string, request webFramework.RecordData, parser webFramework.FieldParser) string {
+func (c NetHTTPParser) ParseCommand(command, title string, request webFramework.RecordData, parser webFramework.FieldParser) string {
 	if request.GetValueMap() == nil {
 		return libQuery.ParseCommand(command, c.GetLocalString("userId"),
 			c.GetLocalString("appName"),
@@ -215,7 +215,7 @@ func (c NetHttpParser) ParseCommand(command, title string, request webFramework.
 }
 
 // SendJSONRespBody writes a JSON response with the given HTTP status code.
-func (c NetHttpParser) SendJSONRespBody(status int, resp any) error {
+func (c NetHTTPParser) SendJSONRespBody(status int, resp any) error {
 	c.Response.Header().Set("Content-Type", "application/json")
 	c.Response.WriteHeader(status)
 
@@ -227,14 +227,14 @@ func (c NetHttpParser) SendJSONRespBody(status int, resp any) error {
 }
 
 // Next advances to the next middleware in the chain (no-op for net/http).
-func (c NetHttpParser) Next() error {
+func (c NetHTTPParser) Next() error {
 	// For net/http, we don't have a built-in Next() concept like middleware chains
 	// This could be implemented using a custom middleware pattern
 	return nil
 }
 
 // Abort stops the middleware chain by writing an internal-server-error status.
-func (c NetHttpParser) Abort() error {
+func (c NetHTTPParser) Abort() error {
 	// For net/http, we can't really "abort" in the same way as Gin/Fiber
 	// We can set a status and return early
 	c.Response.WriteHeader(http.StatusInternalServerError)
@@ -242,12 +242,12 @@ func (c NetHttpParser) Abort() error {
 }
 
 // FormValue returns the first form value for the given field name.
-func (c NetHttpParser) FormValue(name string) string {
+func (c NetHTTPParser) FormValue(name string) string {
 	return c.Request.FormValue(name)
 }
 
 // SaveFile saves an uploaded file from the given form tag to the specified path.
-func (c NetHttpParser) SaveFile(formTagName, path string) error {
+func (c NetHTTPParser) SaveFile(formTagName, path string) error {
 	// Clean the path to prevent directory traversal (gosec G304).
 	cleanPath := filepath.Clean(path)
 	if filepath.IsAbs(cleanPath) || containsTraversal(cleanPath) {
@@ -282,13 +282,13 @@ func containsTraversal(cleanPath string) bool {
 }
 
 // FileAttachment sends a file as an HTTP attachment with the given filename.
-func (c NetHttpParser) FileAttachment(path, fileName string) {
+func (c NetHTTPParser) FileAttachment(path, fileName string) {
 	c.Response.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%s", fileName))
 	http.ServeFile(c.Response, c.Request, path)
 }
 
 // AddCustomAttributes stores a custom slog attribute in the parser's local map.
-func (c NetHttpParser) AddCustomAttributes(attr slog.Attr) {
+func (c NetHTTPParser) AddCustomAttributes(attr slog.Attr) {
 	// For net/http, we can store custom attributes in locals
 	// This is a simplified implementation
 	if c.Locals == nil {
@@ -298,7 +298,7 @@ func (c NetHttpParser) AddCustomAttributes(attr slog.Attr) {
 }
 
 // Helper function to parse map into struct
-func (c NetHttpParser) parseStructFromMap(target any, data map[string]string) error {
+func (c NetHTTPParser) parseStructFromMap(target any, data map[string]string) error {
 	// This is a simplified implementation
 	// You might want to use a more sophisticated library like mapstructure
 	// or implement reflection-based parsing
@@ -313,12 +313,12 @@ func (c NetHttpParser) parseStructFromMap(target any, data map[string]string) er
 }
 
 // SetParams sets URL parameters (useful for routing)
-func (c *NetHttpParser) SetParams(params map[string]string) {
+func (c *NetHTTPParser) SetParams(params map[string]string) {
 	c.Params = params
 }
 
 // AddParam adds a single URL parameter
-func (c *NetHttpParser) AddParam(key, value string) {
+func (c *NetHTTPParser) AddParam(key, value string) {
 	if c.Params == nil {
 		c.Params = make(map[string]string)
 	}
@@ -326,85 +326,85 @@ func (c *NetHttpParser) AddParam(key, value string) {
 }
 
 // ParseForm parses form data
-func (c NetHttpParser) ParseForm() error {
+func (c NetHTTPParser) ParseForm() error {
 	return c.Request.ParseForm()
 }
 
 // ParseMultipartForm parses multipart form data
 // ParseMultipartForm parses multipart form data from the request with the given max memory.
-func (c NetHttpParser) ParseMultipartForm(maxMemory int64) error {
+func (c NetHTTPParser) ParseMultipartForm(maxMemory int64) error {
 	return c.Request.ParseMultipartForm(maxMemory)
 }
 
 // GetFormValue gets form value
-func (c NetHttpParser) GetFormValue(key string) string {
+func (c NetHTTPParser) GetFormValue(key string) string {
 	return c.Request.FormValue(key)
 }
 
 // GetFormValues gets all form values for a key
-func (c NetHttpParser) GetFormValues(key string) []string {
+func (c NetHTTPParser) GetFormValues(key string) []string {
 	return c.Request.Form[key]
 }
 
 // GetPostFormValue gets POST form value
-func (c NetHttpParser) GetPostFormValue(key string) string {
+func (c NetHTTPParser) GetPostFormValue(key string) string {
 	return c.Request.PostFormValue(key)
 }
 
 // GetPostFormValues gets all POST form values for a key
-func (c NetHttpParser) GetPostFormValues(key string) []string {
+func (c NetHTTPParser) GetPostFormValues(key string) []string {
 	return c.Request.PostForm[key]
 }
 
 // GetCookie gets a cookie by name
-func (c NetHttpParser) GetCookie(name string) (*http.Cookie, error) {
+func (c NetHTTPParser) GetCookie(name string) (*http.Cookie, error) {
 	return c.Request.Cookie(name)
 }
 
 // GetCookies gets all cookies
-func (c NetHttpParser) GetCookies() []*http.Cookie {
+func (c NetHTTPParser) GetCookies() []*http.Cookie {
 	return c.Request.Cookies()
 }
 
 // SetCookie sets a cookie
-func (c NetHttpParser) SetCookie(cookie *http.Cookie) {
+func (c NetHTTPParser) SetCookie(cookie *http.Cookie) {
 	http.SetCookie(c.Response, cookie)
 }
 
 // Redirect redirects to a URL
-func (c NetHttpParser) Redirect(url string, statusCode int) {
+func (c NetHTTPParser) Redirect(url string, statusCode int) {
 	http.Redirect(c.Response, c.Request, url, statusCode)
 }
 
 // ServeFile serves a file
-func (c NetHttpParser) ServeFile(name string) {
+func (c NetHTTPParser) ServeFile(name string) {
 	http.ServeFile(c.Response, c.Request, name)
 }
 
 // ServeContent serves content
-func (c NetHttpParser) ServeContent(name string, modtime time.Time, content io.ReadSeeker) {
+func (c NetHTTPParser) ServeContent(name string, modtime time.Time, content io.ReadSeeker) {
 	http.ServeContent(c.Response, c.Request, name, modtime, content)
 }
 
-// Tracing methods for NetHttpParser
-func (c NetHttpParser) GetTraceContext() trace.SpanContext {
+// Tracing methods for NetHTTPParser
+func (c NetHTTPParser) GetTraceContext() trace.SpanContext {
 	span := trace.SpanFromContext(c.Request.Context())
 	return span.SpanContext()
 }
 
 // SetTraceContext sets the trace span context on the request (no-op for net/http).
-func (c NetHttpParser) SetTraceContext(spanCtx trace.SpanContext) {
+func (c NetHTTPParser) SetTraceContext(spanCtx trace.SpanContext) {
 	// This is a no-op for net/http as trace context is handled by the context
 }
 
 // StartSpan starts a new tracing span from the request context.
-func (c NetHttpParser) StartSpan(name string, opts ...trace.SpanStartOption) (context.Context, trace.Span) {
+func (c NetHTTPParser) StartSpan(name string, opts ...trace.SpanStartOption) (context.Context, trace.Span) {
 	span := trace.SpanFromContext(c.Request.Context())
 	return c.Request.Context(), span
 }
 
 // AddSpanAttribute adds a single string attribute to the current tracing span.
-func (c NetHttpParser) AddSpanAttribute(key, value string) {
+func (c NetHTTPParser) AddSpanAttribute(key, value string) {
 	span := trace.SpanFromContext(c.Request.Context())
 	if span.IsRecording() {
 		span.SetAttributes(attribute.String(key, value))
@@ -412,7 +412,7 @@ func (c NetHttpParser) AddSpanAttribute(key, value string) {
 }
 
 // AddSpanAttributes adds multiple string attributes to the current tracing span.
-func (c NetHttpParser) AddSpanAttributes(attrs map[string]string) {
+func (c NetHTTPParser) AddSpanAttributes(attrs map[string]string) {
 	span := trace.SpanFromContext(c.Request.Context())
 	if span.IsRecording() {
 		for k, v := range attrs {
@@ -422,7 +422,7 @@ func (c NetHttpParser) AddSpanAttributes(attrs map[string]string) {
 }
 
 // AddSpanEvent adds an event with attributes to the current tracing span.
-func (c NetHttpParser) AddSpanEvent(name string, attrs map[string]string) {
+func (c NetHTTPParser) AddSpanEvent(name string, attrs map[string]string) {
 	span := trace.SpanFromContext(c.Request.Context())
 	if span.IsRecording() {
 		var eventAttrs []attribute.KeyValue
@@ -434,7 +434,7 @@ func (c NetHttpParser) AddSpanEvent(name string, attrs map[string]string) {
 }
 
 // RecordSpanError records an error with attributes on the current tracing span.
-func (c NetHttpParser) RecordSpanError(err error, attrs map[string]string) {
+func (c NetHTTPParser) RecordSpanError(err error, attrs map[string]string) {
 	span := trace.SpanFromContext(c.Request.Context())
 	if span.IsRecording() {
 		var eventAttrs []attribute.KeyValue
@@ -446,13 +446,13 @@ func (c NetHttpParser) RecordSpanError(err error, attrs map[string]string) {
 }
 
 // GetContext returns the context from the HTTP request
-func (c NetHttpParser) GetContext() context.Context {
+func (c NetHTTPParser) GetContext() context.Context {
 	return c.Request.Context()
 }
 
 // SetContext updates the context in the HTTP request.
 // It uses a pointer receiver because http.Request.WithContext returns a
 // new *http.Request and the mutation must be visible to callers.
-func (c *NetHttpParser) SetContext(ctx context.Context) {
+func (c *NetHTTPParser) SetContext(ctx context.Context) {
 	c.Request = c.Request.WithContext(ctx)
 }

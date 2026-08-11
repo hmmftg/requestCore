@@ -34,7 +34,7 @@ func TestGinReq(t *testing.T) {
 			Name:          "valid",
 			Body:          `{"id":"222222"}`,
 			DesiredBody:   `{"id":"222222"}`,
-			Header:        &RequestHeader{RequestId: "1111111111", User: "tester"},
+			Header:        &RequestHeader{RequestID: "1111111111", User: "tester"},
 			DesiredHeader: `{"id":"1111111111"}`,
 		},
 	}
@@ -46,7 +46,7 @@ func TestGinReq(t *testing.T) {
 				Header: make(http.Header),
 			},
 		}
-		c.Request.Header.Add("Request-Id", v.Header.GetId())
+		c.Request.Header.Add("Request-Id", v.Header.GetID())
 		c.Request.Header.Add("User-Id", v.Header.GetUser())
 		w := libContext.InitContext(&c)
 
@@ -125,7 +125,7 @@ func TestFiberReq(t *testing.T) {
 			Name:          "valid",
 			Body:          `{"id":"222222"}`,
 			DesiredBody:   `{"id":"222222"}`,
-			Header:        &RequestHeader{RequestId: "1111111111"},
+			Header:        &RequestHeader{RequestID: "1111111111"},
 			DesiredHeader: `{"id":"1111111111"}`,
 		},
 	}
@@ -138,7 +138,7 @@ func TestFiberReq(t *testing.T) {
 		c.Request().Header.SetContentLength(len(bodyBytes))
 		defer app.ReleaseCtx(c)
 
-		c.Request().Header.Add("Request-Id", v.Header.GetId())
+		c.Request().Header.Add("Request-Id", v.Header.GetID())
 		w := libContext.InitContext(c)
 
 		result, err := Req[SampleBody, RequestHeader](ParseParams{W: w, Mode: JSON, ValidateHeader: true})

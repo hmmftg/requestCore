@@ -15,6 +15,7 @@ import (
 
 const tokenExpirySkew = 30 * time.Second
 
+// OAuth2Auth implements AuthSystem using OAuth2 grant types (client credentials or password).
 type OAuth2Auth struct {
 	grantType  string
 	user       string
@@ -23,6 +24,7 @@ type OAuth2Auth struct {
 	httpClient *http.Client
 }
 
+// Login authenticates using the configured grant type and returns a token cache.
 func (a OAuth2Auth) Login(w webFramework.WebFramework) (*TokenCache, libError.Error) {
 	switch a.grantType {
 	case GrantTypeClientCredentials:
@@ -39,6 +41,7 @@ func (a OAuth2Auth) Login(w webFramework.WebFramework) (*TokenCache, libError.Er
 	}
 }
 
+// Refresh refreshes the access token using the given refresh token and returns an updated token cache.
 func (a OAuth2Auth) Refresh(w webFramework.WebFramework, refreshToken string) (*TokenCache, libError.Error) {
 	if refreshToken == "" {
 		return nil, libError.NewWithDescription(

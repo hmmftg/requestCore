@@ -31,7 +31,7 @@ func TestNewInstrumentedHTTPClient_Independent(t *testing.T) {
 }
 
 func TestNewInstrumentedHTTPClient_MakesRequest(t *testing.T) {
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte(`{"status":"ok"}`))
 	}))
@@ -45,7 +45,7 @@ func TestNewInstrumentedHTTPClient_MakesRequest(t *testing.T) {
 }
 
 func TestNewInstrumentedHTTPClient_SkipTLSAcceptsSelfSigned(t *testing.T) {
-	srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	}))
 	t.Cleanup(srv.Close)
@@ -58,7 +58,7 @@ func TestNewInstrumentedHTTPClient_SkipTLSAcceptsSelfSigned(t *testing.T) {
 }
 
 func TestNewInstrumentedHTTPClient_TLSVerifyRejectsSelfSigned(t *testing.T) {
-	srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	}))
 	t.Cleanup(srv.Close)

@@ -38,15 +38,15 @@ func GetQuery[R any](query string, core OrmInterface, args ...any) ([]R, error) 
 }
 
 // QueryToStruct executes a raw SQL query and scans the result rows into a slice of Target.
-func QueryToStruct[Target any](db *gorm.DB, querySql string, args ...any) ([]Target, error) {
+func QueryToStruct[Target any](db *gorm.DB, querySQL string, args ...any) ([]Target, error) {
 	var rows []Target
-	result := db.Raw(querySql, args...).Find(&rows)
+	result := db.Raw(querySQL, args...).Find(&rows)
 	if result.Error != nil {
 		return nil, errors.Join(result.Error,
 			libError.NewWithDescription(
 				status.InternalServerError,
 				"UNABLE_TO_QUERY_STATEMENT",
-				"queryRunner[query](%s,%v)", querySql, args,
+				"queryRunner[query](%s,%v)", querySQL, args,
 			))
 	}
 	return rows, nil

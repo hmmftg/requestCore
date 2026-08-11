@@ -9,7 +9,7 @@ func TestDynamicRequestHeader(t *testing.T) {
 	header := CreateDynamicRequestHeader()
 
 	// Set core headers
-	header.RequestId = "req-12345"
+	header.RequestID = "req-12345"
 	header.User = "user123"
 	header.Program = "testapp"
 	header.Module = "auth"
@@ -52,7 +52,7 @@ func TestDynamicRequestHeader(t *testing.T) {
 func TestHeaderMigration(t *testing.T) {
 	// Create legacy header
 	legacyHeader := &RequestHeader{
-		RequestId: "req-12345",
+		RequestID: "req-12345",
 		User:      "user123",
 		Program:   "testapp",
 		Module:    "auth",

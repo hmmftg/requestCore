@@ -66,7 +66,7 @@ func AesEncrypt(kaeyB64, ivB64, text string) (string, error) {
 	return base64.StdEncoding.EncodeToString(ciphertext), nil
 }
 
-// 28cEVB4BUE7GKNwjuRhN3szK5E3!&q*y
+// RandomData generates a random base64-encoded string of the given length.
 func RandomData(length int) string {
 	key := make([]byte, length)
 

@@ -118,7 +118,7 @@ func (c CallArgs[Req, Resp]) Handler(req HandlerRequest[Req, Resp]) (Resp, error
 	resp, err := libCallApi.RemoteCall(req.W,
 		&libCallApi.RemoteCallParamData[Req, Resp]{
 			Headers:  headers,
-			JsonBody: *req.Request,
+			JSONBody: *req.Request,
 			API:      *req.Core.Params().GetRemoteAPI(c.API),
 			Method:   c.Method,
 			Path:     finalPath,
@@ -137,7 +137,7 @@ func (c CallArgs[Req, Resp]) Simulation(req HandlerRequest[Req, Resp]) (Resp, er
 }
 
 // Finalizer is a no-op finalizer for the CallArgs handler.
-func (c CallArgs[Req, Resp]) Finalizer(req HandlerRequest[Req, Resp]) {}
+func (c CallArgs[Req, Resp]) Finalizer(_ HandlerRequest[Req, Resp]) {}
 
 // CallRemote returns a base handler that forwards requests to a remote service.
 func CallRemote[Req any, Resp any](
@@ -235,7 +235,7 @@ func (h *ConsumeHandlerType[Req, Resp]) Handler(req HandlerRequest[Req, Resp]) (
 			Method:      h.Method,
 			Path:        h.Path,
 			Query:       h.Query,
-			JsonBody:    *req.Request,
+			JSONBody:    *req.Request,
 			ValidateTLS: false,
 			EnableLog:   false,
 			Headers:     headersMap,
@@ -254,7 +254,7 @@ func (h *ConsumeHandlerType[Req, Resp]) Simulation(req HandlerRequest[Req, Resp]
 }
 
 // Finalizer is a no-op finalizer for the ConsumeHandlerType.
-func (h *ConsumeHandlerType[Req, Resp]) Finalizer(req HandlerRequest[Req, Resp]) {}
+func (h *ConsumeHandlerType[Req, Resp]) Finalizer(_ HandlerRequest[Req, Resp]) {}
 
 // ConsumeHandler returns a base handler that consumes a remote API endpoint.
 func ConsumeHandler[Req, Resp any](

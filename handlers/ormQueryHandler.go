@@ -54,7 +54,7 @@ func (q OrmHandlerType[Row, Resp]) Parameters() HandlerParameters[Row, Resp] {
 }
 
 // Initializer is a no-op initializer for the OrmHandlerType.
-func (q OrmHandlerType[Row, Resp]) Initializer(req HandlerRequest[Row, Resp]) error {
+func (q OrmHandlerType[Row, Resp]) Initializer(_ HandlerRequest[Row, Resp]) error {
 	return nil
 }
 
@@ -161,7 +161,7 @@ func (q OrmHandlerType[Req, Resp]) Simulation(req HandlerRequest[Req, Resp]) (Re
 }
 
 // Finalizer is a no-op finalizer for the OrmHandlerType.
-func (q OrmHandlerType[Req, Resp]) Finalizer(req HandlerRequest[Req, Resp]) {
+func (q OrmHandlerType[Req, Resp]) Finalizer(_ HandlerRequest[Req, Resp]) {
 }
 
 // QueryWithOrm returns a base handler that executes an ORM query.

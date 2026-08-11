@@ -7,7 +7,7 @@ import (
 	"github.com/hmmftg/requestCore/libNetHttp"
 )
 
-func TestInitNetHttpContext(t *testing.T) {
+func TestInitNetHTTPContext(t *testing.T) {
 	// Create a test request
 	req := httptest.NewRequest("GET", "/test", nil)
 	req.Header.Set("User-Id", "test-user")
@@ -16,17 +16,17 @@ func TestInitNetHttpContext(t *testing.T) {
 	w := httptest.NewRecorder()
 
 	// Initialize net/http context
-	wf := InitNetHttpContext(req, w, false)
+	wf2 := InitNetHTTPContext(req, w, false)
 
 	// Verify the context was created correctly
-	if wf.Parser == nil {
+	if wf2.Parser == nil {
 		t.Error("Parser should not be nil")
 	}
 
-	// Verify we can cast to NetHttpParser
-	parser, ok := wf.Parser.(*libNetHttp.NetHttpParser)
+	// Verify we can cast to NetHTTPParser
+	parser, ok := wf2.Parser.(*libNetHttp.NetHTTPParser)
 	if !ok {
-		t.Error("Parser should be of type NetHttpParser")
+		t.Error("Parser should be of type NetHTTPParser")
 	}
 
 	// Test basic functionality
@@ -43,7 +43,7 @@ func TestInitNetHttpContext(t *testing.T) {
 	}
 }
 
-func TestInitNetHttpContextWithUnknownUser(t *testing.T) {
+func TestInitNetHTTPContextWithUnknownUser(t *testing.T) {
 	// Create a test request
 	req := httptest.NewRequest("GET", "/test", nil)
 
@@ -51,17 +51,17 @@ func TestInitNetHttpContextWithUnknownUser(t *testing.T) {
 	w := httptest.NewRecorder()
 
 	// Initialize net/http context with unknown user
-	wf := InitNetHttpContext(req, w, true)
+	wf := InitNetHTTPContext(req, w, true)
 
 	// Verify the context was created correctly
 	if wf.Parser == nil {
 		t.Error("Parser should not be nil")
 	}
 
-	// Verify we can cast to NetHttpParser
-	parser, ok := wf.Parser.(*libNetHttp.NetHttpParser)
+	// Verify we can cast to NetHTTPParser
+	parser, ok := wf.Parser.(*libNetHttp.NetHTTPParser)
 	if !ok {
-		t.Error("Parser should be of type NetHttpParser")
+		t.Error("Parser should be of type NetHTTPParser")
 	}
 
 	// Test that unknown user is set

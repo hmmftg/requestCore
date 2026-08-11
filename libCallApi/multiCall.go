@@ -13,7 +13,7 @@ type TypeList interface {
 }
 
 // MultiCall executes a sequence of calls, stopping early on non-OK status.
-func MultiCall(w webFramework.WebFramework, paramList []CallParam, core CallAPIInterface) []CallResult[response.WsRemoteResponse] {
+func MultiCall(w webFramework.WebFramework, paramList []CallParam, _ CallAPIInterface) []CallResult[response.WsRemoteResponse] {
 	resultList := make([]CallResult[response.WsRemoteResponse], 0)
 	for i := 0; i < len(paramList); i++ {
 		resp := Call[response.WsRemoteResponse](w, paramList[i])

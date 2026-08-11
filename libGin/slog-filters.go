@@ -11,13 +11,13 @@ import (
 // Filter is a function that decides whether a request should be logged.
 type Filter func(ctx *gin.Context) bool
 
-// Basic
+// Accept returns the given filter unchanged.
 func Accept(filter Filter) Filter { return filter }
 
 // Ignore returns a filter that negates the given filter.
 func Ignore(filter Filter) Filter { return func(ctx *gin.Context) bool { return !filter(ctx) } }
 
-// Method
+// AcceptMethod returns a filter that accepts requests matching any of the given HTTP methods.
 func AcceptMethod(methods ...string) Filter {
 	return func(c *gin.Context) bool {
 		reqMethod := strings.ToLower(c.Request.Method)
@@ -47,7 +47,7 @@ func IgnoreMethod(methods ...string) Filter {
 	}
 }
 
-// Status
+// AcceptStatus returns a filter that accepts responses matching any of the given statuses.
 func AcceptStatus(statuses ...int) Filter {
 	return func(c *gin.Context) bool {
 		return slices.Contains(statuses, c.Writer.Status())
@@ -109,7 +109,7 @@ func IgnoreStatusLessThanOrEqual(status int) Filter {
 	return AcceptStatusGreaterThan(status)
 }
 
-// Path
+// AcceptPath returns a filter that accepts requests whose path matches any of the given URLs.
 func AcceptPath(urls ...string) Filter {
 	return func(c *gin.Context) bool {
 		return slices.Contains(urls, c.Request.URL.Path)
@@ -227,7 +227,7 @@ func IgnorePathMatch(regs ...regexp.Regexp) Filter {
 	}
 }
 
-// Host
+// AcceptHost returns a filter that accepts requests whose host matches any of the given hosts.
 func AcceptHost(hosts ...string) Filter {
 	return func(c *gin.Context) bool {
 		return slices.Contains(hosts, c.Request.URL.Host)

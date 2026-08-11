@@ -91,7 +91,7 @@ func TestErrorLog(t *testing.T) {
 	}
 }
 
-func TestErrorSlogJson(t *testing.T) {
+func TestErrorSlogJSON(t *testing.T) {
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
 		AddSource: true,
 	}))

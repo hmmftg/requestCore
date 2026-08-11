@@ -204,11 +204,11 @@ func (tm *TracingManager) InjectTraceContext(ctx context.Context, headers map[st
 // noopExporter is a no-op span exporter
 type noopExporter struct{}
 
-func (e *noopExporter) ExportSpans(ctx context.Context, spans []sdktrace.ReadOnlySpan) error {
+func (e *noopExporter) ExportSpans(_ context.Context, _ []sdktrace.ReadOnlySpan) error {
 	return nil
 }
 
-func (e *noopExporter) Shutdown(ctx context.Context) error {
+func (e *noopExporter) Shutdown(_ context.Context) error {
 	return nil
 }
 

@@ -137,7 +137,7 @@ func (s *Ssm) PinBlock(pan, pin string) (string, error) {
 }
 
 // Mac returns a MAC (Message Authentication Code) for the given data (currently returns zeros).
-func (s *Ssm) Mac(data string) (string, error) {
+func (s *Ssm) Mac(_ string) (string, error) {
 	return "0000000000000000", nil
 }
 

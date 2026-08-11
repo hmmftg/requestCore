@@ -10,18 +10,18 @@ import (
 	"time"
 )
 
-// FakeAPIServer creates a local test server that mimics external APIs
+// FakeAPIServer creates a local test server that mimics external APIs.
 type FakeAPIServer struct {
 	server *httptest.Server
 }
 
-// AnimeEpisode represents a single anime episode
+// AnimeEpisode represents a single anime episode.
 type AnimeEpisode struct {
 	URL   string `json:"url"`
 	Title string `json:"title"`
 }
 
-// AnimeEpisodesResponse represents the response structure from Jikan API
+// AnimeEpisodesResponse represents the response structure from Jikan API.
 type AnimeEpisodesResponse struct {
 	Data       []AnimeEpisode `json:"data"`
 	Pagination struct {
@@ -30,35 +30,35 @@ type AnimeEpisodesResponse struct {
 	} `json:"pagination"`
 }
 
-// NewFakeAPIServer creates a new fake API server for testing
+// NewFakeAPIServer creates a new fake API server for testing.
 func NewFakeAPIServer() *FakeAPIServer {
 	mux := http.NewServeMux()
 
 	// Mock error status endpoints for testing HTTP status preservation
-	mux.HandleFunc("/api/forbidden", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/api/forbidden", func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusForbidden)
 		_ = json.NewEncoder(w).Encode(map[string]interface{}{"error": "forbidden"})
 	})
-	mux.HandleFunc("/api/unauthorized", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/api/unauthorized", func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusUnauthorized)
 		_ = json.NewEncoder(w).Encode(map[string]interface{}{"error": "unauthorized"})
 	})
-	mux.HandleFunc("/api/server-error", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/api/server-error", func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusInternalServerError)
 		_ = json.NewEncoder(w).Encode(map[string]interface{}{"error": "internal server error"})
 	})
-	mux.HandleFunc("/api/created", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/api/created", func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusCreated)
 		_ = json.NewEncoder(w).Encode(map[string]interface{}{"status": "created"})
 	})
-	mux.HandleFunc("/api/no-content", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/api/no-content", func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusNoContent)
 	})
-	mux.HandleFunc("/api/slow", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/api/slow", func(w http.ResponseWriter, _ *http.Request) {
 		time.Sleep(50 * time.Millisecond)
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(generateMockSimpleResponse("test1"))
@@ -115,24 +115,24 @@ func NewFakeAPIServer() *FakeAPIServer {
 	return &FakeAPIServer{server: server}
 }
 
-// URL returns the base URL of the fake server
+// URL returns the base URL of the fake server.
 func (f *FakeAPIServer) URL() string {
 	return f.server.URL
 }
 
-// Close shuts down the fake server
+// Close shuts down the fake server.
 func (f *FakeAPIServer) Close() {
 	f.server.Close()
 }
 
-// SimpleTestData represents a simplified test response structure
+// SimpleTestData represents a simplified test response structure.
 type SimpleTestData struct {
 	ID    int    `json:"id"`
 	Name  string `json:"name"`
 	Value string `json:"value"`
 }
 
-// SimpleTestResponse represents a simplified API response
+// SimpleTestResponse represents a simplified API response.
 type SimpleTestResponse struct {
 	Data   []SimpleTestData `json:"data"`
 	Status string           `json:"status"`
@@ -230,7 +230,7 @@ func generateMockAnimeEpisodes(animeID string) AnimeEpisodesResponse {
 	}
 }
 
-// MockErrorResponse creates a mock error response
+// MockErrorResponse creates a mock error response.
 func MockErrorResponse(statusCode int, message string) map[string]interface{} {
 	return map[string]interface{}{
 		"error": map[string]interface{}{
@@ -240,7 +240,7 @@ func MockErrorResponse(statusCode int, message string) map[string]interface{} {
 	}
 }
 
-// MockSuccessResponse creates a generic success response
+// MockSuccessResponse creates a generic success response.
 func MockSuccessResponse(data interface{}) map[string]interface{} {
 	return map[string]interface{}{
 		"status": "success",

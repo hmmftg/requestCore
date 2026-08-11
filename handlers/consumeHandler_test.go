@@ -110,7 +110,7 @@ type githubRespOrg struct {
 	Description      string `json:"description"`
 }
 
-func ParseGithubRespJson(respBytes []byte, _ string, status int) (int, map[string]string, any, error) {
+func ParseGithubRespJSON(respBytes []byte, _ string, status int) (int, map[string]string, any, error) {
 	var resp []githubRespOrg
 	err := json.Unmarshal(respBytes, &resp)
 	if err != nil {

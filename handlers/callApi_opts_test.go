@@ -371,7 +371,7 @@ func TestCallAPIJSONWithOpts_CustomBuilderNon2xx(t *testing.T) {
 	w := libContext.InitContextNoAuditTrail(t)
 
 	builderCalled := false
-	param.Builder = func(_ int, rawResp []byte, headers map[string]string) (*optsTestResponse, error) {
+	param.Builder = func(_ int, _ []byte, _ map[string]string) (*optsTestResponse, error) {
 		builderCalled = true
 		return &optsTestResponse{}, nil
 	}
@@ -559,7 +559,7 @@ func TestCallAPIJSONWithOpts_Malformed2xxPreservesStatus(t *testing.T) {
 	w.Parser.SetLocal(webFramework.TransactionLoggerLocalKey, logger)
 
 	// Use a custom builder that returns a parse error for 200
-	param.Builder = func(_ int, rawResp []byte, headers map[string]string) (*optsTestResponse, error) {
+	param.Builder = func(_ int, _ []byte, _ map[string]string) (*optsTestResponse, error) {
 		return nil, fmt.Errorf("custom parse error")
 	}
 
@@ -1158,7 +1158,7 @@ func TestCallAPIJSONWithOpts_MaskFuncApplied(t *testing.T) {
 		API:      libCallApi.RemoteAPI{Domain: srv.URL + "/api"},
 		Method:   "POST",
 		Path:     "mask",
-		JsonBody: reqBody,
+		JSONBody: reqBody,
 	}
 
 	var capturedInfo handlers.APICallInfo
@@ -1205,7 +1205,7 @@ func TestCallAPIJSONWithOpts_MaskFuncNil(t *testing.T) {
 		API:      libCallApi.RemoteAPI{Domain: srv.URL + "/api"},
 		Method:   "POST",
 		Path:     "mask",
-		JsonBody: reqBody,
+		JSONBody: reqBody,
 	}
 
 	var capturedInfo handlers.APICallInfo
@@ -1236,7 +1236,7 @@ func TestCallAPIJSONWithOpts_MaskFuncAppliedOnError(t *testing.T) {
 	w := libContext.InitContextNoAuditTrail(t)
 
 	reqBody := maskTestRequest{PAN: "1234567890123456", Name: "alice"}
-	param.JsonBody = reqBody
+	param.JSONBody = reqBody
 
 	var capturedInfo handlers.APICallInfo
 	_, err := handlers.CallAPIJSONWithOpts(
@@ -1290,7 +1290,7 @@ func TestCallAPIJSONWithOpts_MaskFuncNotAppliedToAddLog(t *testing.T) {
 		API:      libCallApi.RemoteAPI{Domain: srv.URL + "/api"},
 		Method:   "POST",
 		Path:     "mask",
-		JsonBody: reqBody,
+		JSONBody: reqBody,
 		Headers:  map[string]string{"Authorization": "Bearer super-secret"},
 	}
 
@@ -1371,7 +1371,7 @@ func TestCallAPIJSONWithOpts_MaskFuncReturnedResponseIsolated(t *testing.T) {
 		API:      libCallApi.RemoteAPI{Domain: srv.URL + "/api"},
 		Method:   "POST",
 		Path:     "mask",
-		JsonBody: reqBody,
+		JSONBody: reqBody,
 	}
 
 	resp, err := handlers.CallAPIJSONWithOpts(
@@ -1408,7 +1408,7 @@ func TestCallAPIJSONWithOpts_MaskFuncLoggerAndCallbackReceiveMasked(t *testing.T
 		API:      libCallApi.RemoteAPI{Domain: srv.URL + "/api"},
 		Method:   "POST",
 		Path:     "mask",
-		JsonBody: reqBody,
+		JSONBody: reqBody,
 	}
 
 	logger := &fakeTransactionLogger{}

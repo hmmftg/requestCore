@@ -28,7 +28,7 @@ type HeaderConfig struct {
 // DynamicRequestHeader represents a dynamic header structure
 type DynamicRequestHeader struct {
 	// Core headers that are always present
-	RequestId string `header:"Request-Id" reqHeader:"Request-Id" validate:"required,min=10,max=64"`
+	RequestID string `header:"Request-Id" reqHeader:"Request-Id" validate:"required,min=10,max=64"`
 	Program   string `header:"Program-Id" reqHeader:"Program-Id"`
 	Module    string `header:"Module-Id"  reqHeader:"Module-Id"`
 	Method    string `header:"Method-Id"  reqHeader:"Method-Id"`
@@ -137,7 +137,7 @@ func (r *DynamicRequestHeader) validateHeaderValue(key, value string, config Hea
 // GetHeaderMap returns all headers as a map for easy access
 func (r *DynamicRequestHeader) GetHeaderMap() map[string]string {
 	headers := map[string]string{
-		"Request-Id": r.RequestId,
+		"Request-Id": r.RequestID,
 		"Program-Id": r.Program,
 		"Module-Id":  r.Module,
 		"Method-Id":  r.Method,
@@ -153,8 +153,8 @@ func (r *DynamicRequestHeader) GetHeaderMap() map[string]string {
 }
 
 // Dynamic header compatibility methods
-func (r DynamicRequestHeader) GetId() string {
-	return r.RequestId
+func (r DynamicRequestHeader) GetID() string {
+	return r.RequestID
 }
 
 // GetUser returns the user ID from the dynamic header.

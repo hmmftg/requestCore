@@ -97,8 +97,8 @@ func parseRequest[Req any](params ParseParams) (*ParseResult[Req], error) {
 			desc = fmt.Sprintf(ErrorInGetRequest, "BODY")
 			err = libError.NewWithDescription(status.BadRequest, desc, "%s[GetBody](fails)", params.Name)
 		}
-		errUri := params.W.Parser.GetURI(&request)
-		if errUri != nil {
+		errURI := params.W.Parser.GetURI(&request)
+		if errURI != nil {
 			desc = fmt.Sprintf(ErrorInGetRequest, "URI")
 			err = libError.NewWithDescription(status.BadRequest, desc, "%s[GetURI](fails)", params.Name)
 		}
@@ -128,8 +128,8 @@ func parseRequest[Req any](params ParseParams) (*ParseResult[Req], error) {
 			desc = fmt.Sprintf(ErrorInGetRequest, "QUERY")
 			err = libError.NewWithDescription(status.BadRequest, desc, "%s[GetURLQuery](fails)", params.Name)
 		}
-		errUri := params.W.Parser.GetURI(&request)
-		if errUri != nil {
+		errURI := params.W.Parser.GetURI(&request)
+		if errURI != nil {
 			desc = fmt.Sprintf(ErrorInGetRequest, "URI")
 			err = libError.NewWithDescription(status.BadRequest, desc, "%s[GetURI](fails)", params.Name)
 		}
@@ -148,8 +148,8 @@ func parseRequest[Req any](params ParseParams) (*ParseResult[Req], error) {
 		} else {
 			params.W.Parser.SetLocal(PaginationLocalTag, pagination)
 		}
-		errUri := params.W.Parser.GetURI(&request)
-		if errUri != nil {
+		errURI := params.W.Parser.GetURI(&request)
+		if errURI != nil {
 			desc = fmt.Sprintf(ErrorInGetRequest, "URI")
 			err = libError.NewWithDescription(status.BadRequest, desc, "%s[GetURI](fails)", params.Name)
 		}
@@ -162,9 +162,9 @@ func parseRequest[Req any](params ParseParams) (*ParseResult[Req], error) {
 
 	req := Request{
 		Header:   params.Header,
-		Id:       params.Header.GetId(),
+		ID:       params.Header.GetID(),
 		Time:     time.Now(),
-		Incoming: request, //string(requestJson),
+		Incoming: request, //string(requestJSON),
 	}
 	req.Tags = map[string]string{}
 	for id := range params.StoreTags {

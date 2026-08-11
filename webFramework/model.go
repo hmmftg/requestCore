@@ -12,10 +12,10 @@ import (
 
 // RecordData defines the interface for record data used in query and DML operations.
 type RecordData interface {
-	GetId() string
-	GetControlId(string) string
-	GetIdList() []any
-	SetId(string)
+	GetID() string
+	GetControlID(string) string
+	GetIDList() []any
+	SetID(string)
 	SetValue(string)
 	GetSubCategory() string
 	GetValue() any
@@ -24,7 +24,7 @@ type RecordData interface {
 
 // HeaderInterface defines the methods for accessing and mutating request headers.
 type HeaderInterface interface {
-	GetId() string
+	GetID() string
 	GetUser() string
 	GetProgram() string
 	GetModule() string

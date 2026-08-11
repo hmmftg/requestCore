@@ -57,7 +57,7 @@ type Header struct {
 	ID string `header:"id" reqHeader:"id" json:"id"`
 }
 
-func (h Header) GetId() string      { return h.ID }
+func (h Header) GetID() string      { return h.ID }
 func (h Header) GetUser() string    { return h.ID }
 func (h Header) GetBranch() string  { return h.ID }
 func (h Header) GetBank() string    { return h.ID }
@@ -90,7 +90,7 @@ func TestGetHeader(t *testing.T) {
 	app := fiber.New()
 	for _, v := range table {
 		c := app.AcquireCtx(&fasthttp.RequestCtx{})
-		c.Request().Header.Add("id", v.Header.GetId())
+		c.Request().Header.Add("id", v.Header.GetID())
 		c.Request().Header.SetContentType(fiber.MIMEApplicationJSON)
 		bodyBytes := []byte(`{"id":"1"}`)
 		c.Request().SetBody(bodyBytes)

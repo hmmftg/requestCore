@@ -18,7 +18,7 @@ type SplunkParams struct {
 	SkipTLSVerify bool   `yaml:"skipTlsVerify"` // when true, skips TLS certificate verification (use only for internal collectors with self-signed certs)
 }
 
-// Logging related params
+// LogParams holds logging-related configuration parameters.
 type LogParams struct {
 	LogPath     string        `yaml:"logPath"`
 	LogSize     int           `yaml:"logSize"`

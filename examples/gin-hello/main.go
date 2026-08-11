@@ -1,3 +1,4 @@
+// Package main implements a Gin-based HTTP server example using requestCore.
 package main
 
 import (

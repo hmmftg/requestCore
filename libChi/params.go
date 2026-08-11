@@ -24,7 +24,7 @@ func ExtractURLParams(r *http.Request) map[string]string {
 }
 
 // BindURLParams binds Chi URL route parameters to the given parser.
-func BindURLParams(r *http.Request, parser *libNetHttp.NetHttpParser) {
+func BindURLParams(r *http.Request, parser *libNetHttp.NetHTTPParser) {
 	if parser == nil {
 		return
 	}
@@ -33,8 +33,8 @@ func BindURLParams(r *http.Request, parser *libNetHttp.NetHttpParser) {
 	}
 }
 
-// InitParser creates a NetHttpParser for the request and binds Chi URL parameters to it.
-func InitParser(r *http.Request, w http.ResponseWriter) *libNetHttp.NetHttpParser {
+// InitParser creates a NetHTTPParser for the request and binds Chi URL parameters to it.
+func InitParser(r *http.Request, w http.ResponseWriter) *libNetHttp.NetHTTPParser {
 	parser := libNetHttp.InitContext(r, w)
 	BindURLParams(r, parser)
 	return parser

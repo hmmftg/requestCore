@@ -31,12 +31,12 @@ func ExecDML(request libQuery.DmlModel, key, title string, w webFramework.WebFra
 }
 
 // PreControlDML executes the pre-control commands for a DML model.
-func PreControlDML(request libQuery.DmlModel, key, title string, w webFramework.WebFramework, core requestCore.RequestCoreInterface) error {
+func PreControlDML(request libQuery.DmlModel, key, _ string, w webFramework.WebFramework, core requestCore.RequestCoreInterface) error {
 	preControl := request.PreControlCommands()
 	for _, command := range preControl[key] {
 		title := fmt.Sprintf("PreControl: %s", command.Name)
 		_, errPreControl := command.ExecuteWithContext(
-			w.Parser, w.Ctx, title, fmt.Sprintf("%s.%s", "preControl", command.Name), core.GetDB())
+			w.Ctx, w.Parser, title, fmt.Sprintf("%s.%s", "preControl", command.Name), core.GetDB())
 		if errPreControl != nil {
 			if ok, errPreControl := response.Unwrap(errPreControl); ok {
 				return response.Errors(http.StatusInternalServerError, errPreControl.GetDescription(), title, errPreControl)
@@ -48,13 +48,13 @@ func PreControlDML(request libQuery.DmlModel, key, title string, w webFramework.
 }
 
 // ExecuteDML executes the DML commands and returns the results map.
-func ExecuteDML(request libQuery.DmlModel, key, title string, w webFramework.WebFramework, core requestCore.RequestCoreInterface) (map[string]any, error) {
+func ExecuteDML(request libQuery.DmlModel, key, _ string, w webFramework.WebFramework, core requestCore.RequestCoreInterface) (map[string]any, error) {
 	dml := request.DmlCommands()
 	resp := map[string]any{}
 	for _, command := range dml[key] {
 		title := fmt.Sprintf("Insert: %s", command.Name)
 		result, err := command.ExecuteWithContext(
-			w.Parser, w.Ctx, title, fmt.Sprintf("%s.%s", "dml", command.Name), core.GetDB())
+			w.Ctx, w.Parser, title, fmt.Sprintf("%s.%s", "dml", command.Name), core.GetDB())
 		if err != nil {
 			return nil, errors.Join(err, libError.NewWithDescription(status.InternalServerError, "ERROR_IN_EXECUTE_DML", "unable to execute dml command %s", title))
 		}
@@ -64,12 +64,12 @@ func ExecuteDML(request libQuery.DmlModel, key, title string, w webFramework.Web
 }
 
 // FinalizeDML executes the finalize commands for a DML model.
-func FinalizeDML(request libQuery.DmlModel, key, title string, w webFramework.WebFramework, core requestCore.RequestCoreInterface) {
+func FinalizeDML(request libQuery.DmlModel, key, _ string, w webFramework.WebFramework, core requestCore.RequestCoreInterface) {
 	finalize := request.FinalizeCommands()
 	for _, command := range finalize[key] {
 		title := fmt.Sprintf("Finalize: %s", command.Name)
 		_, errFinalize := command.ExecuteWithContext(
-			w.Parser, w.Ctx, title, title, core.GetDB())
+			w.Ctx, w.Parser, title, title, core.GetDB())
 		if errFinalize != nil {
 			webFramework.AddLog(w, webFramework.HandlerLogTag,
 				slog.Group("Error executing finalize command", slog.String("title", title), slog.Any("error", errFinalize)))

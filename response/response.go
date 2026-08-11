@@ -18,7 +18,7 @@ const (
 )
 
 // JustPrintResp unmarshals and logs a remote response without returning parsed data.
-func JustPrintResp(respBytes []byte, desc string, status int) (int, map[string]string, any, error) {
+func JustPrintResp(respBytes []byte, _ string, status int) (int, map[string]string, any, error) {
 	var err error
 	var resp WsRemoteResponse
 	err = json.Unmarshal(respBytes, &resp)
@@ -29,8 +29,8 @@ func JustPrintResp(respBytes []byte, desc string, status int) (int, map[string]s
 	return status, nil, nil, nil
 }
 
-// ParseRemoteRespJson parses a remote JSON response and extracts status, error details, and result.
-func ParseRemoteRespJson(respBytes []byte, desc string, status int) (int, map[string]string, any, error) {
+// ParseRemoteRespJSON parses a remote JSON response and extracts status, error details, and result.
+func ParseRemoteRespJSON(respBytes []byte, desc string, status int) (int, map[string]string, any, error) {
 	var resp WsRemoteResponse
 	err := json.Unmarshal(respBytes, &resp)
 	if err != nil {
@@ -66,7 +66,7 @@ func ParseWsRemoteResp(respBytes []byte, desc string, status int) (int, map[stri
 
 // GetDescFromCode returns (code, description) for API response. When code is not in errDescList,
 // it returns a safe fallback (SystemFault + localized text) and never exposes raw data.
-func GetDescFromCode(code string, data any, errDescList map[string]string) (string, string) {
+func GetDescFromCode(code string, _ any, errDescList map[string]string) (string, string) {
 	safeFallbackDesc := SystemFaultDesc
 	if d, ok := errDescList[SystemFault]; ok {
 		safeFallbackDesc = d

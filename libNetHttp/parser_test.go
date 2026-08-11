@@ -8,7 +8,7 @@ import (
 	"testing"
 )
 
-func TestNetHttpParser(t *testing.T) {
+func TestNetHTTPParser(t *testing.T) {
 	// Create a test request
 	req := httptest.NewRequest("GET", "/test?param=value", nil)
 	req.Header.Set("User-Id", "test-user")
@@ -89,7 +89,7 @@ func TestSetContext_PropagatesToGetContext(t *testing.T) {
 
 func TestMiddleware(t *testing.T) {
 	// Test CORS middleware
-	corsHandler := CORSMiddleware()(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	corsHandler := CORSMiddleware()(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	}))
 
@@ -117,7 +117,7 @@ func TestChainMiddleware(t *testing.T) {
 	handler := ChainMiddleware(
 		addHeaderMiddleware,
 		LoggingMiddleware(),
-	)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	)(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	}))
 

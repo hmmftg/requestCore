@@ -30,7 +30,7 @@ func (m *HeaderMigration) MigrateFromLegacyHeader(legacy *RequestHeader) *Dynami
 	dynamic := CreateDynamicRequestHeader()
 
 	// Copy core fields
-	dynamic.RequestId = legacy.RequestId
+	dynamic.RequestID = legacy.RequestID
 	dynamic.Program = legacy.Program
 	dynamic.Module = legacy.Module
 	dynamic.Method = legacy.Method
@@ -53,7 +53,7 @@ func (m *HeaderMigration) MigrateFromLegacyHeader(legacy *RequestHeader) *Dynami
 // MigrateToLegacyHeader migrates a DynamicRequestHeader to legacy RequestHeader
 func (m *HeaderMigration) MigrateToLegacyHeader(dynamic *DynamicRequestHeader) *RequestHeader {
 	legacy := &RequestHeader{
-		RequestId: dynamic.RequestId,
+		RequestID: dynamic.RequestID,
 		Program:   dynamic.Program,
 		Module:    dynamic.Module,
 		Method:    dynamic.Method,
@@ -95,8 +95,8 @@ func (m *HeaderMigration) GetLegacyMappings() map[string]string {
 // ValidateMigration validates that a migration was successful
 func (m *HeaderMigration) ValidateMigration(legacy *RequestHeader, dynamic *DynamicRequestHeader) error {
 	// Check core fields
-	if legacy.RequestId != dynamic.RequestId {
-		return fmt.Errorf("requestId mismatch: %s != %s", legacy.RequestId, dynamic.RequestId)
+	if legacy.RequestID != dynamic.RequestID {
+		return fmt.Errorf("requestID mismatch: %s != %s", legacy.RequestID, dynamic.RequestID)
 	}
 	if legacy.Program != dynamic.Program {
 		return fmt.Errorf("program mismatch: %s != %s", legacy.Program, dynamic.Program)
@@ -130,8 +130,8 @@ func (m *HeaderMigration) CreateDynamicHeaderFromMap(headers map[string]string) 
 	dynamic := CreateDynamicRequestHeader()
 
 	// Set core headers
-	if requestId, exists := headers["Request-Id"]; exists {
-		dynamic.RequestId = requestId
+	if requestID, exists := headers["Request-Id"]; exists {
+		dynamic.RequestID = requestID
 	}
 	if program, exists := headers["Program-Id"]; exists {
 		dynamic.Program = program

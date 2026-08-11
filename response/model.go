@@ -30,10 +30,10 @@ type RespData struct {
 }
 
 const (
-	// Json indicates a plain JSON response.
-	Json RespType = iota
-	// JsonWithReceipt indicates a JSON response that includes a printable receipt.
-	JsonWithReceipt
+	// JSON indicates a plain JSON response.
+	JSON RespType = iota
+	// JSONWithReceipt indicates a JSON response that includes a printable receipt.
+	JSONWithReceipt
 	// FileAttachment indicates a file-download response.
 	FileAttachment
 )
@@ -57,7 +57,7 @@ type WsResponse struct {
 
 // Receipt represents a printable receipt with an ID, title, and data rows.
 type Receipt struct {
-	Id    string `json:"id"`
+	ID    string `json:"id"`
 	Title string `json:"title"`
 	Rows  []any  `json:"rows"`
 }
