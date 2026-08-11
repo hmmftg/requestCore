@@ -35,7 +35,7 @@ func (a *countingAuth) Login(_ webFramework.WebFramework) (*libCallApi.TokenCach
 	}, nil
 }
 
-func (a *countingAuth) Refresh(_ webFramework.WebFramework, refreshToken string) (*libCallApi.TokenCache, libError.Error) {
+func (a *countingAuth) Refresh(_ webFramework.WebFramework, _ string) (*libCallApi.TokenCache, libError.Error) {
 	a.refreshes.Add(1)
 	return &libCallApi.TokenCache{
 		AccessToken: &libCallApi.OAuth2Token{

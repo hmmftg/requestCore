@@ -9,6 +9,8 @@ import (
 )
 
 // RequestCoreModel is the central model holding query, ORM, request, response, and parameter interfaces.
+//
+//revive:disable-next-line:exported
 type RequestCoreModel struct {
 	RequestInterface libRequest.RequestInterface
 	QueryInterface   libQuery.QueryRunnerInterface
@@ -18,6 +20,8 @@ type RequestCoreModel struct {
 }
 
 // RequestCoreInterface defines the accessor methods for the core request processing model.
+//
+//revive:disable-next-line:exported
 type RequestCoreInterface interface {
 	GetDB() libQuery.QueryRunnerInterface
 	ORM() liborm.OrmInterface

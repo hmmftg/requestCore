@@ -95,7 +95,7 @@ type WebFramework struct {
 	Parser RequestParser
 }
 
-// Tracing methods for WebFramework
+// GetTraceContext returns the trace span context from the web framework span.
 func (w *WebFramework) GetTraceContext() trace.SpanContext {
 	if w.Span != nil {
 		return w.Span.SpanContext()

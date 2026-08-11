@@ -214,7 +214,7 @@ func TestDB(t *testing.T, tc *TestCase, options *TestOptions) {
 	doTest(t, g, tc, options)
 }
 
-// TestDB tests a single DB models.
+// TestDBFiber tests a single DB model using the Fiber framework.
 func TestDBFiber(t *testing.T, tc *TestCase, options *TestOptions) {
 	f := initializeTestServerFiber(options)
 

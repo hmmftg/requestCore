@@ -319,7 +319,7 @@ func ShutdownGlobalTracing(ctx context.Context) error {
 	return nil
 }
 
-// Helper functions for common tracing operations
+// StartSpan starts a new tracing span with attributes using the global tracing manager.
 func StartSpan(ctx context.Context, name string, attrs map[string]string) (context.Context, trace.Span) {
 	tm := GetGlobalTracingManager()
 	return tm.StartSpanWithAttributes(ctx, name, attrs)
@@ -343,7 +343,7 @@ func RecordError(ctx context.Context, err error, attrs map[string]string) {
 	tm.RecordError(ctx, err, attrs)
 }
 
-// Logging integration
+// LogWithTrace logs a message with trace context attributes using the provided logger.
 func LogWithTrace(ctx context.Context, logger *slog.Logger, level slog.Level, msg string, attrs ...slog.Attr) {
 	span := trace.SpanFromContext(ctx)
 	if span.IsRecording() {

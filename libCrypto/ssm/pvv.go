@@ -99,8 +99,8 @@ func GenerateRandomPin(length int) string {
 	return fmt.Sprintf("%0*d", length, nPin)
 }
 
-// DECIMALIZATION_TABLE maps hex digits to decimal digits for PVV/CVV generation.
-const DECIMALIZATION_TABLE string = "0123456789012345"
+// DecimalizationTable maps hex digits to decimal digits for PVV/CVV generation.
+const DecimalizationTable string = "0123456789012345"
 
 // Decimalize converts hex digits to decimal digits using the decimalization table.
 func Decimalize(notDecimaliz string, length int, immediate bool) string {
@@ -114,7 +114,7 @@ func Decimalize(notDecimaliz string, length int, immediate bool) string {
 		for i := 0; i < lenTarget && len(decimalized) < desiredLen; i++ {
 			if notDecimaliz[i] >= '0' && notDecimaliz[i] <= '9' {
 				id, _ := strconv.Atoi(string(notDecimaliz[i]))
-				decimalized += string(DECIMALIZATION_TABLE[id])
+				decimalized += string(DecimalizationTable[id])
 			}
 		}
 		if len(decimalized) == desiredLen {
@@ -123,7 +123,7 @@ func Decimalize(notDecimaliz string, length int, immediate bool) string {
 		for i := 0; i < lenTarget && len(decimalized) < desiredLen; i++ {
 			if notDecimaliz[i] >= 'A' && notDecimaliz[i] <= 'F' {
 				id, _ := strconv.Atoi(string(notDecimaliz[i] - 'A' + '0'))
-				decimalized += string(DECIMALIZATION_TABLE[id+10])
+				decimalized += string(DecimalizationTable[id+10])
 			}
 		}
 		return decimalized
@@ -131,10 +131,10 @@ func Decimalize(notDecimaliz string, length int, immediate bool) string {
 	for i := 0; i < lenTarget && len(decimalized) < desiredLen; i++ {
 		if notDecimaliz[i] >= '0' && notDecimaliz[i] <= '9' {
 			id, _ := strconv.Atoi(string(notDecimaliz[i]))
-			decimalized += string(DECIMALIZATION_TABLE[id])
+			decimalized += string(DecimalizationTable[id])
 		} else {
 			id, _ := strconv.Atoi(string(notDecimaliz[i] - 'A' + '0'))
-			decimalized += string(DECIMALIZATION_TABLE[id+10])
+			decimalized += string(DecimalizationTable[id+10])
 		}
 	}
 	return decimalized

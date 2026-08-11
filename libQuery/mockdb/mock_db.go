@@ -15,6 +15,8 @@ import (
 )
 
 // MockDBHelper provides a simplified interface for creating mock databases.
+//
+//revive:disable-next-line:exported
 type MockDBHelper struct {
 	DB    *gorm.DB
 	Mock  sqlmock.Sqlmock

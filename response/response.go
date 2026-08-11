@@ -30,7 +30,7 @@ func JustPrintResp(respBytes []byte, _ string, status int) (int, map[string]stri
 }
 
 // ParseRemoteRespJSON parses a remote JSON response and extracts status, error details, and result.
-func ParseRemoteRespJSON(respBytes []byte, desc string, status int) (int, map[string]string, any, error) {
+func ParseRemoteRespJSON(respBytes []byte, _ string, status int) (int, map[string]string, any, error) {
 	var resp WsRemoteResponse
 	err := json.Unmarshal(respBytes, &resp)
 	if err != nil {
@@ -47,7 +47,7 @@ func ParseRemoteRespJSON(respBytes []byte, desc string, status int) (int, map[st
 }
 
 // ParseWsRemoteResp parses a remote JSON response and returns the full WsRemoteResponse on success.
-func ParseWsRemoteResp(respBytes []byte, desc string, status int) (int, map[string]string, any, error) {
+func ParseWsRemoteResp(respBytes []byte, _ string, status int) (int, map[string]string, any, error) {
 	var resp WsRemoteResponse
 	err := json.Unmarshal(respBytes, &resp)
 	if err != nil {

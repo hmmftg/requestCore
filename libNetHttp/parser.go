@@ -386,19 +386,19 @@ func (c NetHTTPParser) ServeContent(name string, modtime time.Time, content io.R
 	http.ServeContent(c.Response, c.Request, name, modtime, content)
 }
 
-// Tracing methods for NetHTTPParser
+// GetTraceContext returns the trace span context from the net/http request context.
 func (c NetHTTPParser) GetTraceContext() trace.SpanContext {
 	span := trace.SpanFromContext(c.Request.Context())
 	return span.SpanContext()
 }
 
 // SetTraceContext sets the trace span context on the request (no-op for net/http).
-func (c NetHTTPParser) SetTraceContext(spanCtx trace.SpanContext) {
+func (c NetHTTPParser) SetTraceContext(_ trace.SpanContext) {
 	// This is a no-op for net/http as trace context is handled by the context
 }
 
 // StartSpan starts a new tracing span from the request context.
-func (c NetHTTPParser) StartSpan(name string, opts ...trace.SpanStartOption) (context.Context, trace.Span) {
+func (c NetHTTPParser) StartSpan(_ string, _ ...trace.SpanStartOption) (context.Context, trace.Span) {
 	span := trace.SpanFromContext(c.Request.Context())
 	return c.Request.Context(), span
 }

@@ -35,7 +35,7 @@ type QuerySingleTransformer[Row any, Resp []Row] struct {
 }
 
 // Translate wraps the first row into a single-element response.
-func (s QuerySingleTransformer[Row, Resp]) Translate(rows []Row, req HandlerRequest[Row, Resp]) (QueryResp[Resp], error) {
+func (s QuerySingleTransformer[Row, Resp]) Translate(rows []Row, _ HandlerRequest[Row, Resp]) (QueryResp[Resp], error) {
 	return QueryResp[Resp]{
 		TotalRows: 1,
 		Resp:      Resp{rows[0]},
@@ -43,7 +43,7 @@ func (s QuerySingleTransformer[Row, Resp]) Translate(rows []Row, req HandlerRequ
 }
 
 // TranslateWithPaginate wraps the first row into a single-element response with pagination.
-func (s QuerySingleTransformer[Row, Resp]) TranslateWithPaginate(rows []Row, req HandlerRequest[Row, Resp], pd libRequest.PaginationData) (QueryResp[Resp], error) {
+func (s QuerySingleTransformer[Row, Resp]) TranslateWithPaginate(rows []Row, _ HandlerRequest[Row, Resp], _ libRequest.PaginationData) (QueryResp[Resp], error) {
 	return QueryResp[Resp]{
 		TotalRows: 1,
 		Resp:      Resp{rows[0]},
@@ -55,7 +55,7 @@ type QueryAllTransformer[Row any, Resp []Row] struct {
 }
 
 // Translate wraps all rows into a slice response.
-func (s QueryAllTransformer[Row, Resp]) Translate(rows []Row, req HandlerRequest[Row, Resp]) (QueryResp[Resp], error) {
+func (s QueryAllTransformer[Row, Resp]) Translate(rows []Row, _ HandlerRequest[Row, Resp]) (QueryResp[Resp], error) {
 	return QueryResp[Resp]{
 		TotalRows: len(rows),
 		Resp:      rows,
@@ -63,7 +63,7 @@ func (s QueryAllTransformer[Row, Resp]) Translate(rows []Row, req HandlerRequest
 }
 
 // TranslateWithPaginate wraps all rows into a slice response with pagination.
-func (s QueryAllTransformer[Row, Resp]) TranslateWithPaginate(rows []Row, req HandlerRequest[Row, Resp], pd libRequest.PaginationData) (QueryResp[Resp], error) {
+func (s QueryAllTransformer[Row, Resp]) TranslateWithPaginate(rows []Row, _ HandlerRequest[Row, Resp], _ libRequest.PaginationData) (QueryResp[Resp], error) {
 	return QueryResp[Resp]{
 		TotalRows: len(rows),
 		Resp:      rows,

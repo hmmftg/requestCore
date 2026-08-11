@@ -19,6 +19,8 @@ var httpClient = &http.Client{
 }
 
 // SplunkLogger is a logger that sends logs to Splunk.
+//
+//revive:disable-next-line:exported
 type SplunkLogger struct {
 	lock       *sync.Mutex
 	params     *libParams.SplunkParams
@@ -43,6 +45,8 @@ func newHTTPClient(skipTLS bool) *http.Client {
 }
 
 // SplunkLog represents the structure of a log event sent to Splunk.
+//
+//revive:disable-next-line:exported
 type SplunkLog struct {
 	Event      string `json:"event"`
 	SourceType string `json:"sourcetype"`
@@ -107,7 +111,7 @@ func (j SplunkLogger) Write(p []byte) (n int, err error) {
 	// return len(p), nil
 }
 
-// checkIfSplunkIsWorking tests the Splunk connection by sending a test log.
+// CheckIfSplunkIsWorking tests the Splunk connection by sending a test log.
 func CheckIfSplunkIsWorking(params *libParams.SplunkParams) (*SplunkLogger, error) {
 	logger := SplunkLogger{
 		lock:       &sync.Mutex{},

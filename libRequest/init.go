@@ -41,7 +41,7 @@ func (m RequestModel) Initialize(w webFramework.WebFramework, method, url string
 }
 
 // InitializeNoLog builds the formatted path without duplicate checking or request insertion.
-func (m RequestModel) InitializeNoLog(w webFramework.WebFramework, method, url string, req RequestPtr, args ...any) (int, map[string]string, error) {
+func (m RequestModel) InitializeNoLog(w webFramework.WebFramework, _, url string, _ RequestPtr, args ...any) (int, map[string]string, error) {
 	var params []any
 	for _, arg := range args {
 		params = append(params, w.Parser.GetURLParam(arg.(string)))
@@ -51,7 +51,7 @@ func (m RequestModel) InitializeNoLog(w webFramework.WebFramework, method, url s
 }
 
 // InitRequest checks for duplicates and inserts the request from the parser's local storage.
-func (m RequestModel) InitRequest(w webFramework.WebFramework, method, url string) error {
+func (m RequestModel) InitRequest(w webFramework.WebFramework, method, _ string) error {
 	reqL := w.Parser.GetLocal("reqLog")
 	req := reqL.(RequestPtr)
 	err := m.CheckDuplicateRequest(req)

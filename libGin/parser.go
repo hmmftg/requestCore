@@ -215,19 +215,19 @@ func Gin(handler any) gin.HandlerFunc {
 	}
 }
 
-// Tracing methods for GinParser
+// GetTraceContext returns the trace span context from the Gin request context.
 func (c GinParser) GetTraceContext() trace.SpanContext {
 	span := trace.SpanFromContext(c.Ctx.Request.Context())
 	return span.SpanContext()
 }
 
 // SetTraceContext is a no-op for Gin as trace context is handled by the context.
-func (c GinParser) SetTraceContext(spanCtx trace.SpanContext) {
+func (c GinParser) SetTraceContext(_ trace.SpanContext) {
 	// This is a no-op for Gin as trace context is handled by the context
 }
 
 // StartSpan returns the current span from the request context.
-func (c GinParser) StartSpan(name string, opts ...trace.SpanStartOption) (context.Context, trace.Span) {
+func (c GinParser) StartSpan(_ string, _ ...trace.SpanStartOption) (context.Context, trace.Span) {
 	span := trace.SpanFromContext(c.Ctx.Request.Context())
 	return c.Ctx.Request.Context(), span
 }

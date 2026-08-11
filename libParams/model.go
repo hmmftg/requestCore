@@ -60,7 +60,7 @@ func (m ApplicationParams[SpecialParams]) GetParam(group, name string) *string {
 }
 
 // GetSpecificParams returns the application-specific parameters.
-func (m ApplicationParams[SpecialParams]) GetSpecificParams(name string) any {
+func (m ApplicationParams[SpecialParams]) GetSpecificParams(_ string) any {
 	return m.Specific
 }
 

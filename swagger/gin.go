@@ -77,7 +77,7 @@ func GinHandler(base, name string, spec *swag.Spec) gin.HandlerFunc {
 				return
 			}
 			return
-		case Css, Fav16, Fav32, Bundle, Preset:
+		case CSS, Fav16, Fav32, Bundle, Preset:
 			swaggerPath := os.Getenv("SWAGGER")
 			c.File(fmt.Sprintf("%s/%s", swaggerPath, path))
 			return

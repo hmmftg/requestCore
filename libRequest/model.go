@@ -152,7 +152,7 @@ type Request struct {
 	Sampled bool   `json:"sampled"`
 }
 
-// Tracing methods for Request
+// SetTraceContext stores the trace span context fields on the request.
 func (r *Request) SetTraceContext(spanCtx trace.SpanContext) {
 	r.TraceID = spanCtx.TraceID().String()
 	r.SpanID = spanCtx.SpanID().String()

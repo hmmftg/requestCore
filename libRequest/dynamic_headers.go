@@ -152,7 +152,7 @@ func (r *DynamicRequestHeader) GetHeaderMap() map[string]string {
 	return headers
 }
 
-// Dynamic header compatibility methods
+// GetID returns the request ID from the dynamic header.
 func (r DynamicRequestHeader) GetID() string {
 	return r.RequestID
 }

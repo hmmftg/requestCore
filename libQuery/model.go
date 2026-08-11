@@ -15,6 +15,8 @@ type QueryRunnerModel struct {
 	Mode        DBMode
 }
 
+// DBMode represents the type of database backend (e.g. Oracle, Postgres).
+//
 //go:generate enumer -type=DBMode -json -output dbModeEnum.go
 type DBMode int
 
@@ -28,6 +30,7 @@ const (
 	// MockDB is the DBMode for mock databases used in testing.
 	MockDB
 	// MySql is the DBMode for MySQL databases.
+	//revive:disable-next-line:var-naming
 	MySql
 )
 
@@ -83,6 +86,8 @@ type Updatable interface {
 	Finalize(QueryRunnerInterface) (string, error)
 }
 
+// DmlCommandType represents the type of a DML command (insert, update, delete, etc.).
+//
 //go:generate enumer -type=DmlCommandType -json -output dmlEnum.go
 type DmlCommandType int
 
@@ -115,6 +120,8 @@ func (d DmlCommand) GetType() int {
 	return int(d.Type)
 }
 
+// QueryCommandType represents the type of a query command (select, procedure, etc.).
+//
 //go:generate enumer -type=QueryCommandType -json -output queryEnum.go
 type QueryCommandType int
 

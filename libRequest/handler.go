@@ -16,12 +16,12 @@ import (
 )
 
 // GetRequest parses a request body or query into the given type and returns the parse result.
-func GetRequest[Q any](w webFramework.WebFramework, isJson bool) (*ParseResult[Q], error) {
+func GetRequest[Q any](w webFramework.WebFramework, isJSON bool) (*ParseResult[Q], error) {
 	params := ParseParams{
 		W:              w,
 		ValidateHeader: w.Parser.GetMethod() != "GET",
 	}
-	if isJson {
+	if isJSON {
 		params.Mode = JSON
 	} else {
 		params.Mode = Query
@@ -29,6 +29,8 @@ func GetRequest[Q any](w webFramework.WebFramework, isJson bool) (*ParseResult[Q
 	return Req[Q, RequestHeader](params)
 }
 
+// Type represents the request body binding mode (e.g. NoBinding, JSON, XML).
+//
 //go:generate enumer -type=Type -json -output requestTypeEnum.go
 type Type int
 

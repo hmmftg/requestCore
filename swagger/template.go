@@ -7,8 +7,8 @@ const (
 	IndexFileName = "index.html"
 	// DocJSON is the filename for the Swagger JSON documentation endpoint.
 	DocJSON = "doc.json"
-	// Css is the filename for the Swagger UI stylesheet.
-	Css = "swagger-ui.css"
+	// CSS is the filename for the Swagger UI stylesheet.
+	CSS = "swagger-ui.css"
 	// Preset is the filename for the Swagger UI standalone preset JavaScript.
 	Preset = "swagger-ui-standalone-preset.js"
 	// Bundle is the filename for the Swagger UI bundle JavaScript.

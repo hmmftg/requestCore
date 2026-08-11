@@ -7,6 +7,8 @@ import (
 )
 
 // StatusCode represents an HTTP or application-level status code.
+//
+//revive:disable-next-line:exported
 type StatusCode int
 
 const (

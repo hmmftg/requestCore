@@ -23,7 +23,7 @@ type TestingParams struct {
 // Default is the constant key for the default test configuration.
 const Default = "default"
 
-// columns are prefixed with "o" since we used sqlstruct to generate them
+// InitTesting initializes the test server with the given parameters and returns the request core model and parameter interface.
 func InitTesting(t *testing.T,
 	errDesc map[string]string,
 	remoteApis map[string]libCallApi.RemoteAPI,

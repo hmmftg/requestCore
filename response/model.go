@@ -7,6 +7,8 @@ import (
 )
 
 // ResponseHandler defines the interface for sending success and error HTTP responses.
+//
+//revive:disable-next-line:exported
 type ResponseHandler interface {
 	OK(w webFramework.WebFramework, resp any)
 	OKWithReceipt(w webFramework.WebFramework, resp any, receipt *Receipt)

@@ -469,7 +469,7 @@ func TestSetSystemValidators(t *testing.T) {
 }
 
 // TestDisableDefaultSystemValidators tests DisableDefaultSystemValidators
-func TestDisableDefaultSystemValidators(t *testing.T) {
+func TestDisableDefaultSystemValidators(_ *testing.T) {
 	libValidate.DisableDefaultSystemValidators()
 
 	// Set custom validators

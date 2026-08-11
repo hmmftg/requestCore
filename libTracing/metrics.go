@@ -100,6 +100,6 @@ func RecordHTTPClientCall(apiName, method string, statusCode int, duration time.
 
 // RecordHTTPClientCallWithOutcome records metrics with an explicit outcome label
 // (success, failure, timeout) in addition to the HTTP status class.
-func RecordHTTPClientCallWithOutcome(apiName, method string, statusCode int, duration time.Duration, err error, outcome string) {
+func RecordHTTPClientCallWithOutcome(apiName, method string, statusCode int, duration time.Duration, _ error, outcome string) {
 	DefaultHTTPClientMetricsRecorder().Record(apiName, method, statusCode, duration, outcome)
 }

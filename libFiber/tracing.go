@@ -16,7 +16,7 @@ func TracingMiddleware() fiber.Handler {
 }
 
 // CustomTracingMiddleware creates a custom Fiber middleware with more control
-func CustomTracingMiddleware(tm *libTracing.TracingManager) fiber.Handler {
+func CustomTracingMiddleware(_ *libTracing.TracingManager) fiber.Handler {
 	return otelfiber.Middleware()
 }
 

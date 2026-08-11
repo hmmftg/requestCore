@@ -225,19 +225,19 @@ func ExtendMap(mp map[string]string) map[string][]string {
 	return newMap
 }
 
-// Tracing methods for FiberParser
+// GetTraceContext returns the trace span context from the Fiber user context.
 func (c FiberParser) GetTraceContext() trace.SpanContext {
 	span := trace.SpanFromContext(c.Ctx.UserContext())
 	return span.SpanContext()
 }
 
 // SetTraceContext sets the trace span context (no-op for Fiber).
-func (c FiberParser) SetTraceContext(spanCtx trace.SpanContext) {
+func (c FiberParser) SetTraceContext(_ trace.SpanContext) {
 	// This is a no-op for Fiber as trace context is handled by the context
 }
 
 // StartSpan starts a new tracing span from the Fiber user context.
-func (c FiberParser) StartSpan(name string, opts ...trace.SpanStartOption) (context.Context, trace.Span) {
+func (c FiberParser) StartSpan(_ string, _ ...trace.SpanStartOption) (context.Context, trace.Span) {
 	span := trace.SpanFromContext(c.Ctx.UserContext())
 	return c.Ctx.UserContext(), span
 }

@@ -99,7 +99,7 @@ func ChainMiddleware(middlewares ...Middleware) Middleware {
 	}
 }
 
-// CORS middleware for net/http
+// CORSMiddleware returns a net/http middleware that sets CORS headers and handles preflight requests.
 func CORSMiddleware() Middleware {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -128,7 +128,7 @@ func sanitizeLogValue(s string) string {
 	return s
 }
 
-// Logging middleware for net/http
+// LoggingMiddleware returns a net/http middleware that logs each incoming request.
 func LoggingMiddleware() Middleware {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -138,7 +138,7 @@ func LoggingMiddleware() Middleware {
 	}
 }
 
-// Recovery middleware for net/http
+// RecoveryMiddleware returns a net/http middleware that recovers from panics.
 func RecoveryMiddleware() Middleware {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
