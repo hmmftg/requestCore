@@ -11,6 +11,7 @@ type NetworkParams struct {
 	TlsCert string `yaml:"tlsCert"`
 }
 
+// GetNetwork returns the network parameters for the given name.
 func (m ApplicationParams[SpecialParams]) GetNetwork(name string) *NetworkParams {
 	return GetValueFromMap(name, m.Network)
 }

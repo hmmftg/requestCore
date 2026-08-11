@@ -9,6 +9,7 @@ type paramsContextKey string
 
 const urlParamsKey paramsContextKey = "nethttp.urlparams"
 
+// WithURLParams returns a new *http.Request with URL parameters stored in its context.
 func WithURLParams(r *http.Request, params map[string]string) *http.Request {
 	if len(params) == 0 {
 		return r
@@ -17,6 +18,7 @@ func WithURLParams(r *http.Request, params map[string]string) *http.Request {
 	return r.WithContext(contextWithURLParams(ctx, params))
 }
 
+// URLParamsFromRequest extracts URL parameters from the request context.
 func URLParamsFromRequest(r *http.Request) map[string]string {
 	if r == nil {
 		return nil

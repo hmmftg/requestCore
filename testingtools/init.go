@@ -16,9 +16,11 @@ import (
 	"github.com/hmmftg/requestCore/response"
 )
 
+// TestingParams is the parameter type used for test application configuration.
 type TestingParams struct {
 }
 
+// Default is the constant key for the default test configuration.
 const Default = "default"
 
 // columns are prefixed with "o" since we used sqlstruct to generate them
@@ -76,12 +78,14 @@ func InitTesting(t *testing.T,
 	}, wsParams
 }
 
+// DefaultAccessRoles returns a default access-role map for testing.
 func DefaultAccessRoles() map[string]string {
 	return map[string]string{
 		"/cardType_GET": "get_card",
 	}
 }
 
+// DefaultErrorDesc returns a default error-description map for testing.
 func DefaultErrorDesc() map[string]string {
 	return map[string]string{
 		"AUTH_BAD_USER":     "sss",
@@ -91,6 +95,7 @@ func DefaultErrorDesc() map[string]string {
 	}
 }
 
+// DefaultAPIList returns a default map of remote API configurations for testing.
 func DefaultAPIList() map[string]libCallApi.RemoteAPI {
 	return map[string]libCallApi.RemoteAPI{
 		"simulation": {
@@ -106,6 +111,7 @@ func DefaultAPIList() map[string]libCallApi.RemoteAPI {
 	}
 }
 
+// DefaultDB returns a mock *sql.DB for testing.
 func DefaultDB(t *testing.T) *sql.DB {
 	db, _, err := sqlmock.New()
 	if err != nil {
@@ -115,6 +121,7 @@ func DefaultDB(t *testing.T) *sql.DB {
 	return db
 }
 
+// InitTestingNoDB initializes a test request-core model without a custom database, using a default mock DB.
 func InitTestingNoDB(t *testing.T,
 	errDesc map[string]string,
 	remoteApis map[string]libCallApi.RemoteAPI,
@@ -122,6 +129,7 @@ func InitTestingNoDB(t *testing.T,
 	return InitTestingWithDB(errDesc, remoteApis, DefaultDB(t))
 }
 
+// InitTestingWithDB initializes a test request-core model with the given error descriptions, remote APIs, and database.
 func InitTestingWithDB(
 	errDesc map[string]string,
 	remoteApis map[string]libCallApi.RemoteAPI,

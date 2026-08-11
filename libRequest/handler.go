@@ -15,6 +15,7 @@ import (
 	"github.com/hmmftg/requestCore/webFramework"
 )
 
+// GetRequest parses a request body or query into the given type and returns the parse result.
 func GetRequest[Q any](w webFramework.WebFramework, isJson bool) (*ParseResult[Q], error) {
 	params := ParseParams{
 		W:              w,
@@ -32,18 +33,28 @@ func GetRequest[Q any](w webFramework.WebFramework, isJson bool) (*ParseResult[Q
 type Type int
 
 const (
+	// NoBinding indicates no request body binding.
 	NoBinding Type = iota
+	// JSON indicates JSON body binding.
 	JSON
+	// JSONWithURI indicates JSON body and URI parameter binding.
 	JSONWithURI
+	// Query indicates URL query parameter binding.
 	Query
+	// QueryWithURI indicates URL query and URI parameter binding.
 	QueryWithURI
+	// QueryWithPagination indicates URL query with pagination parameter binding.
 	QueryWithPagination
+	// URI indicates URI parameter binding only.
 	URI
+	// URIAndPagination indicates URI parameter and pagination binding.
 	URIAndPagination
 )
 
+// PaginationLocalTag is the local-storage key for pagination data.
 const PaginationLocalTag string = "pagination"
 
+// PaginationData holds pagination parameters for query requests.
 type PaginationData struct {
 	Start   int    `form:"_start" query:"_start" validate:"omitempty"`
 	End     int    `form:"_end" query:"_end" validate:"omitempty"`
@@ -52,8 +63,10 @@ type PaginationData struct {
 	Order   string `form:"_order" query:"_order" validate:"omitempty,oneof=asc desc"`
 }
 
+// ErrorInGetRequest is the error description template for request parsing failures.
 const ErrorInGetRequest = "ERROR_IN_GET_REQUEST_%s"
 
+// ParseParams holds parameters for parsing a request.
 type ParseParams struct {
 	W              webFramework.WebFramework
 	Mode           Type
@@ -191,6 +204,7 @@ func parseRequest[Req any](params ParseParams) (*ParseResult[Req], error) {
 	return &ParseResult[Req]{request, &req}, nil
 }
 
+// ParseRequest parses the request header and body into the given type.
 func ParseRequest[Req any](
 	w webFramework.WebFramework,
 	mode Type,
@@ -229,11 +243,13 @@ func ParseRequest[Req any](
 	return &result.Request, &header, nil
 }
 
+// ParseResult holds the parsed request and its request pointer.
 type ParseResult[Req any] struct {
 	Request    Req
 	RequestPtr RequestPtr
 }
 
+// Req parses the request header and body using the given parse parameters.
 func Req[Req any, Header any, PT interface {
 	webFramework.HeaderInterface
 	*Header

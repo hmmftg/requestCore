@@ -7,10 +7,12 @@ import (
 	"github.com/hmmftg/requestCore/libCallApi"
 )
 
+// ParametersMap holds a group of simple string parameters keyed by name.
 type ParametersMap struct {
 	Params map[string]string `yaml:"params"`
 }
 
+// SecureParametersMap holds a group of encrypted security parameters keyed by name.
 type SecureParametersMap struct {
 	SecureParams map[string]SecurityParam `yaml:"secureParams"`
 }
@@ -29,6 +31,7 @@ type ApplicationParams[SpecialParams any] struct {
 	Metrics               *ginprom.Prometheus             `json:"-"`                     // Applications metrics storage
 }
 
+// ParamInterface defines the accessor methods for application parameters.
 type ParamInterface interface {
 	GetNetwork(name string) *NetworkParams
 	GetLogging() LogParams
@@ -42,10 +45,12 @@ type ParamInterface interface {
 	GetSpecificParams(name string) any
 }
 
+// GetRemoteAPI returns the remote API definition with the given name.
 func (m ApplicationParams[SpecialParams]) GetRemoteAPI(name string) *libCallApi.RemoteAPI {
 	return GetValueFromMap(name, m.RemoteAPIs)
 }
 
+// GetParam returns the string parameter value for the given group and name.
 func (m ApplicationParams[SpecialParams]) GetParam(group, name string) *string {
 	gr := GetValueFromMap(group, m.ParameterGroups)
 	if gr == nil {
@@ -54,10 +59,12 @@ func (m ApplicationParams[SpecialParams]) GetParam(group, name string) *string {
 	return GetValueFromMap(name, gr.Params)
 }
 
+// GetSpecificParams returns the application-specific parameters.
 func (m ApplicationParams[SpecialParams]) GetSpecificParams(name string) any {
 	return m.Specific
 }
 
+// GetValueFromMap returns a pointer to the value associated with name in mp, or nil if not found.
 func GetValueFromMap[T any](name string, mp map[string]T) *T {
 	val, ok := mp[name]
 	if ok {

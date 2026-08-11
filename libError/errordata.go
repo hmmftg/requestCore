@@ -6,6 +6,7 @@ import (
 	"time"
 )
 
+// ErrorData is the concrete implementation of Error, carrying time, action, source, and child error.
 type ErrorData struct {
 	Time       time.Time
 	ActionData Action  `json:"action"`
@@ -13,8 +14,13 @@ type ErrorData struct {
 	Child      Error   `json:"child"`
 }
 
+// Action returns the action data associated with this error.
 func (e ErrorData) Action() Action { return e.ActionData }
-func (e ErrorData) Src() *Source   { return e.Source }
+
+// Src returns the source location where this error was created.
+func (e ErrorData) Src() *Source { return e.Source }
+
+// Format writes the full error chain (action, source, and child) into the given string builder.
 func (e ErrorData) Format(stack *strings.Builder) {
 	e.ActionData.Format(stack)
 	if e.Source != nil {

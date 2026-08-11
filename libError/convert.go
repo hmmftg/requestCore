@@ -8,6 +8,7 @@ import (
 	"github.com/hmmftg/requestCore/status"
 )
 
+// Convert wraps a standard error into a structured Error with the given status, description, and message.
 func Convert(err error, status status.StatusCode, desc string, message any) Error {
 	return ErrorData{
 		Time:       time.Now(),
@@ -57,6 +58,7 @@ func convert(err error, src *Source) Error {
 	}
 }
 
+// Error returns the formatted string representation of the full error chain.
 func (e ErrorData) Error() string {
 	stack := strings.Builder{}
 	e.Format(&stack)

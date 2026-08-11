@@ -11,11 +11,13 @@ import (
 	"github.com/hmmftg/requestCore/status"
 )
 
+// OrmInterface defines the interface for ORM-based database access with mode and DB handle.
 type OrmInterface interface {
 	GetDbMode() libQuery.DBMode
 	GetDB() *gorm.DB
 }
 
+// GetQuery executes a raw SQL query and returns the result rows, returning NoDataFound error if empty.
 func GetQuery[R any](query string, core OrmInterface, args ...any) ([]R, error) {
 	// Query
 	rows, err := QueryToStruct[R](core.GetDB(), query, args...)
@@ -35,6 +37,7 @@ func GetQuery[R any](query string, core OrmInterface, args ...any) ([]R, error) 
 	return rows, nil
 }
 
+// QueryToStruct executes a raw SQL query and scans the result rows into a slice of Target.
 func QueryToStruct[Target any](db *gorm.DB, querySql string, args ...any) ([]Target, error) {
 	var rows []Target
 	result := db.Raw(querySql, args...).Find(&rows)
@@ -49,6 +52,7 @@ func QueryToStruct[Target any](db *gorm.DB, querySql string, args ...any) ([]Tar
 	return rows, nil
 }
 
+// Query executes a command interface query and returns result rows, handling single vs all result modes.
 func Query[R any](command libQuery.CommandInterface, core OrmInterface, args ...any) ([]R, error) {
 	if command.GetType() == int(libQuery.QueryMap) {
 		return nil, libError.NewWithDescription(status.BadRequest, libQuery.DBReadError, "unsupported command type")

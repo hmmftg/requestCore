@@ -6,6 +6,7 @@ import (
 	"database/sql/driver"
 )
 
+// QueryRunnerModel holds the database connection and metadata for query execution.
 type QueryRunnerModel struct {
 	DB          *sql.DB
 	ProgramName string
@@ -18,13 +19,19 @@ type QueryRunnerModel struct {
 type DBMode int
 
 const (
+	// Oracle is the DBMode for Oracle databases.
 	Oracle DBMode = iota
+	// Postgres is the DBMode for PostgreSQL databases.
 	Postgres
+	// Sqlite is the DBMode for SQLite databases.
 	Sqlite
+	// MockDB is the DBMode for mock databases used in testing.
 	MockDB
+	// MySql is the DBMode for MySQL databases.
 	MySql
 )
 
+// Init creates a QueryRunnerModel with the database-specific set variable command.
 func Init(
 	DB *sql.DB,
 	ProgramName string,
@@ -47,6 +54,7 @@ func Init(
 	return model
 }
 
+// QueryRunnerInterface defines the methods for executing database queries and DML operations.
 type QueryRunnerInterface interface {
 	NewStatement(command string) (*sql.Stmt, error)
 	CallDbFunction(callString string, args ...any) (int, string, error)
@@ -59,12 +67,14 @@ type QueryRunnerInterface interface {
 	GetDbMode() DBMode
 }
 
+// DmlModel defines the interface for models that provide pre-control, DML, and finalize commands.
 type DmlModel interface {
 	PreControlCommands() map[string][]DmlCommand
 	DmlCommands() map[string][]DmlCommand
 	FinalizeCommands() map[string][]DmlCommand
 }
 
+// Updatable defines the interface for models that support update operations.
 type Updatable interface {
 	SetParams(args map[string]string) any
 	GetUniqueId() []any
@@ -76,6 +86,7 @@ type Updatable interface {
 //go:generate enumer -type=DmlCommandType -json -output dmlEnum.go
 type DmlCommandType int
 
+// DmlCommand represents a single DML command with optional database-specific variants.
 type DmlCommand struct {
 	Name        string
 	Command     string
@@ -85,6 +96,7 @@ type DmlCommand struct {
 	CustomError error
 }
 
+// GetCommand returns the SQL command for the given database mode.
 func (d DmlCommand) GetCommand(mode DBMode) string {
 	query := d.Command
 	if len(d.CommandMap) > 0 && len(d.CommandMap[mode]) > 0 {
@@ -93,10 +105,12 @@ func (d DmlCommand) GetCommand(mode DBMode) string {
 	return query
 }
 
+// GetArgs returns the arguments for the DML command.
 func (d DmlCommand) GetArgs() []any {
 	return d.Args
 }
 
+// GetType returns the integer type of the DML command.
 func (d DmlCommand) GetType() int {
 	return int(d.Type)
 }
@@ -104,6 +118,7 @@ func (d DmlCommand) GetType() int {
 //go:generate enumer -type=QueryCommandType -json -output queryEnum.go
 type QueryCommandType int
 
+// QueryCommand represents a single query command with optional database-specific variants.
 type QueryCommand struct {
 	Name       string
 	Command    string
@@ -112,6 +127,7 @@ type QueryCommand struct {
 	Args       []any
 }
 
+// GetCommand returns the SQL command for the given database mode.
 func (q QueryCommand) GetCommand(mode DBMode) string {
 	query := q.Command
 	if len(q.CommandMap) > 0 && len(q.CommandMap[mode]) > 0 {
@@ -120,14 +136,17 @@ func (q QueryCommand) GetCommand(mode DBMode) string {
 	return query
 }
 
+// GetArgs returns the arguments for the query command.
 func (q QueryCommand) GetArgs() []any {
 	return q.Args
 }
 
+// GetType returns the integer type of the query command.
 func (q QueryCommand) GetType() int {
 	return int(q.Type)
 }
 
+// GetDriverArgs resolves form-tagged arguments from the request into driver values.
 func (q QueryCommand) GetDriverArgs(req any) []driver.Value {
 	args := []driver.Value{}
 	for id := range q.Args {
@@ -140,25 +159,30 @@ func (q QueryCommand) GetDriverArgs(req any) []driver.Value {
 	return args
 }
 
+// QueryRequest defines the interface for requests that provide query arguments.
 type QueryRequest interface {
 	QueryArgs() map[string][]any
 }
 
+// QueryResult defines the interface for query results that expose an ID and value.
 type QueryResult interface {
 	GetID() string
 	GetValue() any
 }
 
+// QueryWithDeps defines the interface for queries with fillable dependencies.
 type QueryWithDeps interface {
 	GetFillable(core QueryRunnerInterface) (map[string]any, error)
 }
 
+// DmlResult holds the result of a DML operation including affected rows and output parameters.
 type DmlResult struct {
 	Rows         map[string]string `json:"rows" form:"rows"`
 	LastInsertId int64             `json:"lastId" form:"lastId"`
 	RowsAffected int64             `json:"rowsAffected" form:"rowsAffected"`
 }
 
+// QueryData holds a generic query result row with key-value and array fields.
 type QueryData struct {
 	DataRaw    string   `json:"result,omitempty" db:"result"`
 	Key        string   `json:"key,omitempty" db:"key"`
@@ -167,6 +191,7 @@ type QueryData struct {
 	MapList    string   `json:"mapList,omitempty" db:"map_list"`
 }
 
+// RecordDataGet defines the interface for reading record data from query results.
 type RecordDataGet interface {
 	GetId() string
 	GetControlId(string) string
@@ -175,6 +200,7 @@ type RecordDataGet interface {
 	GetValue() any
 }
 
+// RecordDataDml defines the interface for DML operations on record data.
 type RecordDataDml interface {
 	SetId(string)
 	CheckDuplicate(core QueryRunnerInterface) (int, string, error)

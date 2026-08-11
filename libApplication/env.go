@@ -12,13 +12,16 @@ import (
 	"github.com/hmmftg/requestCore/response"
 )
 
+// AppEnv holds the application parameter interface and request core interface.
 type AppEnv struct {
 	Params    libParams.ParamInterface
 	Interface requestCore.RequestCoreInterface
 }
 
+// DefaultRequestFields is the default comma-separated list of request fields used in SQL insert/update.
 const DefaultRequestFields = "id,dt,incoming,action_id,national_id,branch_id,user_id,outgoing,result,events"
 
+// GetEnv creates and returns a RequestCoreModel configured with query runner and request handler.
 func GetEnv(
 	name, title string,
 	wsParams libParams.ParamInterface,

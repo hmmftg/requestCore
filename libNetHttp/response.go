@@ -9,6 +9,7 @@ import (
 	"github.com/hmmftg/requestCore/webFramework"
 )
 
+// ContextInitiator defines the interface for initializing a web framework context and responding.
 type ContextInitiator interface {
 	InitContext(r *http.Request, w http.ResponseWriter) webFramework.WebFramework
 	Respond(int, int, string, any, bool, webFramework.WebFramework)
@@ -21,21 +22,25 @@ const (
 	writerKey  contextKey = "nethttp.writer"
 )
 
+// WithRequestResponse stores the HTTP request and response writer in the context.
 func WithRequestResponse(ctx context.Context, r *http.Request, w http.ResponseWriter) context.Context {
 	ctx = context.WithValue(ctx, requestKey, r)
 	return context.WithValue(ctx, writerKey, w)
 }
 
+// RequestFromContext retrieves the HTTP request stored in the context.
 func RequestFromContext(ctx context.Context) (*http.Request, bool) {
 	req, ok := ctx.Value(requestKey).(*http.Request)
 	return req, ok
 }
 
+// ResponseWriterFromContext retrieves the HTTP response writer stored in the context.
 func ResponseWriterFromContext(ctx context.Context) (http.ResponseWriter, bool) {
 	writer, ok := ctx.Value(writerKey).(http.ResponseWriter)
 	return writer, ok
 }
 
+// NetHttpErrorHandler returns an http.HandlerFunc that handles common HTTP errors for the given path.
 func NetHttpErrorHandler(path, title string, handler ContextInitiator) http.HandlerFunc {
 	log.Println("ErrorHandler: ", path, title)
 	return func(w http.ResponseWriter, r *http.Request) {

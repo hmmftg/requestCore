@@ -8,11 +8,17 @@ import (
 )
 
 const (
-	DefaultPageText    = "page"
-	DefaultSizeText    = "size"
-	DefaultPage        = "1"
-	DefaultPageSize    = "10"
+	// DefaultPageText is the default query parameter name for the page number.
+	DefaultPageText = "page"
+	// DefaultSizeText is the default query parameter name for the page size.
+	DefaultSizeText = "size"
+	// DefaultPage is the default page number when not specified.
+	DefaultPage = "1"
+	// DefaultPageSize is the default page size when not specified.
+	DefaultPageSize = "10"
+	// DefaultMinPageSize is the minimum allowed page size.
 	DefaultMinPageSize = 10
+	// DefaultMaxPageSize is the maximum allowed page size.
 	DefaultMaxPageSize = 100
 )
 

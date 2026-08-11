@@ -23,16 +23,25 @@ import (
 )
 
 const (
+	// WebFrameworkKey is the context key used to store the web framework type.
 	WebFrameworkKey = libQuery.ContextKey("webFramework")
-	Gin             = "gin"
-	Fiber           = "fiber"
-	NetHttp         = "nethttp"
-	Testing         = "testing"
-	UserIdHeader    = "User-Id"
-	UserIdLocal     = "userId"
-	UnknownUser     = "unknown"
+	// Gin identifies the Gin web framework.
+	Gin = "gin"
+	// Fiber identifies the Fiber web framework.
+	Fiber = "fiber"
+	// NetHttp identifies the net/http web framework.
+	NetHttp = "nethttp"
+	// Testing identifies the testing framework.
+	Testing = "testing"
+	// UserIdHeader is the HTTP header name for the user identifier.
+	UserIdHeader = "User-Id"
+	// UserIdLocal is the local storage key for the user identifier.
+	UserIdLocal = "userId"
+	// UnknownUser is the default user identifier when none is provided.
+	UnknownUser = "unknown"
 )
 
+// InitContext initializes a webFramework.WebFramework from the given framework-specific context.
 func InitContext(c any) webFramework.WebFramework {
 	return initContext(c, false)
 }
@@ -118,6 +127,7 @@ func initContext(c any, unknownUser bool) webFramework.WebFramework {
 	return w
 }
 
+// InitContextWithHandler initializes a webFramework.WebFramework from the given context and response handler.
 func InitContextWithHandler(c context.Context, handler response.ResponseHandler) webFramework.WebFramework {
 	return InitContext(c)
 }

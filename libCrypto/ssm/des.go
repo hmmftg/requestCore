@@ -12,15 +12,20 @@ import (
 	"github.com/hmmftg/requestCore/response"
 )
 
+// DesMode identifies the DES cipher mode (ECB or CBC).
 type DesMode int
 
 const (
+	// Ecb indicates Electronic Codebook mode.
 	Ecb DesMode = iota + 1
+	// Cbc indicates Cipher Block Chaining mode.
 	Cbc
 )
 
+// ZeroIv is an 8-byte zero initialization vector used for DES operations.
 var ZeroIv []byte = []byte{0, 0, 0, 0, 0, 0, 0, 0}
 
+// EncryptDes encrypts base64-encoded plaintext with DES/Triple-DES using a base64-encoded key.
 func EncryptDes(textB64, keyB64 string) (string, error) {
 	key, err := base64.StdEncoding.DecodeString(keyB64)
 	if err != nil {
@@ -39,6 +44,7 @@ func EncryptDes(textB64, keyB64 string) (string, error) {
 	return base64.StdEncoding.EncodeToString(ciphertext), nil
 }
 
+// EncryptDesHex encrypts hex-encoded plaintext with DES/Triple-DES using a base64-encoded key.
 func EncryptDesHex(textHex, keyB64 string) (string, error) {
 	key, err := base64.StdEncoding.DecodeString(keyB64)
 	if err != nil {
@@ -57,6 +63,7 @@ func EncryptDesHex(textHex, keyB64 string) (string, error) {
 	return strings.ToUpper(hex.EncodeToString(ciphertext)), nil
 }
 
+// DecryptDes decrypts a base64-encoded DES/Triple-DES ciphertext using a base64-encoded key.
 func DecryptDes(cipherB64, keyB64 string) (string, error) {
 	key, err := base64.StdEncoding.DecodeString(keyB64)
 	if err != nil {
@@ -74,6 +81,7 @@ func DecryptDes(cipherB64, keyB64 string) (string, error) {
 	return base64.StdEncoding.EncodeToString(plaintext), nil
 }
 
+// DecryptDesHex decrypts a hex-encoded DES/Triple-DES ciphertext using a base64-encoded key.
 func DecryptDesHex(cipherHex, keyB64 string) (string, error) {
 	key, err := base64.StdEncoding.DecodeString(keyB64)
 	if err != nil {
@@ -91,6 +99,7 @@ func DecryptDesHex(cipherHex, keyB64 string) (string, error) {
 	return strings.ToUpper(hex.EncodeToString(plaintext)), nil
 }
 
+// DecryptDesBothHex decrypts a hex-encoded DES/Triple-DES ciphertext using a hex-encoded key.
 func DecryptDesBothHex(cipherHex, keyHex string) (string, error) {
 	key, err := hex.DecodeString(keyHex)
 	if err != nil {

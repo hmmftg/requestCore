@@ -10,12 +10,14 @@ import (
 	"github.com/hmmftg/requestCore/status"
 )
 
+// CommandInterface defines the interface for query commands that provide SQL and arguments.
 type CommandInterface interface {
 	GetCommand(DBMode) string
 	GetArgs() []any
 	GetType() int
 }
 
+// GetQuery executes a SQL query and returns the result as a slice of the target type.
 func GetQuery[R any](query string, core QueryRunnerInterface, args ...any) ([]R, error) {
 	//Query
 	rows, err := QueryToStruct[R](core, query, args...)
@@ -35,6 +37,7 @@ func GetQuery[R any](query string, core QueryRunnerInterface, args ...any) ([]R,
 	return rows, nil
 }
 
+// QueryToStruct executes a SQL query and scans the results into a slice of the target type.
 func QueryToStruct[Target any](q QueryRunnerInterface, querySql string, args ...any) ([]Target, error) {
 	stmt, err := q.NewStatement(querySql)
 	if err != nil {
@@ -111,6 +114,8 @@ func QueryToStruct[Target any](q QueryRunnerInterface, querySql string, args ...
 	//resp, _ := json.Marshal(finalRows)
 	return finalRows, nil
 }
+
+// Query executes a command interface query and returns results based on the command type.
 func Query[R any](command CommandInterface, core QueryRunnerInterface, args ...any) ([]R, error) {
 	if command.GetType() == int(QueryMap) {
 		return nil, libError.NewWithDescription(status.BadRequest, DBReadError, "unsupported command type")

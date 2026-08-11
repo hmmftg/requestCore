@@ -14,6 +14,7 @@ import (
 	"github.com/hmmftg/requestCore/response"
 )
 
+// Ssm holds the cryptographic keys used for SSM operations including CVK, PVK, TPK, and CSD.
 type Ssm struct {
 	Cvk  string
 	Pvk  string
@@ -22,6 +23,7 @@ type Ssm struct {
 	Pvki string
 }
 
+// Cvv generates a CVV (Card Verification Value) for the given PAN, expiry, and CVV type.
 func (s *Ssm) Cvv(pan, exp, cvvType string) (string, error) {
 	switch cvvType {
 	case libCrypto.Cvv1:
@@ -36,6 +38,7 @@ func (s *Ssm) Cvv(pan, exp, cvvType string) (string, error) {
 	)
 }
 
+// Pvv generates a PVV (PIN Verification Value) from the PAN and encrypted PIN block.
 func (s *Ssm) Pvv(pan, pinBlock string) (string, error) {
 	pin, err := s.PinBlockDecode(pan, pinBlock)
 	if err != nil {
@@ -44,6 +47,7 @@ func (s *Ssm) Pvv(pan, pinBlock string) (string, error) {
 	return GeneratePvv(pan, s.Pvk, "1", pin)
 }
 
+// Offset generates a PIN offset from the PAN and encrypted PIN block.
 func (s *Ssm) Offset(pan, pinBlock string) (string, error) {
 	pin, err := s.PinBlockDecode(pan, pinBlock)
 	if err != nil {
@@ -52,6 +56,7 @@ func (s *Ssm) Offset(pan, pinBlock string) (string, error) {
 	return GenerateOffset(pan, s.Pvk, pin, len(pin))
 }
 
+// SetKey sets the value of a cryptographic key by its identifier (Cvk, Pvk, Tpk, or Csd).
 func (s *Ssm) SetKey(id, value string) {
 	switch id {
 	case "Cvk":
@@ -64,6 +69,8 @@ func (s *Ssm) SetKey(id, value string) {
 		s.Csd = value
 	}
 }
+
+// GetKey returns the value of a cryptographic key by its identifier (Cvk, Pvk, Tpk, or Csd).
 func (s *Ssm) GetKey(id string) string {
 	switch id {
 	case "Cvk":
@@ -78,6 +85,7 @@ func (s *Ssm) GetKey(id string) string {
 	return ""
 }
 
+// PinBlock encrypts a PIN block for the given PAN, PIN, and TPK key.
 func PinBlock(pan, pin, tpk string) (string, error) {
 	block1 := ""
 	switch len(pin) {
@@ -123,14 +131,17 @@ func PinBlock(pan, pin, tpk string) (string, error) {
 	return EncryptDesHex(tspHex, tpk)
 }
 
+// PinBlock encrypts a PIN block for the given PAN and PIN using the Ssm's TPK key.
 func (s *Ssm) PinBlock(pan, pin string) (string, error) {
 	return PinBlock(pan, pin, s.Tpk)
 }
 
+// Mac returns a MAC (Message Authentication Code) for the given data (currently returns zeros).
 func (s *Ssm) Mac(data string) (string, error) {
 	return "0000000000000000", nil
 }
 
+// Translate re-encrypts a PIN block from one TPK to another for key translation.
 func (s *Ssm) Translate(pan, pinBlock, tpk2nd string) (string, error) {
 	pin, err := s.PinBlockDecode(pan, pinBlock)
 	if err != nil {
@@ -139,6 +150,7 @@ func (s *Ssm) Translate(pan, pinBlock, tpk2nd string) (string, error) {
 	return PinBlock(pan, pin, tpk2nd)
 }
 
+// Crypt encrypts or decrypts data using the Ssm's TPK key depending on the mode.
 func (s *Ssm) Crypt(data, mode string) (string, error) {
 	var result string
 	var err error
@@ -150,6 +162,7 @@ func (s *Ssm) Crypt(data, mode string) (string, error) {
 	return result, err
 }
 
+// Cvv2Padding encrypts a CVV2 value with zero-padding using the Ssm's CSD key.
 func (s *Ssm) Cvv2Padding(cvv2 string) (string, error) {
 	tspHex := fmt.Sprintf("%X%s", cvv2, strings.Repeat("30", 16-len(cvv2)))
 
@@ -157,6 +170,7 @@ func (s *Ssm) Cvv2Padding(cvv2 string) (string, error) {
 	return EncryptDesHex(tspHex, s.Csd)
 }
 
+// PinBlockDecode decrypts a PIN block and extracts the plaintext PIN for the given PAN.
 func (s *Ssm) PinBlockDecode(pan, pinBlock string) (string, error) {
 	tspHex, errDes := DecryptDesHex(pinBlock, s.Tpk)
 	if errDes != nil {
@@ -206,10 +220,12 @@ func (s *Ssm) PinBlockDecode(pan, pinBlock string) (string, error) {
 	return pin, nil
 }
 
+// Initialize seeds the random number generator for PIN generation.
 func Initialize() {
 	rand.New(rand.NewSource(time.Now().UTC().UnixNano())) // #nosec G404 -- seeding for PIN generation, not cryptographic use
 }
 
+// Init creates a new Ssm instance with the given CVK, PVK, and TPK keys.
 func Init(cvk, pvk, tpk string) (*Ssm, error) {
 	Initialize()
 	return &Ssm{

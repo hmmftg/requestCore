@@ -12,6 +12,7 @@ import (
 	"github.com/hmmftg/requestCore/status"
 )
 
+// CheckDuplicateRequest queries the database to verify the request ID is not a duplicate.
 func (m RequestModel) CheckDuplicateRequest(request RequestPtr) error {
 	result, err := libQuery.GetQuery[RequestPtr](m.QueryInDb, m.QueryInterface, request.Header.GetId())
 	if err != nil {
@@ -36,12 +37,15 @@ func (m RequestModel) CheckDuplicateRequest(request RequestPtr) error {
 	return nil
 }
 
+// InsertRequest inserts a request into the database using a background context.
 func (m RequestModel) InsertRequest(request RequestPtr) error {
 	return m.InsertRequestWithContext(context.Background(), request)
 }
 
+// ModuleName is the module name used for request handler DML operations.
 const ModuleName = "RequestHandler"
 
+// InsertRequestWithContext inserts a request into the database using the given context.
 func (m RequestModel) InsertRequestWithContext(ctx context.Context, request RequestPtr) error {
 	rowByte, err := json.Marshal(request)
 	if err != nil {
@@ -61,10 +65,12 @@ func (m RequestModel) InsertRequestWithContext(ctx context.Context, request Requ
 	return nil
 }
 
+// UpdateRequest updates a request in the database using a background context.
 func (m RequestModel) UpdateRequest(request RequestPtr) error {
 	return m.UpdateRequestWithContext(context.Background(), request)
 }
 
+// UpdateRequestWithContext updates a request in the database using the given context.
 func (m RequestModel) UpdateRequestWithContext(ctx context.Context, request RequestPtr) error {
 	requestBytes, _ := json.Marshal(request)
 	args := []any{string(requestBytes)}

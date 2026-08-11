@@ -15,6 +15,7 @@ import (
 	"github.com/hmmftg/requestCore/webFramework"
 )
 
+// ExecDML runs the pre-control, execute, and finalize phases of a DML model.
 func ExecDML(request libQuery.DmlModel, key, title string, w webFramework.WebFramework, core requestCore.RequestCoreInterface) (map[string]any, error) {
 	errPreControl := PreControlDML(request, key, title, w, core)
 	if errPreControl != nil {
@@ -29,6 +30,7 @@ func ExecDML(request libQuery.DmlModel, key, title string, w webFramework.WebFra
 	return resp, nil
 }
 
+// PreControlDML executes the pre-control commands for a DML model.
 func PreControlDML(request libQuery.DmlModel, key, title string, w webFramework.WebFramework, core requestCore.RequestCoreInterface) error {
 	preControl := request.PreControlCommands()
 	for _, command := range preControl[key] {
@@ -45,6 +47,7 @@ func PreControlDML(request libQuery.DmlModel, key, title string, w webFramework.
 	return nil
 }
 
+// ExecuteDML executes the DML commands and returns the results map.
 func ExecuteDML(request libQuery.DmlModel, key, title string, w webFramework.WebFramework, core requestCore.RequestCoreInterface) (map[string]any, error) {
 	dml := request.DmlCommands()
 	resp := map[string]any{}
@@ -60,6 +63,7 @@ func ExecuteDML(request libQuery.DmlModel, key, title string, w webFramework.Web
 	return resp, nil
 }
 
+// FinalizeDML executes the finalize commands for a DML model.
 func FinalizeDML(request libQuery.DmlModel, key, title string, w webFramework.WebFramework, core requestCore.RequestCoreInterface) {
 	finalize := request.FinalizeCommands()
 	for _, command := range finalize[key] {
@@ -73,6 +77,7 @@ func FinalizeDML(request libQuery.DmlModel, key, title string, w webFramework.We
 	}
 }
 
+// DmlHandlerType holds configuration for a DML handler.
 type DmlHandlerType[Req libQuery.DmlModel, Resp map[string]any] struct {
 	Title           string
 	Path            string
@@ -82,6 +87,7 @@ type DmlHandlerType[Req libQuery.DmlModel, Resp map[string]any] struct {
 	RecoveryHandler func(any)
 }
 
+// Parameters returns the handler parameters for the DmlHandlerType.
 func (h DmlHandlerType[Req, Resp]) Parameters() HandlerParameters[Req, Resp] {
 	return HandlerParameters[Req, Resp]{
 		Title:           h.Title,
@@ -98,22 +104,31 @@ func (h DmlHandlerType[Req, Resp]) Parameters() HandlerParameters[Req, Resp] {
 		TracingSpanName: "",
 	}
 }
+
+// Initializer runs the pre-control DML phase for the handler.
 func (h DmlHandlerType[Req, Resp]) Initializer(req HandlerRequest[Req, Resp]) error {
 	return PreControlDML(*req.Request, h.Key, req.Title, req.W, req.Core)
 }
+
+// Handler executes the DML commands for the handler.
 func (h DmlHandlerType[Req, Resp]) Handler(req HandlerRequest[Req, Resp]) (Resp, error) {
 	resp, err := ExecuteDML(*req.Request, h.Key, req.Title, req.W, req.Core)
 	return resp, err
 }
+
+// Simulation returns the default response for simulation mode.
 func (h DmlHandlerType[Req, Resp]) Simulation(req HandlerRequest[Req, Resp]) (Resp, error) {
 	return req.Response, nil
 }
+
+// Finalizer runs the finalize DML phase if the response was sent.
 func (h DmlHandlerType[Req, Resp]) Finalizer(req HandlerRequest[Req, Resp]) {
 	if req.RespSent {
 		FinalizeDML(*req.Request, h.Key, req.Title, req.W, req.Core)
 	}
 }
 
+// DmlHandler returns a base handler that executes DML commands.
 func DmlHandler[Req libQuery.DmlModel](
 	core requestCore.RequestCoreInterface,
 	handler DmlHandlerType[Req, map[string]any],

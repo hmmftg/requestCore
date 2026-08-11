@@ -121,6 +121,7 @@ func CheckIfSplunkIsWorking(params *libParams.SplunkParams) (*SplunkLogger, erro
 	return &logger, nil
 }
 
+// LogSplunk represents the JSON structure of a Gin log entry sent to Splunk.
 type LogSplunk struct {
 	Logger     string `json:"logger"`
 	Severity   string `json:"serverity"`

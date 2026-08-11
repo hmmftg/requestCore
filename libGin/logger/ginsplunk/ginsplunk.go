@@ -14,6 +14,7 @@ import (
 	"github.com/hmmftg/requestCore/libParams"
 )
 
+// ConfigGinSplunk returns a Gin logger middleware configuration that sends logs to Splunk.
 func ConfigGinSplunk(wsParams libParams.ParamInterface) gin.LoggerConfig {
 	logger, err := splunk.CheckIfSplunkIsWorking(wsParams.GetLogging().Splunk)
 	if err != nil {

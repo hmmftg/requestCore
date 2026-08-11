@@ -29,6 +29,7 @@ func parseTimeUsingTimeFormat(field reflect.StructField, value string) (reflect.
 	return reflect.Value{}, errors.New("empty value")
 }
 
+// ParseQueryResult populates struct fields from a database result map using db tags.
 func ParseQueryResult(result map[string]any, t reflect.Type, v reflect.Value) {
 	for i := 0; i < t.NumField(); i++ {
 		tag := t.Field(i).Tag.Get("db")
@@ -211,6 +212,7 @@ func ParseQueryResult(result map[string]any, t reflect.Type, v reflect.Value) {
 	}
 }
 
+// ParseMap decodes a map into the target type using mapstructure with db tags.
 func ParseMap[Target any](input map[string]any) (*Target, error) {
 	result := new(Target)
 	config := &mapstructure.DecoderConfig{
@@ -229,6 +231,7 @@ func ParseMap[Target any](input map[string]any) (*Target, error) {
 	return result, err
 }
 
+// ConvertJsonToStruct unmarshals a JSON string into the target type.
 func ConvertJsonToStruct[Q any](row string) (Q, error) {
 	var rowObj Q
 	err := json.Unmarshal([]byte(row), &rowObj)
@@ -239,6 +242,7 @@ func ConvertJsonToStruct[Q any](row string) (Q, error) {
 	return rowObj, nil
 }
 
+// LoadFromMap loads DML result data from a map by JSON round-trip.
 func (c *DmlResult) LoadFromMap(m any) error {
 	data, err := json.Marshal(m.(map[string]any))
 	if err == nil {
@@ -247,6 +251,7 @@ func (c *DmlResult) LoadFromMap(m any) error {
 	return err
 }
 
+// ParseCommand substitutes template variables in a command string with request context values.
 func ParseCommand(command, user, app, action, title string, value map[string]string, parser webFramework.FieldParser) string {
 	//template := "http://{{host}}/?q={{query}}&foo={{bar}}{{bar}}"
 	return fasttemplate.New(command, "{{", "}}").ExecuteString(
@@ -261,6 +266,7 @@ func ParseCommand(command, user, app, action, title string, value map[string]str
 	)
 }
 
+// SerializeStringArray serializes a string slice into a PostgreSQL array literal.
 func SerializeStringArray(arr []string) string {
 	var result strings.Builder
 	result.WriteRune('{')
@@ -269,6 +275,7 @@ func SerializeStringArray(arr []string) string {
 	return result.String()
 }
 
+// SerializeArray serializes an any slice into a PostgreSQL array literal.
 func SerializeArray(arr []any) string {
 	result := "{"
 	for _, member := range arr {
@@ -277,6 +284,7 @@ func SerializeArray(arr []any) string {
 	return result[:len(result)-1] + "}"
 }
 
+// PrepareArgs converts slice arguments into PostgreSQL array literals for DML execution.
 func PrepareArgs(args []any) []any {
 	preparedArgs := args
 	for id := range args {

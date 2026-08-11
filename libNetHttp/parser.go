@@ -20,6 +20,7 @@ import (
 	"github.com/hmmftg/requestCore/webFramework"
 )
 
+// InitContext creates a new NetHttpParser from the given HTTP request and response writer.
 func InitContext(r *http.Request, w http.ResponseWriter) *NetHttpParser {
 	parser := &NetHttpParser{
 		Request:  r,
@@ -33,14 +34,17 @@ func InitContext(r *http.Request, w http.ResponseWriter) *NetHttpParser {
 	return parser
 }
 
+// GetMethod returns the HTTP method of the request.
 func (c NetHttpParser) GetMethod() string {
 	return c.Request.Method
 }
 
+// GetPath returns the URL path of the request.
 func (c NetHttpParser) GetPath() string {
 	return c.Request.URL.Path
 }
 
+// GetHeader populates the target struct with header values from the request.
 func (c NetHttpParser) GetHeader(target webFramework.HeaderInterface) error {
 	// Parse headers into target struct
 	// This is a simplified implementation - you might want to use a more sophisticated header parsing
@@ -66,14 +70,17 @@ func (c NetHttpParser) GetHeader(target webFramework.HeaderInterface) error {
 	return nil
 }
 
+// GetHeaderValue returns the value of a single request header by name.
 func (c NetHttpParser) GetHeaderValue(name string) string {
 	return c.Request.Header.Get(name)
 }
 
+// GetHTTPHeader returns the full HTTP header map from the request.
 func (c NetHttpParser) GetHTTPHeader() http.Header {
 	return c.Request.Header
 }
 
+// GetBody reads and unmarshals the request body into the target.
 func (c NetHttpParser) GetBody(target any) error {
 	if c.Request.Body == nil {
 		return nil
@@ -91,6 +98,7 @@ func (c NetHttpParser) GetBody(target any) error {
 	return json.Unmarshal(body, target)
 }
 
+// GetURI parses URL path parameters into the target struct.
 func (c NetHttpParser) GetURI(target any) error {
 	// Parse URL parameters into target struct
 	// This is a simplified implementation
@@ -103,6 +111,7 @@ func (c NetHttpParser) GetURI(target any) error {
 	return c.parseStructFromMap(target, c.Params)
 }
 
+// GetURLQuery parses URL query parameters into the target struct.
 func (c NetHttpParser) GetURLQuery(target any) error {
 	if target == nil {
 		return nil
@@ -118,14 +127,17 @@ func (c NetHttpParser) GetURLQuery(target any) error {
 	return c.parseStructFromMap(target, queryParams)
 }
 
+// GetRawURLQuery returns the raw query string from the request URL.
 func (c NetHttpParser) GetRawURLQuery() string {
 	return c.Request.URL.RawQuery
 }
 
+// GetLocal returns a value stored in the parser's local map by name.
 func (c NetHttpParser) GetLocal(name string) any {
 	return c.Locals[name]
 }
 
+// GetLocalString returns a string value stored in the parser's local map by name.
 func (c NetHttpParser) GetLocalString(name string) string {
 	if value, exists := c.Locals[name]; exists {
 		if str, ok := value.(string); ok {
@@ -135,31 +147,38 @@ func (c NetHttpParser) GetLocalString(name string) string {
 	return ""
 }
 
+// GetURLParam returns a single URL path parameter by name.
 func (c NetHttpParser) GetURLParam(name string) string {
 	return c.Params[name]
 }
 
+// GetURLParams returns all URL path parameters as a map.
 func (c NetHttpParser) GetURLParams() map[string]string {
 	return c.Params
 }
 
+// CheckURLParam returns a URL path parameter by name and whether it exists.
 func (c NetHttpParser) CheckURLParam(name string) (string, bool) {
 	value, exists := c.Params[name]
 	return value, exists
 }
 
+// SetLocal stores a value in the parser's local map by name.
 func (c NetHttpParser) SetLocal(name string, value any) {
 	c.Locals[name] = value
 }
 
+// SetReqHeader sets a request header value by name.
 func (c NetHttpParser) SetReqHeader(name string, value string) {
 	c.Request.Header.Set(name, value)
 }
 
+// SetRespHeader sets a response header value by name.
 func (c NetHttpParser) SetRespHeader(name string, value string) {
 	c.Response.Header().Set(name, value)
 }
 
+// GetArgs returns a map of common request arguments including user, app, action, and path.
 func (c NetHttpParser) GetArgs(args ...any) map[string]string {
 	netHttpArgs := map[string]string{
 		"userId":   c.GetLocalString("userId"),
@@ -179,6 +198,7 @@ func (c NetHttpParser) GetArgs(args ...any) map[string]string {
 	return netHttpArgs
 }
 
+// ParseCommand parses a DML command template using local values and the provided request data.
 func (c NetHttpParser) ParseCommand(command, title string, request webFramework.RecordData, parser webFramework.FieldParser) string {
 	if request.GetValueMap() == nil {
 		return libQuery.ParseCommand(command, c.GetLocalString("userId"),
@@ -194,6 +214,7 @@ func (c NetHttpParser) ParseCommand(command, title string, request webFramework.
 		request.GetValueMap(), parser)
 }
 
+// SendJSONRespBody writes a JSON response with the given HTTP status code.
 func (c NetHttpParser) SendJSONRespBody(status int, resp any) error {
 	c.Response.Header().Set("Content-Type", "application/json")
 	c.Response.WriteHeader(status)
@@ -205,12 +226,14 @@ func (c NetHttpParser) SendJSONRespBody(status int, resp any) error {
 	return json.NewEncoder(c.Response).Encode(resp)
 }
 
+// Next advances to the next middleware in the chain (no-op for net/http).
 func (c NetHttpParser) Next() error {
 	// For net/http, we don't have a built-in Next() concept like middleware chains
 	// This could be implemented using a custom middleware pattern
 	return nil
 }
 
+// Abort stops the middleware chain by writing an internal-server-error status.
 func (c NetHttpParser) Abort() error {
 	// For net/http, we can't really "abort" in the same way as Gin/Fiber
 	// We can set a status and return early
@@ -218,10 +241,12 @@ func (c NetHttpParser) Abort() error {
 	return nil
 }
 
+// FormValue returns the first form value for the given field name.
 func (c NetHttpParser) FormValue(name string) string {
 	return c.Request.FormValue(name)
 }
 
+// SaveFile saves an uploaded file from the given form tag to the specified path.
 func (c NetHttpParser) SaveFile(formTagName, path string) error {
 	// Clean the path to prevent directory traversal (gosec G304).
 	cleanPath := filepath.Clean(path)
@@ -256,11 +281,13 @@ func containsTraversal(cleanPath string) bool {
 	return cleanPath == ".." || strings.HasPrefix(cleanPath, "../") || strings.HasPrefix(cleanPath, "..\\")
 }
 
+// FileAttachment sends a file as an HTTP attachment with the given filename.
 func (c NetHttpParser) FileAttachment(path, fileName string) {
 	c.Response.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%s", fileName))
 	http.ServeFile(c.Response, c.Request, path)
 }
 
+// AddCustomAttributes stores a custom slog attribute in the parser's local map.
 func (c NetHttpParser) AddCustomAttributes(attr slog.Attr) {
 	// For net/http, we can store custom attributes in locals
 	// This is a simplified implementation
@@ -304,6 +331,7 @@ func (c NetHttpParser) ParseForm() error {
 }
 
 // ParseMultipartForm parses multipart form data
+// ParseMultipartForm parses multipart form data from the request with the given max memory.
 func (c NetHttpParser) ParseMultipartForm(maxMemory int64) error {
 	return c.Request.ParseMultipartForm(maxMemory)
 }
@@ -364,15 +392,18 @@ func (c NetHttpParser) GetTraceContext() trace.SpanContext {
 	return span.SpanContext()
 }
 
+// SetTraceContext sets the trace span context on the request (no-op for net/http).
 func (c NetHttpParser) SetTraceContext(spanCtx trace.SpanContext) {
 	// This is a no-op for net/http as trace context is handled by the context
 }
 
+// StartSpan starts a new tracing span from the request context.
 func (c NetHttpParser) StartSpan(name string, opts ...trace.SpanStartOption) (context.Context, trace.Span) {
 	span := trace.SpanFromContext(c.Request.Context())
 	return c.Request.Context(), span
 }
 
+// AddSpanAttribute adds a single string attribute to the current tracing span.
 func (c NetHttpParser) AddSpanAttribute(key, value string) {
 	span := trace.SpanFromContext(c.Request.Context())
 	if span.IsRecording() {
@@ -380,6 +411,7 @@ func (c NetHttpParser) AddSpanAttribute(key, value string) {
 	}
 }
 
+// AddSpanAttributes adds multiple string attributes to the current tracing span.
 func (c NetHttpParser) AddSpanAttributes(attrs map[string]string) {
 	span := trace.SpanFromContext(c.Request.Context())
 	if span.IsRecording() {
@@ -389,6 +421,7 @@ func (c NetHttpParser) AddSpanAttributes(attrs map[string]string) {
 	}
 }
 
+// AddSpanEvent adds an event with attributes to the current tracing span.
 func (c NetHttpParser) AddSpanEvent(name string, attrs map[string]string) {
 	span := trace.SpanFromContext(c.Request.Context())
 	if span.IsRecording() {
@@ -400,6 +433,7 @@ func (c NetHttpParser) AddSpanEvent(name string, attrs map[string]string) {
 	}
 }
 
+// RecordSpanError records an error with attributes on the current tracing span.
 func (c NetHttpParser) RecordSpanError(err error, attrs map[string]string) {
 	span := trace.SpanFromContext(c.Request.Context())
 	if span.IsRecording() {

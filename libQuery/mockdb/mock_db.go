@@ -104,7 +104,10 @@ type SimpleTestData struct {
 	Price  float64 `db:"price"`
 }
 
+// GetID returns the ID of the test data as a string.
 func (s SimpleTestData) GetID() string { return "" }
+
+// GetValue returns the value of the test data.
 func (s SimpleTestData) GetValue() any { return "" }
 
 // MockQueryExpectations provides common query expectations for testing

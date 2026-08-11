@@ -3,13 +3,20 @@ package swagger
 import "regexp"
 
 const (
+	// IndexFileName is the filename for the Swagger UI index page.
 	IndexFileName = "index.html"
-	DocJSON       = "doc.json"
-	CSS           = "swagger-ui.css"
-	Preset        = "swagger-ui-standalone-preset.js"
-	Bundle        = "swagger-ui-bundle.js"
-	Fav32         = "favicon-32x32.png"
-	Fav16         = "favicon-16x16.png"
+	// DocJSON is the filename for the Swagger JSON documentation endpoint.
+	DocJSON = "doc.json"
+	// CSS is the filename for the Swagger UI stylesheet.
+	CSS = "swagger-ui.css"
+	// Preset is the filename for the Swagger UI standalone preset JavaScript.
+	Preset = "swagger-ui-standalone-preset.js"
+	// Bundle is the filename for the Swagger UI bundle JavaScript.
+	Bundle = "swagger-ui-bundle.js"
+	// Fav32 is the filename for the 32x32 favicon.
+	Fav32 = "favicon-32x32.png"
+	// Fav16 is the filename for the 16x16 favicon.
+	Fav16 = "favicon-16x16.png"
 )
 
 //nolint:lll

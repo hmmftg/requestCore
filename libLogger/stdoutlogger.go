@@ -12,13 +12,16 @@ import (
 	"github.com/hmmftg/requestCore/libParams"
 )
 
+// StdoutLogger is a logger that writes log output to standard output.
 type StdoutLogger struct {
 }
 
+// Write writes the given bytes to standard output, implementing io.Writer.
 func (logger StdoutLogger) Write(p []byte) (n int, err error) {
 	return os.Stdout.WriteString(string(p))
 }
 
+// Config returns a gin.LoggerConfig configured for stdout logging with the application's log settings.
 func (logger StdoutLogger) Config(wsParams libParams.ParamInterface) gin.LoggerConfig {
 	log.SetOutput(logger)
 	log.Printf("Logger Configured %T \n", logger)

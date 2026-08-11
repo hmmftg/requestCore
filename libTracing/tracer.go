@@ -325,16 +325,19 @@ func StartSpan(ctx context.Context, name string, attrs map[string]string) (conte
 	return tm.StartSpanWithAttributes(ctx, name, attrs)
 }
 
+// AddSpanAttributes adds attributes to the current span using the global tracing manager.
 func AddSpanAttributes(ctx context.Context, attrs map[string]string) {
 	tm := GetGlobalTracingManager()
 	tm.AddSpanAttributes(ctx, attrs)
 }
 
+// AddSpanEvent adds an event to the current span using the global tracing manager.
 func AddSpanEvent(ctx context.Context, name string, attrs map[string]string) {
 	tm := GetGlobalTracingManager()
 	tm.AddSpanEvent(ctx, name, attrs)
 }
 
+// RecordError records an error in the current span using the global tracing manager.
 func RecordError(ctx context.Context, err error, attrs map[string]string) {
 	tm := GetGlobalTracingManager()
 	tm.RecordError(ctx, err, attrs)

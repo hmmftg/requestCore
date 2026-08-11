@@ -9,11 +9,15 @@ import (
 )
 
 const (
-	NoDataFound     = "NO-DATA-FOUND"
-	SystemFault     = "SYSTEM_FAULT"
+	// NoDataFound is the error code for missing data.
+	NoDataFound = "NO-DATA-FOUND"
+	// SystemFault is the error code for internal system faults.
+	SystemFault = "SYSTEM_FAULT"
+	// SystemFaultDesc is the default localized description for system faults.
 	SystemFaultDesc = "خطای سیستمی"
 )
 
+// JustPrintResp unmarshals and logs a remote response without returning parsed data.
 func JustPrintResp(respBytes []byte, desc string, status int) (int, map[string]string, any, error) {
 	var err error
 	var resp WsRemoteResponse
@@ -25,6 +29,7 @@ func JustPrintResp(respBytes []byte, desc string, status int) (int, map[string]s
 	return status, nil, nil, nil
 }
 
+// ParseRemoteRespJson parses a remote JSON response and extracts status, error details, and result.
 func ParseRemoteRespJson(respBytes []byte, desc string, status int) (int, map[string]string, any, error) {
 	var resp WsRemoteResponse
 	err := json.Unmarshal(respBytes, &resp)
@@ -41,6 +46,7 @@ func ParseRemoteRespJson(respBytes []byte, desc string, status int) (int, map[st
 	return http.StatusOK, nil, resp.Result, nil
 }
 
+// ParseWsRemoteResp parses a remote JSON response and returns the full WsRemoteResponse on success.
 func ParseWsRemoteResp(respBytes []byte, desc string, status int) (int, map[string]string, any, error) {
 	var resp WsRemoteResponse
 	err := json.Unmarshal(respBytes, &resp)

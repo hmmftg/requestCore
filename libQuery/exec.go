@@ -13,14 +13,17 @@ import (
 	"github.com/hmmftg/requestCore/webFramework"
 )
 
+// SetVariableCommand returns the database-specific command for setting session variables.
 func (m QueryRunnerModel) SetVariableCommand() string {
 	return m.SetVariable
 }
 
 const (
+	// ERROR_CALLING_DB_FUNCTION is the error description for database function call failures.
 	ERROR_CALLING_DB_FUNCTION = "ERROR_CALLING_DB_FUNCTION"
 )
 
+// CallDbFunction executes a database function with the given call string and arguments.
 func (m QueryRunnerModel) CallDbFunction(callString string, args ...any) (int, string, error) {
 	errPing := m.DB.Ping()
 	if errPing != nil {
@@ -35,17 +38,24 @@ func (m QueryRunnerModel) CallDbFunction(callString string, args ...any) (int, s
 }
 
 const (
+	// QueryCheckNotExists is the DML command type for verifying a record does not exist.
 	QueryCheckNotExists DmlCommandType = iota
+	// QueryCheckExists is the DML command type for verifying a record exists.
 	QueryCheckExists
+	// Insert is the DML command type for insert operations.
 	Insert
+	// Update is the DML command type for update operations.
 	Update
+	// Delete is the DML command type for delete operations.
 	Delete
 )
 
+// Execute runs the DML command using a background context.
 func (command DmlCommand) Execute(core QueryRunnerInterface, moduleName, methodName string) (any, error) {
 	return command.ExecuteWithContext(nil, context.Background(), moduleName, methodName, core)
 }
 
+// GetDmlResult builds a DmlResult from a SQL result and output parameter rows.
 func GetDmlResult(resultDb sql.Result, rows map[string]string) DmlResult {
 	resp := DmlResult{
 		Rows: rows,
@@ -55,6 +65,7 @@ func GetDmlResult(resultDb sql.Result, rows map[string]string) DmlResult {
 	return resp
 }
 
+// GetLocalArgs resolves named arguments that reference parser local storage.
 func GetLocalArgs(parser webFramework.RequestParser, args []any) []any {
 	result := make([]any, len(args))
 	for id, arg := range args {
@@ -73,6 +84,7 @@ func GetLocalArgs(parser webFramework.RequestParser, args []any) []any {
 	return result
 }
 
+// GetOutArgs extracts output parameter values from DML arguments and stores them in parser locals.
 func GetOutArgs(parser webFramework.RequestParser, args ...any) map[string]string {
 	rows := map[string]string{}
 	for id, arg := range args {
@@ -118,6 +130,7 @@ func GetOutArgs(parser webFramework.RequestParser, args ...any) map[string]strin
 	return rows
 }
 
+// ExecuteWithContext runs the DML command with the given context, parser, and query runner.
 func (command DmlCommand) ExecuteWithContext(parser webFramework.RequestParser, w context.Context, moduleName, methodName string, core QueryRunnerInterface) (any, error) {
 	switch command.Type {
 	case QueryCheckExists:

@@ -43,7 +43,9 @@ type ValidatorBuilder struct {
 }
 
 var (
-	Validator  *validator.Validate
+	// Validator is the global validator instance used for struct validation.
+	Validator *validator.Validate
+	// Translator is the global translator used for validation error messages.
 	Translator ut.Translator
 	initOnce   sync.Once
 
@@ -57,14 +59,18 @@ var (
 	useDefaultSystemValidators  = true
 )
 
+// RegexPaddedIp is the regular expression for validating padded IP addresses.
 const RegexPaddedIp string = `^((25[0-5]|2[0-4]\d|1\d\d|0\d\d)\.?\b){4}$` //^((25[0-5]|2[0-4]\d|1\d\d|0\d\d)\.?\b){4}$
 
 // Error code constants
 const (
-	ErrorCodeRequiredField    = "REQUIRED-FIELD"
+	// ErrorCodeRequiredField is the error code for missing required fields.
+	ErrorCodeRequiredField = "REQUIRED-FIELD"
+	// ErrorCodeInvalidInputData is the error code for invalid input data.
 	ErrorCodeInvalidInputData = "INVALID-INPUT-DATA"
 )
 
+// PaddedIpValidator validates that a field contains a properly padded IP address.
 func PaddedIpValidator(fl validator.FieldLevel) bool {
 	st := fl.Field().String()
 
@@ -313,6 +319,7 @@ func registerDefaultSystemValidators() {
 	registerSystemValidator("oneof", ErrorCodeInvalidInputData)
 }
 
+// ValidateStruct validates the given struct and returns validation errors or an invalid-type error.
 func ValidateStruct(in any) (*validator.InvalidValidationError, validator.ValidationErrors) {
 	Init()
 	err := Validator.Struct(in)
@@ -327,10 +334,12 @@ func ValidateStruct(in any) (*validator.InvalidValidationError, validator.Valida
 	return nil, nil
 }
 
+// GetTranslator returns the global translator used for validation error messages.
 func GetTranslator() ut.Translator {
 	return Translator
 }
 
+// Init initializes the global validator and translator, safe to call multiple times.
 func Init() {
 	initOnce.Do(func() {
 		var err error

@@ -12,21 +12,28 @@ import (
 	"github.com/hmmftg/requestCore/libError"
 )
 
+// GetModule returns the module and program names of the query runner.
 func (m QueryRunnerModel) GetModule() (string, string) {
 	return m.ModuleName, m.ProgramName
 }
 
+// GetDbMode returns the database mode of the query runner.
 func (m QueryRunnerModel) GetDbMode() DBMode {
 	return m.Mode
 }
 
 const (
+	// PREPARE_ERROR is the error code for statement preparation failures.
 	PREPARE_ERROR = -1
-	QUERY_ERROR   = -2
-	PARSE_ERROR   = -3
-	SCAN_ERROR    = -4
+	// QUERY_ERROR is the error code for query execution failures.
+	QUERY_ERROR = -2
+	// PARSE_ERROR is the error code for result parsing failures.
+	PARSE_ERROR = -3
+	// SCAN_ERROR is the error code for row scanning failures.
+	SCAN_ERROR = -4
 )
 
+// NewStatement prepares a SQL statement on the database.
 func (m QueryRunnerModel) NewStatement(command string) (*sql.Stmt, error) {
 	errPing := m.DB.Ping()
 	if errPing != nil {
@@ -39,6 +46,7 @@ func (m QueryRunnerModel) NewStatement(command string) (*sql.Stmt, error) {
 	return stmt, nil
 }
 
+// GetTagValue retrieves a struct field value by its tag name and returns the field name and value.
 func GetTagValue(name, tag string, s any) (*string, *string, error) {
 	//var elemType reflect.Type
 	elemType := reflect.TypeOf(s)
@@ -75,30 +83,43 @@ func GetTagValue(name, tag string, s any) (*string, *string, error) {
 	return nil, nil, fmt.Errorf("field %s with tag %s is not present in %T ", name, tag, s)
 }
 
+// GetDBTagValue retrieves a struct field value by its "db" tag name.
 func GetDBTagValue(name string, s any) (*string, *string, error) {
 	return GetTagValue(name, "db", s)
 }
 
+// GetFormTagValue retrieves a struct field value by its "form" tag name.
 func GetFormTagValue(name string, s any) (*string, *string, error) {
 	return GetTagValue(name, "form", s)
 }
 
 const (
-	NoDataFound        = "NoDataFound"
-	NoDataFoundDesc    = "رکوردی یافت نشد"
-	DuplicateFound     = "DuplicateFound"
+	// NoDataFound is the error description when a query returns no rows.
+	NoDataFound = "NoDataFound"
+	// NoDataFoundDesc is the human-readable description for no data found.
+	NoDataFoundDesc = "رکوردی یافت نشد"
+	// DuplicateFound is the error description when a query returns duplicate rows.
+	DuplicateFound = "DuplicateFound"
+	// DuplicateFoundDesc is the human-readable description for duplicate data.
 	DuplicateFoundDesc = "رکورد تکراری است"
-	DBReadError        = "DBReadError"
-	ParseDBRespError   = "ParseDBRespError"
+	// DBReadError is the error description for database read failures.
+	DBReadError = "DBReadError"
+	// ParseDBRespError is the error description for database response parsing failures.
+	ParseDBRespError = "ParseDBRespError"
 )
 
 const (
+	// QuerySingle indicates a query that expects exactly one row.
 	QuerySingle QueryCommandType = iota
+	// QueryAll indicates a query that returns all matching rows.
 	QueryAll
+	// QueryMap indicates a query that returns results as a key-value map.
 	QueryMap
+	// Transforms indicates a query with custom row transformation.
 	Transforms
 )
 
+// QueryOld executes a query command and returns the result based on the command type.
 func QueryOld[Result QueryResult](core QueryRunnerInterface, command QueryCommand, args ...any) (any, error) {
 	sqlCommand := command.Command
 	if len(command.CommandMap) > 0 && len(command.CommandMap[core.GetDbMode()]) > 0 {

@@ -12,6 +12,7 @@ import (
 	"github.com/hmmftg/requestCore/libParams"
 )
 
+// InitDB opens and pings the database connection, initializing both the sql.DB and gorm.DB handles.
 func InitDB(dbParams *libParams.DbParams) {
 	db, err := sql.Open(dbParams.DataBaseType, dbParams.DataBaseAddress.Value)
 	if err != nil {
@@ -44,6 +45,7 @@ func InitDB(dbParams *libParams.DbParams) {
 	dbParams.Orm = orm
 }
 
+// InitDataBases initializes all databases listed in dbNames using the provided parameters.
 func InitDataBases(params libParams.ParamInterface, dbNames []string) {
 	for id := range dbNames {
 		db := params.GetDB(dbNames[id])

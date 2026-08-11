@@ -12,6 +12,7 @@ import (
 	"github.com/lib/pq"
 )
 
+// Connect creates a PostgreSQL database connection with a notification handler for LISTEN/NOTIFY.
 func Connect(connectionString string, channel chan string) *sql.DB {
 	base, err := pq.NewConnector(connectionString)
 	if err != nil {
@@ -27,6 +28,7 @@ func Connect(connectionString string, channel chan string) *sql.DB {
 	return sql.OpenDB(connector)
 }
 
+// Results holds query result rows and PostgreSQL notification messages.
 type Results struct {
 	allRows [][]string
 	notices []string
@@ -34,10 +36,12 @@ type Results struct {
 
 var channel chan string
 
+// NotifyHandler handles PostgreSQL notification messages by sending them to the channel.
 func NotifyHandler(notice *pq.Error) {
 	channel <- notice.Message
 }
 
+// RunQuery executes a query and populates myresults with the returned rows.
 func RunQuery(db *sql.DB, query string, myresults *Results) error {
 	response, err := db.Query(query)
 	if err != nil {
@@ -92,6 +96,7 @@ func RunQuery(db *sql.DB, query string, myresults *Results) error {
 	return nil
 }
 
+// SendNotifs executes a NOTIFY command on the database.
 func SendNotifs(db *sql.DB, notifs string) {
 	result, err := db.Exec(notifs)
 	if err != nil {

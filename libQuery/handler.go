@@ -6,6 +6,7 @@ import (
 	"net/http"
 )
 
+// HandleCheckDuplicate checks query results for duplicate records and returns the appropriate status.
 func HandleCheckDuplicate(code int, desc, dupDesc string, record []QueryData, err error) (int, string, error) {
 	if desc != NoDataFound && len(record) != 0 {
 		return http.StatusBadRequest, dupDesc, fmt.Errorf("check duplicate faile: %s", dupDesc)
@@ -16,6 +17,7 @@ func HandleCheckDuplicate(code int, desc, dupDesc string, record []QueryData, er
 	return http.StatusOK, "", nil
 }
 
+// HandleCheckExistence checks query results for record existence and returns the appropriate status.
 func HandleCheckExistence(code int, desc, notExistDesc string, record []QueryData, err error) (int, string, error) {
 	if err != nil {
 		if desc == NoDataFound || len(record) == 0 {
@@ -26,6 +28,7 @@ func HandleCheckExistence(code int, desc, notExistDesc string, record []QueryDat
 	return http.StatusOK, "", nil
 }
 
+// Close closes the database connection for mock DB mode.
 func (m QueryRunnerModel) Close() {
 	if m.Mode == MockDB {
 		_ = m.DB.Close()

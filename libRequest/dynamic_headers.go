@@ -156,46 +156,73 @@ func (r *DynamicRequestHeader) GetHeaderMap() map[string]string {
 func (r DynamicRequestHeader) GetId() string {
 	return r.RequestId
 }
+
+// GetUser returns the user ID from the dynamic header.
 func (r DynamicRequestHeader) GetUser() string {
 	return r.User
 }
+
+// GetBank returns the bank ID from the dynamic header with default fallback.
 func (r DynamicRequestHeader) GetBank() string {
 	return r.GetDynamicHeaderWithDefault("Bank-Id")
 }
+
+// GetBranch returns the branch ID from the dynamic header with default fallback.
 func (r DynamicRequestHeader) GetBranch() string {
 	return r.GetDynamicHeaderWithDefault("Branch-Id")
 }
+
+// GetPerson returns the person ID from the dynamic header with default fallback.
 func (r DynamicRequestHeader) GetPerson() string {
 	return r.GetDynamicHeaderWithDefault("Person-Id")
 }
+
+// GetProgram returns the program ID from the dynamic header.
 func (r DynamicRequestHeader) GetProgram() string {
 	return r.Program
 }
+
+// GetModule returns the module ID from the dynamic header.
 func (r DynamicRequestHeader) GetModule() string {
 	return r.Module
 }
+
+// GetMethod returns the method ID from the dynamic header.
 func (r DynamicRequestHeader) GetMethod() string {
 	return r.Method
 }
 
+// SetUser sets the user ID on the dynamic header.
 func (r *DynamicRequestHeader) SetUser(user string) {
 	r.User = user
 }
+
+// SetProgram sets the program ID on the dynamic header.
 func (r *DynamicRequestHeader) SetProgram(program string) {
 	r.Program = program
 }
+
+// SetModule sets the module ID on the dynamic header.
 func (r *DynamicRequestHeader) SetModule(module string) {
 	r.Module = module
 }
+
+// SetMethod sets the method ID on the dynamic header.
 func (r *DynamicRequestHeader) SetMethod(method string) {
 	r.Method = method
 }
+
+// SetBranch sets the branch ID as a dynamic header.
 func (r *DynamicRequestHeader) SetBranch(branch string) {
 	r.SetDynamicHeader("Branch-Id", branch)
 }
+
+// SetBank sets the bank ID as a dynamic header.
 func (r *DynamicRequestHeader) SetBank(bank string) {
 	r.SetDynamicHeader("Bank-Id", bank)
 }
+
+// SetPerson sets the person ID as a dynamic header.
 func (r *DynamicRequestHeader) SetPerson(person string) {
 	r.SetDynamicHeader("Person-Id", person)
 }

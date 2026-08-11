@@ -20,13 +20,19 @@ const (
 )
 
 var (
-	TraceIDKey   = "trace_id"
-	SpanIDKey    = "span_id"
+	// TraceIDKey is the slog attribute key for the OpenTelemetry trace ID.
+	TraceIDKey = "trace_id"
+	// SpanIDKey is the slog attribute key for the OpenTelemetry span ID.
+	SpanIDKey = "span_id"
+	// RequestIDKey is the slog attribute key for the request ID.
 	RequestIDKey = "id"
 
-	RequestBodyMaxSize  = 64 * 1024 // 64KB
+	// RequestBodyMaxSize is the maximum number of bytes captured from the request body.
+	RequestBodyMaxSize = 64 * 1024 // 64KB
+	// ResponseBodyMaxSize is the maximum number of bytes captured from the response body.
 	ResponseBodyMaxSize = 64 * 1024 // 64KB
 
+	// HiddenRequestHeaders is the set of request headers excluded from logs.
 	HiddenRequestHeaders = map[string]struct{}{
 		"authorization": {},
 		"cookie":        {},
@@ -35,6 +41,7 @@ var (
 		"x-csrf-token":  {},
 		"x-xsrf-token":  {},
 	}
+	// HiddenResponseHeaders is the set of response headers excluded from logs.
 	HiddenResponseHeaders = map[string]struct{}{
 		"set-cookie": {},
 	}
@@ -44,6 +51,7 @@ var (
 	RequestIDContextKey = "slog-gin.request-id"
 )
 
+// Config holds the configuration for the slog Gin middleware.
 type Config struct {
 	DefaultLevel     slog.Level
 	ClientErrorLevel slog.Level

@@ -9,11 +9,13 @@ import (
 	"github.com/hmmftg/requestCore/webFramework"
 )
 
+// ContextInitiator defines the interface for initializing a web framework context and responding in Fiber.
 type ContextInitiator interface {
 	InitContext(c *fiber.Ctx) webFramework.WebFramework
 	Respond(int, int, string, any, bool, webFramework.WebFramework)
 }
 
+// ErrorHandler returns a Fiber error handler that maps errors to appropriate HTTP responses.
 func ErrorHandler(path, title string, handler ContextInitiator) fiber.ErrorHandler {
 	log.Println("ErrorHandler: ", path, title)
 	return func(c *fiber.Ctx, err error) error {

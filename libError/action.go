@@ -23,12 +23,14 @@ type Action struct {
 var matchFirstCap = regexp.MustCompile("(.)([A-Z][a-z]+)")
 var matchAllCap = regexp.MustCompile("([a-z0-9])([A-Z])")
 
+// ToSnakeCase converts a camelCase or PascalCase string to UPPER_SNAKE_CASE.
 func ToSnakeCase(str string) string {
 	snake := matchFirstCap.ReplaceAllString(str, "${1}_${2}")
 	snake = matchAllCap.ReplaceAllString(snake, "${1}_${2}")
 	return strings.ToUpper(snake)
 }
 
+// Format writes the action's status, description, and message into the given string builder.
 func (a Action) Format(stack *strings.Builder) {
 	fmt.Fprintf(stack,
 		"status: %d|%s, desc: %s",
@@ -43,6 +45,7 @@ func (a Action) Format(stack *strings.Builder) {
 	stack.WriteString(message)
 }
 
+// SLog returns a grouped slog.Attr representing the action for structured logging.
 func (a Action) SLog() slog.Attr {
 	attrs := []any{
 		slog.String("status", fmt.Sprintf("%d|%s", a.Status.Int(), a.Status.String())),

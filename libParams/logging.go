@@ -29,26 +29,37 @@ type LogParams struct {
 	Splunk      *SplunkParams `yaml:"splunkParams"`
 }
 
+// GetLogPath returns the configured log file path.
 func (l LogParams) GetLogPath() string {
 	return l.LogPath
 }
+
+// GetLogSize returns the configured maximum log file size.
 func (l LogParams) GetLogSize() int {
 	return l.LogSize
 }
+
+// GetLogCompress returns whether log compression is enabled.
 func (l LogParams) GetLogCompress() bool {
 	return l.LogCompress
 }
+
+// GetSkipPaths returns the list of request paths excluded from logging.
 func (l LogParams) GetSkipPaths() []string {
 	return l.SkipPaths
 }
+
+// GetHeaderName returns the configured log header name.
 func (l LogParams) GetHeaderName() string {
 	return l.LogHeader
 }
 
+// GetLogging returns the logging parameters for the application.
 func (m ApplicationParams[SpecialParams]) GetLogging() LogParams {
 	return m.Logging
 }
 
+// LogRotate starts a background goroutine that rotates the lumberjack logger hourly.
 func LogRotate(logger *lumberjack.Logger) {
 	// ticker := time.NewTicker(time.Second * 1)
 	ticker := time.NewTicker(time.Hour)

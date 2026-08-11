@@ -226,6 +226,7 @@ func (a AnyString) Match(_ driver.Value) bool {
 	return true
 }
 
+// GetRequestModel returns a QueryRunnerModel backed by a sqlmock database with predefined query expectations.
 func GetRequestModel(t *testing.T) libQuery.QueryRunnerModel {
 	db, mockDB, err := sqlmock.New() // sqlmock.QueryMatcherOption(sqlmock.QueryMatcherEqual))
 	if err != nil {

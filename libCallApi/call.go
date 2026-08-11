@@ -11,7 +11,10 @@ import (
 	"github.com/hmmftg/requestCore/webFramework"
 )
 
+// CallParam is a pointer alias for CallParamData used in Call.
 type CallParam *CallParamData
+
+// CallParamData holds the parameters for a generic remote API call.
 type CallParamData struct {
 	HttpClient  *http.Client
 	Parameters  map[string]any
@@ -28,6 +31,7 @@ type CallParamData struct {
 	Parser      webFramework.RequestParser `json:"-"` // Parser for distributed tracing and request cancellation
 }
 
+// LogValue returns a structured slog.Value summarizing the call parameters.
 func (r CallParamData) LogValue() slog.Value {
 	return slog.GroupValue(
 		slog.String("api", r.API.Name),
@@ -41,8 +45,10 @@ func (r CallParamData) LogValue() slog.Value {
 	)
 }
 
+// BuilerFunc is the signature for a response builder function.
 type BuilerFunc[Resp any] func(status int, rawResp []byte, headers map[string]string) (*Resp, error)
 
+// RemoteCallParamData holds the parameters for a typed remote API call.
 type RemoteCallParamData[Req, Resp any] struct {
 	HttpClient  *http.Client
 	Parameters  map[string]any             `json:"-"`
@@ -61,6 +67,7 @@ type RemoteCallParamData[Req, Resp any] struct {
 	Parser      webFramework.RequestParser `json:"-"` // Parser for distributed tracing and request cancellation
 }
 
+// LogValue returns a structured slog.Value summarizing the remote call parameters with masked auth.
 func (r RemoteCallParamData[Req, Resp]) LogValue() slog.Value {
 	headers := maps.Clone(r.Headers)
 	if headers == nil {
@@ -79,6 +86,7 @@ func (r RemoteCallParamData[Req, Resp]) LogValue() slog.Value {
 	)
 }
 
+// CallResult wraps the outcome of a Call including response, ws response, status, and error.
 type CallResult[RespType any] struct {
 	Resp   *RespType
 	WsResp *response.WsRemoteResponse
@@ -86,6 +94,7 @@ type CallResult[RespType any] struct {
 	Error  error
 }
 
+// Call executes a remote API call and returns a CallResult.
 func Call[RespType any](w webFramework.WebFramework, param CallParam) CallResult[RespType] {
 	if param.QueryStack != nil && len(*param.QueryStack) > 0 {
 		param.Query = (*param.QueryStack)[0]
@@ -120,6 +129,7 @@ func Call[RespType any](w webFramework.WebFramework, param CallParam) CallResult
 	return CallResult[RespType]{resp, wsResp, callResp, err}
 }
 
+// RemoteCall executes a typed remote API call and returns the parsed response.
 func RemoteCall[Req, Resp any](w webFramework.WebFramework, param *RemoteCallParamData[Req, Resp]) (*Resp, error) {
 	if param.QueryStack != nil && len(*param.QueryStack) > 0 {
 		param.Query = (*param.QueryStack)[0]

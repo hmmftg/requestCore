@@ -8,12 +8,14 @@ import (
 	"encoding/base64"
 )
 
+// PKCS7Padding appends PKCS#7 padding bytes to the given ciphertext.
 func PKCS7Padding(ciphertext []byte) []byte {
 	padding := aes.BlockSize - len(ciphertext)%aes.BlockSize
 	padtext := bytes.Repeat([]byte{byte(padding)}, padding)
 	return append(ciphertext, padtext...)
 }
 
+// PKCS7UnPadding removes PKCS#7 padding bytes from the given plaintext.
 func PKCS7UnPadding(plantText []byte) []byte {
 	var unpadding int
 	length := len(plantText)
@@ -27,6 +29,7 @@ func PKCS7UnPadding(plantText []byte) []byte {
 	return plantText[:(length - unpadding)]
 }
 
+// AesDecrypt decrypts a base64-encoded AES-CBC ciphertext using the given base64-encoded key and IV.
 func AesDecrypt(kaeyB64, ivB64, textB64 string) (string, error) {
 	key, _ := base64.StdEncoding.DecodeString(kaeyB64)
 	iv, _ := base64.StdEncoding.DecodeString(ivB64)
@@ -44,6 +47,7 @@ func AesDecrypt(kaeyB64, ivB64, textB64 string) (string, error) {
 	return base64.StdEncoding.EncodeToString(plaintext), nil
 }
 
+// AesEncrypt encrypts a plaintext string using AES-CBC with the given base64-encoded key and IV.
 func AesEncrypt(kaeyB64, ivB64, text string) (string, error) {
 	plaintext := []byte(text)
 	key, _ := base64.StdEncoding.DecodeString(kaeyB64)

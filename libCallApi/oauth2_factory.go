@@ -8,10 +8,13 @@ import (
 )
 
 const (
+	// GrantTypeClientCredentials is the OAuth2 client_credentials grant type string.
 	GrantTypeClientCredentials = "client_credentials"
-	GrantTypePassword          = "password"
+	// GrantTypePassword is the OAuth2 password grant type string.
+	GrantTypePassword = "password"
 )
 
+// NewTokenHTTPClient creates a new *http.Client with the default timeout for token requests.
 func NewTokenHTTPClient() *http.Client {
 	return &http.Client{
 		Timeout:   defaultTimeOut,
@@ -19,6 +22,7 @@ func NewTokenHTTPClient() *http.Client {
 	}
 }
 
+// NewOAuth2AuthFromAuthData builds an AuthSystem implementation from Auth data and an HTTP client.
 func NewOAuth2AuthFromAuthData(auth Auth, httpClient *http.Client) (AuthSystem, error) {
 	if auth.GrantType == "" {
 		return nil, fmt.Errorf("grant-type is required")

@@ -18,19 +18,23 @@ import (
 	"github.com/hmmftg/requestCore/status"
 )
 
+// QueryResp holds the total row count and the translated response for a query.
 type QueryResp[Resp any] struct {
 	TotalRows int
 	Resp      Resp
 }
 
+// RowTranslator is the interface for translating query rows into a response.
 type RowTranslator[Row, Resp any] interface {
 	Translate([]Row, HandlerRequest[Row, Resp]) (QueryResp[Resp], error)
 	TranslateWithPaginate([]Row, HandlerRequest[Row, Resp], libRequest.PaginationData) (QueryResp[Resp], error)
 }
 
+// QuerySingleTransformer translates a single-row query result into a one-element slice response.
 type QuerySingleTransformer[Row any, Resp []Row] struct {
 }
 
+// Translate wraps the first row into a single-element response.
 func (s QuerySingleTransformer[Row, Resp]) Translate(rows []Row, req HandlerRequest[Row, Resp]) (QueryResp[Resp], error) {
 	return QueryResp[Resp]{
 		TotalRows: 1,
@@ -38,6 +42,7 @@ func (s QuerySingleTransformer[Row, Resp]) Translate(rows []Row, req HandlerRequ
 	}, nil
 }
 
+// TranslateWithPaginate wraps the first row into a single-element response with pagination.
 func (s QuerySingleTransformer[Row, Resp]) TranslateWithPaginate(rows []Row, req HandlerRequest[Row, Resp], pd libRequest.PaginationData) (QueryResp[Resp], error) {
 	return QueryResp[Resp]{
 		TotalRows: 1,
@@ -45,9 +50,11 @@ func (s QuerySingleTransformer[Row, Resp]) TranslateWithPaginate(rows []Row, req
 	}, nil
 }
 
+// QueryAllTransformer translates all query rows into a slice response.
 type QueryAllTransformer[Row any, Resp []Row] struct {
 }
 
+// Translate wraps all rows into a slice response.
 func (s QueryAllTransformer[Row, Resp]) Translate(rows []Row, req HandlerRequest[Row, Resp]) (QueryResp[Resp], error) {
 	return QueryResp[Resp]{
 		TotalRows: len(rows),
@@ -55,6 +62,7 @@ func (s QueryAllTransformer[Row, Resp]) Translate(rows []Row, req HandlerRequest
 	}, nil
 }
 
+// TranslateWithPaginate wraps all rows into a slice response with pagination.
 func (s QueryAllTransformer[Row, Resp]) TranslateWithPaginate(rows []Row, req HandlerRequest[Row, Resp], pd libRequest.PaginationData) (QueryResp[Resp], error) {
 	return QueryResp[Resp]{
 		TotalRows: len(rows),
@@ -62,6 +70,7 @@ func (s QueryAllTransformer[Row, Resp]) TranslateWithPaginate(rows []Row, req Ha
 	}, nil
 }
 
+// QueryHandlerType holds configuration for a database query handler.
 type QueryHandlerType[Row, Resp any] struct {
 	Title           string
 	Path            string
@@ -80,24 +89,30 @@ type QueryHandlerType[Row, Resp any] struct {
 	OnEmpty200      bool
 }
 
+// CommandReplacer replaces a token in a query command string using a builder function.
 type CommandReplacer[T any] struct {
 	Token   string
 	Builder func(T) string
 }
 
+// Replace substitutes the token in the command with the value built from data.
 func (c CommandReplacer[T]) Replace(command string, data T) string {
 	return strings.Replace(command, c.Token, c.Builder(data), 1)
 }
 
+// RowPaginator provides a less function for sorting rows based on pagination data.
 type RowPaginator[Row any] struct {
 	Less func(libRequest.PaginationData) func(i, j int) bool
 }
 
 const (
+	// Asc is the ascending sort order constant.
 	Asc = "asc"
+	// Dsc is the descending sort order constant.
 	Dsc = "desc"
 )
 
+// Filter holds a single filter condition for query result filtering.
 type Filter struct {
 	Field    string
 	Operator string
@@ -105,6 +120,7 @@ type Filter struct {
 	Value2nd string
 }
 
+// Filterate applies filter conditions from pagination data to the row slice.
 func Filterate[Row any](paginationData libRequest.PaginationData, data []Row, filterFunc func(Filter) func(Row) bool) []Row {
 	if len(paginationData.Filters) == 0 {
 		return data
@@ -136,6 +152,7 @@ func Filterate[Row any](paginationData libRequest.PaginationData, data []Row, fi
 	return result
 }
 
+// Paginate sorts and slices the data according to the pagination parameters.
 func Paginate[Row any](paginationData libRequest.PaginationData, data []Row, less func(string) func(i int, j int) bool) []Row {
 	start := paginationData.Start
 	end := paginationData.End
@@ -161,6 +178,7 @@ func Paginate[Row any](paginationData libRequest.PaginationData, data []Row, les
 	return result[start:end]
 }
 
+// Parameters returns the handler parameters for the QueryHandlerType.
 func (q QueryHandlerType[Row, Resp]) Parameters() HandlerParameters[Row, Resp] {
 	return HandlerParameters[Row, Resp]{
 		Title:           q.Title,
@@ -178,14 +196,17 @@ func (q QueryHandlerType[Row, Resp]) Parameters() HandlerParameters[Row, Resp] {
 	}
 }
 
+// Initializer is a no-op initializer for the QueryHandlerType.
 func (q QueryHandlerType[Row, Resp]) Initializer(req HandlerRequest[Row, Resp]) error {
 	return nil
 }
 
+// CacheKey builds a cache key from the handler title and arguments.
 func (q QueryHandlerType[Row, Resp]) CacheKey(args []any) string {
 	return fmt.Sprintf("%s-%v", q.Title, args)
 }
 
+// CheckCache returns cached rows for the given arguments if still valid.
 func (q QueryHandlerType[Row, Resp]) CheckCache(args []any) []Row {
 	key := q.CacheKey(args)
 	if data, ok := q.CacheData[key]; ok {
@@ -197,12 +218,14 @@ func (q QueryHandlerType[Row, Resp]) CheckCache(args []any) []Row {
 	return nil
 }
 
+// CacheResult stores rows in the cache under the key derived from the arguments.
 func (q QueryHandlerType[Row, Resp]) CacheResult(args []any, rows []Row) {
 	key := q.CacheKey(args)
 	q.CacheData[key] = rows
 	q.CacheTime = time.Now()
 }
 
+// Handler executes the query and translates the rows into the response.
 func (q QueryHandlerType[Row, Resp]) Handler(req HandlerRequest[Row, Resp]) (Resp, error) {
 	anyArgs := []any{}
 	for id := range q.Command.Args {
@@ -275,13 +298,16 @@ func (q QueryHandlerType[Row, Resp]) Handler(req HandlerRequest[Row, Resp]) (Res
 
 }
 
+// Simulation returns the default response for simulation mode.
 func (q QueryHandlerType[Req, Resp]) Simulation(req HandlerRequest[Req, Resp]) (Resp, error) {
 	return req.Response, nil
 }
 
+// Finalizer is a no-op finalizer for the QueryHandlerType.
 func (q QueryHandlerType[Req, Resp]) Finalizer(req HandlerRequest[Req, Resp]) {
 }
 
+// Query returns a base handler that executes a database query.
 func Query[Row, Resp any](
 	core requestCore.RequestCoreInterface,
 	handler QueryHandlerType[Row, Resp],
@@ -292,6 +318,7 @@ func Query[Row, Resp any](
 		simulation)
 }
 
+// CachingArgs holds caching configuration for query handlers.
 type CachingArgs struct {
 	Cache       bool
 	CacheMaxAge time.Duration
@@ -345,6 +372,7 @@ func queryHandler[Row any, Resp []Row](
 	return Query(core, handler, simulation)
 }
 
+// QueryHandler returns a base handler for database queries using the database's default mode.
 func QueryHandler[Row any, Resp []Row](
 	title, key, path string, queryMap map[string]libQuery.QueryCommand,
 	core requestCore.RequestCoreInterface,
@@ -359,6 +387,7 @@ func QueryHandler[Row any, Resp []Row](
 		recoveryHandler, nil, core.GetDB().GetDbMode())
 }
 
+// QueryHandlerWithCaching returns a base handler for database queries with caching support.
 func QueryHandlerWithCaching[Row any, Resp []Row](
 	title, key, path string, queryMap map[string]libQuery.QueryCommand,
 	core requestCore.RequestCoreInterface,
@@ -374,6 +403,7 @@ func QueryHandlerWithCaching[Row any, Resp []Row](
 	)
 }
 
+// QueryHandlerWithTransform returns a base handler for queries with a custom translator and command replacer.
 func QueryHandlerWithTransform[Row, Resp any](
 	title, key, path string, queryMap map[string]libQuery.QueryCommand,
 	core requestCore.RequestCoreInterface,

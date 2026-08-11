@@ -29,6 +29,7 @@ import (
 	_ "github.com/sijms/go-ora/v2" // register oracle driver
 )
 
+// Application defines the interface that a requestCore-based service must implement.
 type Application[T any] interface {
 	AddRoutes(
 		model *requestCore.RequestCoreModel,
@@ -50,9 +51,13 @@ type Application[T any] interface {
 	GetCorsConfig() *cors.Config
 }
 
+// NoRequest is the request mode constant indicating no request tracking.
 const NoRequest = "no_req"
+
+// LogRequest is the request mode constant indicating log-only request tracking.
 const LogRequest = "log_req"
 
+// App holds the initialized application instance, parameters, Gin engine, and model.
 type App[T any] struct {
 	Instance Application[T]
 	Params   *libParams.ApplicationParams[T]
@@ -60,6 +65,8 @@ type App[T any] struct {
 	Model    requestCore.RequestCoreInterface
 }
 
+// InitializeApp initializes and returns a fully configured App from the given Application instance.
+//
 //nolint:lll
 func InitializeApp[T any](app Application[T]) *App[T] {
 	var err error
@@ -150,6 +157,7 @@ func InitializeApp[T any](app Application[T]) *App[T] {
 	return &App[T]{app, wsParams, engine, model}
 }
 
+// StartApp starts the HTTP/HTTPS server for the given application.
 func StartApp[T any](app App[T]) {
 	Listen(app.Params.GetNetwork(app.Instance.Name()), app.Engine)
 }

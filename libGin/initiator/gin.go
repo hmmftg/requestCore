@@ -13,11 +13,13 @@ import (
 	"github.com/hmmftg/requestCore/libParams"
 )
 
+// HandlePanics is the default panic recovery handler for Gin that logs the panic and aborts the request.
 var HandlePanics gin.RecoveryFunc = func(c *gin.Context, err any) {
 	log.Printf("panic happened!!! err: %+v", err)
 	c.Abort()
 }
 
+// InitGin creates and configures a new Gin engine with logging, recovery, and CORS middleware.
 func InitGin(basePath string, wsParams libParams.ParamInterface, corsConfig *cors.Config) (*gin.Engine, *gin.RouterGroup) {
 	app := gin.New()
 	logParams := wsParams.GetLogging()

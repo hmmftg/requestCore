@@ -8,6 +8,7 @@ import (
 	"strings"
 )
 
+// ErrorData holds structured error information including status, description, message, and child errors.
 type ErrorData struct {
 	source      string
 	input       any
@@ -17,6 +18,7 @@ type ErrorData struct {
 	childs      []ErrorState
 }
 
+// Unwrap attempts to extract an ErrorState from the given error, returning whether it succeeded.
 func Unwrap(err error) (bool, ErrorState) {
 	errData := &ErrorData{}
 	if errors.As(err, errData) {
@@ -41,26 +43,42 @@ func (e ErrorData) LogValue() slog.Value {
 	)
 }
 
-func (e ErrorData) GetStatus() int         { return e.Status }
-func (e ErrorData) GetInput() any          { return e.input }
-func (e ErrorData) GetDescription() string { return e.Description }
-func (e ErrorData) GetMessage() any        { return e.Message }
+// GetStatus returns the HTTP status code associated with the error.
+func (e ErrorData) GetStatus() int { return e.Status }
 
+// GetInput returns the input data associated with the error.
+func (e ErrorData) GetInput() any { return e.input }
+
+// GetDescription returns the error description string.
+func (e ErrorData) GetDescription() string { return e.Description }
+
+// GetMessage returns the error message payload.
+func (e ErrorData) GetMessage() any { return e.Message }
+
+// SetStatus sets the HTTP status code and returns the updated ErrorState.
 func (e ErrorData) SetStatus(status int) ErrorState {
 	e.Status = status
 	return &e
 }
+
+// SetDescription sets the error description and returns the updated ErrorState.
 func (e ErrorData) SetDescription(desc string) ErrorState {
 	e.Description = desc
 	return &e
 }
+
+// SetMessage sets the error message payload and returns the updated ErrorState.
 func (e ErrorData) SetMessage(msg any) ErrorState {
 	e.Message = msg
 	return &e
 }
+
+// ChildErr wraps a standard error as a child ErrorState and appends it to the chain.
 func (e ErrorData) ChildErr(err error) ErrorState {
 	return e.Child(toErrorState(err, 4))
 }
+
+// Child appends an ErrorState as a child to this error and returns the updated state.
 func (e ErrorData) Child(err ErrorState) ErrorState {
 	if e.childs == nil {
 		e.childs = []ErrorState{err}
@@ -69,6 +87,8 @@ func (e ErrorData) Child(err ErrorState) ErrorState {
 	}
 	return &e
 }
+
+// Format writes a structured text representation of the error and its children into the given builder.
 func (e ErrorData) Format(header string, stack *strings.Builder) {
 	var jsonMsg, jsonInput string
 	if e.input != nil {
@@ -89,21 +109,25 @@ func (e ErrorData) Format(header string, stack *strings.Builder) {
 	}
 }
 
+// Error returns a formatted multi-line string representation of the error chain.
 func (e ErrorData) Error() string {
 	var stack strings.Builder
 	e.Format("", &stack)
 	return stack.String()
 }
 
+// Input associates input data with the error and returns the updated ErrorState.
 func (e *ErrorData) Input(in any) ErrorState {
 	e.input = in
 	return e
 }
 
+// WsResponse returns a hash-like string combining the error's description, source, input, message, and status.
 func (e ErrorData) WsResponse() string {
 	return fmt.Sprintf("%s#%s#%v#%v#%d", e.Description, e.source, e.input, e.Message, e.Status)
 }
 
+// GetErrorsArray builds a slice of ErrorResponse from a message and data, handling pre-built error arrays.
 func GetErrorsArray(message string, data any) []ErrorResponse {
 	var errorResponses []ErrorResponse
 	errorResponses, ok := data.([]ErrorResponse)
@@ -117,6 +141,7 @@ func GetErrorsArray(message string, data any) []ErrorResponse {
 	return errorResponses
 }
 
+// GetErrorsArrayWithMap resolves error codes against a description map to produce localized ErrorResponse entries.
 func GetErrorsArrayWithMap(incomingDesc string, data any, errDescList map[string]string) []ErrorResponse {
 	var errorResponses []ErrorResponse
 	respData, okRespData := data.(RespData)

@@ -11,6 +11,7 @@ import (
 	"github.com/blockloop/scan/v2"
 )
 
+// Query executes a SQL query and scans the result rows into a slice of Result.
 func Query[Result any](db *sql.DB, querySql string, args ...any) ([]Result, error) {
 	errPing := db.Ping()
 	if errPing != nil {

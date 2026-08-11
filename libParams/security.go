@@ -11,21 +11,25 @@ import (
 	"github.com/hmmftg/requestCore/libCrypto/ssm"
 )
 
+// SecurityParam represents a single parameter that may be stored in plain or encrypted form.
 type SecurityParam struct {
 	IsPlain bool   `yaml:"isPlain,omitempty"`
 	Value   string `yaml:"value"`
 }
 
+// SecurityModule defines a security module with its type, parameters, and crypto implementation.
 type SecurityModule struct {
 	Type   string            `yaml:"type"`
 	Params map[string]string `yaml:"params"`
 	libCrypto.Sm
 }
 
+// GetSecurityModule returns the security module with the given name.
 func (m ApplicationParams[SpecialParams]) GetSecurityModule(name string) *SecurityModule {
 	return GetValueFromMap(name, m.SecurityModule)
 }
 
+// GetSecureParam returns the security parameter for the given group and name.
 func (m ApplicationParams[SpecialParams]) GetSecureParam(group, name string) *SecurityParam {
 	gr := GetValueFromMap(group, m.SecureParameterGroups)
 	if gr == nil {
@@ -34,6 +38,7 @@ func (m ApplicationParams[SpecialParams]) GetSecureParam(group, name string) *Se
 	return GetValueFromMap(name, gr.SecureParams)
 }
 
+// FillCipher encrypts the given field if it is plain, using the provided key and IV.
 func FillCipher(key, iv string, field SecurityParam) (*SecurityParam, error) {
 	if field.IsPlain {
 		cipher, err := ssm.AesEncrypt(key, iv, field.Value)
@@ -47,6 +52,7 @@ func FillCipher(key, iv string, field SecurityParam) (*SecurityParam, error) {
 	return &field, nil
 }
 
+// EncryptParams encrypts all plain secure parameters and DB addresses, writing the result to paramFile.
 func EncryptParams[T any](keyByte, ivByte []byte, paramFile string, params *ApplicationParams[T]) error {
 	encryptedParams := ApplicationParams[T]{}
 	err := copier.Copy(&encryptedParams, params)
@@ -88,6 +94,7 @@ func EncryptParams[T any](keyByte, ivByte []byte, paramFile string, params *Appl
 	return Write(&encryptedParams, paramFile)
 }
 
+// Decrypt decrypts the given field using the provided key and IV, returning the plain value.
 func Decrypt(key, iv, name string, field SecurityParam) (*SecurityParam, error) {
 	if field.IsPlain {
 		return nil, fmt.Errorf("security field %s is plain", name)
@@ -107,6 +114,7 @@ func Decrypt(key, iv, name string, field SecurityParam) (*SecurityParam, error) 
 	return &field, nil
 }
 
+// DecryptParams decrypts all secure parameters and populates remote API and security module fields.
 func DecryptParams[T any](keyByte, ivByte []byte, params *ApplicationParams[T]) (*ApplicationParams[T], error) {
 	plainParams := &ApplicationParams[T]{}
 	err := copier.Copy(&plainParams, params)

@@ -21,11 +21,13 @@ import (
 	"github.com/hmmftg/requestCore/libValidate"
 )
 
+// ErrorResponse represents a single error entry returned to API clients.
 type ErrorResponse struct {
 	Code        string `json:"code"`
 	Description string `json:"description"`
 }
 
+// ToErrorState converts a WsRemoteResponse into an ErrorState for error chaining.
 func (e WsRemoteResponse) ToErrorState() ErrorState {
 	if len(e.Description) > 0 {
 		if len(e.ErrorData) == 0 {
@@ -48,6 +50,7 @@ func (e WsRemoteResponse) ToErrorState() ErrorState {
 	}
 }
 
+// ErrorState defines the interface for structured error data with chaining and logging support.
 type ErrorState interface {
 	Error() string
 	Input(in any) ErrorState
@@ -64,6 +67,7 @@ type ErrorState interface {
 	LogValue() slog.Value
 }
 
+// GetStack returns a formatted caller stack frame, skipping framework-internal files.
 func GetStack(skip int, exclude string) string {
 	_, filename, line, _ := runtime.Caller(skip + 1)
 	localSkip := skip
@@ -83,18 +87,22 @@ func toErrorState(err error, skip int) ErrorState {
 	}
 }
 
+// ToErrorState converts a standard error into an ErrorState with source tracking.
 func ToErrorState(err error) ErrorState {
 	return toErrorState(err, 2)
 }
 
+// ToError creates an ErrorState with an internal-server-error status from the given description, message, and error.
 func ToError(desc string, message any, err error) ErrorState {
 	return Error(http.StatusInternalServerError, desc, message, err)
 }
 
+// Error creates an ErrorState with the given status, description, message, and wrapped error.
 func Error(status int, desc string, message any, err error) ErrorState {
 	return Errors(status, desc, message, toErrorState(err, 3))
 }
 
+// Errors creates an ErrorState by chaining an existing ErrorState with a new status and description.
 func Errors(status int, desc string, message any, err ErrorState) ErrorState {
 	_, filename, line, _ := runtime.Caller(1)
 	src := fmt.Sprintf("%s:%d", filename, line)
@@ -106,6 +114,7 @@ func Errors(status int, desc string, message any, err ErrorState) ErrorState {
 	}.Child(err)
 }
 
+// FormatErrorResp translates validator validation errors into a slice of ErrorResponse using the given translator.
 func FormatErrorResp(errs error, trans ut.Translator) []ErrorResponse {
 	err := errs.(validator.ValidationErrors)
 	errorResponses := make([]ErrorResponse, 0)

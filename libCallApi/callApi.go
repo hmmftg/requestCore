@@ -34,6 +34,7 @@ import (
 	"github.com/hmmftg/requestCore/webFramework"
 )
 
+// ConsumeRestBasicAuthAPI calls a remote REST API using basic authentication.
 func (m RemoteAPIModel) ConsumeRestBasicAuthAPI(w webFramework.WebFramework, requestJson []byte, apiName, path, contentType, method string, headers map[string]string) ([]byte, string, error) {
 	if timeOutString, ok := headers["Time-Out"]; ok {
 		timeoutSeconds, _ := strconv.Atoi(timeOutString)
@@ -84,10 +85,12 @@ func (m RemoteAPIModel) ConsumeRestBasicAuthAPI(w webFramework.WebFramework, req
 	return responseData, resp.Status, nil
 }
 
+// GetApi returns the RemoteAPI registered under the given name.
 func (m RemoteAPIModel) GetApi(apiName string) RemoteAPI {
 	return m.RemoteAPIList[apiName]
 }
 
+// ConsumeRestAPI calls a remote REST API and returns the response body, status text, status code, and error.
 func (m RemoteAPIModel) ConsumeRestAPI(w webFramework.WebFramework, requestJson []byte, apiName, path, contentType, method string, headers map[string]string) ([]byte, string, int, error) {
 	if timeOutString, ok := headers["Time-Out"]; ok {
 		timeoutSeconds, _ := strconv.Atoi(timeOutString)
@@ -160,14 +163,19 @@ func logResponseBodyForDebug(apiName, label string, body []byte) {
 	slog.Debug("response body for debug", slog.String("api", apiName), slog.String("label", label), slog.String("body", preview))
 }
 
+// RequestBodyType identifies the kind of request body to send.
 type RequestBodyType int
 
 const (
+	// JSON indicates a JSON request body.
 	JSON RequestBodyType = iota
+	// Form indicates a form-urlencoded request body.
 	Form
+	// Empty indicates no request body.
 	Empty
 )
 
+// CallData holds all parameters needed to perform an instrumented remote API call.
 type CallData[Resp any] struct {
 	httpClient *http.Client
 	API        RemoteAPI
@@ -186,6 +194,7 @@ type CallData[Resp any] struct {
 	LogValue slog.Value
 }
 
+// CallResp contains the HTTP status and response headers from a remote call.
 type CallResp struct {
 	Headers map[string]string
 	Status  int
@@ -223,6 +232,7 @@ func GetResp[Resp any, Error any](api RemoteAPI, resp *http.Response) (*Resp, *E
 	return &respJson, &errJson, &CallResp{Status: resp.StatusCode, Headers: headerMap}, nil
 }
 
+// GetJSONResp reads and parses an HTTP response into a typed result using an optional builder.
 func GetJSONResp[Resp any](api RemoteAPI, resp *http.Response, Builder func(int, []byte, map[string]string) (*Resp, error)) (*Resp, error) {
 	responseData, err := io.ReadAll(resp.Body)
 	if err != nil {
@@ -248,6 +258,7 @@ func GetJSONResp[Resp any](api RemoteAPI, resp *http.Response, Builder func(int,
 	return &jsonResp, nil
 }
 
+// PrepareCall constructs an *http.Request from CallData, applying auth, headers, and tracing propagation.
 func PrepareCall[Resp any](w webFramework.WebFramework, c CallData[Resp]) (*http.Request, error) {
 	var to time.Duration
 	if timeOutString, ok := c.Headers["Time-Out"]; ok {
@@ -328,6 +339,7 @@ func PrepareCall[Resp any](w webFramework.WebFramework, c CallData[Resp]) (*http
 	return req, nil
 }
 
+// SetLogs attaches an httptrace.ClientTrace to the request for verbose connection logging.
 func (c CallData[Resp]) SetLogs(req *http.Request) *http.Request {
 	trace := &httptrace.ClientTrace{
 		GotConn: func(connInfo httptrace.GotConnInfo) {
@@ -354,6 +366,7 @@ func (c CallData[Resp]) SetLogs(req *http.Request) *http.Request {
 	return req
 }
 
+// ConsumeRest executes a remote API call and returns the parsed response, ws response, and call metadata.
 func ConsumeRest[Resp any](w webFramework.WebFramework, c CallData[Resp]) (*Resp, *response.WsRemoteResponse, *CallResp, error) {
 	req, err := PrepareCall(w, c)
 	if err != nil {
@@ -448,6 +461,7 @@ func ConsumeRest[Resp any](w webFramework.WebFramework, c CallData[Resp]) (*Resp
 	return respJson, errResp, callResp, nil
 }
 
+// DefaultBuilderfunc is the default response builder that unmarshals JSON into the result type.
 func DefaultBuilderfunc[Resp any](stat int, rawResp []byte, headers map[string]string) (*Resp, error) {
 	if stat != http.StatusOK {
 		return nil, libError.NewWithDescription(status.StatusCode(stat), "API_RESP_NOK", "build request failed, status %d", stat)
@@ -461,6 +475,7 @@ func DefaultBuilderfunc[Resp any](stat int, rawResp []byte, headers map[string]s
 	return &resp, nil
 }
 
+// ConsumeRestJSON executes a remote API call and returns the parsed JSON response.
 func ConsumeRestJSON[Resp any](w webFramework.WebFramework, c *CallData[Resp]) (*Resp, error) {
 	req, err := PrepareCall(w, *c)
 	if err != nil {
@@ -557,6 +572,7 @@ func ConsumeRestJSON[Resp any](w webFramework.WebFramework, c *CallData[Resp]) (
 	return respJson, nil
 }
 
+// TransmitRequestWithAuth sends a request through a consume handler and parses the remote response.
 func TransmitRequestWithAuth(
 	path, api, method string,
 	requestByte []byte,
@@ -576,11 +592,13 @@ func TransmitRequestWithAuth(
 	return http.StatusOK, nil, respApi, nil
 }
 
+// BasicAuth returns the base64-encoded basic authentication string for the given credentials.
 func BasicAuth(username, password string) string {
 	auth := username + ":" + password
 	return base64.StdEncoding.EncodeToString([]byte(auth))
 }
 
+// TransmitSoap sends a SOAP request to the given URL and parses the XML response.
 func TransmitSoap[Resp any](request any, url string, debug bool, timeout time.Duration) (*Resp, error) {
 	requestBytes, _ := xml.MarshalIndent(&request, " ", "  ")
 	req, requestErr := http.NewRequest(

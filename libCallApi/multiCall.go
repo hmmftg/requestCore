@@ -7,10 +7,12 @@ import (
 	"github.com/hmmftg/requestCore/webFramework"
 )
 
+// TypeList is an interface for retrieving a typed element by index.
 type TypeList interface {
 	GetType(int) any
 }
 
+// MultiCall executes a sequence of calls, stopping early on non-OK status.
 func MultiCall(w webFramework.WebFramework, paramList []CallParam, core CallAPIInterface) []CallResult[response.WsRemoteResponse] {
 	resultList := make([]CallResult[response.WsRemoteResponse], 0)
 	for i := 0; i < len(paramList); i++ {

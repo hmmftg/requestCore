@@ -15,6 +15,7 @@ import (
 	"gopkg.in/natefinch/lumberjack.v2"
 )
 
+// ConfigGinLogger returns a Gin logger middleware configuration using the provided logging parameters.
 func ConfigGinLogger(params libLogger.LoggerInterface) gin.LoggerConfig {
 	logger := lumberjack.Logger{
 		Filename: params.GetLogPath(),

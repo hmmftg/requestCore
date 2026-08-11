@@ -1,6 +1,7 @@
 // Package libCrypto provides cryptographic utility wrappers.
 package libCrypto
 
+// Sm is the interface for security module cryptographic operations (CVV, PVV, MAC, encryption).
 type Sm interface {
 	SetKey(id, value string)
 	GetKey(id string) string
@@ -14,8 +15,12 @@ type Sm interface {
 }
 
 const (
-	Cvv1    = "Cvv1"
-	Cvv2    = "Cvv2"
+	// Cvv1 is the constant identifying CVV1 card verification value generation.
+	Cvv1 = "Cvv1"
+	// Cvv2 is the constant identifying CVV2 card verification value generation.
+	Cvv2 = "Cvv2"
+	// Encrypt is the mode constant for encryption operations.
 	Encrypt = "E"
+	// Decrypt is the mode constant for decryption operations.
 	Decrypt = "D"
 )

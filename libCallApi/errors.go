@@ -15,6 +15,7 @@ type RemoteCallError struct {
 	Err    error  // Underlying error (e.g. libError.NewWithDescription)
 }
 
+// Error returns a human-readable description of the remote call error.
 func (e *RemoteCallError) Error() string {
 	if e.Err != nil {
 		return fmt.Sprintf("remote call failed (status %d): %s", e.Status, e.Err.Error())
@@ -22,6 +23,7 @@ func (e *RemoteCallError) Error() string {
 	return fmt.Sprintf("remote call failed (status %d)", e.Status)
 }
 
+// Unwrap returns the underlying error for use with errors.Is and errors.As.
 func (e *RemoteCallError) Unwrap() error {
 	return e.Err
 }

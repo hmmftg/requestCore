@@ -7,6 +7,7 @@ import (
 	"github.com/gofiber/fiber/v2"
 )
 
+// FiberHandler returns a Fiber handler function that serves Swagger UI and documentation.
 func FiberHandler(docs string) fiber.Handler {
 	return func(c *fiber.Ctx) error {
 		// Allow all origins

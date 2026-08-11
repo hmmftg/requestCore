@@ -15,6 +15,7 @@ import (
 	"github.com/hmmftg/requestCore/libContext"
 )
 
+// GinHandler returns a Gin handler function that serves Swagger UI and documentation.
 func GinHandler(base, name string, spec *swag.Spec) gin.HandlerFunc {
 	index, err := template.New("swagger_index.html").Parse(indexTempl)
 	if err != nil {

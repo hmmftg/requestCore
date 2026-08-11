@@ -6,11 +6,13 @@ import (
 	"strings"
 )
 
+// Source identifies the file and line where an error originated.
 type Source struct {
 	File string `json:"file"`
 	Line int    `json:"line"`
 }
 
+// Format writes the source file and line number into the given string builder.
 func (s Source) Format(stack *strings.Builder) {
 	fmt.Fprintf(stack, "%s:%d", s.File, s.Line)
 }

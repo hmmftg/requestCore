@@ -14,6 +14,7 @@ import (
 	"golang.org/x/exp/slices"
 )
 
+// ExtractPanFromCard extracts the 12-digit PAN from a 16-digit card number.
 func ExtractPanFromCard(card string) (string, error) {
 	if len(card) != 16 {
 		return "", errors.New("Invalid Card length: " + card)
@@ -22,8 +23,10 @@ func ExtractPanFromCard(card string) (string, error) {
 	return card[3:15], nil
 }
 
+// BadPins is the list of PIN values considered weak or easily guessable.
 var BadPins []int
 
+// IsPinEasy reports whether the given PIN is weak or easily guessable.
 func IsPinEasy(pin int) bool {
 
 	if BadPins == nil {
@@ -79,6 +82,7 @@ func IsPinEasy(pin int) bool {
 		slices.IndexFunc(BadPins, func(badPin int) bool { return pinMid10 == badPin }) == -1)
 }
 
+// GenerateRandomPin generates a random PIN of the given length, avoiding weak PINs.
 func GenerateRandomPin(length int) string {
 	if length == 4 {
 		nPin := rand.Intn(9999) // #nosec G404 -- PIN generation is not a cryptographic secret
@@ -95,8 +99,10 @@ func GenerateRandomPin(length int) string {
 	return fmt.Sprintf("%0*d", length, nPin)
 }
 
+// DECIMALIZATION_TABLE maps hex digits to decimal digits for PVV/CVV generation.
 const DECIMALIZATION_TABLE string = "0123456789012345"
 
+// Decimalize converts hex digits to decimal digits using the decimalization table.
 func Decimalize(notDecimaliz string, length int, immediate bool) string {
 	lenTarget := len(notDecimaliz)
 	desiredLen := length
@@ -134,6 +140,7 @@ func Decimalize(notDecimaliz string, length int, immediate bool) string {
 	return decimalized
 }
 
+// GeneratePinBlock creates an encrypted PIN block for the given PAN, TPK, and PIN.
 func GeneratePinBlock(pan, tpkB64, pin string) (string, error) {
 	block1 := ""
 	switch len(pin) {
@@ -176,6 +183,7 @@ func GeneratePinBlock(pan, tpkB64, pin string) (string, error) {
 	return EncryptDesHex(tspHex, tpkB64)
 }
 
+// GeneratePvv generates a PVV (PIN Verification Value) from the card, PVK, PVKI, and PIN.
 func GeneratePvv(card, pvkB64, pvki, pin string) (string, error) {
 	pan, err := ExtractPanFromCard(card)
 	if err != nil {
@@ -203,6 +211,7 @@ func GeneratePvv(card, pvkB64, pvki, pin string) (string, error) {
 	return Decimalize(pvvHex, 4, false), nil
 }
 
+// SubTen performs a digit-wise subtraction of the decimalized value from the PIN, modulo 10.
 func SubTen(pin, decimalized string, length int) (string, error) {
 	sub := ""
 	x1 := "1"
@@ -218,6 +227,7 @@ func SubTen(pin, decimalized string, length int) (string, error) {
 	return sub, nil
 }
 
+// GenerateOffset generates a PIN offset from the card, PVK, PIN, and PIN length.
 func GenerateOffset(card, pvkB64, pin string, pinlen int) (string, error) {
 	cipherHex, err := EncryptDesHex(card, pvkB64)
 	if err != nil {

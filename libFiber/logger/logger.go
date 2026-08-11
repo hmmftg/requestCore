@@ -12,6 +12,7 @@ import (
 	"github.com/hmmftg/requestCore/libParams"
 )
 
+// ConfigFiberLogger returns a Fiber logger middleware configuration using the provided logging parameters.
 func ConfigFiberLogger(params libLogger.LoggerInterface) logger.Config {
 	logWriter := lumberjack.Logger{
 		Filename: params.GetLogPath(),

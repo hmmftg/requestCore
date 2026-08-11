@@ -6,6 +6,7 @@ import (
 	"github.com/hmmftg/requestCore/webFramework"
 )
 
+// EnsureAuthorization populates the Authorization header if missing, using OAuth2 or basic auth.
 func (api *RemoteAPI) EnsureAuthorization(w webFramework.WebFramework, headers map[string]string) libError.Error {
 	if headers == nil {
 		return libError.NewWithDescription(

@@ -8,6 +8,7 @@ import (
 	"github.com/hmmftg/requestCore/response"
 )
 
+// RequestCoreModel is the central model holding query, ORM, request, response, and parameter interfaces.
 type RequestCoreModel struct {
 	RequestInterface libRequest.RequestInterface
 	QueryInterface   libQuery.QueryRunnerInterface
@@ -16,6 +17,7 @@ type RequestCoreModel struct {
 	ParamMap         libParams.ParamInterface
 }
 
+// RequestCoreInterface defines the accessor methods for the core request processing model.
 type RequestCoreInterface interface {
 	GetDB() libQuery.QueryRunnerInterface
 	ORM() liborm.OrmInterface

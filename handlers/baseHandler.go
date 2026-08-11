@@ -19,6 +19,7 @@ import (
 	"github.com/hmmftg/requestCore/webFramework"
 )
 
+// HandlerParameters holds configuration for a request handler.
 type HandlerParameters[Req, Resp any] struct {
 	Title           string
 	Body            libRequest.Type
@@ -35,6 +36,7 @@ type HandlerParameters[Req, Resp any] struct {
 	TracingSpanName string
 }
 
+// HandlerInterface is the interface that request handlers must implement.
 type HandlerInterface[Req any, Resp any] interface {
 	// returns handler title
 	//   Request Bodymode
@@ -52,11 +54,13 @@ type HandlerInterface[Req any, Resp any] interface {
 	Simulation(req HandlerRequest[Req, Resp]) (Resp, error)
 }
 
+// HandlerOutcome holds the error and HTTP status result of a handler request.
 type HandlerOutcome struct {
 	Error      error
 	HTTPStatus int
 }
 
+// HandlerRequest holds the per-request state passed through the handler lifecycle.
 type HandlerRequest[Req any, Resp any] struct {
 	Title    string
 	Core     requestCore.RequestCoreInterface
@@ -74,6 +78,7 @@ type HandlerRequest[Req any, Resp any] struct {
 	SpanCtx context.Context
 }
 
+// SetOutcome sets the error and HTTP status on the handler request's outcome.
 func (trx *HandlerRequest[Req, Resp]) SetOutcome(err error, httpStatus int) {
 	trx.Outcome.Error = err
 	trx.Outcome.HTTPStatus = httpStatus
@@ -86,6 +91,7 @@ func (trx *HandlerRequest[Req, Resp]) AddSpanAttribute(key, value string) {
 	}
 }
 
+// AddSpanAttributes adds multiple string key-value attributes to the request's span.
 func (trx *HandlerRequest[Req, Resp]) AddSpanAttributes(attrs map[string]string) {
 	if trx.Span != nil && trx.Span.IsRecording() {
 		for k, v := range attrs {
@@ -94,6 +100,7 @@ func (trx *HandlerRequest[Req, Resp]) AddSpanAttributes(attrs map[string]string)
 	}
 }
 
+// AddSpanEvent records an event with attributes on the request's span.
 func (trx *HandlerRequest[Req, Resp]) AddSpanEvent(name string, attrs map[string]string) {
 	if trx.Span != nil && trx.Span.IsRecording() {
 		var eventAttrs []attribute.KeyValue
@@ -104,6 +111,7 @@ func (trx *HandlerRequest[Req, Resp]) AddSpanEvent(name string, attrs map[string
 	}
 }
 
+// RecordSpanError records an error with attributes on the request's span.
 func (trx *HandlerRequest[Req, Resp]) RecordSpanError(err error, attrs map[string]string) {
 	if trx.Span != nil && trx.Span.IsRecording() {
 		var eventAttrs []attribute.KeyValue
@@ -114,6 +122,7 @@ func (trx *HandlerRequest[Req, Resp]) RecordSpanError(err error, attrs map[strin
 	}
 }
 
+// StartChildSpan starts a child span with attributes from the request's span context.
 func (trx *HandlerRequest[Req, Resp]) StartChildSpan(name string, attrs map[string]string) (context.Context, trace.Span) {
 	if trx.SpanCtx == nil {
 		trx.SpanCtx = context.Background()
@@ -151,6 +160,7 @@ func respondOKWithAttachment[Req, Resp any](core requestCore.RequestCoreInterfac
 	trx.RespSent = true
 }
 
+// BaseHandler returns a handler function that orchestrates the full request lifecycle.
 func BaseHandler[Req any, Resp any, Handler HandlerInterface[Req, Resp]](
 	core requestCore.RequestCoreInterface,
 	handler Handler,

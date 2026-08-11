@@ -11,6 +11,7 @@ import (
 	"github.com/hmmftg/requestCore/webFramework"
 )
 
+// Initialize checks for duplicate requests, inserts the request, and builds the formatted path.
 func (m RequestModel) Initialize(w webFramework.WebFramework, method, url string, req RequestPtr, args ...any) (int, map[string]string, error) {
 	err := m.CheckDuplicateRequest(req)
 	if err != nil {
@@ -39,6 +40,7 @@ func (m RequestModel) Initialize(w webFramework.WebFramework, method, url string
 	return http.StatusOK, map[string]string{"path": path}, nil
 }
 
+// InitializeNoLog builds the formatted path without duplicate checking or request insertion.
 func (m RequestModel) InitializeNoLog(w webFramework.WebFramework, method, url string, req RequestPtr, args ...any) (int, map[string]string, error) {
 	var params []any
 	for _, arg := range args {
@@ -48,6 +50,7 @@ func (m RequestModel) InitializeNoLog(w webFramework.WebFramework, method, url s
 	return http.StatusOK, map[string]string{"path": path}, nil
 }
 
+// InitRequest checks for duplicates and inserts the request from the parser's local storage.
 func (m RequestModel) InitRequest(w webFramework.WebFramework, method, url string) error {
 	reqL := w.Parser.GetLocal("reqLog")
 	req := reqL.(RequestPtr)

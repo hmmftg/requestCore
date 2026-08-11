@@ -10,6 +10,7 @@ import (
 	"go.opentelemetry.io/otel/trace"
 )
 
+// RecordData defines the interface for record data used in query and DML operations.
 type RecordData interface {
 	GetId() string
 	GetControlId(string) string
@@ -21,6 +22,7 @@ type RecordData interface {
 	GetValueMap() map[string]string
 }
 
+// HeaderInterface defines the methods for accessing and mutating request headers.
 type HeaderInterface interface {
 	GetId() string
 	GetUser() string
@@ -33,10 +35,12 @@ type HeaderInterface interface {
 	SetMethod(string)
 }
 
+// FieldParser defines the interface for parsing field values in command templates.
 type FieldParser interface {
 	Parse(string) string
 }
 
+// RequestParser defines the interface for parsing HTTP requests in a web framework.
 type RequestParser interface {
 	GetMethod() string
 	GetPath() string
@@ -77,11 +81,13 @@ type RequestParser interface {
 	SetContext(context.Context)
 }
 
+// RequestHandler defines the interface for responding to HTTP requests.
 type RequestHandler interface {
 	Respond(code, status int, message string, data any, abort bool)
 	HandleErrorState(err error, status int, message string, data any)
 }
 
+// WebFramework holds the request context, tracing span, and parser for handling HTTP requests.
 type WebFramework struct {
 	Ctx  context.Context
 	Span trace.Span
@@ -97,10 +103,12 @@ func (w *WebFramework) GetTraceContext() trace.SpanContext {
 	return trace.SpanContext{}
 }
 
+// SetSpan sets the tracing span on the web framework.
 func (w *WebFramework) SetSpan(span trace.Span) {
 	w.Span = span
 }
 
+// StartSpan starts a new tracing span via the parser.
 func (w *WebFramework) StartSpan(name string, opts ...trace.SpanStartOption) (context.Context, trace.Span) {
 	if w.Parser != nil {
 		return w.Parser.StartSpan(name, opts...)
@@ -108,12 +116,14 @@ func (w *WebFramework) StartSpan(name string, opts ...trace.SpanStartOption) (co
 	return w.Ctx, nil
 }
 
+// AddSpanAttribute adds a string key-value attribute to the web framework's span.
 func (w *WebFramework) AddSpanAttribute(key, value string) {
 	if w.Span != nil && w.Span.IsRecording() {
 		w.Span.SetAttributes(attribute.String(key, value))
 	}
 }
 
+// AddSpanAttributes adds multiple string key-value attributes to the web framework's span.
 func (w *WebFramework) AddSpanAttributes(attrs map[string]string) {
 	if w.Span != nil && w.Span.IsRecording() {
 		for k, v := range attrs {
@@ -122,6 +132,7 @@ func (w *WebFramework) AddSpanAttributes(attrs map[string]string) {
 	}
 }
 
+// AddSpanEvent records an event with attributes on the web framework's span.
 func (w *WebFramework) AddSpanEvent(name string, attrs map[string]string) {
 	if w.Span != nil && w.Span.IsRecording() {
 		var eventAttrs []attribute.KeyValue
@@ -132,6 +143,7 @@ func (w *WebFramework) AddSpanEvent(name string, attrs map[string]string) {
 	}
 }
 
+// RecordSpanError records an error with attributes on the web framework's span.
 func (w *WebFramework) RecordSpanError(err error, attrs map[string]string) {
 	if w.Span != nil && w.Span.IsRecording() {
 		var eventAttrs []attribute.KeyValue

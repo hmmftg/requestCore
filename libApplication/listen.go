@@ -11,6 +11,7 @@ import (
 	"github.com/hmmftg/requestCore/webFramework"
 )
 
+// Listen starts the Gin engine on the configured HTTP or HTTPS port.
 func Listen(netParams *libParams.NetworkParams, app *gin.Engine) {
 	listenLog := ""
 	if len(netParams.TlsPort) > 0 {

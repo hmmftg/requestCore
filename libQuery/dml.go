@@ -9,6 +9,7 @@ import (
 	"github.com/hmmftg/requestCore/libError"
 )
 
+// InsertRow executes an insert statement with the given arguments.
 func (m QueryRunnerModel) InsertRow(insert string, args ...any) (sql.Result, error) {
 	errPing := m.DB.Ping()
 	if errPing != nil {
@@ -23,6 +24,7 @@ func (m QueryRunnerModel) InsertRow(insert string, args ...any) (sql.Result, err
 	return result, nil
 }
 
+// Dml executes a DML statement within a transaction with audit trail variables set.
 func (m QueryRunnerModel) Dml(ctx context.Context, moduleName, methodName, command string, args ...any) (sql.Result, error) {
 	errPing := m.DB.Ping()
 	if errPing != nil {

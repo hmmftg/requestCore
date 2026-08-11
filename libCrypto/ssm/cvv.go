@@ -7,6 +7,7 @@ import (
 	"github.com/hmmftg/requestCore/response"
 )
 
+// EncryptCvv encrypts a CVV toolstring using a two-part DES scheme with the given CVK.
 func EncryptCvv(tspB64, cvkB64 string) (string, error) {
 	key, err := base64.StdEncoding.DecodeString(cvkB64)
 	if err != nil {
@@ -46,6 +47,7 @@ func EncryptCvv(tspB64, cvkB64 string) (string, error) {
 	return cipherCvv, nil
 }
 
+// GenCvv generates a CVV from the PAN, expiry date, service code, and CVK key.
 func GenCvv(pan, exp, service, cvkB64 string) (string, error) {
 	tspHex := pan + exp + service + "000000000"
 	tsp, _ := hex.DecodeString(tspHex)

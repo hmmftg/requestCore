@@ -7,6 +7,7 @@ import (
 	"github.com/hmmftg/requestCore/libQuery"
 )
 
+// TestFetchData tests query models for equality of command argument counts against provided arguments.
 func TestFetchData[Model any, PT interface {
 	libQuery.QueryRequest
 	*Model

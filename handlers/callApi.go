@@ -17,6 +17,7 @@ import (
 	"github.com/hmmftg/requestCore/webFramework"
 )
 
+// WsResponse is the generic web-service response wrapper for remote API calls.
 type WsResponse[Result any] struct {
 	HTTPStatus   int                      `json:"-"`
 	HTTPHeaders  map[string]string        `json:"-"`
@@ -27,17 +28,22 @@ type WsResponse[Result any] struct {
 	PrintReceipt *response.Receipt        `json:"printReceipt,omitempty"`
 }
 
+// CallAPILogEntry is the log key used for API call log entries.
 const (
 	CallAPILogEntry string = "ApiCall"
 )
 
+// SetStatus sets the HTTP status code on the response.
 func (w *WsResponse[any]) SetStatus(status int) {
 	w.HTTPStatus = status
 }
+
+// SetHeaders sets the HTTP headers on the response.
 func (w *WsResponse[any]) SetHeaders(headers map[string]string) {
 	w.HTTPHeaders = headers
 }
 
+// CallAPIInternal performs a remote API call and returns the raw response.
 func CallAPIInternal[Resp any](
 	w webFramework.WebFramework,
 	_ requestCore.RequestCoreInterface,
@@ -66,6 +72,7 @@ func CallAPIInternal[Resp any](
 	return resp1.Resp, nil
 }
 
+// CallAPI performs a remote API call and returns the typed result.
 func CallAPI[Resp any](
 	w webFramework.WebFramework,
 	core requestCore.RequestCoreInterface,
@@ -78,6 +85,7 @@ func CallAPI[Resp any](
 	return &result.Result, err
 }
 
+// CallAPIWithReceipt performs a remote API call and returns the result and receipt.
 func CallAPIWithReceipt[Resp any](
 	w webFramework.WebFramework,
 	core requestCore.RequestCoreInterface,
@@ -90,6 +98,7 @@ func CallAPIWithReceipt[Resp any](
 	return &result.Result, result.PrintReceipt, err
 }
 
+// CallAPIJSON performs a JSON remote API call and returns the typed response.
 func CallAPIJSON[Req any, Resp any](
 	w webFramework.WebFramework,
 	_ requestCore.RequestCoreInterface,
@@ -111,6 +120,7 @@ func CallAPIJSON[Req any, Resp any](
 	return *resp, nil
 }
 
+// CallAPIForm performs a form-encoded remote API call and returns the typed response.
 func CallAPIForm[Req any, Resp any](
 	w webFramework.WebFramework,
 	_ requestCore.RequestCoreInterface,
@@ -153,6 +163,7 @@ func callAPINoLog[Resp any](
 	return resp1.Resp, nil
 }
 
+// CallAPINoLog performs a remote API call without logging and returns the typed result.
 func CallAPINoLog[Resp any](
 	w webFramework.WebFramework,
 	method string,

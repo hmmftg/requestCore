@@ -11,6 +11,7 @@ import (
 	"github.com/pavlo-v-chernykh/keystore-go/v4"
 )
 
+// ReadKeyStore loads a Java keystore from the given file using the provided password.
 func ReadKeyStore(filename string, password []byte) keystore.KeyStore {
 	f, err := os.Open(filename) // #nosec G304 -- filename comes from application config, not user input
 	if err != nil {
@@ -31,6 +32,7 @@ func ReadKeyStore(filename string, password []byte) keystore.KeyStore {
 	return ks
 }
 
+// WriteKeyStore saves a Java keystore to the given file using the provided password.
 func WriteKeyStore(ks keystore.KeyStore, filename string, password []byte) {
 	f, err := os.Create(filename) // #nosec G304 -- filename comes from application config, not user input
 	if err != nil {
@@ -49,12 +51,14 @@ func WriteKeyStore(ks keystore.KeyStore, filename string, password []byte) {
 	}
 }
 
+// Zeroing overwrites the given byte slice with zeros for secure memory clearing.
 func Zeroing(buf []byte) {
 	for i := range buf {
 		buf[i] = 0
 	}
 }
 
+// EncryptRsa encrypts base64-encoded data using the RSA public key from the given keystore entry.
 func EncryptRsa(ks1 keystore.KeyStore, keyId, data string) (string, error) {
 	certBytes, err := ks1.GetTrustedCertificateEntry(keyId)
 	if err != nil {
@@ -77,6 +81,7 @@ func EncryptRsa(ks1 keystore.KeyStore, keyId, data string) (string, error) {
 	return cipherB64, nil
 }
 
+// DecryptRsa decrypts base64-encoded RSA ciphertext using the private key from the given keystore entry.
 func DecryptRsa(ks1 keystore.KeyStore, keyId, pass, data string) (string, error) {
 	prvBytes, err := ks1.GetPrivateKeyEntry(keyId, []byte(pass))
 	if err != nil {

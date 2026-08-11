@@ -10,6 +10,7 @@ import (
 	"github.com/hmmftg/requestCore/libRequest"
 )
 
+// InitSimulationHandler parses a simulation request from the context and returns the typed request body.
 func InitSimulationHandler[Req any](c context.Context, core requestCore.RequestCoreInterface) (*Req, error) {
 	w := libContext.InitContext(c)
 	result, err := libRequest.Req[Req, libRequest.RequestHeader](libRequest.ParseParams{W: w, ValidateHeader: false})
@@ -20,6 +21,7 @@ func InitSimulationHandler[Req any](c context.Context, core requestCore.RequestC
 	return &result.Request, nil
 }
 
+// GetSingleSimulationHandler returns a gin handler that parses and responds with a single simulation request.
 func GetSingleSimulationHandler[Req any](core requestCore.RequestCoreInterface) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		w := libContext.InitContext(c)
@@ -31,6 +33,7 @@ func GetSingleSimulationHandler[Req any](core requestCore.RequestCoreInterface) 
 	}
 }
 
+// GetAllSimulationHandler returns a gin handler that parses and responds with a list of simulation requests.
 func GetAllSimulationHandler[Req any](core requestCore.RequestCoreInterface) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		w := libContext.InitContext(c)

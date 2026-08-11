@@ -7,6 +7,7 @@ import (
 	"time"
 )
 
+// RemoteAPI represents a remote API configuration including domain, auth, and options.
 type RemoteAPI struct {
 	Domain         string            `yaml:"domain" json:"domain"`
 	Name           string            `yaml:"name" json:"name"`
@@ -17,10 +18,12 @@ type RemoteAPI struct {
 	TokenCache     *TokenCache       `yaml:"-" json:"-"`
 }
 
+// RemoteAPIModel holds a map of named remote API configurations.
 type RemoteAPIModel struct {
 	RemoteAPIList map[string]RemoteAPI
 }
 
+// CallAPIInterface defines the contract for retrieving a RemoteAPI by name.
 type CallAPIInterface interface {
 	GetAPI(apiName string) RemoteAPI
 }

@@ -82,6 +82,7 @@ func GetDMLModel(t *testing.T, m Model) libQuery.QueryRunnerModel {
 	}
 }
 
+// TestAPIList returns a default map of remote API configurations for API testing.
 func TestAPIList() map[string]libCallApi.RemoteAPI {
 	return map[string]libCallApi.RemoteAPI{
 		"api": {
@@ -91,6 +92,7 @@ func TestAPIList() map[string]libCallApi.RemoteAPI {
 	}
 }
 
+// SampleRequestModelMock returns a QueryRunnerModel with predefined mock expectations for request handling.
 func SampleRequestModelMock(t *testing.T, mockList func(sqlmock.Sqlmock)) libQuery.QueryRunnerModel {
 	db, mockDB, err := sqlmock.New() // sqlmock.QueryMatcherOption(sqlmock.QueryMatcherEqual))
 	if err != nil {
@@ -122,6 +124,7 @@ func SampleRequestModelMock(t *testing.T, mockList func(sqlmock.Sqlmock)) libQue
 	}
 }
 
+// SampleMockDB returns a mock *sql.DB with optional custom mock expectations.
 func SampleMockDB(t *testing.T, mockList func(sqlmock.Sqlmock)) *sql.DB {
 	db, mockDB, err := sqlmock.New() // sqlmock.QueryMatcherOption(sqlmock.QueryMatcherEqual))
 	if err != nil {
@@ -135,6 +138,7 @@ func SampleMockDB(t *testing.T, mockList func(sqlmock.Sqlmock)) *sql.DB {
 	return db
 }
 
+// SampleQueryMock returns a QueryRunnerModel in mock mode with optional custom mock expectations.
 func SampleQueryMock(t *testing.T, mockList func(sqlmock.Sqlmock)) libQuery.QueryRunnerModel {
 	return libQuery.QueryRunnerModel{
 		DB:   SampleMockDB(t, mockList),

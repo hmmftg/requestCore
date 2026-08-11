@@ -11,8 +11,10 @@ import (
 	"github.com/hmmftg/requestCore/webFramework"
 )
 
+// LastHTTPStatusLocal is the local-storage key for the most recent HTTP status code.
 const LastHTTPStatusLocal = "response.http_status"
 
+// WebHanlder holds description lookup maps for building API error responses.
 type WebHanlder struct {
 	MessageDesc map[string]string
 	ErrorDesc   map[string]string
@@ -85,30 +87,37 @@ func (m WebHanlder) errorhandler(w webFramework.WebFramework, err error) {
 	m.Respond(http.StatusInternalServerError, 1, desc, nil, true, w)
 }
 
+// Error handles an error by logging it and sending an appropriate error response to the client.
 func (m WebHanlder) Error(w webFramework.WebFramework, err error) {
 	m.errorhandler(w, err)
 }
 
+// Respond sends a JSON response with the given code, status, message, and data, optionally aborting the request chain.
 func (m WebHanlder) Respond(code, status int, message string, data any, abort bool, w webFramework.WebFramework) {
 	m.RespondWithReceipt(code, status, message, data, nil, abort, w)
 }
 
+// OK sends a successful JSON response with HTTP 200 and the given data.
 func (m WebHanlder) OK(w webFramework.WebFramework, resp any) {
 	m.Respond(http.StatusOK, 0, "OK", resp, false, w)
 }
 
+// OKWithReceipt sends a successful JSON response with an optional printable receipt.
 func (m WebHanlder) OKWithReceipt(w webFramework.WebFramework, resp any, receipt *Receipt) {
 	m.RespondWithReceipt(http.StatusOK, 0, "OK", resp, receipt, false, w)
 }
 
+// OKWithAttachment sends a successful file-attachment response with HTTP 200.
 func (m WebHanlder) OKWithAttachment(w webFramework.WebFramework, attachment *FileResponse) {
 	m.RespondWithAttachment(http.StatusOK, 0, "OK", attachment, false, w)
 }
 
+// GetErrorsArray builds a slice of ErrorResponse from a message and data using the handler's error description map.
 func (m WebHanlder) GetErrorsArray(message string, data any) []ErrorResponse {
 	return GetErrorsArrayWithMap(message, data, m.ErrorDesc)
 }
 
+// RespondWithReceipt sends a JSON response with an optional printable receipt and abort control.
 func (m WebHanlder) RespondWithReceipt(code, status int, message string, data any, printData *Receipt, abort bool, w webFramework.WebFramework) {
 	respData := RespData{
 		Code:      code,
@@ -122,6 +131,7 @@ func (m WebHanlder) RespondWithReceipt(code, status int, message string, data an
 	m.respond(respData, abort, w)
 }
 
+// RespondWithAttachment sends a file-attachment response with the given code, status, and message.
 func (m WebHanlder) RespondWithAttachment(code, status int, message string, file *FileResponse, abort bool, w webFramework.WebFramework) {
 	respData := RespData{
 		Code:       code,

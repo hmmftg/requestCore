@@ -16,6 +16,7 @@ import (
 	"github.com/hmmftg/requestCore/status"
 )
 
+// OrmHandlerType holds configuration for an ORM-based query handler.
 type OrmHandlerType[Row, Resp any] struct {
 	Title           string
 	Path            string
@@ -34,6 +35,7 @@ type OrmHandlerType[Row, Resp any] struct {
 	OnEmpty200      bool
 }
 
+// Parameters returns the handler parameters for the OrmHandlerType.
 func (q OrmHandlerType[Row, Resp]) Parameters() HandlerParameters[Row, Resp] {
 	return HandlerParameters[Row, Resp]{
 		Title:           q.Title,
@@ -51,14 +53,17 @@ func (q OrmHandlerType[Row, Resp]) Parameters() HandlerParameters[Row, Resp] {
 	}
 }
 
+// Initializer is a no-op initializer for the OrmHandlerType.
 func (q OrmHandlerType[Row, Resp]) Initializer(req HandlerRequest[Row, Resp]) error {
 	return nil
 }
 
+// CacheKey builds a cache key from the handler title and arguments.
 func (q OrmHandlerType[Row, Resp]) CacheKey(args []any) string {
 	return fmt.Sprintf("%s-%v", q.Title, args)
 }
 
+// CheckCache returns cached rows for the given arguments if still valid.
 func (q OrmHandlerType[Row, Resp]) CheckCache(args []any) []Row {
 	key := q.CacheKey(args)
 	if data, ok := q.CacheData[key]; ok {
@@ -70,12 +75,14 @@ func (q OrmHandlerType[Row, Resp]) CheckCache(args []any) []Row {
 	return nil
 }
 
+// CacheResult stores rows in the cache under the key derived from the arguments.
 func (q OrmHandlerType[Row, Resp]) CacheResult(args []any, rows []Row) {
 	key := q.CacheKey(args)
 	q.CacheData[key] = rows
 	q.CacheTime = time.Now()
 }
 
+// Handler executes the ORM query and translates the rows into the response.
 func (q OrmHandlerType[Row, Resp]) Handler(req HandlerRequest[Row, Resp]) (Resp, error) {
 	anyArgs := []any{}
 	for id := range q.Command.Args {
@@ -148,13 +155,16 @@ func (q OrmHandlerType[Row, Resp]) Handler(req HandlerRequest[Row, Resp]) (Resp,
 
 }
 
+// Simulation returns the default response for simulation mode.
 func (q OrmHandlerType[Req, Resp]) Simulation(req HandlerRequest[Req, Resp]) (Resp, error) {
 	return req.Response, nil
 }
 
+// Finalizer is a no-op finalizer for the OrmHandlerType.
 func (q OrmHandlerType[Req, Resp]) Finalizer(req HandlerRequest[Req, Resp]) {
 }
 
+// QueryWithOrm returns a base handler that executes an ORM query.
 func QueryWithOrm[Row, Resp any](
 	core requestCore.RequestCoreInterface,
 	handler OrmHandlerType[Row, Resp],
@@ -213,6 +223,7 @@ func queryHandlerWithOrm[Row any, Resp []Row](
 	return QueryWithOrm(core, handler, simulation)
 }
 
+// QueryHandlerWithOrm returns a base handler for ORM queries using the database's default mode.
 func QueryHandlerWithOrm[Row any, Resp []Row](
 	title, key, path string, queryMap map[string]libQuery.QueryCommand,
 	core requestCore.RequestCoreInterface,

@@ -12,24 +12,36 @@ import (
 	"github.com/hmmftg/requestCore/libQuery"
 )
 
+// ContextKey is the type used for context keys in ORM transaction variables.
 type ContextKey string
 
 const (
-	APP                      = "request.APP"
-	USER                     = "request.USER"
-	MODULE                   = "request.MODULE"
-	METHOD                   = "request.METHOD"
-	SetCommandError          = "error in Dml->SetTrxVariable(%s,%s,%s)"
-	ErrorExecuteDML          = "ERROR_EXECUTE_DML"
+	// APP is the context key for the application/program identifier in audit trail variables.
+	APP = "request.APP"
+	// USER is the context key for the user identifier in audit trail variables.
+	USER = "request.USER"
+	// MODULE is the context key for the module name in audit trail variables.
+	MODULE = "request.MODULE"
+	// METHOD is the context key for the method name in audit trail variables.
+	METHOD = "request.METHOD"
+	// SetCommandError is the error description format for SetTrxVariable failures.
+	SetCommandError = "error in Dml->SetTrxVariable(%s,%s,%s)"
+	// ErrorExecuteDML is the error code for DML execution failures.
+	ErrorExecuteDML = "ERROR_EXECUTE_DML"
+	// OracleSetVariableCommand is the SQL command for setting audit trail variables in Oracle.
 	OracleSetVariableCommand = `--sql
 		BEGIN 
 			AUDIT_TRAIL.SET_MODIF_ARGS(:1, :2);
 		END;`
+	// PostgresSetVariableCommand is the SQL command for setting audit trail variables in PostgreSQL.
 	PostgresSetVariableCommand = "SELECT set_config($1,$2,true);"
-	MySQLSetVariableCommand    = "SET @%s = '%s';"
-	SQLiteSetVariableCommand   = "PRAGMA %s = '%s';"
+	// MySQLSetVariableCommand is the SQL command format for setting audit trail variables in MySQL.
+	MySQLSetVariableCommand = "SET @%s = '%s';"
+	// SQLiteSetVariableCommand is the SQL command format for setting audit trail variables in SQLite.
+	SQLiteSetVariableCommand = "PRAGMA %s = '%s';"
 )
 
+// SetVariable executes the given command to set a transaction variable (key/value) in the database.
 func SetVariable(ctx context.Context, tx *gorm.DB, command, key, value string) error {
 	if command == "none" {
 		return nil
@@ -42,6 +54,7 @@ func SetVariable(ctx context.Context, tx *gorm.DB, command, key, value string) e
 	return nil
 }
 
+// OrmModel holds the Gorm DB connection, program/module names, and DML configuration.
 type OrmModel struct {
 	DB          *gorm.DB
 	ProgramName string
@@ -50,6 +63,7 @@ type OrmModel struct {
 	Mode        libQuery.DBMode
 }
 
+// Init creates and returns an OrmModel configured for the given database mode.
 func Init(
 	DB *gorm.DB,
 	ProgramName string,
@@ -76,13 +90,17 @@ func Init(
 	return &model, nil
 }
 
+// GetDB returns the underlying Gorm DB connection.
 func (m OrmModel) GetDB() *gorm.DB {
 	return m.DB
 }
+
+// GetDbMode returns the database mode (Oracle, Postgres, MySQL, SQLite).
 func (m OrmModel) GetDbMode() libQuery.DBMode {
 	return m.Mode
 }
 
+// SetModifVariables sets audit trail modification variables (app, user, module, method) on the transaction.
 func (m OrmModel) SetModifVariables(ctx context.Context, moduleName, methodName string, tx *gorm.DB) error {
 	if tx == nil {
 		return errors.New("tx is nil")
@@ -113,6 +131,7 @@ func (m OrmModel) SetModifVariables(ctx context.Context, moduleName, methodName 
 	return nil
 }
 
+// Dml executes a DML command within a transaction with audit trail variables set, returning rows affected.
 func (m OrmModel) Dml(ctx context.Context, moduleName, methodName, command string, args ...any) (int64, error) {
 	tx := m.DB.Begin()
 	if tx == nil {

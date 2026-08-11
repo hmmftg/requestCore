@@ -7,6 +7,7 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+// Load reads and unmarshals the application parameters from the YAML file at path.
 func Load[T any](path string) (*ApplicationParams[T], error) {
 	data, err := os.ReadFile(path) // #nosec G304 -- path comes from application config, not user input
 	if err != nil {
@@ -20,6 +21,7 @@ func Load[T any](path string) (*ApplicationParams[T], error) {
 	return &paramData, nil
 }
 
+// ParsePrams loads and decrypts application parameters from paramFile using the provided keys.
 func ParsePrams[T any](paramFile string, keys [][]byte) (*ApplicationParams[T], error) {
 	wsParams, err := Load[T](paramFile)
 	if err != nil {
@@ -32,6 +34,7 @@ func ParsePrams[T any](paramFile string, keys [][]byte) (*ApplicationParams[T], 
 	return wsParams, nil
 }
 
+// Write marshals and writes the application parameters to the YAML file at path.
 func Write[T any](params *ApplicationParams[T], path string) error {
 	paramData, err := yaml.Marshal(&params)
 	if err != nil {

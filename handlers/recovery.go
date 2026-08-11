@@ -14,6 +14,7 @@ import (
 	"github.com/hmmftg/requestCore/webFramework"
 )
 
+// Recovery handles panic recovery, finalization, and log collection for a handler request.
 func Recovery[Req any, Resp any, Handler HandlerInterface[Req, Resp]](
 	start time.Time,
 	w webFramework.WebFramework,

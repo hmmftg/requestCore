@@ -12,6 +12,7 @@ import (
 	"github.com/hmmftg/requestCore/webFramework"
 )
 
+// ExtractValue extracts a value from source and stores it in dest, supporting header#alias syntax.
 func ExtractValue(name string, source func(string) string, dest map[string]string) {
 	if strings.Contains(name, "#") {
 		headerSplit := strings.Split(name, "#")
@@ -21,6 +22,7 @@ func ExtractValue(name string, source func(string) string, dest map[string]strin
 	}
 }
 
+// ExtractHeaders builds a map of headers and locals from the web framework parser.
 func ExtractHeaders(w webFramework.WebFramework, headers, locals []string) map[string]string {
 	headersMap := make(map[string]string, 0)
 	for _, header := range headers {
@@ -32,6 +34,7 @@ func ExtractHeaders(w webFramework.WebFramework, headers, locals []string) map[s
 	return headersMap
 }
 
+// CallArgs holds the arguments for a remote call handler.
 type CallArgs[Req any, Resp any] struct {
 	Title, Path, API, Method string
 	HasQuery, IsJSON         bool
@@ -49,6 +52,7 @@ type CallArgs[Req any, Resp any] struct {
 	RecoveryHandler       func(any)
 }
 
+// Parameters returns the handler parameters for the CallArgs.
 func (c CallArgs[Req, Resp]) Parameters() HandlerParameters[Req, Resp] {
 	var mode libRequest.Type
 	if c.IsJSON {
@@ -73,10 +77,13 @@ func (c CallArgs[Req, Resp]) Parameters() HandlerParameters[Req, Resp] {
 }
 
 const (
+	// HeadersMap is the local key for the extracted headers map.
 	HeadersMap = "headersMap"
-	FinalPath  = "finalPath"
+	// FinalPath is the local key for the computed final request path.
+	FinalPath = "finalPath"
 )
 
+// Initializer prepares headers and the final path for the remote call.
 func (c CallArgs[Req, Resp]) Initializer(req HandlerRequest[Req, Resp]) error {
 	if c.ForwardAuth {
 		c.Headers = append(c.Headers, "Authorization")
@@ -96,6 +103,8 @@ func (c CallArgs[Req, Resp]) Initializer(req HandlerRequest[Req, Resp]) error {
 	req.W.Parser.SetLocal(FinalPath, finalPath)
 	return nil
 }
+
+// Handler performs the remote call for the CallArgs handler.
 func (c CallArgs[Req, Resp]) Handler(req HandlerRequest[Req, Resp]) (Resp, error) {
 	finalPath := req.W.Parser.GetLocalString(FinalPath)
 	headers, ok := req.W.Parser.GetLocal(HeadersMap).(map[string]string)
@@ -121,11 +130,16 @@ func (c CallArgs[Req, Resp]) Handler(req HandlerRequest[Req, Resp]) (Resp, error
 	}
 	return *resp, nil
 }
+
+// Simulation returns the default response for simulation mode.
 func (c CallArgs[Req, Resp]) Simulation(req HandlerRequest[Req, Resp]) (Resp, error) {
 	return req.Response, nil
 }
+
+// Finalizer is a no-op finalizer for the CallArgs handler.
 func (c CallArgs[Req, Resp]) Finalizer(req HandlerRequest[Req, Resp]) {}
 
+// CallRemote returns a base handler that forwards requests to a remote service.
 func CallRemote[Req any, Resp any](
 	core requestCore.RequestCoreInterface,
 	callArg CallArgs[Req, Resp],
@@ -135,6 +149,7 @@ func CallRemote[Req any, Resp any](
 	return BaseHandler(core, callArg, simulation, args)
 }
 
+// CallRemoteWithRespParser returns a base handler that forwards requests with a response parser.
 func CallRemoteWithRespParser[Req any, Resp any](
 	core requestCore.RequestCoreInterface,
 	callArgs CallArgs[Req, Resp],
@@ -144,6 +159,7 @@ func CallRemoteWithRespParser[Req any, Resp any](
 	return BaseHandler(core, callArgs, simulation, args)
 }
 
+// InitPostRequest validates and persists a request, then builds the formatted path.
 func InitPostRequest(
 	w webFramework.WebFramework,
 	reqLog libRequest.RequestPtr,
@@ -168,6 +184,7 @@ func InitPostRequest(
 	return http.StatusOK, map[string]string{"path": path}, nil
 }
 
+// ConsumeHandlerType holds configuration for a consume handler that proxies remote API calls.
 type ConsumeHandlerType[Req, Resp any] struct {
 	Title           string
 	Params          libCallApi.RemoteCallParamData[Req, Resp]
@@ -182,6 +199,7 @@ type ConsumeHandlerType[Req, Resp any] struct {
 	RecoveryHandler func(any)
 }
 
+// Parameters returns the handler parameters for the ConsumeHandlerType.
 func (h *ConsumeHandlerType[Req, Resp]) Parameters() HandlerParameters[Req, Resp] {
 	return HandlerParameters[Req, Resp]{
 		Title:           h.Title,
@@ -199,6 +217,7 @@ func (h *ConsumeHandlerType[Req, Resp]) Parameters() HandlerParameters[Req, Resp
 	}
 }
 
+// Initializer appends URL parameters to the handler path.
 func (h *ConsumeHandlerType[Req, Resp]) Initializer(req HandlerRequest[Req, Resp]) error {
 	for _, value := range req.W.Parser.GetURLParams() {
 		//normalized := strings.ReplaceAll(param.Value, "*", "/")
@@ -207,6 +226,7 @@ func (h *ConsumeHandlerType[Req, Resp]) Initializer(req HandlerRequest[Req, Resp
 	return nil
 }
 
+// Handler performs the remote JSON call for the ConsumeHandlerType.
 func (h *ConsumeHandlerType[Req, Resp]) Handler(req HandlerRequest[Req, Resp]) (Resp, error) {
 	headersMap := ExtractHeaders(req.W, h.Headers, nil)
 	resp, errCall := CallAPIJSON(req.W, req.Core, h.Title,
@@ -228,12 +248,15 @@ func (h *ConsumeHandlerType[Req, Resp]) Handler(req HandlerRequest[Req, Resp]) (
 	return resp, nil
 }
 
+// Simulation returns the default response for simulation mode.
 func (h *ConsumeHandlerType[Req, Resp]) Simulation(req HandlerRequest[Req, Resp]) (Resp, error) {
 	return req.Response, nil
 }
 
+// Finalizer is a no-op finalizer for the ConsumeHandlerType.
 func (h *ConsumeHandlerType[Req, Resp]) Finalizer(req HandlerRequest[Req, Resp]) {}
 
+// ConsumeHandler returns a base handler that consumes a remote API endpoint.
 func ConsumeHandler[Req, Resp any](
 	core requestCore.RequestCoreInterface,
 	params *ConsumeHandlerType[Req, Resp],

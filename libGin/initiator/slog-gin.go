@@ -17,6 +17,7 @@ import (
 	"github.com/hmmftg/requestCore/webFramework"
 )
 
+// InitSlogGin configures slog-based logging middleware for the Gin engine.
 func InitSlogGin(wsParams libParams.ParamInterface, app *gin.Engine) {
 	var logWriter io.Writer
 	splunkLogger, err := splunk.CheckIfSplunkIsWorking(wsParams.GetLogging().Splunk)
