@@ -1,3 +1,4 @@
+//revive:disable
 package libContext
 
 import (
