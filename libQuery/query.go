@@ -111,6 +111,15 @@ func QueryToStruct[Target any](q QueryRunnerInterface, querySQL string, args ...
 		}
 		finalRows = append(finalRows, *parsed)
 	}
+
+	if err := rows.Err(); err != nil {
+		return nil, errors.Join(err,
+			libError.NewWithDescription(
+				status.InternalServerError,
+				"UNABLE_TO_QUERY_STATEMENT",
+				"queryRunner[rows.Err](%s,%v)", querySQL, args,
+			))
+	}
 	//resp, _ := json.Marshal(finalRows)
 	return finalRows, nil
 }
