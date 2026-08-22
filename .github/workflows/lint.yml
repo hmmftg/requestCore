@@ -21,3 +21,19 @@ jobs:
         uses: golangci/golangci-lint-action@v9
         with:
           version: v2.12
+
+  golangci-lint-v2:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: v2/go.mod
+          cache: true
+      - name: golangci-lint v2
+        uses: golangci/golangci-lint-action@v9
+        with:
+          version: v2.12
+          working-directory: v2

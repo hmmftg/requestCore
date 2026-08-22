@@ -28,3 +28,26 @@ jobs:
         run: go build ./...
       - name: Build examples
         run: go build ./examples/...
+
+  test-v2:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+      - name: Vet v2
+        working-directory: v2
+        run: go vet ./...
+      - name: Test v2
+        working-directory: v2
+        run: go test -race -coverprofile=coverage-v2.out ./...
+      - name: Upload v2 coverage
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-v2
+          path: v2/coverage-v2.out
+      - name: Build v2
+        working-directory: v2
+        run: go build ./...

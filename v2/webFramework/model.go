@@ -1,0 +1,80 @@
+// Package webFramework provides the v2 web framework abstraction layer.
+//
+// It extends the root module's [github.com/hmmftg/requestCore/webFramework]
+// with renderer support, cookie access, and session/flash integration.
+// Framework adapters (libGin, libFiber, libNetHttp) implement these
+// interfaces for their respective HTTP frameworks.
+package webFramework
+
+import (
+	"context"
+	"net/http"
+
+	legacy "github.com/hmmftg/requestCore/webFramework"
+
+	"github.com/hmmftg/requestCore/v2/session"
+)
+
+// RequestParser extends the v1 RequestParser with raw response writing,
+// cookie access, and session/flash support.
+//
+// Renderers produce encoded bytes; the parser's SendResponse method
+// writes them to the framework-specific transport. This avoids leaking
+// net/http types (like http.ResponseWriter) into Fiber/fasthttp adapters.
+type RequestParser interface {
+	legacy.RequestParser
+
+	// SendResponse writes a raw response with the given status code,
+	// content type, and body bytes. The adapter handles framework-specific
+	// transport mechanics (gin.Context.Writer, fiber.Ctx, http.ResponseWriter).
+	SendResponse(status int, contentType string, body []byte) error
+
+	// GetCookie returns the value of the named request cookie.
+	// Returns "" if the cookie does not exist.
+	GetCookie(name string) string
+
+	// SetCookie sets an HTTP response cookie.
+	SetCookie(cookie *http.Cookie)
+}
+
+// RequestContext holds the per-request state passed through the v2
+// handler and middleware pipeline.
+type RequestContext struct {
+	// Context is the v2 request context (may carry cancellation, tracing).
+	Context context.Context
+
+	// LegacyContext is the framework-native context expected by
+	// libContext.InitContext (e.g. *gin.Context, *fiber.Ctx, context.Context
+	// with net/http request/response). Used by the legacy handler adapter.
+	LegacyContext context.Context
+
+	// Parser is the v2 request parser.
+	Parser RequestParser
+
+	// Legacy is the v1 WebFramework, providing access to existing
+	// query, persistence, response, logging, and tracing infrastructure.
+	// Its Parser field is the same object as Parser above (type-asserted
+	// to the legacy RequestParser interface).
+	Legacy legacy.WebFramework
+
+	// Session is the per-request session, loaded by session middleware.
+	// May be nil if session middleware has not run.
+	Session *session.Session
+
+	// Flash is the per-request flash, loaded by session middleware.
+	// May be nil if session middleware has not run.
+	Flash *session.Flash
+}
+
+// LegacyWebFramework returns the v1 WebFramework for use with existing
+// query, persistence, response, and API-call helpers.
+func (c *RequestContext) LegacyWebFramework() legacy.WebFramework {
+	return c.Legacy
+}
+
+// WebFrameworkV2 is a convenience wrapper that bundles a RequestContext
+// with its parser and legacy framework. It is used by response handlers
+// and error handlers that need both v1 and v2 access.
+type WebFrameworkV2 struct {
+	RequestContext
+}
