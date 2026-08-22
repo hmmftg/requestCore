@@ -7,7 +7,9 @@ import (
 	"strings"
 )
 
-// generateHandler generates a new handler file.
+// generateHandler generates a new handler file with typed request/response
+// types and a handler function compatible with handlers.GetEndpoint /
+// handlers.PostEndpoint registration.
 func generateHandler(name string) error {
 	pascalName := toPascalCase(name)
 	camelName := toCamelCase(name)
@@ -16,8 +18,11 @@ func generateHandler(name string) error {
 package handlers
 
 import (
+	"log/slog"
+
 	"github.com/hmmftg/requestCore/libRequest"
 	"github.com/hmmftg/requestCore/v2/handlers"
+	"github.com/hmmftg/requestCore/webFramework"
 )
 
 // {PASCAL}Req is the request body for the {NAME} handler.
@@ -30,34 +35,38 @@ type {PASCAL}Resp struct {
 	// Add response fields here
 }
 
-// {PASCAL}Handler implements handlers.HandlerInterface for the {NAME} endpoint.
-type {PASCAL}Handler struct{}
+// {PASCAL}Handler is the handler function for the {NAME} endpoint.
+// Register it via:
+//
+//	handlers.PostEndpoint[{PASCAL}Req, {PASCAL}Resp](
+//	    router, core, respHandler, "/{NAME}",
+//	    {PASCAL}Handler,
+//	)
+//
+// or for a GET endpoint:
+//
+//	handlers.GetEndpoint[{PASCAL}Req, {PASCAL}Resp](
+//	    router, core, respHandler, "/{NAME}",
+//	    {PASCAL}Handler,
+//	)
+func {PASCAL}Handler(req *{PASCAL}Req, trx *handlers.HandlerRequest[{PASCAL}Req, {PASCAL}Resp]) ({PASCAL}Resp, error) {
+	// Log to the Splunk transaction pipeline via webFramework.AddLog.
+	webFramework.AddLog(trx.W, "{NAME}-req", slog.String("status", "processing"))
 
-// Parameters returns the handler configuration.
-func (h *{PASCAL}Handler) Parameters() handlers.HandlerParameters[{PASCAL}Req, {PASCAL}Resp] {
-	return handlers.HandlerParameters[{PASCAL}Req, {PASCAL}Resp]{
-		Title: "{NAME}",
-		Path:  "/{NAME}",
-		Body:  libRequest.JSON,
-	}
-}
+	// TODO: implement handler logic.
 
-// Initializer runs after validating the request.
-func (h *{PASCAL}Handler) Initializer(req *handlers.HandlerRequest[{PASCAL}Req, {PASCAL}Resp]) error {
-	return nil
-}
-
-// Handler is the main handler logic.
-func (h *{PASCAL}Handler) Handler(req *handlers.HandlerRequest[{PASCAL}Req, {PASCAL}Resp]) ({PASCAL}Resp, error) {
 	return {PASCAL}Resp{}, nil
 }
 
-// Finalizer runs after sending back the response.
-func (h *{PASCAL}Handler) Finalizer(req *handlers.HandlerRequest[{PASCAL}Req, {PASCAL}Resp]) {}
-
-// Simulation handles simulation mode.
-func (h *{PASCAL}Handler) Simulation(req *handlers.HandlerRequest[{PASCAL}Req, {PASCAL}Resp]) ({PASCAL}Resp, error) {
-	return {PASCAL}Resp{}, nil
+// {PASCAL}Endpoint returns a typed Endpoint for the {NAME} handler.
+// Use this with handlers.RegisterEndpoint for custom HTTP methods or
+// when you need to attach lifecycle hooks.
+func {PASCAL}Endpoint() *handlers.Endpoint {
+	return handlers.NewEndpoint[{PASCAL}Req, {PASCAL}Resp](
+		"{NAME}",
+		libRequest.JSON,
+		{PASCAL}Handler,
+	)
 }`
 
 	content := strings.NewReplacer(
@@ -112,7 +121,7 @@ type {PASCAL}ListResp struct {
 func (r *{PASCAL}Resource) List() *handlers.Endpoint {
 	return handlers.NewEndpoint[{PASCAL}ListReq, {PASCAL}ListResp](
 		"list-{NAME}",
-		libRequest.JSON,
+		libRequest.NoBinding,
 		func(req *{PASCAL}ListReq, trx *handlers.HandlerRequest[{PASCAL}ListReq, {PASCAL}ListResp]) ({PASCAL}ListResp, error) {
 			return {PASCAL}ListResp{Items: []map[string]any{}}, nil
 		},
@@ -131,7 +140,7 @@ type {PASCAL}ShowResp struct {
 func (r *{PASCAL}Resource) Show() *handlers.Endpoint {
 	return handlers.NewEndpoint[{PASCAL}ShowReq, {PASCAL}ShowResp](
 		"show-{NAME}",
-		libRequest.JSON,
+		libRequest.NoBinding,
 		func(req *{PASCAL}ShowReq, trx *handlers.HandlerRequest[{PASCAL}ShowReq, {PASCAL}ShowResp]) ({PASCAL}ShowResp, error) {
 			id, err := resources.GetParsedID[string](trx.V2, "id")
 			if err != nil {
@@ -154,7 +163,7 @@ type {PASCAL}NewResp struct {
 func (r *{PASCAL}Resource) New() *handlers.Endpoint {
 	return handlers.NewEndpoint[{PASCAL}NewReq, {PASCAL}NewResp](
 		"new-{NAME}",
-		libRequest.JSON,
+		libRequest.NoBinding,
 		func(req *{PASCAL}NewReq, trx *handlers.HandlerRequest[{PASCAL}NewReq, {PASCAL}NewResp]) ({PASCAL}NewResp, error) {
 			return {PASCAL}NewResp{Form: "new-{NAME}"}, nil
 		},
@@ -194,7 +203,7 @@ type {PASCAL}EditResp struct {
 func (r *{PASCAL}Resource) Edit() *handlers.Endpoint {
 	return handlers.NewEndpoint[{PASCAL}EditReq, {PASCAL}EditResp](
 		"edit-{NAME}",
-		libRequest.JSON,
+		libRequest.NoBinding,
 		func(req *{PASCAL}EditReq, trx *handlers.HandlerRequest[{PASCAL}EditReq, {PASCAL}EditResp]) ({PASCAL}EditResp, error) {
 			id, err := resources.GetParsedID[string](trx.V2, "id")
 			if err != nil {
@@ -244,7 +253,7 @@ type {PASCAL}DestroyResp struct {
 func (r *{PASCAL}Resource) Destroy() *handlers.Endpoint {
 	return handlers.NewEndpoint[{PASCAL}DestroyReq, {PASCAL}DestroyResp](
 		"delete-{NAME}",
-		libRequest.JSON,
+		libRequest.NoBinding,
 		func(req *{PASCAL}DestroyReq, trx *handlers.HandlerRequest[{PASCAL}DestroyReq, {PASCAL}DestroyResp]) ({PASCAL}DestroyResp, error) {
 			id, err := resources.GetParsedID[string](trx.V2, "id")
 			if err != nil {

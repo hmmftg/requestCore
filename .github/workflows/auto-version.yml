@@ -24,9 +24,17 @@ jobs:
       - name: Check for v2-only changes
         id: check_v2_only
         run: |
-          # Get the list of files changed in the PR
+          # Get the list of files changed in the PR using the merged
+          # PR's base and merge-commit SHAs for an accurate diff range.
           git fetch origin main
-          FILES=$(git diff --name-only origin/main~1 origin/main 2>/dev/null || git diff --name-only HEAD~1 HEAD 2>/dev/null || echo "")
+          BASE_SHA="${{ github.event.pull_request.base.sha }}"
+          HEAD_SHA="${{ github.event.pull_request.merge_commit_sha }}"
+          # Fall back to HEAD~1..HEAD if SHAs are unavailable (e.g. push event).
+          if [ -z "$BASE_SHA" ] || [ -z "$HEAD_SHA" ]; then
+            FILES=$(git diff --name-only HEAD~1 HEAD 2>/dev/null || echo "")
+          else
+            FILES=$(git diff --name-only "$BASE_SHA" "$HEAD_SHA" 2>/dev/null || echo "")
+          fi
 
           # Check if all changed files are under v2/ or v2-related workflow files
           V2_ONLY=true
@@ -175,15 +183,15 @@ jobs:
 
       - name: Create Release
         if: steps.check_v2_only.outputs.v2_only != 'true' && steps.new_version.outputs.new_version != steps.get_tag.outputs.latest_tag
-        uses: actions/create-release@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.new_version.outputs.new_version }}
-          release_name: Release ${{ steps.new_version.outputs.new_version }}
+          name: Release ${{ steps.new_version.outputs.new_version }}
           body: ${{ steps.release_notes.outputs.body }}
           draft: false
           prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Update go.mod version
         if: steps.check_v2_only.outputs.v2_only != 'true' && steps.new_version.outputs.new_version != steps.get_tag.outputs.latest_tag

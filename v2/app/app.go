@@ -100,6 +100,11 @@ type App struct {
 // The returned App is ready for route registration via Register()
 // or direct router access via Router.
 func Bootstrap(config Config) (*App, error) {
+	// Validate configuration before allocating any resources.
+	if err := validateConfig(config); err != nil {
+		return nil, err
+	}
+
 	// Set defaults
 	if config.Renderer == nil {
 		config.Renderer = renderers.JSONRenderer{}
@@ -171,6 +176,42 @@ func wireErrorHandler(router routing.Router, handler *v2response.Handler) {
 	}
 }
 
+// validateConfig checks the Bootstrap configuration before any resources
+// are allocated. It returns an error describing the first issue found.
+func validateConfig(config Config) error {
+	// Framework must be one of the supported values.
+	switch config.Framework {
+	case FrameworkGin, FrameworkFiber, FrameworkChi, FrameworkNetHTTP:
+	default:
+		return fmt.Errorf("app: unsupported framework: %q", config.Framework)
+	}
+
+	// WorkerConfig must have positive worker count if non-zero
+	// (zero is allowed and defaults to NumCPU in NewInProcessWorker).
+	if config.WorkerConfig.WorkerCount < 0 {
+		return fmt.Errorf("app: WorkerConfig.WorkerCount must be >= 0, got %d", config.WorkerConfig.WorkerCount)
+	}
+	if config.WorkerConfig.QueueSize < 0 {
+		return fmt.Errorf("app: WorkerConfig.QueueSize must be >= 0, got %d", config.WorkerConfig.QueueSize)
+	}
+
+	// SessionSecret is documented as required when SessionStore is not
+	// NoOpStore. If a non-NoOp store is provided without a secret, the
+	// CookieStore cannot sign tokens. We warn by returning an error since
+	// this is a configuration mistake that would cause runtime failures.
+	if config.SessionSecret != "" && config.SessionStore == nil {
+		// Secret provided but no store — this is fine, NoOpStore will be
+		// used and the secret is ignored. Not an error.
+	}
+	if config.SessionStore != nil {
+		if _, isNoOp := config.SessionStore.(session.NoOpStore); !isNoOp && config.SessionSecret == "" {
+			return fmt.Errorf("app: SessionSecret is required when SessionStore is not NoOpStore")
+		}
+	}
+
+	return nil
+}
+
 // defaultNotFound returns a 404 handler that emits a JSON error response
 // through the v2 response handler.
 func defaultNotFound(h *v2response.Handler) routing.Handler {
@@ -233,31 +274,42 @@ func (m *middlewareRouter) With(middlewares ...routing.Middleware) routing.Route
 }
 
 func (m *middlewareRouter) Handle(method, pattern string, handler routing.Handler) error {
-	return m.router.Handle(method, pattern, handler)
+	return m.router.Handle(method, pattern, m.wrap(handler))
 }
 
 func (m *middlewareRouter) Get(pattern string, handler routing.Handler) error {
-	return m.router.Get(pattern, handler)
+	return m.router.Get(pattern, m.wrap(handler))
 }
 
 func (m *middlewareRouter) Post(pattern string, handler routing.Handler) error {
-	return m.router.Post(pattern, handler)
+	return m.router.Post(pattern, m.wrap(handler))
 }
 
 func (m *middlewareRouter) Put(pattern string, handler routing.Handler) error {
-	return m.router.Put(pattern, handler)
+	return m.router.Put(pattern, m.wrap(handler))
 }
 
 func (m *middlewareRouter) Patch(pattern string, handler routing.Handler) error {
-	return m.router.Patch(pattern, handler)
+	return m.router.Patch(pattern, m.wrap(handler))
 }
 
 func (m *middlewareRouter) Delete(pattern string, handler routing.Handler) error {
-	return m.router.Delete(pattern, handler)
+	return m.router.Delete(pattern, m.wrap(handler))
 }
 
 func (m *middlewareRouter) Head(pattern string, handler routing.Handler) error {
-	return m.router.Head(pattern, handler)
+	return m.router.Head(pattern, m.wrap(handler))
+}
+
+// wrap applies the global middleware chain to the given handler so that
+// direct route registration (Handle/Get/Post/...) inherits bootstrap
+// middleware, matching the behavior of Group and With.
+func (m *middlewareRouter) wrap(h routing.Handler) routing.Handler {
+	chain := h
+	for i := len(m.middlewares) - 1; i >= 0; i-- {
+		chain = m.middlewares[i](chain)
+	}
+	return chain
 }
 
 func (m *middlewareRouter) NotFound(handler routing.Handler) {
@@ -289,7 +341,16 @@ func (a *App) Start(addr string) error {
 
 // StartWithContext starts the HTTP server with the given context.
 // When the context is cancelled, the server shuts down gracefully.
+//
+// The error handler registry is frozen before the server starts so
+// that route handlers cannot modify error handlers at runtime.
 func (a *App) StartWithContext(ctx context.Context, addr string) error {
+	// Freeze the registry so no new error handlers can be registered
+	// after startup. This prevents accidental mutation during serving.
+	if a.Registry != nil {
+		a.Registry.Freeze()
+	}
+
 	native := a.Router.Native()
 
 	switch server := native.(type) {
