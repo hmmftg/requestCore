@@ -36,7 +36,18 @@ func NewTestParserV2() *TestParserV2 {
 }
 
 // SendResponse captures the response or returns the configured error.
+// Before writing (or returning the configured error), the before-commit
+// hook runner is invoked so that session cookies and other pre-write side
+// effects are persisted.
 func (p *TestParserV2) SendResponse(status int, contentType string, body []byte) error {
+	// Run hooks before any write attempt, even if the write will fail.
+	// If hooks fail (e.g. strict-mode session save failure), return the
+	// error without writing.
+	if p.FakeParserV2.HooksRan == false {
+		if err := p.FakeParserV2.RunHookRunnerErr(); err != nil {
+			return err
+		}
+	}
 	if p.SendResponseError != nil {
 		return p.SendResponseError
 	}
@@ -46,6 +57,11 @@ func (p *TestParserV2) SendResponse(status int, contentType string, body []byte)
 // SetCommitState delegates to the embedded FakeParserV2.
 func (p *TestParserV2) SetCommitState(cs *v2wf.CommitState) {
 	p.FakeParserV2.SetCommitState(cs)
+}
+
+// SetBeforeCommitHookRunner delegates to the embedded FakeParserV2.
+func (p *TestParserV2) SetBeforeCommitHookRunner(fn func() error) {
+	p.FakeParserV2.SetBeforeCommitHookRunner(fn)
 }
 
 // TestRequestContext creates a RequestContext suitable for testing

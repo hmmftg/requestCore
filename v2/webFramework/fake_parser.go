@@ -32,6 +32,13 @@ type FakeParserV2 struct {
 
 	// commitState tracks whether the response has been written.
 	commitState *CommitState
+
+	// hookRunner runs before-commit hooks before the response is written.
+	// Set via SetBeforeCommitHookRunner; nil means no hooks.
+	hookRunner func() error
+
+	// HooksRan reports whether the hook runner was invoked.
+	HooksRan bool
 }
 
 // NewFakeParserV2 creates a FakeParserV2 with initialized maps.
@@ -50,9 +57,18 @@ func NewFakeParserV2() *FakeParserV2 {
 
 // SendResponse captures the response parameters for test assertions.
 // If a CommitState is bound and already committed, returns nil without writing.
+// Before writing, the before-commit hook runner is invoked (if set) so that
+// session cookies and other pre-write side effects are persisted even for
+// direct parser writes.
 func (f *FakeParserV2) SendResponse(status int, contentType string, body []byte) error {
 	if f.commitState != nil && f.commitState.Committed() {
 		return nil
+	}
+	if f.hookRunner != nil {
+		f.HooksRan = true
+		if err := f.hookRunner(); err != nil {
+			return err
+		}
 	}
 	f.ResponseStatus = status
 	f.ResponseContentType = contentType
@@ -76,6 +92,30 @@ func (f *FakeParserV2) Committed() bool {
 // SendResponse can check and update the committed status.
 func (f *FakeParserV2) SetCommitState(cs *CommitState) {
 	f.commitState = cs
+}
+
+// SetBeforeCommitHookRunner binds a function that runs before-commit hooks
+// before SendResponse writes the response.
+func (f *FakeParserV2) SetBeforeCommitHookRunner(fn func() error) {
+	f.hookRunner = fn
+}
+
+// RunHookRunner invokes the before-commit hook runner if set. This is used
+// by test parsers that override SendResponse to ensure hooks still run
+// before simulating write failures. Errors are ignored (best-effort).
+func (f *FakeParserV2) RunHookRunner() {
+	_ = f.RunHookRunnerErr()
+}
+
+// RunHookRunnerErr invokes the before-commit hook runner if set and returns
+// any error. This is used by test parsers that need to propagate hook
+// errors (e.g. strict-mode session save failures).
+func (f *FakeParserV2) RunHookRunnerErr() error {
+	if f.hookRunner != nil {
+		f.HooksRan = true
+		return f.hookRunner()
+	}
+	return nil
 }
 
 // GetCookie returns the value of the named request cookie.

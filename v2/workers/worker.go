@@ -381,36 +381,55 @@ func (w *InProcessWorker) executeJob(env jobEnvelope) {
 // worker-<name>-req-failed (failure) log entry with attempt, elapsed time,
 // terminal state, and collected transaction attributes.
 //
-// The final entry is emitted via slog (supplementary) since the worker
-// has no HTTP response pipeline. The collected attributes from
-// webFramework.AddLog calls are included in the entry so they flow
-// into the Splunk transaction pipeline via the slog handler.
+// The outcome entry is emitted through webFramework.AddLog on the job-owned
+// WebFramework so it flows into the Splunk transaction pipeline alongside
+// the handler's own AddLog entries. The entry is then collected into the
+// transaction sink via CollectLogArrays and also emitted via slog as a
+// supplementary log for environments without a Splunk-connected handler.
 func (w *InProcessWorker) flushTransaction(ctx *JobContext, err error, elapsed time.Duration) {
 	if ctx.transactionSink == nil {
 		return
 	}
-	entries := ctx.transactionSink.Entries()
 
 	key := "worker-" + ctx.JobName + "-req"
 	if err != nil {
 		key = "worker-" + ctx.JobName + "-req-failed"
 	}
 
-	// Build the transaction log attribute group.
-	attrs := make([]slog.Attr, 0, len(entries)+4)
-	attrs = append(attrs, slog.Int("attempt", ctx.Attempt))
-	attrs = append(attrs, slog.String("elapsed", elapsed.String()))
+	// Build the outcome attributes.
+	outcomeAttrs := make([]slog.Attr, 0, 4)
+	outcomeAttrs = append(outcomeAttrs, slog.Int("attempt", ctx.Attempt))
+	outcomeAttrs = append(outcomeAttrs, slog.String("elapsed", elapsed.String()))
 	if err != nil {
-		attrs = append(attrs, slog.String("error", err.Error()))
-		attrs = append(attrs, slog.String("state", "failed"))
+		outcomeAttrs = append(outcomeAttrs, slog.String("error", err.Error()))
+		outcomeAttrs = append(outcomeAttrs, slog.String("state", "failed"))
 	} else {
-		attrs = append(attrs, slog.String("state", "succeeded"))
+		outcomeAttrs = append(outcomeAttrs, slog.String("state", "succeeded"))
 	}
+
+	// Emit the outcome entry through the real webFramework.AddLog pipeline
+	// so it flows into the Splunk transaction pipeline. This satisfies the
+	// mandatory AddLog requirement for worker transaction boundaries.
+	if ctx.WebFramework.Parser != nil {
+		for _, attr := range outcomeAttrs {
+			webFramework.AddLog(ctx.WebFramework, key, attr)
+		}
+		// Collect the outcome entry into the transaction sink.
+		webFramework.CollectLogArrays(ctx.WebFramework, key)
+	}
+
+	// Read all sink entries (handler AddLog entries + outcome entry).
+	entries := ctx.transactionSink.Entries()
+
+	// Build the full attribute list for the supplementary slog emission.
+	attrs := make([]slog.Attr, 0, len(entries)+len(outcomeAttrs))
+	attrs = append(attrs, outcomeAttrs...)
 	attrs = append(attrs, entries...)
 
-	// Emit via slog as the supplementary log. The real AddLog entries
-	// were already collected via webFramework.AddLog into the parser's
-	// local storage and flushed via CollectLogArrays into the sink.
+	// Emit via slog as a supplementary log. The real AddLog entry is
+	// already in the pipeline via the AddLog calls above; this slog
+	// emission ensures observability in environments without a
+	// Splunk-connected slog handler.
 	slog.LogAttrs(context.Background(), slog.LevelInfo, key, attrs...)
 }
 

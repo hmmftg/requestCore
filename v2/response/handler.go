@@ -63,6 +63,11 @@ func (h *Handler) LegacyHandler() legacyResponse.WebHanlder {
 // hooks. It marks the context committed and emits a mandatory AddLog failure
 // entry if the parser write fails. If the response is already committed,
 // this method returns nil without writing.
+//
+// Before-commit hooks are also invoked inside the parser's SendResponse
+// (via the hook runner bound by RequestContext.SetCommitState). The call
+// here is an idempotent safety net: if hooks were already run by a prior
+// SendResponse call, RunBeforeCommitHooks returns nil immediately.
 func (h *Handler) commit(req *v2wf.RequestContext, status int, contentType string, body []byte) error {
 	if req == nil {
 		return errors.New("response: nil request context")
@@ -75,9 +80,14 @@ func (h *Handler) commit(req *v2wf.RequestContext, status int, contentType strin
 		return nil
 	}
 	// Run before-commit hooks (session cookie persistence, etc.).
-	// Hook errors are logged but do not block the commit.
+	// This is idempotent: if the parser already ran hooks via its
+	// hook runner, this is a no-op. If a hook returns an error (e.g.
+	// strict-mode session save failure), return the error so the
+	// response is not committed as a success. The adapter's error
+	// dispatch will then handle the error response.
 	if hookErr := req.RunBeforeCommitHooks(); hookErr != nil {
 		addLogFailure(req, "response-commit-hook", hookErr)
+		return hookErr
 	}
 	if err := req.Parser.SendResponse(status, contentType, body); err != nil {
 		addLogFailure(req, "response-write", err)

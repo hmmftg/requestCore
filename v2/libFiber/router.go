@@ -23,6 +23,8 @@ type FiberRouter struct {
 	methodNA    routing.Handler
 	// registeredRoutes tracks method+pattern pairs for 405 dispatch.
 	registeredRoutes []routeEntry
+	// catchAllRegistered prevents duplicate catch-all registration.
+	catchAllRegistered bool
 }
 
 // routeEntry records a registered method and pattern for 405 checks.
@@ -131,29 +133,42 @@ func (r *FiberRouter) Head(pattern string, handler routing.Handler) error {
 	return r.Handle("HEAD", pattern, handler)
 }
 
-// NotFound sets the handler for unmatched routes.
+// NotFound sets the handler for unmatched routes. It registers a single
+// catch-all that dispatches either the 404 handler (no route matches the
+// path) or the 405 handler (a route matches the path but with a different
+// method), ensuring the two do not shadow each other.
 func (r *FiberRouter) NotFound(handler routing.Handler) {
 	r.notFound = handler
-	r.app.Use("*", r.wrapHandler(handler))
+	r.registerCatchAll()
 }
 
-// MethodNotAllowed sets the handler for disallowed methods.
-// Fiber v2 does not have a built-in 405 handler, so we register a
-// catch-all that checks the method against registered routes and
-// dispatches the 405 handler when the path matches but the method doesn't.
+// MethodNotAllowed sets the handler for disallowed methods. The handler is
+// dispatched by the catch-all registered by NotFound (or by this method if
+// NotFound was not called).
 func (r *FiberRouter) MethodNotAllowed(handler routing.Handler) {
 	r.methodNA = handler
-	// Register a catch-all that fires after all specific routes.
-	// It checks if the path matches a registered route with a different
-	// method and dispatches the 405 handler if so.
+	r.registerCatchAll()
+}
+
+// registerCatchAll registers a single Fiber catch-all middleware that
+// dispatches 404 or 405 based on whether the request path matches a
+// registered route with a different method. It is idempotent: calling it
+// multiple times has no effect beyond the first.
+func (r *FiberRouter) registerCatchAll() {
+	if r.catchAllRegistered {
+		return
+	}
+	r.catchAllRegistered = true
 	r.app.Use("*", func(c *fiber.Ctx) error {
-		// If a response was already sent by a matched route, skip.
+		// If a matched route already sent a response, skip.
 		if c.Response().StatusCode() != 404 {
 			return nil
 		}
-		// Check if the path matches any registered route pattern.
 		path := c.Path()
 		method := c.Method()
+
+		// Check if the path matches a registered route with a
+		// different method → 405. If no route matches at all → 404.
 		pathMatches := false
 		for _, entry := range r.registeredRoutes {
 			if fiberPathMatches(entry.pattern, path) {
@@ -165,10 +180,19 @@ func (r *FiberRouter) MethodNotAllowed(handler routing.Handler) {
 				pathMatches = true
 			}
 		}
-		if !pathMatches {
+
+		var handler routing.Handler
+		if pathMatches && r.methodNA != nil {
+			handler = r.methodNA
+		} else if r.notFound != nil {
+			handler = r.notFound
+		}
+
+		if handler == nil {
 			return nil
 		}
-		// Dispatch the 405 handler through the v2 pipeline.
+
+		// Dispatch through the v2 pipeline.
 		parser := InitContextV2(c)
 		commit := &v2wf.CommitState{}
 		parser.SetCommitState(commit)

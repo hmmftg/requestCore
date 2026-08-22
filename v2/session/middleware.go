@@ -14,6 +14,34 @@ const SessionKey = "_v2_session"
 // FlashKey is the local storage key for the *Flash on the request parser.
 const FlashKey = "_v2_flash"
 
+// SaveFailureMode controls how the session middleware handles session
+// save failures in the before-commit hook.
+type SaveFailureMode int
+
+const (
+	// SaveStrict (default) propagates save failures to the caller so
+	// the response is not committed as a success. The failure is also
+	// logged via webFramework.AddLog with the "session-save-failed" key.
+	SaveStrict SaveFailureMode = iota
+	// SaveBestEffort logs save failures via webFramework.AddLog but
+	// does not propagate the error, allowing the response to commit
+	// successfully even if the session was not persisted.
+	SaveBestEffort
+)
+
+// MiddlewareConfig configures the session middleware.
+type MiddlewareConfig struct {
+	// Manager is the session manager used to load and save sessions.
+	Manager *Manager
+
+	// CookieName is the name of the session cookie.
+	CookieName string
+
+	// SaveFailureMode controls how session save failures are handled.
+	// Default: SaveStrict.
+	SaveFailureMode SaveFailureMode
+}
+
 // Middleware returns a v2 middleware that loads the session from the
 // request cookie and registers a before-commit hook to persist any
 // dirty session state back to the response cookie.
@@ -21,7 +49,25 @@ const FlashKey = "_v2_flash"
 // The middleware stores the *Session and *Flash on the request parser's
 // locals (SessionKey and FlashKey) so handlers can access them via
 // FromContext.
+//
+// Session save failures are handled in strict mode (default): the error
+// is logged via webFramework.AddLog and propagated to the caller so the
+// response is not committed as a success. Use MiddlewareWithConfig to
+// select best-effort mode if needed.
 func Middleware(manager *Manager, cookieName string) func(next func(*v2wf.RequestContext) error) func(*v2wf.RequestContext) error {
+	return MiddlewareWithConfig(MiddlewareConfig{
+		Manager:         manager,
+		CookieName:      cookieName,
+		SaveFailureMode: SaveStrict,
+	})
+}
+
+// MiddlewareWithConfig returns a v2 middleware configured by the given
+// MiddlewareConfig. See Middleware for behavior details.
+func MiddlewareWithConfig(cfg MiddlewareConfig) func(next func(*v2wf.RequestContext) error) func(*v2wf.RequestContext) error {
+	manager := cfg.Manager
+	cookieName := cfg.CookieName
+	mode := cfg.SaveFailureMode
 	return func(next func(*v2wf.RequestContext) error) func(*v2wf.RequestContext) error {
 		return func(ctx *v2wf.RequestContext) error {
 			// Load session from request cookie.
@@ -64,11 +110,16 @@ func Middleware(manager *Manager, cookieName string) func(next func(*v2wf.Reques
 
 				cookie, err := manager.SaveToCookie(c.Context, sess, nil, cookieName)
 				if err != nil {
-					// Log the error but don't block the response.
+					// Log the save failure via the mandatory AddLog pipeline.
 					if c.Legacy.Parser != nil {
 						w := webFramework.WebFramework{Parser: c.Legacy.Parser}
 						webFramework.AddLog(w, "session-save-failed",
 							slog.Any("error", err))
+					}
+					// In strict mode, propagate the error so the
+					// response is not committed as a success.
+					if mode == SaveStrict {
+						return err
 					}
 					return nil
 				}

@@ -49,6 +49,17 @@ type RequestParser interface {
 	// Adapters call this during request setup, after creating the parser
 	// and before running handlers.
 	SetCommitState(cs *CommitState)
+
+	// SetBeforeCommitHookRunner binds a function that runs before-commit
+	// hooks before the response is written. SendResponse implementations
+	// must call this function (if non-nil) before writing the response,
+	// so that direct writes (not going through response.Handler.commit)
+	// also execute hooks such as session cookie persistence.
+	//
+	// The function is idempotent: repeated calls return nil after the
+	// first invocation. Hook errors are logged inside the runner and do
+	// not block the write.
+	SetBeforeCommitHookRunner(fn func() error)
 }
 
 // RequestContext holds the per-request state passed through the v2
@@ -95,6 +106,11 @@ type RequestContext struct {
 	// is written.
 	hooksMu           sync.RWMutex
 	beforeCommitHooks []BeforeCommitHook
+
+	// hooksRan ensures RunBeforeCommitHooks executes hooks exactly once
+	// per request, whether called from the parser's SendResponse or from
+	// response.Handler.commit.
+	hooksRan bool
 }
 
 // LegacyWebFramework returns the v1 WebFramework for use with existing

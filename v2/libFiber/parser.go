@@ -24,6 +24,9 @@ type FiberParserV2 struct {
 	// commitState tracks whether the response has been written.
 	// SendResponse checks and updates this to avoid double-writes.
 	commitState *v2wf.CommitState
+
+	// hookRunner runs before-commit hooks before the response is written.
+	hookRunner func() error
 }
 
 // InitContextV2 creates a FiberParserV2 from a Fiber context.
@@ -37,9 +40,17 @@ func InitContextV2(c *fiber.Ctx) *FiberParserV2 {
 // and body bytes to the Fiber response. This bypasses net/http entirely
 // and writes directly to the fasthttp response.
 // If a CommitState is bound and already committed, returns nil without writing.
+// Before writing, the before-commit hook runner is invoked (if set) so that
+// session cookies and other pre-write side effects are persisted even for
+// direct parser writes.
 func (p *FiberParserV2) SendResponse(status int, contentType string, body []byte) error {
 	if p.commitState != nil && p.commitState.Committed() {
 		return nil
+	}
+	if p.hookRunner != nil {
+		if err := p.hookRunner(); err != nil {
+			return err
+		}
 	}
 	if contentType != "" {
 		p.Ctx.Set("Content-Type", contentType)
@@ -92,4 +103,10 @@ func (p *FiberParserV2) SetCookie(cookie *http.Cookie) {
 // SendResponse can check and update the committed status.
 func (p *FiberParserV2) SetCommitState(cs *v2wf.CommitState) {
 	p.commitState = cs
+}
+
+// SetBeforeCommitHookRunner binds a function that runs before-commit hooks
+// before SendResponse writes the response.
+func (p *FiberParserV2) SetBeforeCommitHookRunner(fn func() error) {
+	p.hookRunner = fn
 }

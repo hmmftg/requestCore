@@ -13,7 +13,7 @@ import (
 // CommitState is safe for concurrent use, though a single request is
 // typically processed by one goroutine.
 type CommitState struct {
-	mu       sync.RWMutex
+	mu        sync.RWMutex
 	committed bool
 	status    int
 }
@@ -47,9 +47,19 @@ func (c *CommitState) Status() int {
 // the response. Hooks may set cookies, persist session state, or record
 // metrics. A hook must not write the response body itself.
 //
-// If a hook returns an error, the response is still committed (the error is
-// logged but not propagated to the caller, since the response is about to be
-// written). Hooks should be best-effort.
+// Hook error handling depends on the hook's policy:
+//   - The session middleware's hook follows the configured SaveFailureMode
+//     (strict by default: the error is propagated so the response is not
+//     committed as a success; best-effort: the error is logged but the
+//     response is still committed).
+//   - Other hooks should be best-effort: log errors via webFramework.AddLog
+//     but return nil so the response can still be committed.
+//
+// When a hook returns a non-nil error, the parser's SendResponse still
+// proceeds with the write (the hook error is logged via addLogFailure).
+// The session middleware in strict mode returns the error before the
+// parser write path is reached, because RunBeforeCommitHooks is called
+// before SendResponse in the commit path.
 type BeforeCommitHook func(*RequestContext) error
 
 // AddBeforeCommitHook registers a hook to be invoked before the response is
@@ -65,12 +75,20 @@ func (c *RequestContext) AddBeforeCommitHook(hook BeforeCommitHook) {
 }
 
 // RunBeforeCommitHooks invokes all registered before-commit hooks in order.
-// Errors are collected but do not abort the commit; the first error is
-// returned for logging purposes.
+// This method is idempotent: the first call runs all hooks and subsequent
+// calls return nil without re-running them. This ensures hooks run exactly
+// once whether triggered by the parser's SendResponse or by
+// response.Handler.commit. Errors are collected but do not abort the commit;
+// the first error is returned for logging purposes.
 func (c *RequestContext) RunBeforeCommitHooks() error {
-	c.hooksMu.RLock()
+	c.hooksMu.Lock()
+	if c.hooksRan {
+		c.hooksMu.Unlock()
+		return nil
+	}
+	c.hooksRan = true
 	hooks := append([]BeforeCommitHook(nil), c.beforeCommitHooks...)
-	c.hooksMu.RUnlock()
+	c.hooksMu.Unlock()
 	var firstErr error
 	for _, h := range hooks {
 		if err := h(c); err != nil && firstErr == nil {
@@ -100,10 +118,17 @@ func (c *RequestContext) CommitState() *CommitState {
 	return c.commit
 }
 
-// SetCommitState associates a CommitState with this context. Adapters call
-// this during request setup so that response methods can track commitment.
+// SetCommitState associates a CommitState with this context and wires the
+// before-commit hook runner on the parser so that SendResponse runs hooks
+// before writing. Adapters call this during request setup after assigning
+// c.Parser.
 func (c *RequestContext) SetCommitState(cs *CommitState) {
 	c.commit = cs
+	if c.Parser != nil {
+		c.Parser.SetBeforeCommitHookRunner(func() error {
+			return c.RunBeforeCommitHooks()
+		})
+	}
 }
 
 // CookieHelpers is an optional interface that parsers may implement to expose
