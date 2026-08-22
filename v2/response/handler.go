@@ -160,7 +160,7 @@ func (h *Handler) NoContent(req *v2wf.RequestContext) error {
 
 // Redirect sends a redirect response.
 func (h *Handler) Redirect(req *v2wf.RequestContext, status int, url string) error {
-	if req.Legacy.Parser != nil {
+	if !req.Committed() && req.Legacy.Parser != nil {
 		req.Legacy.Parser.SetRespHeader("Location", url)
 	}
 	return h.commit(req, status, "", nil)

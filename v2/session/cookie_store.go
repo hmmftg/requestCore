@@ -24,6 +24,12 @@ func generateID() string {
 	return fmt.Sprintf("%x", b)
 }
 
+// cookieTokenVersion is the current token format version. It is embedded
+// in every saved token and verified on load so that future format changes
+// (e.g. new encryption schemes, key rotation markers) can be distinguished
+// safely. Tokens with an unknown version are rejected on load.
+const cookieTokenVersion = 1
+
 // CookieStoreConfig configures a CookieStore.
 type CookieStoreConfig struct {
 	// SecretKey is the HMAC signing key. Must be at least 32 bytes.
@@ -53,7 +59,10 @@ type CookieStoreConfig struct {
 	Secure bool
 
 	// HttpOnly sets the cookie HttpOnly flag. Default: true.
-	HttpOnly bool
+	// Use a pointer to distinguish "not set" (nil → defaults to true)
+	// from "explicitly set to false" (allows disabling HttpOnly for
+	// cross-site JavaScript access when needed).
+	HttpOnly *bool
 
 	// SameSite sets the cookie SameSite attribute.
 	// Values: "lax", "strict", "none". Default: "lax".
@@ -90,13 +99,12 @@ func NewCookieStore(config CookieStoreConfig) (*CookieStore, error) {
 	if config.SameSite == "" {
 		config.SameSite = "lax"
 	}
-	// HttpOnly defaults to true. We use a sentinel check: the zero value
-	// of bool is false, so we only set the default when the caller hasn't
-	// explicitly set it. Since we can't distinguish "not set" from "set
-	// to false" with a bool, we default to true always and let callers
-	// who want false pass it explicitly after construction.
-	if !config.HttpOnly {
-		config.HttpOnly = true
+	// HttpOnly defaults to true when nil. An explicit *false honors
+	// the caller's intent to disable HttpOnly (e.g. for cross-site
+	// JavaScript cookie access).
+	if config.HttpOnly == nil {
+		t := true
+		config.HttpOnly = &t
 	}
 	if config.MaxPayloadSize == 0 {
 		config.MaxPayloadSize = 3800
@@ -116,6 +124,7 @@ func (s *CookieStore) Load(_ context.Context, token string) (*Session, error) {
 	}
 
 	var raw struct {
+		Version   int            `json:"v"`
 		ID        string         `json:"id"`
 		Data      map[string]any `json:"data"`
 		CreatedAt time.Time      `json:"created_at"`
@@ -123,6 +132,12 @@ func (s *CookieStore) Load(_ context.Context, token string) (*Session, error) {
 	}
 	if err := json.Unmarshal(payload, &raw); err != nil {
 		return nil, fmt.Errorf("session: unmarshal payload: %w", err)
+	}
+
+	// Reject unknown token versions so future format changes can be
+	// distinguished safely during key rotation.
+	if raw.Version != cookieTokenVersion {
+		return nil, fmt.Errorf("session: unsupported token version %d, expected %d", raw.Version, cookieTokenVersion)
 	}
 
 	if time.Now().After(raw.ExpiresAt) {
@@ -141,11 +156,13 @@ func (s *CookieStore) Load(_ context.Context, token string) (*Session, error) {
 func (s *CookieStore) Save(_ context.Context, sess *Session) (string, error) {
 	expiresAt := time.Now().Add(s.config.MaxAge)
 	raw := struct {
+		Version   int            `json:"v"`
 		ID        string         `json:"id"`
 		Data      map[string]any `json:"data"`
 		CreatedAt time.Time      `json:"created_at"`
 		ExpiresAt time.Time      `json:"expires_at"`
 	}{
+		Version:   cookieTokenVersion,
 		ID:        sess.id,
 		Data:      sess.Data(),
 		CreatedAt: sess.createdAt,

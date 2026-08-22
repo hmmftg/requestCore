@@ -34,7 +34,12 @@ func buildEndpointHandler(
 	args []any,
 ) func(ctx *v2wf.RequestContext) error {
 	if respHandler == nil {
-		respHandler = v2response.NewHandler(nil, nil, response.WebHanlder{})
+		// Install a handler with a default fallback so the registry
+		// never encounters a fallback-less state. This prevents
+		// silent failures when respHandler is not explicitly configured.
+		reg := v2response.NewRegistry(nil)
+		reg.SetFallback(v2response.LegacyFallback(response.WebHanlder{}))
+		respHandler = v2response.NewHandler(reg, nil, response.WebHanlder{})
 	}
 	return func(ctx *v2wf.RequestContext) (err error) {
 		start := time.Now()

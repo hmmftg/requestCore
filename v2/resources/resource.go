@@ -58,9 +58,7 @@ type Resource[ID any] interface {
 // ResourceDefaults holds default endpoint handlers for unsupported operations.
 // When a Resource returns nil for an operation, the corresponding default
 // handler emits a 405 Method Not Allowed response.
-type ResourceDefaults struct {
-	Registry v2response.Registry
-}
+type ResourceDefaults struct{}
 
 // Config holds the configuration for registering a resource.
 type Config[ID any] struct {

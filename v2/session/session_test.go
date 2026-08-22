@@ -375,7 +375,7 @@ func TestCookieStore_Defaults(t *testing.T) {
 	if cfg.Path != "/" {
 		t.Fatalf("expected default path '/', got %q", cfg.Path)
 	}
-	if !cfg.HttpOnly {
+	if cfg.HttpOnly == nil || !*cfg.HttpOnly {
 		t.Fatal("expected default HttpOnly=true")
 	}
 	if cfg.MaxPayloadSize != 3800 {

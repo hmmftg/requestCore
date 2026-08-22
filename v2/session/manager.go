@@ -71,7 +71,7 @@ func (m *Manager) SaveToCookie(ctx context.Context, sess *Session, flash *Flash,
 		cookie.Path = cfg.Path
 		cookie.Domain = cfg.Domain
 		cookie.Secure = cfg.Secure
-		cookie.HttpOnly = cfg.HttpOnly
+		cookie.HttpOnly = *cfg.HttpOnly
 		cookie.MaxAge = int(cfg.MaxAge.Seconds())
 
 		switch cfg.SameSite {

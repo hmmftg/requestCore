@@ -8,6 +8,7 @@ package app
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"sync"
@@ -91,6 +92,12 @@ type App struct {
 	// Protected by serverMu to prevent data races between Start and Shutdown.
 	serverMu     sync.Mutex
 	nativeServer any
+
+	// serverRegistered is closed when StartWithContext stores nativeServer,
+	// allowing Shutdown to wait deterministically instead of polling.
+	serverRegistered chan struct{}
+	// serverRegOnce ensures serverRegistered is closed at most once.
+	serverRegOnce sync.Once
 }
 
 // Bootstrap creates a new v2 App with the given configuration.
@@ -155,13 +162,14 @@ func Bootstrap(config Config) (*App, error) {
 	}
 
 	return &App{
-		Router:      router,
-		RespHandler: respHandler,
-		Registry:    registry,
-		Renderer:    config.Renderer,
-		Worker:      worker,
-		Sessions:    sessionMgr,
-		Middlewares: config.Middlewares,
+		Router:           router,
+		RespHandler:      respHandler,
+		Registry:         registry,
+		Renderer:         config.Renderer,
+		Worker:           worker,
+		Sessions:         sessionMgr,
+		Middlewares:      config.Middlewares,
+		serverRegistered: make(chan struct{}),
 	}, nil
 }
 
@@ -359,6 +367,7 @@ func (a *App) StartWithContext(ctx context.Context, addr string) error {
 		a.serverMu.Lock()
 		a.nativeServer = server
 		a.serverMu.Unlock()
+		a.serverRegOnce.Do(func() { close(a.serverRegistered) })
 		go func() {
 			<-ctx.Done()
 			shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -374,6 +383,7 @@ func (a *App) StartWithContext(ctx context.Context, addr string) error {
 		a.serverMu.Lock()
 		a.nativeServer = httpServer
 		a.serverMu.Unlock()
+		a.serverRegOnce.Do(func() { close(a.serverRegistered) })
 		go func() {
 			<-ctx.Done()
 			shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -386,6 +396,7 @@ func (a *App) StartWithContext(ctx context.Context, addr string) error {
 		a.serverMu.Lock()
 		a.nativeServer = native
 		a.serverMu.Unlock()
+		a.serverRegOnce.Do(func() { close(a.serverRegistered) })
 		return startFiber(native, addr)
 	}
 }
@@ -394,26 +405,22 @@ func (a *App) StartWithContext(ctx context.Context, addr string) error {
 // server, then shuts down the worker pool. Both operations are bounded
 // by the given context.
 //
-// Shutdown is safe to call concurrently with StartWithContext. If the
-// server has not yet been registered (StartWithContext hasn't stored it
-// yet), Shutdown waits briefly for it to appear, then proceeds to shut
-// down the worker pool.
+// Shutdown is safe to call concurrently with StartWithContext. It waits
+// deterministically for StartWithContext to register the server (via a
+// closed channel) before proceeding, eliminating the prior polling race.
+//
+// http.ErrServerClosed is treated as a clean termination (return nil)
+// because it indicates the server was already shut down, typically by
+// a concurrent StartWithContext context cancellation.
 func (a *App) Shutdown(ctx context.Context) error {
-	// Wait for the server to be registered if StartWithContext is
-	// concurrently in progress. This closes the race window where
-	// Shutdown sees nil nativeServer because Start hasn't stored it yet.
-	deadline, hasDeadline := ctx.Deadline()
-	for i := 0; i < 50; i++ { // up to ~500ms
-		a.serverMu.Lock()
-		server := a.nativeServer
-		a.serverMu.Unlock()
-		if server != nil {
-			break
+	// Wait deterministically for StartWithContext to register the server.
+	// This replaces the previous polling loop and closes the race window
+	// where Shutdown sees nil nativeServer because Start hasn't stored it yet.
+	if a.serverRegistered != nil {
+		select {
+		case <-a.serverRegistered:
+		case <-ctx.Done():
 		}
-		if hasDeadline && time.Now().After(deadline) {
-			break
-		}
-		time.Sleep(10 * time.Millisecond)
 	}
 
 	a.serverMu.Lock()
@@ -424,6 +431,11 @@ func (a *App) Shutdown(ctx context.Context) error {
 	if server != nil {
 		if httpServer, ok := server.(*http.Server); ok {
 			httpErr = httpServer.Shutdown(ctx)
+			// http.ErrServerClosed is expected when StartWithContext's
+			// context-driven shutdown races with an explicit Shutdown call.
+			if errors.Is(httpErr, http.ErrServerClosed) {
+				httpErr = nil
+			}
 		} else {
 			// Fiber shutdown
 			httpErr = shutdownFiber(server, ctx)

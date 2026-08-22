@@ -247,7 +247,7 @@ func TestRegister_Defaults405(t *testing.T) {
 	// A resource that returns nil for all operations.
 	emptyResource := &emptyResourceImpl{}
 
-	defaults := &ResourceDefaults{Registry: respHandler.Registry()}
+	defaults := &ResourceDefaults{}
 	err := Register[string](router, Config[string]{
 		Path:        "/items",
 		Resource:    emptyResource,

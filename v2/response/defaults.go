@@ -46,7 +46,7 @@ func DefaultErrorHandlers() map[int]v2wf.ErrorHandler {
 				addLogFailure(ctx.Request, "default-error-encode", err)
 				return err
 			}
-			if ctx.Request != nil && ctx.Request.Legacy.Parser != nil {
+			if ctx.Request != nil && !ctx.Request.Committed() && ctx.Request.Legacy.Parser != nil {
 				ctx.Request.Legacy.Parser.SetRespHeader("Retry-After", "60")
 			}
 			addLogFailure(ctx.Request, "default-error", ctx.Error)
