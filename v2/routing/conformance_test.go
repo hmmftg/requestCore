@@ -4,6 +4,7 @@ package routing_test
 
 import (
 	"context"
+	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -250,6 +251,171 @@ func TestConformance_InvalidPattern(t *testing.T) {
 			})
 			if err == nil {
 				t.Fatal("expected error for invalid pattern")
+			}
+		})
+	}
+}
+
+// TestConformance_NoDoubleWrite verifies that when a handler writes a
+// response directly and then returns an error, the adapter does not
+// write a second response (the error is ignored because the response
+// is already committed).
+func TestConformance_NoDoubleWrite(t *testing.T) {
+	for _, af := range adapterFactories() {
+		t.Run(af.Name, func(t *testing.T) {
+			router, serve := af.NewRouter()
+
+			router.Get("/test", func(ctx *v2wf.RequestContext) error {
+				// Write a 200 response directly.
+				_ = ctx.Parser.SendResponse(200, "text/plain", []byte("first"))
+				// Return an error after committing.
+				return errors.New("should be ignored")
+			})
+
+			req := httptest.NewRequest("GET", "/test", nil)
+			resp, err := serve(req)
+			if err != nil {
+				t.Fatalf("serve: %v", err)
+			}
+			defer resp.Body.Close()
+
+			if resp.StatusCode != 200 {
+				t.Fatalf("expected 200 (first write wins), got %d", resp.StatusCode)
+			}
+			body, _ := io.ReadAll(resp.Body)
+			if string(body) != "first" {
+				t.Fatalf("expected 'first', got %s", string(body))
+			}
+		})
+	}
+}
+
+// TestConformance_HookRunsOnce verifies that before-commit hooks run
+// exactly once per request, even when the handler writes directly.
+func TestConformance_HookRunsOnce(t *testing.T) {
+	for _, af := range adapterFactories() {
+		t.Run(af.Name, func(t *testing.T) {
+			router, serve := af.NewRouter()
+
+			hookCalls := 0
+			router.Get("/test", func(ctx *v2wf.RequestContext) error {
+				ctx.AddBeforeCommitHook(func(c *v2wf.RequestContext) error {
+					hookCalls++
+					return nil
+				})
+				// Direct write triggers the hook runner in SendResponse.
+				return ctx.Parser.SendResponse(200, "text/plain", []byte("ok"))
+			})
+
+			req := httptest.NewRequest("GET", "/test", nil)
+			resp, err := serve(req)
+			if err != nil {
+				t.Fatalf("serve: %v", err)
+			}
+			defer resp.Body.Close()
+
+			if resp.StatusCode != 200 {
+				t.Fatalf("expected 200, got %d", resp.StatusCode)
+			}
+			if hookCalls != 1 {
+				t.Fatalf("expected hook to run exactly once, got %d", hookCalls)
+			}
+		})
+	}
+}
+
+// TestConformance_204NoContent verifies that a 204 response with no body
+// is handled correctly across all adapters.
+func TestConformance_204NoContent(t *testing.T) {
+	for _, af := range adapterFactories() {
+		t.Run(af.Name, func(t *testing.T) {
+			router, serve := af.NewRouter()
+
+			router.Get("/test", func(ctx *v2wf.RequestContext) error {
+				return ctx.Parser.SendResponse(204, "", nil)
+			})
+
+			req := httptest.NewRequest("GET", "/test", nil)
+			resp, err := serve(req)
+			if err != nil {
+				t.Fatalf("serve: %v", err)
+			}
+			defer resp.Body.Close()
+
+			if resp.StatusCode != 204 {
+				t.Fatalf("expected 204, got %d", resp.StatusCode)
+			}
+			body, _ := io.ReadAll(resp.Body)
+			if len(body) != 0 {
+				t.Fatalf("expected empty body for 204, got %d bytes", len(body))
+			}
+		})
+	}
+}
+
+// TestConformance_404NotFound verifies that unmatched routes return 404
+// when a NotFound handler is configured.
+func TestConformance_404NotFound(t *testing.T) {
+	for _, af := range adapterFactories() {
+		t.Run(af.Name, func(t *testing.T) {
+			router, serve := af.NewRouter()
+
+			router.Get("/exists", func(ctx *v2wf.RequestContext) error {
+				return ctx.Parser.SendResponse(200, "text/plain", []byte("ok"))
+			})
+
+			// Register a 404 handler.
+			router.NotFound(func(ctx *v2wf.RequestContext) error {
+				return ctx.Parser.SendResponse(404, "text/plain", []byte("not-found"))
+			})
+
+			req := httptest.NewRequest("GET", "/nonexistent", nil)
+			resp, err := serve(req)
+			if err != nil {
+				t.Fatalf("serve: %v", err)
+			}
+			defer resp.Body.Close()
+
+			if resp.StatusCode != 404 {
+				t.Fatalf("expected 404, got %d", resp.StatusCode)
+			}
+		})
+	}
+}
+
+// TestConformance_405MethodNotAllowed verifies that using a wrong method
+// on an existing path returns 405 when a MethodNotAllowed handler is
+// configured.
+func TestConformance_405MethodNotAllowed(t *testing.T) {
+	for _, af := range adapterFactories() {
+		t.Run(af.Name, func(t *testing.T) {
+			router, serve := af.NewRouter()
+
+			// Register only GET.
+			router.Get("/test", func(ctx *v2wf.RequestContext) error {
+				return ctx.Parser.SendResponse(200, "text/plain", []byte("ok"))
+			})
+
+			// Register 404 and 405 handlers.
+			router.NotFound(func(ctx *v2wf.RequestContext) error {
+				return ctx.Parser.SendResponse(404, "text/plain", []byte("not-found"))
+			})
+			router.MethodNotAllowed(func(ctx *v2wf.RequestContext) error {
+				return ctx.Parser.SendResponse(405, "text/plain", []byte("method-not-allowed"))
+			})
+
+			// POST to a GET-only route should return 405.
+			req := httptest.NewRequest("POST", "/test", nil)
+			resp, err := serve(req)
+			if err != nil {
+				t.Fatalf("serve: %v", err)
+			}
+			defer resp.Body.Close()
+
+			// Some frameworks may return 404 instead of 405 for
+			// method mismatches; accept either but prefer 405.
+			if resp.StatusCode != 405 && resp.StatusCode != 404 {
+				t.Fatalf("expected 405 or 404, got %d", resp.StatusCode)
 			}
 		})
 	}

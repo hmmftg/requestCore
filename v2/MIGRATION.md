@@ -22,10 +22,20 @@ v2 is a **separate Go module** that lives in the `v2/` directory. It is fully ba
 
 ## Step 1: Add v2 as a dependency
 
+The v2 module is released via a manual, prerelease-aware GitHub Actions
+workflow (`release-v2.yml`). Until the first stable v2 tag is published,
+pin to the latest prerelease tag:
+
 ```bash
 cd your-project
-go get github.com/hmmftg/requestCore/v2@latest
+# Replace v2.0.0-alpha with the latest published v2 prerelease tag.
+# Check available tags at:
+#   https://github.com/hmmftg/requestCore/releases
+go get github.com/hmmftg/requestCore/v2@v2.0.0-alpha
 ```
+
+> **Note:** `go get ...@latest` will not resolve until the first
+> non-prerelease v2 tag is published. Always pin to a specific tag.
 
 ## Step 2: Bootstrap the v2 App
 

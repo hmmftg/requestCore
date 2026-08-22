@@ -154,13 +154,25 @@ func (r *FiberRouter) MethodNotAllowed(handler routing.Handler) {
 // dispatches 404 or 405 based on whether the request path matches a
 // registered route with a different method. It is idempotent: calling it
 // multiple times has no effect beyond the first.
+//
+// The middleware calls c.Next() first to let route handlers run. After
+// the handler chain completes, if the response status is still 404
+// (Fiber's default for unmatched routes), the catch-all dispatches the
+// configured 404 or 405 handler.
 func (r *FiberRouter) registerCatchAll() {
 	if r.catchAllRegistered {
 		return
 	}
 	r.catchAllRegistered = true
 	r.app.Use("*", func(c *fiber.Ctx) error {
-		// If a matched route already sent a response, skip.
+		// Continue to the next handler (route handler or Fiber's
+		// default 404). This ensures route handlers run before the
+		// catch-all checks the response status.
+		if err := c.Next(); err != nil {
+			return err
+		}
+		// If a matched route already sent a response (status != 404),
+		// skip the catch-all.
 		if c.Response().StatusCode() != 404 {
 			return nil
 		}

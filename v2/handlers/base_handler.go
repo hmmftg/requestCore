@@ -148,6 +148,7 @@ func runLifecycle(
 			legacy.AddLog(w, endpoint.Title+"-req-failed", slog.Any("write-error", wErr))
 			return wErr
 		}
+		legacy.AddLog(w, endpoint.Title+"-req-failed", slog.Any("error", errParse))
 		return errParse
 	}
 	trxCarrier.setHeader(header)
@@ -165,6 +166,7 @@ func runLifecycle(
 				legacy.AddLog(w, endpoint.Title+"-req-failed", slog.Any("write-error", wErr))
 				return wErr
 			}
+			legacy.AddLog(w, endpoint.Title+"-req-failed", slog.Any("error", errID))
 			return errID
 		}
 	}
@@ -176,6 +178,7 @@ func runLifecycle(
 				legacy.AddLog(w, endpoint.Title+"-req-failed", slog.Any("write-error", wErr))
 				return wErr
 			}
+			legacy.AddLog(w, endpoint.Title+"-req-failed", slog.Any("error", errInsert))
 			return errInsert
 		}
 		*requestInserted = true
@@ -189,6 +192,7 @@ func runLifecycle(
 				legacy.AddLog(w, endpoint.Title+"-req-failed", slog.Any("write-error", wErr))
 				return wErr
 			}
+			legacy.AddLog(w, endpoint.Title+"-req-failed", slog.Any("error", errInit))
 			return errInit
 		}
 		legacy.AddLog(w, legacy.HandlerLogTag, slog.Any("initialize", nil))
@@ -202,6 +206,7 @@ func runLifecycle(
 			legacy.AddLog(w, endpoint.Title+"-req-failed", slog.Any("write-error", wErr))
 			return wErr
 		}
+		legacy.AddLog(w, endpoint.Title+"-req-failed", slog.Any("error", err))
 		return err
 	}
 	trxCarrier.setResponse(resp)

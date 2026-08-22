@@ -85,8 +85,13 @@ func printUsage() {
 	}
 }
 
+// Version is the requestcore CLI version. It can be overridden at build
+// time via -ldflags "-X github.com/hmmftg/requestCore/v2/cmd/requestcore.Version=v2.0.0".
+// When not overridden, it defaults to "v2.0.0-alpha".
+var Version = "v2.0.0-alpha"
+
 func runVersion(args []string) error {
-	fmt.Println("requestcore v2.0.0-alpha")
+	fmt.Printf("requestcore %s\n", Version)
 	return nil
 }
 
