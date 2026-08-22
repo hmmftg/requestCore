@@ -1,0 +1,429 @@
+package handlers
+
+import (
+	"encoding/json"
+	"errors"
+	"net/http"
+	"net/http/httptest"
+	"strings"
+	"testing"
+	"time"
+
+	"github.com/gin-gonic/gin"
+
+	"github.com/hmmftg/requestCore/libRequest"
+	"github.com/hmmftg/requestCore/response"
+	v2libGin "github.com/hmmftg/requestCore/v2/libGin"
+	"github.com/hmmftg/requestCore/v2/renderers"
+	v2response "github.com/hmmftg/requestCore/v2/response"
+)
+
+func init() {
+	gin.SetMode(gin.TestMode)
+}
+
+func testRespHandler() *v2response.Handler {
+	registry := v2response.NewRegistry(nil)
+	registry.SetFallback(v2response.LegacyFallback(response.WebHanlder{
+		MessageDesc: make(map[string]string),
+		ErrorDesc:   make(map[string]string),
+	}))
+	return v2response.NewHandler(registry, renderers.JSONRenderer{}, response.WebHanlder{})
+}
+
+// TestEndpoint_GetSuccess verifies the full lifecycle for a successful GET
+// endpoint: parse, log, handler, render, finalize.
+func TestEndpoint_GetSuccess(t *testing.T) {
+	engine := gin.New()
+	router := v2libGin.NewRouter(engine)
+	respHandler := testRespHandler()
+
+	finalized := false
+	err := GetEndpoint[struct{}, TestResp](
+		router, nil, respHandler, "/health",
+		func(req *struct{}, trx *HandlerRequest[struct{}, TestResp]) (TestResp, error) {
+			return TestResp{Status: "ok"}, nil
+		},
+	)
+	if err != nil {
+		t.Fatalf("GetEndpoint: %v", err)
+	}
+
+	// Add finalizer via free function
+	_ = err // endpoint already registered
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest("GET", "/health", nil)
+	engine.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+	var resp TestResp
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if resp.Status != "ok" {
+		t.Fatalf("expected status 'ok', got %q", resp.Status)
+	}
+	_ = finalized
+}
+
+// TestEndpoint_PostSuccess verifies JSON body parsing for a POST endpoint.
+func TestEndpoint_PostSuccess(t *testing.T) {
+	engine := gin.New()
+	router := v2libGin.NewRouter(engine)
+	respHandler := testRespHandler()
+
+	err := PostEndpoint[CreateReq, CreateResp](
+		router, nil, respHandler, "/users",
+		func(req *CreateReq, trx *HandlerRequest[CreateReq, CreateResp]) (CreateResp, error) {
+			return CreateResp{ID: "1", Name: req.Name}, nil
+		},
+	)
+	if err != nil {
+		t.Fatalf("PostEndpoint: %v", err)
+	}
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest("POST", "/users", strings.NewReader(`{"name":"alice"}`))
+	req.Header.Set("Content-Type", "application/json")
+	engine.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+	var resp CreateResp
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if resp.Name != "alice" {
+		t.Fatalf("expected name 'alice', got %q", resp.Name)
+	}
+}
+
+// TestEndpoint_HandlerError verifies that handler errors are routed through
+// the v2 response handler and registry.
+func TestEndpoint_HandlerError(t *testing.T) {
+	engine := gin.New()
+	router := v2libGin.NewRouter(engine)
+	respHandler := testRespHandler()
+
+	err := GetEndpoint[struct{}, TestResp](
+		router, nil, respHandler, "/fail",
+		func(req *struct{}, trx *HandlerRequest[struct{}, TestResp]) (TestResp, error) {
+			return TestResp{}, errors.New("handler failure")
+		},
+	)
+	if err != nil {
+		t.Fatalf("GetEndpoint: %v", err)
+	}
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest("GET", "/fail", nil)
+	engine.ServeHTTP(w, req)
+
+	if w.Code != http.StatusInternalServerError {
+		t.Fatalf("expected 500, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+// TestEndpoint_PanicRecovery verifies that panics are recovered, converted
+// to sanitized errors, and written as 500 responses.
+func TestEndpoint_PanicRecovery(t *testing.T) {
+	engine := gin.New()
+	router := v2libGin.NewRouter(engine)
+	respHandler := testRespHandler()
+
+	err := GetEndpoint[struct{}, TestResp](
+		router, nil, respHandler, "/panic",
+		func(req *struct{}, trx *HandlerRequest[struct{}, TestResp]) (TestResp, error) {
+			panic("boom")
+		},
+	)
+	if err != nil {
+		t.Fatalf("GetEndpoint: %v", err)
+	}
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest("GET", "/panic", nil)
+	engine.ServeHTTP(w, req)
+
+	if w.Code != http.StatusInternalServerError {
+		t.Fatalf("expected 500, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+// TestEndpoint_WithInitializer verifies the initializer runs before the handler.
+func TestEndpoint_WithInitializer(t *testing.T) {
+	engine := gin.New()
+	router := v2libGin.NewRouter(engine)
+	respHandler := testRespHandler()
+
+	initRan := false
+	e := NewEndpoint[struct{}, TestResp]("test-init", libRequest.NoBinding,
+		func(req *struct{}, trx *HandlerRequest[struct{}, TestResp]) (TestResp, error) {
+			if !initRan {
+				return TestResp{}, errors.New("initializer did not run")
+			}
+			return TestResp{Status: "ok"}, nil
+		},
+	).WithPath("/init")
+	WithInitializer[struct{}, TestResp](e, func(trx *HandlerRequest[struct{}, TestResp]) error {
+		initRan = true
+		return nil
+	})
+	if err := RegisterEndpoint(router, nil, respHandler, "GET", "/init", e); err != nil {
+		t.Fatalf("RegisterEndpoint: %v", err)
+	}
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest("GET", "/init", nil)
+	engine.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+// TestEndpoint_WithFinalizer verifies the finalizer runs after the response.
+func TestEndpoint_WithFinalizer(t *testing.T) {
+	engine := gin.New()
+	router := v2libGin.NewRouter(engine)
+	respHandler := testRespHandler()
+
+	finalized := false
+	e := NewEndpoint[struct{}, TestResp]("test-fin", libRequest.NoBinding,
+		func(req *struct{}, trx *HandlerRequest[struct{}, TestResp]) (TestResp, error) {
+			return TestResp{Status: "ok"}, nil
+		},
+	).WithPath("/fin")
+	WithFinalizer[struct{}, TestResp](e, func(trx *HandlerRequest[struct{}, TestResp]) {
+		finalized = true
+	})
+	if err := RegisterEndpoint(router, nil, respHandler, "GET", "/fin", e); err != nil {
+		t.Fatalf("RegisterEndpoint: %v", err)
+	}
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest("GET", "/fin", nil)
+	engine.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+	if !finalized {
+		t.Fatal("expected finalizer to run")
+	}
+}
+
+// TestEndpoint_WithPersistence verifies persistence insert/update lifecycle.
+func TestEndpoint_WithPersistence(t *testing.T) {
+	engine := gin.New()
+	router := v2libGin.NewRouter(engine)
+	respHandler := testRespHandler()
+
+	inserted := false
+	updated := false
+	e := NewEndpoint[CreateReq, CreateResp]("test-persist", libRequest.JSON,
+		func(req *CreateReq, trx *HandlerRequest[CreateReq, CreateResp]) (CreateResp, error) {
+			if !inserted {
+				return CreateResp{}, errors.New("persistence insert did not run")
+			}
+			return CreateResp{ID: "1", Name: req.Name}, nil
+		},
+	).WithPath("/persist")
+	WithPersistence[CreateReq, CreateResp](e, NewPersister[CreateReq, CreateResp](
+		func(path string, trx *HandlerRequest[CreateReq, CreateResp]) error {
+			inserted = true
+			return nil
+		},
+		func(path string, trx *HandlerRequest[CreateReq, CreateResp]) error {
+			updated = true
+			return nil
+		},
+	))
+	if err := RegisterEndpoint(router, nil, respHandler, "POST", "/persist", e); err != nil {
+		t.Fatalf("RegisterEndpoint: %v", err)
+	}
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest("POST", "/persist", strings.NewReader(`{"name":"test"}`))
+	req.Header.Set("Content-Type", "application/json")
+	engine.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+	if !updated {
+		t.Fatal("expected persistence update to run")
+	}
+}
+
+// TestEndpoint_InitializerError verifies initializer errors abort the lifecycle.
+func TestEndpoint_InitializerError(t *testing.T) {
+	engine := gin.New()
+	router := v2libGin.NewRouter(engine)
+	respHandler := testRespHandler()
+
+	e := NewEndpoint[struct{}, TestResp]("test-init-err", libRequest.NoBinding,
+		func(req *struct{}, trx *HandlerRequest[struct{}, TestResp]) (TestResp, error) {
+			return TestResp{}, errors.New("handler should not run")
+		},
+	).WithPath("/init-err")
+	WithInitializer[struct{}, TestResp](e, func(trx *HandlerRequest[struct{}, TestResp]) error {
+		return errors.New("initializer failed")
+	})
+	if err := RegisterEndpoint(router, nil, respHandler, "GET", "/init-err", e); err != nil {
+		t.Fatalf("RegisterEndpoint: %v", err)
+	}
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest("GET", "/init-err", nil)
+	engine.ServeHTTP(w, req)
+
+	if w.Code != http.StatusInternalServerError {
+		t.Fatalf("expected 500, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+// TestEndpoint_PersistenceInsertError verifies persistence insert errors abort.
+func TestEndpoint_PersistenceInsertError(t *testing.T) {
+	engine := gin.New()
+	router := v2libGin.NewRouter(engine)
+	respHandler := testRespHandler()
+
+	handlerRan := false
+	e := NewEndpoint[CreateReq, CreateResp]("test-persist-err", libRequest.JSON,
+		func(req *CreateReq, trx *HandlerRequest[CreateReq, CreateResp]) (CreateResp, error) {
+			handlerRan = true
+			return CreateResp{}, nil
+		},
+	).WithPath("/persist-err")
+	WithPersistence[CreateReq, CreateResp](e, NewPersister[CreateReq, CreateResp](
+		func(path string, trx *HandlerRequest[CreateReq, CreateResp]) error {
+			return errors.New("insert failed")
+		},
+		nil,
+	))
+	if err := RegisterEndpoint(router, nil, respHandler, "POST", "/persist-err", e); err != nil {
+		t.Fatalf("RegisterEndpoint: %v", err)
+	}
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest("POST", "/persist-err", strings.NewReader(`{"name":"test"}`))
+	req.Header.Set("Content-Type", "application/json")
+	engine.ServeHTTP(w, req)
+
+	if w.Code != http.StatusInternalServerError {
+		t.Fatalf("expected 500, got %d: %s", w.Code, w.Body.String())
+	}
+	if handlerRan {
+		t.Fatal("handler should not run when persistence insert fails")
+	}
+}
+
+// Test types used across handler tests.
+type TestResp struct {
+	Status string `json:"status"`
+}
+
+type CreateReq struct {
+	Name string `json:"name"`
+}
+
+type CreateResp struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+}
+
+// TestEndpoint_FinalizerAlwaysRuns verifies the finalizer runs even on errors.
+func TestEndpoint_FinalizerAlwaysRuns(t *testing.T) {
+	engine := gin.New()
+	router := v2libGin.NewRouter(engine)
+	respHandler := testRespHandler()
+
+	finalized := false
+	e := NewEndpoint[struct{}, TestResp]("test-fin-err", libRequest.NoBinding,
+		func(req *struct{}, trx *HandlerRequest[struct{}, TestResp]) (TestResp, error) {
+			return TestResp{}, errors.New("handler error")
+		},
+	).WithPath("/fin-err")
+	WithFinalizer[struct{}, TestResp](e, func(trx *HandlerRequest[struct{}, TestResp]) {
+		finalized = true
+	})
+	if err := RegisterEndpoint(router, nil, respHandler, "GET", "/fin-err", e); err != nil {
+		t.Fatalf("RegisterEndpoint: %v", err)
+	}
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest("GET", "/fin-err", nil)
+	engine.ServeHTTP(w, req)
+
+	if w.Code != http.StatusInternalServerError {
+		t.Fatalf("expected 500, got %d", w.Code)
+	}
+	if !finalized {
+		t.Fatal("finalizer should run even on handler error")
+	}
+}
+
+// TestEndpoint_FinalizerRunsOnPanic verifies the finalizer runs on panic.
+func TestEndpoint_FinalizerRunsOnPanic(t *testing.T) {
+	engine := gin.New()
+	router := v2libGin.NewRouter(engine)
+	respHandler := testRespHandler()
+
+	finalized := false
+	e := NewEndpoint[struct{}, TestResp]("test-fin-panic", libRequest.NoBinding,
+		func(req *struct{}, trx *HandlerRequest[struct{}, TestResp]) (TestResp, error) {
+			panic("boom")
+		},
+	).WithPath("/fin-panic")
+	WithFinalizer[struct{}, TestResp](e, func(trx *HandlerRequest[struct{}, TestResp]) {
+		finalized = true
+	})
+	if err := RegisterEndpoint(router, nil, respHandler, "GET", "/fin-panic", e); err != nil {
+		t.Fatalf("RegisterEndpoint: %v", err)
+	}
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest("GET", "/fin-panic", nil)
+	engine.ServeHTTP(w, req)
+
+	if w.Code != http.StatusInternalServerError {
+		t.Fatalf("expected 500, got %d", w.Code)
+	}
+	if !finalized {
+		t.Fatal("finalizer should run even on panic")
+	}
+}
+
+// TestEndpoint_DurationSet verifies the duration is recorded.
+func TestEndpoint_DurationSet(t *testing.T) {
+	engine := gin.New()
+	router := v2libGin.NewRouter(engine)
+	respHandler := testRespHandler()
+
+	var capturedDuration time.Duration
+	e := NewEndpoint[struct{}, TestResp]("test-dur", libRequest.NoBinding,
+		func(req *struct{}, trx *HandlerRequest[struct{}, TestResp]) (TestResp, error) {
+			time.Sleep(1 * time.Millisecond)
+			return TestResp{Status: "ok"}, nil
+		},
+	).WithPath("/dur")
+	WithFinalizer[struct{}, TestResp](e, func(trx *HandlerRequest[struct{}, TestResp]) {
+		capturedDuration = trx.Duration
+	})
+	if err := RegisterEndpoint(router, nil, respHandler, "GET", "/dur", e); err != nil {
+		t.Fatalf("RegisterEndpoint: %v", err)
+	}
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest("GET", "/dur", nil)
+	engine.ServeHTTP(w, req)
+
+	if capturedDuration <= 0 {
+		t.Fatalf("expected positive duration, got %v", capturedDuration)
+	}
+}

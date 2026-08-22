@@ -4,8 +4,10 @@ import (
 	"context"
 	"net/http"
 
+	legacyLibNetHttp "github.com/hmmftg/requestCore/libNetHttp"
 	legacy "github.com/hmmftg/requestCore/webFramework"
 
+	"github.com/hmmftg/requestCore/v2/response"
 	"github.com/hmmftg/requestCore/v2/routing"
 	v2wf "github.com/hmmftg/requestCore/v2/webFramework"
 )
@@ -19,6 +21,8 @@ type NetHTTPRouter struct {
 	notFound              routing.Handler
 	methodNA              routing.Handler
 	responseWriterFactory func(*http.Request, http.ResponseWriter) *NetHTTPParserV2
+	registry              response.Registry
+	respHandler           *response.Handler
 }
 
 // NewRouter creates a new NetHTTPRouter with a new http.ServeMux.
@@ -35,6 +39,16 @@ func NewRouterFromMux(mux *http.ServeMux) *NetHTTPRouter {
 		mux:                   mux,
 		responseWriterFactory: InitContextV2,
 	}
+}
+
+// SetErrorHandler installs the v2 response handler and error registry used
+// for centralized error dispatch.
+func (r *NetHTTPRouter) SetErrorHandler(handler *response.Handler) {
+	if handler == nil {
+		return
+	}
+	r.respHandler = handler
+	r.registry = handler.Registry()
 }
 
 // Native returns the underlying http.ServeMux.
@@ -63,6 +77,8 @@ func (r *NetHTTPRouter) With(middleware ...routing.Middleware) routing.RouteGrou
 		notFound:              r.notFound,
 		methodNA:              r.methodNA,
 		responseWriterFactory: r.responseWriterFactory,
+		registry:              r.registry,
+		respHandler:           r.respHandler,
 	}
 }
 
@@ -75,7 +91,7 @@ func (r *NetHTTPRouter) Handle(method, pattern string, handler routing.Handler) 
 
 	// Go 1.22+ ServeMux supports {id} syntax directly
 	muxPattern := method + " " + pattern
-	wrapped := r.wrapHandler(handler)
+	wrapped := r.wrapHandler(handler, r.middlewares)
 	r.mux.HandleFunc(muxPattern, wrapped)
 	return nil
 }
@@ -113,73 +129,63 @@ func (r *NetHTTPRouter) Head(pattern string, handler routing.Handler) error {
 // NotFound sets the handler for unmatched routes.
 func (r *NetHTTPRouter) NotFound(handler routing.Handler) {
 	r.notFound = handler
-	r.mux.HandleFunc("/", r.wrapHandler(handler))
+	r.mux.HandleFunc("/", r.wrapHandler(handler, r.middlewares))
 }
 
 // MethodNotAllowed sets the handler for disallowed methods.
-// Go 1.22+ ServeMux handles this automatically.
+// Go 1.22+ ServeMux handles 405 automatically; this stores the handler
+// for manual dispatch if needed.
 func (r *NetHTTPRouter) MethodNotAllowed(handler routing.Handler) {
 	r.methodNA = handler
 }
 
 // wrapHandler converts a v2 routing.Handler to an http.HandlerFunc.
-func (r *NetHTTPRouter) wrapHandler(h routing.Handler) http.HandlerFunc {
+func (r *NetHTTPRouter) wrapHandler(h routing.Handler, mws []routing.Middleware) http.HandlerFunc {
 	return func(w http.ResponseWriter, req *http.Request) {
 		parser := r.responseWriterFactory(req, w)
+		commit := &v2wf.CommitState{}
+
+		// LegacyContext must be a context.Context carrying the
+		// request and response writer via libNetHttp.WithRequestResponse,
+		// so that libContext.InitContext follows the net/http branch.
+		legacyCtx := legacyLibNetHttp.WithRequestResponse(req.Context(), req, w)
 
 		reqCtx := &v2wf.RequestContext{
 			Context:       req.Context(),
-			LegacyContext: context.WithValue(req.Context(), httpRequestKey{}, req),
+			LegacyContext: legacyCtx,
 			Parser:        parser,
 			Legacy: legacy.WebFramework{
 				Parser: parser,
 			},
 		}
+		reqCtx.SetCommitState(commit)
 
 		// Apply middleware chain
 		chain := h
-		for i := len(r.middlewares) - 1; i >= 0; i-- {
-			chain = r.middlewares[i](chain)
+		for i := len(mws) - 1; i >= 0; i-- {
+			chain = mws[i](chain)
 		}
 
 		if err := chain(reqCtx); err != nil {
-			// If no response was written, send 500
-			if !responseWritten(w) {
-				w.Header().Set("Content-Type", "application/json")
-				w.WriteHeader(500)
-				_, _ = w.Write([]byte(`{"errors":[{"code":"INTERNAL","description":"Internal server error"}]}`))
+			if !commit.Committed() {
+				r.dispatchError(reqCtx, err)
 			}
 		}
 	}
 }
 
-// responseWritten checks if the response writer has had WriteHeader called.
-type writtenChecker interface {
-	Written() bool
-}
-
-func responseWritten(w http.ResponseWriter) bool {
-	if wc, ok := w.(writtenChecker); ok {
-		return wc.Written()
+// dispatchError routes an error through the v2 response registry if one is
+// configured; otherwise it falls back to a sanitized 500 response.
+func (r *NetHTTPRouter) dispatchError(ctx *v2wf.RequestContext, err error) {
+	if r.respHandler != nil {
+		_ = r.respHandler.Error(ctx, err)
+		if ctx.Committed() {
+			return
+		}
 	}
-	// Default: assume not written if we can't check
-	return false
-}
-
-// httpRequestKey is used to store the *http.Request in the LegacyContext.
-type httpRequestKey struct{}
-
-// HTTPRequestKey is the exported version of httpRequestKey for use by
-// other adapters (e.g. libChi) that need to extract the *http.Request
-// from the LegacyContext.
-type HTTPRequestKey = httpRequestKey
-
-// GetHTTPRequest extracts the *http.Request from a LegacyContext created by NetHTTPRouter.
-func GetHTTPRequest(ctx context.Context) *http.Request {
-	if v, ok := ctx.Value(httpRequestKey{}).(*http.Request); ok {
-		return v
-	}
-	return nil
+	_ = ctx.Parser.SendResponse(500, "application/json",
+		[]byte(`{"errors":[{"code":"INTERNAL","description":"Internal server error"}]}`))
+	ctx.MarkCommitted(500)
 }
 
 // netHTTPSubGroup implements RouteGroup for a prefixed sub-group.
@@ -221,7 +227,7 @@ func (g *netHTTPSubGroup) Handle(method, pattern string, handler routing.Handler
 	allMws = append(allMws, g.parent.middlewares...)
 	allMws = append(allMws, g.middlewares...)
 
-	wrapped := g.wrapHandlerWithMw(handler, allMws)
+	wrapped := g.parent.wrapHandler(handler, allMws)
 	g.parent.mux.HandleFunc(muxPattern, wrapped)
 	return nil
 }
@@ -250,38 +256,34 @@ func (g *netHTTPSubGroup) Head(pattern string, handler routing.Handler) error {
 	return g.Handle("HEAD", pattern, handler)
 }
 
-func (g *netHTTPSubGroup) wrapHandlerWithMw(h routing.Handler, mws []routing.Middleware) http.HandlerFunc {
-	return func(w http.ResponseWriter, req *http.Request) {
-		parser := g.parent.responseWriterFactory(req, w)
-		reqCtx := &v2wf.RequestContext{
-			Context:       req.Context(),
-			LegacyContext: context.WithValue(req.Context(), httpRequestKey{}, req),
-			Parser:        parser,
-			Legacy: legacy.WebFramework{
-				Parser: parser,
-			},
-		}
-
-		chain := h
-		for i := len(mws) - 1; i >= 0; i-- {
-			chain = mws[i](chain)
-		}
-
-		if err := chain(reqCtx); err != nil {
-			if !responseWritten(w) {
-				w.Header().Set("Content-Type", "application/json")
-				w.WriteHeader(500)
-				_, _ = w.Write([]byte(`{"errors":[{"code":"INTERNAL","description":"Internal server error"}]}`))
-			}
-		}
-	}
-}
-
 // Ensure NetHTTPRouter implements routing.Router.
 var _ routing.Router = (*NetHTTPRouter)(nil)
 
 // Ensure netHTTPSubGroup implements routing.RouteGroup.
 var _ routing.RouteGroup = (*netHTTPSubGroup)(nil)
+
+// GetHTTPRequest extracts the *http.Request from a LegacyContext created by
+// NetHTTPRouter. The LegacyContext is a context.Context carrying the request
+// and response writer via libNetHttp.WithRequestResponse.
+func GetHTTPRequest(ctx any) *http.Request {
+	if c, ok := ctx.(context.Context); ok {
+		if req, okReq := legacyLibNetHttp.RequestFromContext(c); okReq {
+			return req
+		}
+	}
+	return nil
+}
+
+// GetHTTPResponseWriter extracts the http.ResponseWriter from a LegacyContext
+// created by NetHTTPRouter.
+func GetHTTPResponseWriter(ctx any) http.ResponseWriter {
+	if c, ok := ctx.(context.Context); ok {
+		if w, okW := legacyLibNetHttp.ResponseWriterFromContext(c); okW {
+			return w
+		}
+	}
+	return nil
+}
 
 // Suppress unused import warning.
 var _ = context.Background

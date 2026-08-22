@@ -10,6 +10,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"sync"
 	"time"
 
 	"github.com/hmmftg/requestCore"
@@ -26,9 +27,9 @@ import (
 type Framework string
 
 const (
-	FrameworkGin    Framework = "gin"
-	FrameworkFiber  Framework = "fiber"
-	FrameworkChi    Framework = "chi"
+	FrameworkGin     Framework = "gin"
+	FrameworkFiber   Framework = "fiber"
+	FrameworkChi     Framework = "chi"
 	FrameworkNetHTTP Framework = "net/http"
 )
 
@@ -76,16 +77,18 @@ type Config struct {
 // App is the v2 application instance. It composes the router,
 // response handler, worker pool, and session manager.
 type App struct {
-	Router       routing.Router
-	RespHandler  *v2response.Handler
-	Registry     v2response.Registry
-	Renderer     renderers.Renderer
-	Worker       workers.Worker
-	Sessions     *session.Manager
-	Middlewares  []routing.Middleware
+	Router      routing.Router
+	RespHandler *v2response.Handler
+	Registry    v2response.Registry
+	Renderer    renderers.Renderer
+	Worker      workers.Worker
+	Sessions    *session.Manager
+	Middlewares []routing.Middleware
 
 	// nativeServer holds the underlying framework server (e.g. *http.Server,
 	// *fiber.App). Set by Start to enable graceful shutdown.
+	// Protected by serverMu to prevent data races between Start and Shutdown.
+	serverMu     sync.Mutex
 	nativeServer any
 }
 
@@ -121,9 +124,15 @@ func Bootstrap(config Config) (*App, error) {
 		return nil, fmt.Errorf("app: failed to create router: %w", err)
 	}
 
-	// Apply global middleware
+	// Wire the error handler into the router so that handler errors
+	// are routed through the v2 error registry.
+	wireErrorHandler(router, respHandler)
+
+	// Apply global middleware by wrapping the router's route group.
+	// Global middleware is applied at the root group level so all
+	// routes inherit it.
 	if len(config.Middlewares) > 0 {
-		router = routerWithMiddleware(router, config.Middlewares)
+		router = &middlewareRouter{router: router, middlewares: config.Middlewares}
 	}
 
 	// Set not found / method not allowed handlers
@@ -145,6 +154,17 @@ func Bootstrap(config Config) (*App, error) {
 	}, nil
 }
 
+// wireErrorHandler installs the v2 response handler on routers that
+// support SetErrorHandler (all v2 adapter routers).
+func wireErrorHandler(router routing.Router, handler *v2response.Handler) {
+	type errorHandlerSetter interface {
+		SetErrorHandler(*v2response.Handler)
+	}
+	if s, ok := router.(errorHandlerSetter); ok {
+		s.SetErrorHandler(handler)
+	}
+}
+
 // createRouter creates a router for the specified framework.
 func createRouter(framework Framework) (routing.Router, error) {
 	switch framework {
@@ -161,13 +181,67 @@ func createRouter(framework Framework) (routing.Router, error) {
 	}
 }
 
-// routerWithMiddleware wraps a router with middleware.
-// Since routing.Router doesn't have With, we create a group at "/".
-func routerWithMiddleware(router routing.Router, mws []routing.Middleware) routing.Router {
-	// Return the router as-is; middleware will be applied per-group.
-	// This is a limitation of the current Router interface.
-	return router
+// middlewareRouter wraps a Router so that all route groups inherit
+// the configured global middleware. This ensures that middleware
+// registered at bootstrap time is applied to every route.
+type middlewareRouter struct {
+	router      routing.Router
+	middlewares []routing.Middleware
 }
+
+func (m *middlewareRouter) Native() any {
+	return m.router.Native()
+}
+
+func (m *middlewareRouter) Group(prefix string) routing.RouteGroup {
+	return m.router.Group(prefix).With(m.middlewares...)
+}
+
+func (m *middlewareRouter) With(middlewares ...routing.Middleware) routing.RouteGroup {
+	all := make([]routing.Middleware, 0, len(m.middlewares)+len(middlewares))
+	all = append(all, m.middlewares...)
+	all = append(all, middlewares...)
+	return m.router.With(all...)
+}
+
+func (m *middlewareRouter) Handle(method, pattern string, handler routing.Handler) error {
+	return m.router.Handle(method, pattern, handler)
+}
+
+func (m *middlewareRouter) Get(pattern string, handler routing.Handler) error {
+	return m.router.Get(pattern, handler)
+}
+
+func (m *middlewareRouter) Post(pattern string, handler routing.Handler) error {
+	return m.router.Post(pattern, handler)
+}
+
+func (m *middlewareRouter) Put(pattern string, handler routing.Handler) error {
+	return m.router.Put(pattern, handler)
+}
+
+func (m *middlewareRouter) Patch(pattern string, handler routing.Handler) error {
+	return m.router.Patch(pattern, handler)
+}
+
+func (m *middlewareRouter) Delete(pattern string, handler routing.Handler) error {
+	return m.router.Delete(pattern, handler)
+}
+
+func (m *middlewareRouter) Head(pattern string, handler routing.Handler) error {
+	return m.router.Head(pattern, handler)
+}
+
+func (m *middlewareRouter) NotFound(handler routing.Handler) {
+	m.router.NotFound(handler)
+}
+
+func (m *middlewareRouter) MethodNotAllowed(handler routing.Handler) {
+	m.router.MethodNotAllowed(handler)
+}
+
+// Ensure middlewareRouter implements routing.Router.
+var _ routing.Router = (*middlewareRouter)(nil)
 
 // Register registers a route group with middleware.
 func (a *App) Register(prefix string, middlewares ...routing.Middleware) routing.RouteGroup {
@@ -193,7 +267,9 @@ func (a *App) StartWithContext(ctx context.Context, addr string) error {
 	switch server := native.(type) {
 	case *http.Server:
 		server.Addr = addr
+		a.serverMu.Lock()
 		a.nativeServer = server
+		a.serverMu.Unlock()
 		go func() {
 			<-ctx.Done()
 			shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -206,7 +282,9 @@ func (a *App) StartWithContext(ctx context.Context, addr string) error {
 			Addr:    addr,
 			Handler: server,
 		}
+		a.serverMu.Lock()
 		a.nativeServer = httpServer
+		a.serverMu.Unlock()
 		go func() {
 			<-ctx.Done()
 			shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -216,25 +294,35 @@ func (a *App) StartWithContext(ctx context.Context, addr string) error {
 		return httpServer.ListenAndServe()
 	default:
 		// Fiber or other framework
+		a.serverMu.Lock()
+		a.nativeServer = native
+		a.serverMu.Unlock()
 		return startFiber(native, addr)
 	}
 }
 
 // Shutdown gracefully shuts down the application.
 func (a *App) Shutdown(ctx context.Context) error {
-	if a.nativeServer == nil {
+	a.serverMu.Lock()
+	server := a.nativeServer
+	a.serverMu.Unlock()
+
+	if server == nil {
 		return nil
 	}
 
-	if server, ok := a.nativeServer.(*http.Server); ok {
-		return server.Shutdown(ctx)
+	if httpServer, ok := server.(*http.Server); ok {
+		return httpServer.Shutdown(ctx)
 	}
 
 	// Fiber shutdown
-	return shutdownFiber(a.nativeServer, ctx)
+	return shutdownFiber(server, ctx)
 }
 
 // Close stops the worker pool and releases resources.
+// It uses a 10-second timeout for the worker shutdown.
 func (a *App) Close() error {
-	return a.Worker.Shutdown(context.Background())
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	return a.Worker.Shutdown(ctx)
 }

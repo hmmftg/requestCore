@@ -9,10 +9,9 @@ package webFramework
 import (
 	"context"
 	"net/http"
+	"sync"
 
 	legacy "github.com/hmmftg/requestCore/webFramework"
-
-	"github.com/hmmftg/requestCore/v2/session"
 )
 
 // RequestParser extends the v1 RequestParser with raw response writing,
@@ -46,7 +45,9 @@ type RequestContext struct {
 	// LegacyContext is the framework-native context expected by
 	// libContext.InitContext (e.g. *gin.Context, *fiber.Ctx, context.Context
 	// with net/http request/response). Used by the legacy handler adapter.
-	LegacyContext context.Context
+	// It is typed as any because *fiber.Ctx does not implement
+	// context.Context but is a valid input to libContext.InitContext.
+	LegacyContext any
 
 	// Parser is the v2 request parser.
 	Parser RequestParser
@@ -58,12 +59,27 @@ type RequestContext struct {
 	Legacy legacy.WebFramework
 
 	// Session is the per-request session, loaded by session middleware.
-	// May be nil if session middleware has not run.
-	Session *session.Session
+	// May be nil if session middleware has not run. Typed as any to
+	// avoid an import cycle with the session package; callers should
+	// type-assert to *session.Session.
+	Session any
 
 	// Flash is the per-request flash, loaded by session middleware.
-	// May be nil if session middleware has not run.
-	Flash *session.Flash
+	// May be nil if session middleware has not run. Typed as any to
+	// avoid an import cycle with the session package; callers should
+	// type-assert to *session.Flash.
+	Flash any
+
+	// commit tracks whether the response has been written. Adapters
+	// update this from SendResponse so error dispatch and panic recovery
+	// can avoid double-writes.
+	commit *CommitState
+
+	// beforeCommitHooks are invoked before the response is committed.
+	// Session middleware uses this to persist cookies before the body
+	// is written.
+	hooksMu           sync.RWMutex
+	beforeCommitHooks []BeforeCommitHook
 }
 
 // LegacyWebFramework returns the v1 WebFramework for use with existing

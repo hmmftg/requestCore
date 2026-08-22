@@ -45,10 +45,10 @@ func (p FiberParserV2) GetCookie(name string) string {
 }
 
 // SetCookie sets an HTTP response cookie on the Fiber response.
-// Fiber's cookie API differs from net/http, so we map the http.Cookie
-// fields to Fiber's cookie methods.
+// Fiber's cookie API differs from net/http, so we map all http.Cookie
+// fields to Fiber's cookie methods, including SameSite.
 func (p FiberParserV2) SetCookie(cookie *http.Cookie) {
-	p.Ctx.Cookie(&fiber.Cookie{
+	fc := &fiber.Cookie{
 		Name:     cookie.Name,
 		Value:    cookie.Value,
 		Path:     cookie.Path,
@@ -56,5 +56,21 @@ func (p FiberParserV2) SetCookie(cookie *http.Cookie) {
 		MaxAge:   cookie.MaxAge,
 		Secure:   cookie.Secure,
 		HTTPOnly: cookie.HttpOnly,
-	})
+	}
+	// Map SameSite.
+	switch cookie.SameSite {
+	case http.SameSiteStrictMode:
+		fc.SameSite = "strict"
+	case http.SameSiteNoneMode:
+		fc.SameSite = "none"
+	case http.SameSiteLaxMode:
+		fc.SameSite = "lax"
+	default:
+		fc.SameSite = ""
+	}
+	// Map Expires if set.
+	if !cookie.Expires.IsZero() {
+		fc.Expires = cookie.Expires
+	}
+	p.Ctx.Cookie(fc)
 }

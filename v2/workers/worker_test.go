@@ -139,9 +139,9 @@ func TestInProcessWorker_AllRetriesFail(t *testing.T) {
 
 func TestInProcessWorker_QueueFull(t *testing.T) {
 	w := NewInProcessWorker(Config{
-		WorkerCount:   1,
-		QueueSize:     1,
-		BlockOnFull:   false,
+		WorkerCount: 1,
+		QueueSize:   1,
+		BlockOnFull: false,
 	})
 	defer func() {
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -283,7 +283,7 @@ func TestCalculateBackoff(t *testing.T) {
 		{10 * time.Millisecond, 50 * time.Millisecond, 10, false, 50 * time.Millisecond, 50 * time.Millisecond},
 	}
 	for _, tt := range tests {
-		result := calculateBackoff(tt.initial, tt.max, tt.attempt, tt.jitter)
+		result := calculateBackoff(tt.initial, tt.max, tt.attempt, tt.jitter, defaultJitter)
 		if result < tt.minExpected || result > tt.maxExpected {
 			t.Fatalf("attempt %d: expected %v-%v, got %v", tt.attempt, tt.minExpected, tt.maxExpected, result)
 		}
@@ -291,7 +291,7 @@ func TestCalculateBackoff(t *testing.T) {
 }
 
 func TestCalculateBackoff_WithJitter(t *testing.T) {
-	result := calculateBackoff(100*time.Millisecond, 500*time.Millisecond, 1, true)
+	result := calculateBackoff(100*time.Millisecond, 500*time.Millisecond, 1, true, defaultJitter)
 	// With 50% jitter, result should be between 100ms and 150ms
 	if result < 100*time.Millisecond || result > 150*time.Millisecond {
 		t.Fatalf("expected 100ms-150ms with jitter, got %v", result)
@@ -305,5 +305,106 @@ func TestDefaultConfig(t *testing.T) {
 	}
 	if cfg.BlockOnFull != false {
 		t.Fatal("expected default BlockOnFull=false")
+	}
+}
+
+func TestInProcessWorker_IdempotentShutdown(t *testing.T) {
+	w := NewInProcessWorker(Config{
+		WorkerCount: 2,
+		QueueSize:   10,
+	})
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	if err := w.Shutdown(ctx); err != nil {
+		t.Fatalf("first Shutdown: %v", err)
+	}
+	// Second shutdown should not panic or hang.
+	if err := w.Shutdown(ctx); err != nil {
+		t.Fatalf("second Shutdown: %v", err)
+	}
+}
+
+func TestInProcessWorker_ConcurrentSubmitAndShutdown(t *testing.T) {
+	w := NewInProcessWorker(Config{
+		WorkerCount: 2,
+		QueueSize:   100,
+	})
+	var submitted atomic.Int32
+	var done atomic.Bool
+	go func() {
+		for !done.Load() {
+			err := w.Submit(context.Background(), Job{
+				Name: "concurrent-test",
+				Handler: func(ctx *JobContext) error {
+					return nil
+				},
+			})
+			if err == nil {
+				submitted.Add(1)
+			}
+		}
+	}()
+	time.Sleep(50 * time.Millisecond)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	if err := w.Shutdown(ctx); err != nil {
+		t.Fatalf("Shutdown: %v", err)
+	}
+	done.Store(true)
+}
+
+func TestInProcessWorker_InvalidJob(t *testing.T) {
+	w := NewInProcessWorker(Config{
+		WorkerCount: 1,
+		QueueSize:   10,
+	})
+	defer func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		_ = w.Shutdown(ctx)
+	}()
+	if err := w.Submit(context.Background(), Job{Name: "", Handler: func(ctx *JobContext) error { return nil }}); err != ErrInvalidJob {
+		t.Fatalf("expected ErrInvalidJob for empty name, got %v", err)
+	}
+	if err := w.Submit(context.Background(), Job{Name: "test", Handler: nil}); err != ErrInvalidJob {
+		t.Fatalf("expected ErrInvalidJob for nil handler, got %v", err)
+	}
+}
+
+func TestInProcessWorker_TransactionSink(t *testing.T) {
+	w := NewInProcessWorker(Config{
+		WorkerCount: 1,
+		QueueSize:   10,
+	})
+	defer func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		_ = w.Shutdown(ctx)
+	}()
+	err := w.Submit(context.Background(), Job{
+		Name: "sink-test",
+		Handler: func(ctx *JobContext) error {
+			// The WebFramework should be available for AddLog calls.
+			if ctx.WebFramework == nil {
+				return errors.New("nil WebFramework")
+			}
+			if ctx.WebFramework.Parser() == nil {
+				return errors.New("nil Parser")
+			}
+			// Simulate an AddLog call via the background parser.
+			ctx.WebFramework.Parser().SetLocal("test", "value")
+			if v := ctx.WebFramework.Parser().GetLocal("test"); v != "value" {
+				return errors.New("SetLocal/GetLocal failed")
+			}
+			return nil
+		},
+	})
+	if err != nil {
+		t.Fatalf("Submit: %v", err)
+	}
+	time.Sleep(100 * time.Millisecond)
+	stats := w.Stats()
+	if stats.Succeeded != 1 {
+		t.Fatalf("expected 1 succeeded, got %d", stats.Succeeded)
 	}
 }

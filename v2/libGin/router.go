@@ -8,6 +8,7 @@ import (
 
 	legacy "github.com/hmmftg/requestCore/webFramework"
 
+	"github.com/hmmftg/requestCore/v2/response"
 	"github.com/hmmftg/requestCore/v2/routing"
 	v2wf "github.com/hmmftg/requestCore/v2/webFramework"
 )
@@ -20,15 +21,18 @@ type GinRouter struct {
 	notFound     routing.Handler
 	methodNA     routing.Handler
 	legacyParser func(any) GinParserV2
+	registry     response.Registry
+	respHandler  *response.Handler
 }
 
 // NewRouter creates a new GinRouter from a Gin engine.
 func NewRouter(engine *gin.Engine) *GinRouter {
-	return &GinRouter{
+	r := &GinRouter{
 		engine:       engine,
 		group:        &engine.RouterGroup,
 		legacyParser: InitContextV2,
 	}
+	return r
 }
 
 // NewRouterFromGroup creates a new GinRouter from an existing Gin RouterGroup.
@@ -38,6 +42,17 @@ func NewRouterFromGroup(group *gin.RouterGroup) *GinRouter {
 		group:        group,
 		legacyParser: InitContextV2,
 	}
+}
+
+// SetErrorHandler installs the v2 response handler and error registry used
+// for centralized error dispatch. When set, handler errors are routed
+// through the registry instead of emitting hard-coded 500 responses.
+func (r *GinRouter) SetErrorHandler(handler *response.Handler) {
+	if handler == nil {
+		return
+	}
+	r.respHandler = handler
+	r.registry = handler.Registry()
 }
 
 // Native returns the underlying Gin engine or router group.
@@ -55,6 +70,8 @@ func (r *GinRouter) Group(prefix string) routing.RouteGroup {
 		group:        r.group.Group(prefix),
 		middlewares:  r.middlewares,
 		legacyParser: r.legacyParser,
+		registry:     r.registry,
+		respHandler:  r.respHandler,
 	}
 }
 
@@ -68,6 +85,8 @@ func (r *GinRouter) With(middleware ...routing.Middleware) routing.RouteGroup {
 		group:        r.group,
 		middlewares:  mws,
 		legacyParser: r.legacyParser,
+		registry:     r.registry,
+		respHandler:  r.respHandler,
 	}
 }
 
@@ -117,13 +136,19 @@ func (r *GinRouter) Head(pattern string, handler routing.Handler) error {
 // NotFound sets the handler for unmatched routes.
 func (r *GinRouter) NotFound(handler routing.Handler) {
 	r.notFound = handler
-	r.engine.NoRoute(r.wrapHandler(handler))
+	if r.engine != nil {
+		r.engine.NoRoute(r.wrapHandler(handler))
+	}
 }
 
 // MethodNotAllowed sets the handler for disallowed methods.
 func (r *GinRouter) MethodNotAllowed(handler routing.Handler) {
 	r.methodNA = handler
-	r.engine.NoMethod(r.wrapHandler(handler))
+	if r.engine != nil {
+		engine := r.engine
+		engine.HandleMethodNotAllowed = true
+		engine.NoMethod(r.wrapHandler(handler))
+	}
 }
 
 // wrapHandler converts a v2 routing.Handler to a gin.HandlerFunc,
@@ -131,14 +156,19 @@ func (r *GinRouter) MethodNotAllowed(handler routing.Handler) {
 func (r *GinRouter) wrapHandler(h routing.Handler) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		parser := r.legacyParser(c)
+		commit := &v2wf.CommitState{}
 		reqCtx := &v2wf.RequestContext{
-			Context:       c.Request.Context(),
+			// LegacyContext is the native *gin.Context expected by
+			// libContext.InitContext.
 			LegacyContext: c,
 			Parser:        parser,
 			Legacy: legacy.WebFramework{
 				Parser: parser,
 			},
 		}
+		reqCtx.SetCommitState(commit)
+		// Use the request context for cancellation/tracing.
+		reqCtx.Context = c.Request.Context()
 
 		// Apply middleware chain
 		chain := h
@@ -147,21 +177,29 @@ func (r *GinRouter) wrapHandler(h routing.Handler) gin.HandlerFunc {
 		}
 
 		if err := chain(reqCtx); err != nil {
-			// If the handler returns an error and no response was written,
-			// the error should be handled by the error handler registry.
-			// The caller is responsible for setting up the registry.
-			// For now, we abort with 500 if no response was written.
-			if !responseWritten(parser) {
-				_ = parser.SendResponse(500, "application/json", []byte(`{"errors":[{"code":"INTERNAL","description":"Internal server error"}]}`))
+			// If the handler returns an error and no response was
+			// committed, route it through the error registry.
+			if !commit.Committed() {
+				r.dispatchError(reqCtx, err)
 			}
 			c.Abort()
 		}
 	}
 }
 
-// responseWritten checks if the parser has already written a response.
-func responseWritten(parser GinParserV2) bool {
-	return parser.Ctx.Writer.Written()
+// dispatchError routes an error through the v2 response registry if one is
+// configured; otherwise it falls back to a sanitized 500 response.
+func (r *GinRouter) dispatchError(ctx *v2wf.RequestContext, err error) {
+	if r.respHandler != nil {
+		_ = r.respHandler.Error(ctx, err)
+		if ctx.Committed() {
+			return
+		}
+	}
+	// Final sanitized fallback.
+	_ = ctx.Parser.SendResponse(500, "application/json",
+		[]byte(`{"errors":[{"code":"INTERNAL","description":"Internal server error"}]}`))
+	ctx.MarkCommitted(500)
 }
 
 // Ensure GinRouter implements routing.Router.

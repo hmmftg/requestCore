@@ -122,15 +122,26 @@ func (f *Flash) ActiveEntries() map[string]string {
 const flashKey = "_flash"
 
 // LoadFlashFromSession creates a Flash populated from session data.
+// It handles both map[string]string (direct) and map[string]any
+// (after JSON round-trip through CookieStore) flash data.
 func LoadFlashFromSession(s *Session) *Flash {
 	f := NewFlash()
 	if s == nil {
 		return f
 	}
 	if raw := s.Get(flashKey); raw != nil {
-		if entries, ok := raw.(map[string]string); ok {
+		switch entries := raw.(type) {
+		case map[string]string:
 			for k, v := range entries {
 				f.entries[k] = v
+			}
+		case map[string]any:
+			// After JSON round-trip through CookieStore, map values
+			// are unmarshaled as any. Convert string values back.
+			for k, v := range entries {
+				if sv, ok := v.(string); ok {
+					f.entries[k] = sv
+				}
 			}
 		}
 	}

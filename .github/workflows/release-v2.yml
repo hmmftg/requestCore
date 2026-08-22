@@ -32,6 +32,17 @@ jobs:
           go-version-file: v2/go.mod
           cache: true
 
+      # Force standalone module mode: remove go.work so v2 resolves
+      # dependencies from its own go.mod, not the root workspace.
+      - name: Force standalone v2 module
+        run: |
+          if [ -f go.work ]; then rm go.work; fi
+          if [ -f go.work.sum ]; then rm go.work.sum; fi
+
+      - name: Tidy v2
+        working-directory: v2
+        run: go mod tidy
+
       - name: Validate v2 module
         working-directory: v2
         run: |

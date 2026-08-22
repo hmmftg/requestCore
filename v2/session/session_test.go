@@ -1,8 +1,10 @@
 package session
 
 import (
+	"bytes"
 	"context"
 	"crypto/rand"
+	"encoding/base64"
 	"encoding/json"
 	"testing"
 	"time"
@@ -312,8 +314,8 @@ func TestCookieStore_KeyRotation(t *testing.T) {
 
 func TestCookieStore_MaxPayloadSize(t *testing.T) {
 	store, err := NewCookieStore(CookieStoreConfig{
-		SecretKey:       mustSecretKey(t, 32),
-		MaxPayloadSize:  100,
+		SecretKey:      mustSecretKey(t, 32),
+		MaxPayloadSize: 100,
 	})
 	if err != nil {
 		t.Fatalf("NewCookieStore: %v", err)
@@ -520,5 +522,90 @@ func TestSession_JSONRoundTrip(t *testing.T) {
 	}
 	if nested["b"].(string) != "two" {
 		t.Fatalf("expected b=two, got %v", nested["b"])
+	}
+}
+
+func TestCookieStore_EncryptionRoundTrip(t *testing.T) {
+	encKey := make([]byte, 32)
+	if _, err := rand.Read(encKey); err != nil {
+		t.Fatalf("rand.Read: %v", err)
+	}
+	store, err := NewCookieStore(CookieStoreConfig{
+		SecretKey:     mustSecretKey(t, 32),
+		EncryptionKey: encKey,
+	})
+	if err != nil {
+		t.Fatalf("NewCookieStore: %v", err)
+	}
+
+	sess := NewSession(store)
+	sess.Set("user_id", "alice")
+	sess.Set("role", "admin")
+
+	token, err := sess.Save(context.Background())
+	if err != nil {
+		t.Fatalf("Save: %v", err)
+	}
+
+	// Verify the token is not readable (encrypted).
+	decoded, err := base64.URLEncoding.DecodeString(token)
+	if err != nil {
+		t.Fatalf("base64 decode: %v", err)
+	}
+	// The payload portion (before the HMAC signature) should not contain
+	// plaintext "alice" or "admin".
+	payload := decoded[:len(decoded)-32]
+	if bytes.Contains(payload, []byte("alice")) || bytes.Contains(payload, []byte("admin")) {
+		t.Fatal("encrypted payload should not contain plaintext user data")
+	}
+
+	loaded, err := store.Load(context.Background(), token)
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if loaded.GetString("user_id") != "alice" {
+		t.Fatalf("expected user_id 'alice', got %q", loaded.GetString("user_id"))
+	}
+	if loaded.GetString("role") != "admin" {
+		t.Fatalf("expected role 'admin', got %q", loaded.GetString("role"))
+	}
+}
+
+func TestCookieStore_EncryptionTamperedToken(t *testing.T) {
+	encKey := make([]byte, 32)
+	if _, err := rand.Read(encKey); err != nil {
+		t.Fatalf("rand.Read: %v", err)
+	}
+	store, err := NewCookieStore(CookieStoreConfig{
+		SecretKey:     mustSecretKey(t, 32),
+		EncryptionKey: encKey,
+	})
+	if err != nil {
+		t.Fatalf("NewCookieStore: %v", err)
+	}
+
+	sess := NewSession(store)
+	sess.Set("user_id", "alice")
+
+	token, err := sess.Save(context.Background())
+	if err != nil {
+		t.Fatalf("Save: %v", err)
+	}
+
+	// Tamper with the token by flipping a character.
+	tampered := token[:len(token)-5] + "X" + token[len(token)-4:]
+	_, err = store.Load(context.Background(), tampered)
+	if err == nil {
+		t.Fatal("expected error loading tampered encrypted token")
+	}
+}
+
+func TestCookieStore_EncryptionKeyWrongSize(t *testing.T) {
+	_, err := NewCookieStore(CookieStoreConfig{
+		SecretKey:     mustSecretKey(t, 32),
+		EncryptionKey: make([]byte, 16), // wrong size
+	})
+	if err == nil {
+		t.Fatal("expected error for 16-byte encryption key")
 	}
 }

@@ -32,6 +32,11 @@ jobs:
         with:
           go-version-file: v2/go.mod
           cache: true
+      # Force standalone module mode for v2 linting.
+      - name: Force standalone v2 module
+        run: |
+          if [ -f go.work ]; then rm go.work; fi
+          if [ -f go.work.sum ]; then rm go.work.sum; fi
       - name: golangci-lint v2
         uses: golangci/golangci-lint-action@v9
         with:

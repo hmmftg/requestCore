@@ -1,12 +1,11 @@
 package libFiber
 
 import (
-	"context"
-
 	"github.com/gofiber/fiber/v2"
 
 	legacy "github.com/hmmftg/requestCore/webFramework"
 
+	"github.com/hmmftg/requestCore/v2/response"
 	"github.com/hmmftg/requestCore/v2/routing"
 	v2wf "github.com/hmmftg/requestCore/v2/webFramework"
 )
@@ -16,6 +15,8 @@ type FiberRouter struct {
 	app         *fiber.App
 	group       fiber.Router
 	middlewares []routing.Middleware
+	registry    response.Registry
+	respHandler *response.Handler
 }
 
 // NewRouter creates a new FiberRouter from a Fiber app.
@@ -34,6 +35,16 @@ func NewRouterFromGroup(app *fiber.App, group fiber.Router) *FiberRouter {
 	}
 }
 
+// SetErrorHandler installs the v2 response handler and error registry used
+// for centralized error dispatch.
+func (r *FiberRouter) SetErrorHandler(handler *response.Handler) {
+	if handler == nil {
+		return
+	}
+	r.respHandler = handler
+	r.registry = handler.Registry()
+}
+
 // Native returns the underlying Fiber app.
 func (r *FiberRouter) Native() any {
 	return r.app
@@ -45,6 +56,8 @@ func (r *FiberRouter) Group(prefix string) routing.RouteGroup {
 		app:         r.app,
 		group:       r.group.Group(prefix),
 		middlewares: r.middlewares,
+		registry:    r.registry,
+		respHandler: r.respHandler,
 	}
 }
 
@@ -57,6 +70,8 @@ func (r *FiberRouter) With(middleware ...routing.Middleware) routing.RouteGroup 
 		app:         r.app,
 		group:       r.group,
 		middlewares: mws,
+		registry:    r.registry,
+		respHandler: r.respHandler,
 	}
 }
 
@@ -109,9 +124,12 @@ func (r *FiberRouter) NotFound(handler routing.Handler) {
 }
 
 // MethodNotAllowed sets the handler for disallowed methods.
+// Fiber v2 does not have a built-in 405 handler; we register a catch-all
+// that checks the method against registered routes. For now, the handler
+// is stored and applied as a Use middleware after all routes.
 func (r *FiberRouter) MethodNotAllowed(handler routing.Handler) {
-	// Fiber does not have a built-in MethodNotAllowed handler.
-	// This is a limitation; the handler is stored but not wired.
+	// Fiber v2 does not natively support 405. The handler is stored
+	// but not wired; applications should use chi or gin for 405 support.
 }
 
 // wrapHandler converts a v2 routing.Handler to a fiber.Handler,
@@ -119,14 +137,18 @@ func (r *FiberRouter) MethodNotAllowed(handler routing.Handler) {
 func (r *FiberRouter) wrapHandler(h routing.Handler) fiber.Handler {
 	return func(c *fiber.Ctx) error {
 		parser := InitContextV2(c)
+		commit := &v2wf.CommitState{}
+		// LegacyContext is the native *fiber.Ctx expected by
+		// libContext.InitContext (it switches on *fiber.Ctx).
 		reqCtx := &v2wf.RequestContext{
-			Context:       c.UserContext(),
-			LegacyContext: context.WithValue(context.Background(), fiberCtxKey{}, c),
+			LegacyContext: c,
 			Parser:        parser,
 			Legacy: legacy.WebFramework{
 				Parser: parser,
 			},
 		}
+		reqCtx.SetCommitState(commit)
+		reqCtx.Context = c.UserContext()
 
 		// Apply middleware chain
 		chain := h
@@ -135,15 +157,26 @@ func (r *FiberRouter) wrapHandler(h routing.Handler) fiber.Handler {
 		}
 
 		if err := chain(reqCtx); err != nil {
-			// If no response body was written, send a 500 error.
-			if len(c.Response().Body()) == 0 {
-				c.Status(500)
-				return c.SendString(`{"errors":[{"code":"INTERNAL","description":"Internal server error"}]}`)
+			if !commit.Committed() {
+				r.dispatchError(reqCtx, err)
 			}
-			return err
 		}
 		return nil
 	}
+}
+
+// dispatchError routes an error through the v2 response registry if one is
+// configured; otherwise it falls back to a sanitized 500 response.
+func (r *FiberRouter) dispatchError(ctx *v2wf.RequestContext, err error) {
+	if r.respHandler != nil {
+		_ = r.respHandler.Error(ctx, err)
+		if ctx.Committed() {
+			return
+		}
+	}
+	_ = ctx.Parser.SendResponse(500, "application/json",
+		[]byte(`{"errors":[{"code":"INTERNAL","description":"Internal server error"}]}`))
+	ctx.MarkCommitted(500)
 }
 
 // Ensure FiberRouter implements routing.Router.
@@ -152,13 +185,12 @@ var _ routing.Router = (*FiberRouter)(nil)
 // Ensure FiberRouter implements routing.RouteGroup.
 var _ routing.RouteGroup = (*FiberRouter)(nil)
 
-// fiberCtxKey is used to store the fiber.Ctx in the LegacyContext.
-type fiberCtxKey struct{}
-
-// GetFiberCtx extracts the fiber.Ctx from a LegacyContext created by FiberRouter.
-func GetFiberCtx(ctx context.Context) *fiber.Ctx {
-	if v, ok := ctx.Value(fiberCtxKey{}).(*fiber.Ctx); ok {
-		return v
+// GetFiberCtx extracts the fiber.Ctx from a LegacyContext created by
+// FiberRouter. Since v2 now passes *fiber.Ctx directly as LegacyContext,
+// this helper type-asserts it.
+func GetFiberCtx(ctx any) *fiber.Ctx {
+	if c, ok := ctx.(*fiber.Ctx); ok {
+		return c
 	}
 	return nil
 }

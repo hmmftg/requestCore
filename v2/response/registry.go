@@ -109,6 +109,16 @@ func (r *DefaultRegistry) Handle(req *webFramework.RequestContext, err error) er
 	if err == nil {
 		return nil
 	}
+	if req == nil {
+		return errors.New("response: nil request context")
+	}
+
+	// If the response is already committed, we cannot write an error
+	// response. Log the failure and return the original error.
+	if req.Committed() {
+		addLogFailure(req, "registry-handle-after-commit", err)
+		return err
+	}
 
 	status := r.Resolve(err)
 	ctx := webFramework.ErrorContext{
@@ -124,10 +134,17 @@ func (r *DefaultRegistry) Handle(req *webFramework.RequestContext, err error) er
 
 	if ok {
 		if hErr := handler(ctx); hErr != nil {
-			if fallback != nil {
+			// The custom handler failed. If it did not commit a
+			// response, invoke the fallback exactly once.
+			if !req.Committed() && fallback != nil {
 				return fallback(ctx)
 			}
 			return hErr
+		}
+		// If the custom handler returned nil but did not commit a
+		// response, invoke the fallback exactly once.
+		if !req.Committed() && fallback != nil {
+			return fallback(ctx)
 		}
 		return nil
 	}

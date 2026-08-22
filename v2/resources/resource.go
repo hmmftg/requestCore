@@ -2,126 +2,64 @@
 // standard CRUD operations, inspired by Buffalo's resource pattern.
 //
 // A Resource defines the seven operations:
-//   - Index:    GET    /{resource}
-//   - Show:     GET    /{resource}/{id}
-//   - Create:   POST   /{resource}
-//   - Update:   PUT    /{resource}/{id}
-//   - Patch:    PATCH  /{resource}/{id}
-//   - Destroy:  DELETE /{resource}/{id}
-//   - New:      GET    /{resource}/new
+//   - List:    GET    /{resource}
+//   - Show:    GET    /{resource}/{id}
+//   - New:     GET    /{resource}/new
+//   - Create:  POST   /{resource}
+//   - Edit:    GET    /{resource}/{id}/edit
+//   - Update:  PUT    /{resource}/{id}
+//   - Destroy: DELETE /{resource}/{id}
+//
+// PATCH is an optional alias of Update, not a separate seventh operation.
 //
 // Each operation is independently typed with its own request and response
-// types, providing type safety without requiring a single mega-struct.
+// types via handlers.Endpoint, providing type safety without requiring a
+// single mega-struct. Operations that are not supported return explicit
+// 405 responses via ResourceDefaults.
 package resources
 
 import (
-	"github.com/hmmftg/requestCore"
-	"github.com/hmmftg/requestCore/libRequest"
+	"fmt"
+	"strconv"
 
+	"github.com/hmmftg/requestCore/libError"
+	"github.com/hmmftg/requestCore/libRequest"
+	"github.com/hmmftg/requestCore/response"
+	"github.com/hmmftg/requestCore/status"
+	"github.com/hmmftg/requestCore/webFramework"
+
+	"github.com/hmmftg/requestCore/v2/handlers"
 	v2response "github.com/hmmftg/requestCore/v2/response"
 	"github.com/hmmftg/requestCore/v2/routing"
 	v2wf "github.com/hmmftg/requestCore/v2/webFramework"
 )
 
 // Resource defines the seven standard CRUD operations for a resource.
-// Each operation has its own request and response types.
+// Each operation returns an Endpoint descriptor that captures its own
+// request and response types. Operations returning nil are not supported
+// and will be registered with a default 405 handler.
 type Resource[ID any] interface {
-	// Index returns a list of resources.
-	Index() IndexOperation
+	// List returns a list of resources.
+	List() *handlers.Endpoint
 	// Show returns a single resource by ID.
-	Show() ShowOperation[ID]
-	// Create creates a new resource.
-	Create() CreateOperation
-	// Update replaces a resource by ID.
-	Update() UpdateOperation[ID]
-	// Patch partially updates a resource by ID.
-	Patch() PatchOperation[ID]
-	// Destroy deletes a resource by ID.
-	Destroy() DestroyOperation[ID]
+	Show() *handlers.Endpoint
 	// New returns the form/data for creating a new resource.
-	New() NewOperation
+	New() *handlers.Endpoint
+	// Create creates a new resource.
+	Create() *handlers.Endpoint
+	// Edit returns the form/data for editing a resource by ID.
+	Edit() *handlers.Endpoint
+	// Update replaces a resource by ID.
+	Update() *handlers.Endpoint
+	// Destroy deletes a resource by ID.
+	Destroy() *handlers.Endpoint
 }
 
-// IndexOperation lists resources.
-type IndexOperation struct {
-	Title   string
-	Handler func(trx *ResourceContext) (any, error)
-}
-
-// ShowOperation retrieves a single resource by ID.
-type ShowOperation[ID any] struct {
-	Title   string
-	Handler func(id ID, trx *ResourceContext) (any, error)
-}
-
-// CreateOperation creates a new resource.
-type CreateOperation struct {
-	Title   string
-	Handler func(trx *ResourceContext) (any, error)
-}
-
-// UpdateOperation replaces a resource by ID.
-type UpdateOperation[ID any] struct {
-	Title   string
-	Handler func(id ID, trx *ResourceContext) (any, error)
-}
-
-// PatchOperation partially updates a resource by ID.
-type PatchOperation[ID any] struct {
-	Title   string
-	Handler func(id ID, trx *ResourceContext) (any, error)
-}
-
-// DestroyOperation deletes a resource by ID.
-type DestroyOperation[ID any] struct {
-	Title   string
-	Handler func(id ID, trx *ResourceContext) (any, error)
-}
-
-// NewOperation returns the form for creating a new resource.
-type NewOperation struct {
-	Title   string
-	Handler func(trx *ResourceContext) (any, error)
-}
-
-// ResourceContext provides the request context for resource operations.
-// It wraps the v2 RequestContext and provides helper methods for
-// body parsing, parameter access, and response sending.
-type ResourceContext struct {
-	ReqCtx *v2wf.RequestContext
-	// Core is the v1 RequestCoreInterface (may be nil in tests).
-	Core requestCore.RequestCoreInterface
-}
-
-// GetURLParam returns a URL path parameter by name.
-func (c *ResourceContext) GetURLParam(name string) string {
-	return c.ReqCtx.Parser.GetURLParam(name)
-}
-
-// GetBody binds the request body to the given target.
-func (c *ResourceContext) GetBody(target any) error {
-	return c.ReqCtx.Parser.GetBody(target)
-}
-
-// GetURLQuery binds URL query parameters to the given target.
-func (c *ResourceContext) GetURLQuery(target any) error {
-	return c.ReqCtx.Parser.GetURLQuery(target)
-}
-
-// GetHeaderValue returns the value of the named HTTP request header.
-func (c *ResourceContext) GetHeaderValue(name string) string {
-	return c.ReqCtx.Parser.GetHeaderValue(name)
-}
-
-// SendResponse writes a raw response with the given status, content type, and body.
-func (c *ResourceContext) SendResponse(status int, contentType string, body []byte) error {
-	type sender interface {
-		SendResponse(status int, contentType string, body []byte) error
-	}
-	if s, ok := c.ReqCtx.Parser.(sender); ok {
-		return s.SendResponse(status, contentType, body)
-	}
-	return nil
+// ResourceDefaults holds default endpoint handlers for unsupported operations.
+// When a Resource returns nil for an operation, the corresponding default
+// handler emits a 405 Method Not Allowed response.
+type ResourceDefaults struct {
+	Registry v2response.Registry
 }
 
 // Config holds the configuration for registering a resource.
@@ -133,7 +71,8 @@ type Config[ID any] struct {
 	Resource Resource[ID]
 
 	// Core is the v1 RequestCoreInterface for infrastructure access.
-	Core requestCore.RequestCoreInterface
+	// May be nil.
+	Core any
 
 	// RespHandler is the v2 response handler.
 	RespHandler *v2response.Handler
@@ -145,99 +84,118 @@ type Config[ID any] struct {
 	// IDParser converts a string URL parameter to the ID type.
 	// If nil, the string value is used directly for string IDs.
 	IDParser func(string) (ID, error)
+
+	// EnablePatchAlias, when true, registers PATCH as an alias for
+	// Update on the /{id} path.
+	EnablePatchAlias bool
+
+	// Defaults provides 405 handlers for unsupported operations.
+	// If nil, unsupported operations are silently skipped.
+	Defaults *ResourceDefaults
 }
 
 // Register registers all seven resource operations on the given router.
-// Operations with nil handlers are skipped.
+// Static routes (/new, /{id}/edit) are registered before /{id} routes
+// to ensure correct precedence on all adapters.
 func Register[ID any](router routing.RouteGroup, config Config[ID]) error {
 	idParam := config.IDParam
 	if idParam == "" {
 		idParam = "id"
 	}
 	basePath := config.Path
+	idPath := basePath + "/{" + idParam + "}"
 
-	// Index: GET /{resource}
-	if op := config.Resource.Index(); op.Handler != nil {
-		h := makeSimpleHandler(op.Title, config, func(ctx *ResourceContext) (any, error) {
-			return op.Handler(ctx)
-		})
-		if err := router.Get(basePath, h); err != nil {
+	// Register static routes first (before /{id}) for correct precedence.
+	// New: GET /{resource}/new
+	if op := config.Resource.New(); op != nil {
+		op = op.WithPath(basePath + "/new")
+		if err := handlers.RegisterEndpoint(router, config.Core, config.RespHandler, "GET", basePath+"/new", op); err != nil {
+			return err
+		}
+	} else if config.Defaults != nil {
+		if err := registerDefault405(router, config.Defaults, config.RespHandler, "GET", basePath+"/new"); err != nil {
 			return err
 		}
 	}
 
-	// Show: GET /{resource}/{id}
-	if op := config.Resource.Show(); op.Handler != nil {
-		h := makeSimpleHandler(op.Title, config, func(ctx *ResourceContext) (any, error) {
-			id, err := parseID(config, ctx.GetURLParam(idParam))
-			if err != nil {
-				return nil, err
-			}
-			return op.Handler(id, ctx)
-		})
-		if err := router.Get(basePath+"/{"+idParam+"}", h); err != nil {
+	// Edit: GET /{resource}/{id}/edit
+	if op := config.Resource.Edit(); op != nil {
+		op = op.WithPath(basePath + "/{" + idParam + "}/edit")
+		op = withIDParser[ID](op, config, idParam)
+		if err := handlers.RegisterEndpoint(router, config.Core, config.RespHandler, "GET", basePath+"/{"+idParam+"}/edit", op); err != nil {
+			return err
+		}
+	} else if config.Defaults != nil {
+		if err := registerDefault405(router, config.Defaults, config.RespHandler, "GET", basePath+"/{"+idParam+"}/edit"); err != nil {
+			return err
+		}
+	}
+
+	// List: GET /{resource}
+	if op := config.Resource.List(); op != nil {
+		op = op.WithPath(basePath)
+		if err := handlers.RegisterEndpoint(router, config.Core, config.RespHandler, "GET", basePath, op); err != nil {
+			return err
+		}
+	} else if config.Defaults != nil {
+		if err := registerDefault405(router, config.Defaults, config.RespHandler, "GET", basePath); err != nil {
 			return err
 		}
 	}
 
 	// Create: POST /{resource}
-	if op := config.Resource.Create(); op.Handler != nil {
-		h := makeSimpleHandler(op.Title, config, func(ctx *ResourceContext) (any, error) {
-			return op.Handler(ctx)
-		})
-		if err := router.Post(basePath, h); err != nil {
+	if op := config.Resource.Create(); op != nil {
+		op = op.WithPath(basePath)
+		if err := handlers.RegisterEndpoint(router, config.Core, config.RespHandler, "POST", basePath, op); err != nil {
+			return err
+		}
+	} else if config.Defaults != nil {
+		if err := registerDefault405(router, config.Defaults, config.RespHandler, "POST", basePath); err != nil {
+			return err
+		}
+	}
+
+	// Show: GET /{resource}/{id}
+	if op := config.Resource.Show(); op != nil {
+		op = op.WithPath(idPath)
+		op = withIDParser[ID](op, config, idParam)
+		if err := handlers.RegisterEndpoint(router, config.Core, config.RespHandler, "GET", idPath, op); err != nil {
+			return err
+		}
+	} else if config.Defaults != nil {
+		if err := registerDefault405(router, config.Defaults, config.RespHandler, "GET", idPath); err != nil {
 			return err
 		}
 	}
 
 	// Update: PUT /{resource}/{id}
-	if op := config.Resource.Update(); op.Handler != nil {
-		h := makeSimpleHandler(op.Title, config, func(ctx *ResourceContext) (any, error) {
-			id, err := parseID(config, ctx.GetURLParam(idParam))
-			if err != nil {
-				return nil, err
-			}
-			return op.Handler(id, ctx)
-		})
-		if err := router.Put(basePath+"/{"+idParam+"}", h); err != nil {
+	if op := config.Resource.Update(); op != nil {
+		op = op.WithPath(idPath)
+		op = withIDParser[ID](op, config, idParam)
+		if err := handlers.RegisterEndpoint(router, config.Core, config.RespHandler, "PUT", idPath, op); err != nil {
 			return err
 		}
-	}
-
-	// Patch: PATCH /{resource}/{id}
-	if op := config.Resource.Patch(); op.Handler != nil {
-		h := makeSimpleHandler(op.Title, config, func(ctx *ResourceContext) (any, error) {
-			id, err := parseID(config, ctx.GetURLParam(idParam))
-			if err != nil {
-				return nil, err
+		// Optional PATCH alias.
+		if config.EnablePatchAlias {
+			if err := handlers.RegisterEndpoint(router, config.Core, config.RespHandler, "PATCH", idPath, op); err != nil {
+				return err
 			}
-			return op.Handler(id, ctx)
-		})
-		if err := router.Patch(basePath+"/{"+idParam+"}", h); err != nil {
+		}
+	} else if config.Defaults != nil {
+		if err := registerDefault405(router, config.Defaults, config.RespHandler, "PUT", idPath); err != nil {
 			return err
 		}
 	}
 
 	// Destroy: DELETE /{resource}/{id}
-	if op := config.Resource.Destroy(); op.Handler != nil {
-		h := makeSimpleHandler(op.Title, config, func(ctx *ResourceContext) (any, error) {
-			id, err := parseID(config, ctx.GetURLParam(idParam))
-			if err != nil {
-				return nil, err
-			}
-			return op.Handler(id, ctx)
-		})
-		if err := router.Delete(basePath+"/{"+idParam+"}", h); err != nil {
+	if op := config.Resource.Destroy(); op != nil {
+		op = op.WithPath(idPath)
+		op = withIDParser[ID](op, config, idParam)
+		if err := handlers.RegisterEndpoint(router, config.Core, config.RespHandler, "DELETE", idPath, op); err != nil {
 			return err
 		}
-	}
-
-	// New: GET /{resource}/new
-	if op := config.Resource.New(); op.Handler != nil {
-		h := makeSimpleHandler(op.Title, config, func(ctx *ResourceContext) (any, error) {
-			return op.Handler(ctx)
-		})
-		if err := router.Get(basePath+"/new", h); err != nil {
+	} else if config.Defaults != nil {
+		if err := registerDefault405(router, config.Defaults, config.RespHandler, "DELETE", idPath); err != nil {
 			return err
 		}
 	}
@@ -245,79 +203,108 @@ func Register[ID any](router routing.RouteGroup, config Config[ID]) error {
 	return nil
 }
 
-// makeSimpleHandler creates a routing.Handler from a resource handler function.
-// It handles response sending, error handling, and panic recovery.
-func makeSimpleHandler[ID any](
-	title string,
-	config Config[ID],
-	fn func(*ResourceContext) (any, error),
-) func(ctx *v2wf.RequestContext) error {
-	return func(ctx *v2wf.RequestContext) (err error) {
-		defer func() {
-			if r := recover(); r != nil {
-				err = nil // suppress error since we handle the response below
-				if config.RespHandler != nil {
-					if hErr := config.RespHandler.Error(ctx, err); hErr != nil {
-						sendRawError(ctx)
-					}
-				} else {
-					sendRawError(ctx)
-				}
-			}
-		}()
-
-		resCtx := &ResourceContext{
-			ReqCtx: ctx,
-			Core:   config.Core,
-		}
-
-		result, err := fn(resCtx)
+// withIDParser wraps an endpoint to parse the ID parameter before the
+// handler runs. The parsed ID is stored in the request context's Legacy
+// parser locals under the IDParam key.
+func withIDParser[ID any](e *handlers.Endpoint, config Config[ID], idParam string) *handlers.Endpoint {
+	// We inject ID parsing via WithIDParser, which runs before the
+	// initializer and receives the v2 RequestContext directly.
+	e.WithIDParser(func(ctx *v2wf.RequestContext) error {
+		raw := ctx.Parser.GetURLParam(idParam)
+		id, err := parseID[ID](config, raw)
 		if err != nil {
-			if config.RespHandler != nil {
-				if hErr := config.RespHandler.Error(ctx, err); hErr != nil {
-					sendRawError(ctx)
-				}
-			} else {
-				sendRawError(ctx)
-			}
 			return err
 		}
-
-		if config.RespHandler != nil {
-			if hErr := config.RespHandler.OK(ctx, result); hErr != nil {
-				return hErr
-			}
+		// Store the parsed ID in locals for the handler to retrieve.
+		// Use both ctx.Parser and ctx.Legacy.Parser to ensure the
+		// value is accessible regardless of which parser instance
+		// the handler reads from.
+		ctx.Parser.SetLocal(idParam+"_parsed", id)
+		if ctx.Legacy.Parser != nil {
+			ctx.Legacy.Parser.SetLocal(idParam+"_parsed", id)
 		}
 		return nil
-	}
-}
-
-// sendRawError sends a 500 error response directly to the parser.
-func sendRawError(ctx *v2wf.RequestContext) {
-	type sender interface {
-		SendResponse(status int, contentType string, body []byte) error
-	}
-	if s, ok := ctx.Parser.(sender); ok {
-		_ = s.SendResponse(500, "application/json", []byte(`{"errors":[{"code":"INTERNAL","description":"Internal server error"}]}`))
-	}
+	})
+	return e
 }
 
 // parseID converts a string URL parameter to the ID type.
+// If IDParser is configured, it is used. Otherwise, the string is used
+// directly for string IDs. For non-string IDs without an IDParser, a
+// 400 error is returned.
 func parseID[ID any](config Config[ID], raw string) (ID, error) {
 	if config.IDParser != nil {
 		return config.IDParser(raw)
 	}
-	// Default: assume ID is string type
 	var zero ID
-	if any(zero) == nil || raw == "" {
-		return zero, nil
-	}
-	// Try to cast string to ID (works when ID is string)
+	// Try to cast string to ID (works when ID is string).
 	if id, ok := any(raw).(ID); ok {
 		return id, nil
 	}
-	return zero, nil
+	// Try int64 conversion.
+	if _, ok := any(zero).(int64); ok {
+		if n, err := strconv.ParseInt(raw, 10, 64); err == nil {
+			if id, ok := any(n).(ID); ok {
+				return id, nil
+			}
+		}
+	}
+	// Try int conversion.
+	if _, ok := any(zero).(int); ok {
+		if n, err := strconv.Atoi(raw); err == nil {
+			if id, ok := any(n).(ID); ok {
+				return id, nil
+			}
+		}
+	}
+	return zero, libError.NewWithDescription(
+		status.BadRequest,
+		"INVALID_ID",
+		"invalid id parameter: %s",
+		raw,
+	)
 }
 
-// Suppress unused import warning.
+// registerDefault405 registers a default 405 Method Not Allowed handler
+// for an unsupported operation.
+func registerDefault405(router routing.RouteGroup, defaults *ResourceDefaults, respHandler *v2response.Handler, method, path string) error {
+	h := func(ctx *v2wf.RequestContext) error {
+		return respHandler.Error(ctx, libError.NewWithDescription(
+			status.StatusCode(405),
+			"METHOD_NOT_ALLOWED",
+			"method %s not allowed on %s",
+			method, path,
+		))
+	}
+	return router.Handle(method, path, h)
+}
+
+// GetParsedID retrieves a parsed ID from the request context's locals.
+// This is used by resource handlers to access the ID parsed by withIDParser.
+// The RequestContext is available on the HandlerRequest's V2 field.
+func GetParsedID[ID any](ctx *v2wf.RequestContext, idParam string) (ID, error) {
+	key := idParam + "_parsed"
+	// Check ctx.Parser first (the v2 parser), then ctx.Legacy.Parser.
+	var v any
+	if ctx.Parser != nil {
+		v = ctx.Parser.GetLocal(key)
+	}
+	if v == nil && ctx.Legacy.Parser != nil {
+		v = ctx.Legacy.Parser.GetLocal(key)
+	}
+	if v == nil {
+		var zero ID
+		return zero, fmt.Errorf("resources: parsed ID not found for param %q", idParam)
+	}
+	id, ok := v.(ID)
+	if !ok {
+		var zero ID
+		return zero, fmt.Errorf("resources: parsed ID type mismatch for param %q: got %T", idParam, v)
+	}
+	return id, nil
+}
+
+// Suppress unused import warnings for types used in signatures.
 var _ = libRequest.JSON
+var _ = webFramework.WebFramework{}
+var _ response.ResponseHandler

@@ -177,7 +177,10 @@ func TestNetHTTPRouter_Middleware(t *testing.T) {
 	server := httptest.NewServer(router.mux)
 	defer server.Close()
 
-	resp, _ := http.Get(server.URL + "/test")
+	resp, err := http.Get(server.URL + "/test")
+	if err != nil {
+		t.Fatalf("http.Get: %v", err)
+	}
 	defer resp.Body.Close()
 
 	expected := []string{"mw-before", "handler", "mw-after"}
@@ -221,7 +224,10 @@ func TestNetHTTPRouter_HandlerError(t *testing.T) {
 	server := httptest.NewServer(router.mux)
 	defer server.Close()
 
-	resp, _ := http.Get(server.URL + "/fail")
+	resp, err := http.Get(server.URL + "/fail")
+	if err != nil {
+		t.Fatalf("http.Get: %v", err)
+	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != 500 {

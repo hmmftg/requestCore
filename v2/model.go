@@ -21,9 +21,10 @@ type Runtime interface {
 	// query, persistence, response, logging, and tracing infrastructure.
 	Legacy() requestCore.RequestCoreInterface
 
-	// Responder returns the v2 response handler with renderer support
-	// and error handler registry.
-	Responder() *v2response.Handler
+	// V2Responder returns the v2 response handler with renderer support
+	// and error handler registry. Named V2Responder to avoid conflict
+	// with the v1 RequestCoreInterface.Responder method.
+	V2Responder() *v2response.Handler
 
 	// ErrorHandlers returns the error handler registry.
 	ErrorHandlers() v2response.Registry
@@ -46,8 +47,9 @@ type Runtime interface {
 	ORM() liborm.OrmInterface
 	// RequestTools returns the request interface (delegates to v1).
 	RequestTools() libRequest.RequestInterface
-	// ResponderV1 returns the v1 response handler (delegates to v1).
-	ResponderV1() response.ResponseHandler
+	// Responder returns the v1 response handler (delegates to v1).
+	// This matches the v1 RequestCoreInterface.Responder signature.
+	Responder() response.ResponseHandler
 	// Params returns the parameter interface (delegates to v1).
 	Params() libParams.ParamInterface
 }
@@ -68,9 +70,15 @@ func (m *Model) Legacy() requestCore.RequestCoreInterface {
 	return m.LegacyCore
 }
 
-// Responder returns the v2 response handler.
-func (m *Model) Responder() *v2response.Handler {
+// V2Responder returns the v2 response handler.
+func (m *Model) V2Responder() *v2response.Handler {
 	return m.ResponseHandler
+}
+
+// Responder returns the v1 response handler, implementing
+// RequestCoreInterface.
+func (m *Model) Responder() response.ResponseHandler {
+	return m.LegacyCore.Responder()
 }
 
 // ErrorHandlers returns the error handler registry.
@@ -106,11 +114,6 @@ func (m *Model) ORM() liborm.OrmInterface {
 // RequestTools delegates to the v1 core.
 func (m *Model) RequestTools() libRequest.RequestInterface {
 	return m.LegacyCore.RequestTools()
-}
-
-// ResponderV1 delegates to the v1 core.
-func (m *Model) ResponderV1() response.ResponseHandler {
-	return m.LegacyCore.Responder()
 }
 
 // Params delegates to the v1 core.
@@ -153,3 +156,11 @@ func NewModel(
 		Sessions:        session.NewManager(sessionStore),
 	}
 }
+
+// Compile-time assertion that Model implements both Runtime and
+// RequestCoreInterface. This ensures the v2 facade can be used wherever
+// a v1 RequestCoreInterface is expected.
+var (
+	_ Runtime                          = (*Model)(nil)
+	_ requestCore.RequestCoreInterface = (*Model)(nil)
+)

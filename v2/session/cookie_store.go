@@ -2,6 +2,8 @@ package session
 
 import (
 	"context"
+	"crypto/aes"
+	"crypto/cipher"
 	"crypto/hmac"
 	"crypto/rand"
 	"crypto/sha256"
@@ -88,7 +90,12 @@ func NewCookieStore(config CookieStoreConfig) (*CookieStore, error) {
 	if config.SameSite == "" {
 		config.SameSite = "lax"
 	}
-	if !config.HttpOnly && config.HttpOnly == false {
+	// HttpOnly defaults to true. We use a sentinel check: the zero value
+	// of bool is false, so we only set the default when the caller hasn't
+	// explicitly set it. Since we can't distinguish "not set" from "set
+	// to false" with a bool, we default to true always and let callers
+	// who want false pass it explicitly after construction.
+	if !config.HttpOnly {
 		config.HttpOnly = true
 	}
 	if config.MaxPayloadSize == 0 {
@@ -173,12 +180,25 @@ func (s *CookieStore) Config() CookieStoreConfig {
 }
 
 func (s *CookieStore) signAndEncode(payload []byte) (string, error) {
+	// If encryption is enabled, encrypt the payload with AES-GCM before
+	// signing. The nonce is prepended to the ciphertext.
+	var signedPayload []byte
+	if s.config.EncryptionKey != nil {
+		encrypted, err := s.encrypt(payload)
+		if err != nil {
+			return "", fmt.Errorf("session: encrypt: %w", err)
+		}
+		signedPayload = encrypted
+	} else {
+		signedPayload = payload
+	}
+
 	mac := hmac.New(sha256.New, s.config.SecretKey)
-	mac.Write(payload)
+	mac.Write(signedPayload)
 	signature := mac.Sum(nil)
 
-	combined := make([]byte, 0, len(payload)+len(signature))
-	combined = append(combined, payload...)
+	combined := make([]byte, 0, len(signedPayload)+len(signature))
+	combined = append(combined, signedPayload...)
 	combined = append(combined, signature...)
 
 	return base64.URLEncoding.EncodeToString(combined), nil
@@ -195,14 +215,63 @@ func (s *CookieStore) verifyAndDecode(token string) ([]byte, error) {
 		return nil, errors.New("session: token too short")
 	}
 
-	payload := combined[:len(combined)-sigLen]
+	signedPayload := combined[:len(combined)-sigLen]
 	signature := combined[len(combined)-sigLen:]
 
-	if !s.verifySignature(payload, signature) {
+	if !s.verifySignature(signedPayload, signature) {
 		return nil, errors.New("session: invalid signature")
 	}
 
-	return payload, nil
+	// If encryption is enabled, decrypt the payload.
+	if s.config.EncryptionKey != nil {
+		plaintext, err := s.decrypt(signedPayload)
+		if err != nil {
+			return nil, fmt.Errorf("session: decrypt: %w", err)
+		}
+		return plaintext, nil
+	}
+
+	return signedPayload, nil
+}
+
+// encrypt encrypts plaintext using AES-GCM with the configured EncryptionKey.
+// The nonce is prepended to the ciphertext.
+func (s *CookieStore) encrypt(plaintext []byte) ([]byte, error) {
+	block, err := aes.NewCipher(s.config.EncryptionKey)
+	if err != nil {
+		return nil, err
+	}
+	gcm, err := cipher.NewGCM(block)
+	if err != nil {
+		return nil, err
+	}
+	nonce := make([]byte, gcm.NonceSize())
+	if _, err := rand.Read(nonce); err != nil {
+		return nil, err
+	}
+	// nonce is prepended to ciphertext
+	ciphertext := gcm.Seal(nil, nonce, plaintext, nil)
+	return append(nonce, ciphertext...), nil
+}
+
+// decrypt decrypts an AES-GCM ciphertext (nonce prepended) using the
+// configured EncryptionKey.
+func (s *CookieStore) decrypt(ciphertext []byte) ([]byte, error) {
+	block, err := aes.NewCipher(s.config.EncryptionKey)
+	if err != nil {
+		return nil, err
+	}
+	gcm, err := cipher.NewGCM(block)
+	if err != nil {
+		return nil, err
+	}
+	nonceSize := gcm.NonceSize()
+	if len(ciphertext) < nonceSize {
+		return nil, errors.New("session: ciphertext too short")
+	}
+	nonce := ciphertext[:nonceSize]
+	ct := ciphertext[nonceSize:]
+	return gcm.Open(nil, nonce, ct, nil)
 }
 
 func (s *CookieStore) verifySignature(payload, signature []byte) bool {

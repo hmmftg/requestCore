@@ -75,7 +75,11 @@ func FlashMiddleware() routing.Middleware {
 		return func(ctx *v2wf.RequestContext) error {
 			if ctx.Flash == nil {
 				if ctx.Session != nil {
-					ctx.Flash = session.LoadFlashFromSession(ctx.Session)
+					if sess, ok := ctx.Session.(*session.Session); ok {
+						ctx.Flash = session.LoadFlashFromSession(sess)
+					} else {
+						ctx.Flash = session.NewFlash()
+					}
 				} else {
 					ctx.Flash = session.NewFlash()
 				}

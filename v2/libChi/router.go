@@ -6,15 +6,17 @@
 package libChi
 
 import (
-	"context"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
 
+	legacyLibNetHttp "github.com/hmmftg/requestCore/libNetHttp"
+	legacy "github.com/hmmftg/requestCore/webFramework"
+
 	v2libNetHttp "github.com/hmmftg/requestCore/v2/libNetHttp"
+	"github.com/hmmftg/requestCore/v2/response"
 	"github.com/hmmftg/requestCore/v2/routing"
 	v2wf "github.com/hmmftg/requestCore/v2/webFramework"
-	legacy "github.com/hmmftg/requestCore/webFramework"
 )
 
 // ChiRouter implements routing.Router using chi.
@@ -36,6 +38,16 @@ func NewRouterFromMux(mux *chi.Mux) *ChiRouter {
 	r := &ChiRouter{mux: mux}
 	r.routeGroup = &chiGroup{mux: mux, r: mux, middlewares: nil}
 	return r
+}
+
+// SetErrorHandler installs the v2 response handler and error registry used
+// for centralized error dispatch.
+func (r *ChiRouter) SetErrorHandler(handler *response.Handler) {
+	if handler == nil {
+		return
+	}
+	r.routeGroup.respHandler = handler
+	r.routeGroup.registry = handler.Registry()
 }
 
 // Native returns the underlying chi.Mux.
@@ -97,6 +109,8 @@ type chiGroup struct {
 	mux         *chi.Mux
 	r           chi.Router
 	middlewares []routing.Middleware
+	registry    response.Registry
+	respHandler *response.Handler
 }
 
 func (g *chiGroup) Group(prefix string) routing.RouteGroup {
@@ -109,14 +123,14 @@ func (g *chiGroup) Group(prefix string) routing.RouteGroup {
 	if sub == nil {
 		sub = g.r
 	}
-	return &chiGroup{mux: g.mux, r: sub, middlewares: g.middlewares}
+	return &chiGroup{mux: g.mux, r: sub, middlewares: g.middlewares, registry: g.registry, respHandler: g.respHandler}
 }
 
 func (g *chiGroup) With(middleware ...routing.Middleware) routing.RouteGroup {
 	mws := make([]routing.Middleware, 0, len(g.middlewares)+len(middleware))
 	mws = append(mws, g.middlewares...)
 	mws = append(mws, middleware...)
-	return &chiGroup{mux: g.mux, r: g.r, middlewares: mws}
+	return &chiGroup{mux: g.mux, r: g.r, middlewares: mws, registry: g.registry, respHandler: g.respHandler}
 }
 
 func (g *chiGroup) Handle(method, pattern string, handler routing.Handler) error {
@@ -157,6 +171,7 @@ func (g *chiGroup) Head(pattern string, handler routing.Handler) error {
 func (g *chiGroup) wrapHandler(h routing.Handler) http.HandlerFunc {
 	return func(w http.ResponseWriter, req *http.Request) {
 		parser := v2libNetHttp.InitContextV2(req, w)
+		commit := &v2wf.CommitState{}
 
 		// Populate Params from chi URL params
 		if chiCtx := chi.RouteContext(req.Context()); chiCtx != nil {
@@ -167,14 +182,20 @@ func (g *chiGroup) wrapHandler(h routing.Handler) http.HandlerFunc {
 			}
 		}
 
+		// LegacyContext must carry the request and response writer
+		// via libNetHttp.WithRequestResponse so libContext.InitContext
+		// follows the net/http branch.
+		legacyCtx := legacyLibNetHttp.WithRequestResponse(req.Context(), req, w)
+
 		reqCtx := &v2wf.RequestContext{
 			Context:       req.Context(),
-			LegacyContext: context.WithValue(req.Context(), v2libNetHttp.HTTPRequestKey{}, req),
+			LegacyContext: legacyCtx,
 			Parser:        parser,
 			Legacy: legacy.WebFramework{
 				Parser: parser,
 			},
 		}
+		reqCtx.SetCommitState(commit)
 
 		// Apply middleware chain
 		chain := h
@@ -183,24 +204,25 @@ func (g *chiGroup) wrapHandler(h routing.Handler) http.HandlerFunc {
 		}
 
 		if err := chain(reqCtx); err != nil {
-			if !responseWritten(w) {
-				w.Header().Set("Content-Type", "application/json")
-				w.WriteHeader(500)
-				_, _ = w.Write([]byte(`{"errors":[{"code":"INTERNAL","description":"Internal server error"}]}`))
+			if !commit.Committed() {
+				g.dispatchError(reqCtx, err)
 			}
 		}
 	}
 }
 
-type writtenChecker interface {
-	Written() bool
-}
-
-func responseWritten(w http.ResponseWriter) bool {
-	if wc, ok := w.(writtenChecker); ok {
-		return wc.Written()
+// dispatchError routes an error through the v2 response registry if one is
+// configured; otherwise it falls back to a sanitized 500 response.
+func (g *chiGroup) dispatchError(ctx *v2wf.RequestContext, err error) {
+	if g.respHandler != nil {
+		_ = g.respHandler.Error(ctx, err)
+		if ctx.Committed() {
+			return
+		}
 	}
-	return false
+	_ = ctx.Parser.SendResponse(500, "application/json",
+		[]byte(`{"errors":[{"code":"INTERNAL","description":"Internal server error"}]}`))
+	ctx.MarkCommitted(500)
 }
 
 // Ensure ChiRouter implements routing.Router.

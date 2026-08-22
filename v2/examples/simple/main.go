@@ -18,6 +18,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/hmmftg/requestCore/libRequest"
 	"github.com/hmmftg/requestCore/webFramework"
 
 	"github.com/hmmftg/requestCore/v2/app"
@@ -89,9 +90,10 @@ func main() {
 
 	// Register a full CRUD resource
 	err = resources.Register[string](application.Router, resources.Config[string]{
-		Path:        "/items",
-		Resource:    &ItemResource{},
-		RespHandler: application.RespHandler,
+		Path:             "/items",
+		Resource:         &ItemResource{},
+		RespHandler:      application.RespHandler,
+		EnablePatchAlias: true,
 	})
 	if err != nil {
 		log.Fatalf("Register items resource: %v", err)
@@ -117,6 +119,7 @@ func main() {
 	log.Printf("  PATCH /items/{id}  - Patch item")
 	log.Printf("  DELETE /items/{id} - Delete item")
 	log.Printf("  GET  /items/new    - New item form")
+	log.Printf("  GET  /items/{id}/edit - Edit item form")
 
 	if err := application.StartWithContext(ctx, ":"+port); err != nil {
 		log.Fatalf("Server: %v", err)
@@ -142,73 +145,89 @@ type CreateUserResp struct {
 	Created bool   `json:"created"`
 }
 
-// ItemResource implements a full CRUD resource for items.
+// ItemResp is the response for item endpoints.
+type ItemResp struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+}
+
+// ItemResource implements resources.Resource[string] for items.
 type ItemResource struct{}
 
-func (r *ItemResource) Index() resources.IndexOperation {
-	return resources.IndexOperation{
-		Title: "list-items",
-		Handler: func(trx *resources.ResourceContext) (any, error) {
-			return []map[string]any{
-				{"id": "1", "name": "Item 1"},
-				{"id": "2", "name": "Item 2"},
+func (r *ItemResource) List() *handlers.Endpoint {
+	return handlers.NewEndpoint[struct{}, []ItemResp]("list-items", libRequest.NoBinding,
+		func(req *struct{}, trx *handlers.HandlerRequest[struct{}, []ItemResp]) ([]ItemResp, error) {
+			return []ItemResp{
+				{ID: "1", Name: "Item 1"},
+				{ID: "2", Name: "Item 2"},
 			}, nil
 		},
-	}
+	)
 }
 
-func (r *ItemResource) Show() resources.ShowOperation[string] {
-	return resources.ShowOperation[string]{
-		Title: "show-item",
-		Handler: func(id string, trx *resources.ResourceContext) (any, error) {
-			return map[string]any{"id": id, "name": "Item " + id}, nil
+func (r *ItemResource) Show() *handlers.Endpoint {
+	return handlers.NewEndpoint[struct{}, ItemResp]("show-item", libRequest.NoBinding,
+		func(req *struct{}, trx *handlers.HandlerRequest[struct{}, ItemResp]) (ItemResp, error) {
+			id, err := resources.GetParsedID[string](trx.V2, "id")
+			if err != nil {
+				return ItemResp{}, err
+			}
+			return ItemResp{ID: id, Name: "Item " + id}, nil
 		},
-	}
+	)
 }
 
-func (r *ItemResource) Create() resources.CreateOperation {
-	return resources.CreateOperation{
-		Title: "create-item",
-		Handler: func(trx *resources.ResourceContext) (any, error) {
-			return map[string]any{"id": "3", "created": true}, nil
-		},
-	}
-}
-
-func (r *ItemResource) Update() resources.UpdateOperation[string] {
-	return resources.UpdateOperation[string]{
-		Title: "update-item",
-		Handler: func(id string, trx *resources.ResourceContext) (any, error) {
-			return map[string]any{"id": id, "updated": true}, nil
-		},
-	}
-}
-
-func (r *ItemResource) Patch() resources.PatchOperation[string] {
-	return resources.PatchOperation[string]{
-		Title: "patch-item",
-		Handler: func(id string, trx *resources.ResourceContext) (any, error) {
-			return map[string]any{"id": id, "patched": true}, nil
-		},
-	}
-}
-
-func (r *ItemResource) Destroy() resources.DestroyOperation[string] {
-	return resources.DestroyOperation[string]{
-		Title: "delete-item",
-		Handler: func(id string, trx *resources.ResourceContext) (any, error) {
-			return map[string]any{"id": id, "deleted": true}, nil
-		},
-	}
-}
-
-func (r *ItemResource) New() resources.NewOperation {
-	return resources.NewOperation{
-		Title: "new-item",
-		Handler: func(trx *resources.ResourceContext) (any, error) {
+func (r *ItemResource) New() *handlers.Endpoint {
+	return handlers.NewEndpoint[struct{}, map[string]any]("new-item", libRequest.NoBinding,
+		func(req *struct{}, trx *handlers.HandlerRequest[struct{}, map[string]any]) (map[string]any, error) {
 			return map[string]any{"form": "item-form"}, nil
 		},
-	}
+	)
+}
+
+func (r *ItemResource) Create() *handlers.Endpoint {
+	return handlers.NewEndpoint[ItemResp, ItemResp]("create-item", libRequest.JSON,
+		func(req *ItemResp, trx *handlers.HandlerRequest[ItemResp, ItemResp]) (ItemResp, error) {
+			return ItemResp{ID: req.ID, Name: req.Name}, nil
+		},
+	)
+}
+
+func (r *ItemResource) Edit() *handlers.Endpoint {
+	return handlers.NewEndpoint[struct{}, ItemResp]("edit-item", libRequest.NoBinding,
+		func(req *struct{}, trx *handlers.HandlerRequest[struct{}, ItemResp]) (ItemResp, error) {
+			id, err := resources.GetParsedID[string](trx.V2, "id")
+			if err != nil {
+				return ItemResp{}, err
+			}
+			return ItemResp{ID: id, Name: "Item " + id}, nil
+		},
+	)
+}
+
+func (r *ItemResource) Update() *handlers.Endpoint {
+	return handlers.NewEndpoint[ItemResp, ItemResp]("update-item", libRequest.JSON,
+		func(req *ItemResp, trx *handlers.HandlerRequest[ItemResp, ItemResp]) (ItemResp, error) {
+			id, err := resources.GetParsedID[string](trx.V2, "id")
+			if err != nil {
+				return ItemResp{}, err
+			}
+			req.ID = id
+			return *req, nil
+		},
+	)
+}
+
+func (r *ItemResource) Destroy() *handlers.Endpoint {
+	return handlers.NewEndpoint[struct{}, map[string]any]("delete-item", libRequest.NoBinding,
+		func(req *struct{}, trx *handlers.HandlerRequest[struct{}, map[string]any]) (map[string]any, error) {
+			id, err := resources.GetParsedID[string](trx.V2, "id")
+			if err != nil {
+				return nil, err
+			}
+			return map[string]any{"id": id, "deleted": true}, nil
+		},
+	)
 }
 
 // Suppress unused import warnings.

@@ -35,11 +35,11 @@ type FakeParserV2 struct {
 func NewFakeParserV2() *FakeParserV2 {
 	return &FakeParserV2{
 		FakeParser: legacy.FakeParser{
-			Locals:    make(map[string]any),
-			ReqHeader: make(map[string]string),
+			Locals:     make(map[string]any),
+			ReqHeader:  make(map[string]string),
 			RespHeader: make(map[string]string),
-			Args:      make(map[string]string),
-			Urlparams: make(map[string]string),
+			Args:       make(map[string]string),
+			Urlparams:  make(map[string]string),
 		},
 		Cookies: make(map[string]string),
 	}
@@ -52,6 +52,11 @@ func (f *FakeParserV2) SendResponse(status int, contentType string, body []byte)
 	f.ResponseBody = body
 	f.ResponseWritten = true
 	return nil
+}
+
+// Committed reports whether SendResponse has been called.
+func (f *FakeParserV2) Committed() bool {
+	return f.ResponseWritten
 }
 
 // GetCookie returns the value of the named request cookie.
