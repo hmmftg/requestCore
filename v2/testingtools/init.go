@@ -43,6 +43,11 @@ func (p *TestParserV2) SendResponse(status int, contentType string, body []byte)
 	return p.FakeParserV2.SendResponse(status, contentType, body)
 }
 
+// SetCommitState delegates to the embedded FakeParserV2.
+func (p *TestParserV2) SetCommitState(cs *v2wf.CommitState) {
+	p.FakeParserV2.SetCommitState(cs)
+}
+
 // TestRequestContext creates a RequestContext suitable for testing
 // handlers and middleware without a real HTTP framework.
 func TestRequestContext() *v2wf.RequestContext {

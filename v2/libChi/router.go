@@ -172,6 +172,7 @@ func (g *chiGroup) wrapHandler(h routing.Handler) http.HandlerFunc {
 	return func(w http.ResponseWriter, req *http.Request) {
 		parser := v2libNetHttp.InitContextV2(req, w)
 		commit := &v2wf.CommitState{}
+		parser.SetCommitState(commit)
 
 		// Populate Params from chi URL params
 		if chiCtx := chi.RouteContext(req.Context()); chiCtx != nil {
@@ -211,18 +212,11 @@ func (g *chiGroup) wrapHandler(h routing.Handler) http.HandlerFunc {
 	}
 }
 
-// dispatchError routes an error through the v2 response registry if one is
-// configured; otherwise it falls back to a sanitized 500 response.
+// dispatchError routes an error through the shared adapter error-dispatch
+// helper, which uses the v2 response registry if configured and falls back
+// to a sanitized 500 response.
 func (g *chiGroup) dispatchError(ctx *v2wf.RequestContext, err error) {
-	if g.respHandler != nil {
-		_ = g.respHandler.Error(ctx, err)
-		if ctx.Committed() {
-			return
-		}
-	}
-	_ = ctx.Parser.SendResponse(500, "application/json",
-		[]byte(`{"errors":[{"code":"INTERNAL","description":"Internal server error"}]}`))
-	ctx.MarkCommitted(500)
+	response.DispatchError(g.respHandler, ctx, err)
 }
 
 // Ensure ChiRouter implements routing.Router.

@@ -244,3 +244,38 @@ func TestGinRouter_HandlerError(t *testing.T) {
 		t.Fatalf("expected 500, got %d", w.Code)
 	}
 }
+
+func TestGinRouter_MethodNotAllowed(t *testing.T) {
+	engine := gin.New()
+	router := NewRouter(engine)
+
+	router.MethodNotAllowed(func(ctx *v2wf.RequestContext) error {
+		return ctx.Parser.SendResponse(http.StatusMethodNotAllowed, "text/plain", []byte("method not allowed"))
+	})
+
+	router.Post("/items", func(ctx *v2wf.RequestContext) error {
+		return ctx.Parser.SendResponse(http.StatusOK, "text/plain", []byte("created"))
+	})
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest("GET", "/items", nil)
+	engine.ServeHTTP(w, req)
+
+	if w.Code != http.StatusMethodNotAllowed {
+		t.Fatalf("expected 405, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+func TestGinRouter_NewRouterFromGroup_NotFoundPanics(t *testing.T) {
+	group := &gin.RouterGroup{}
+	router := NewRouterFromGroup(group)
+
+	defer func() {
+		if r := recover(); r == nil {
+			t.Fatal("expected panic for NotFound on group-only router")
+		}
+	}()
+	router.NotFound(func(ctx *v2wf.RequestContext) error {
+		return nil
+	})
+}

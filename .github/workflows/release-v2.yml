@@ -1,16 +1,34 @@
 name: Release v2
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - 'v2/**'
+  # Manual trigger only — prevents accidental automatic tagging.
+  # The caller selects the bump type and whether it is a prerelease.
   workflow_dispatch:
+    inputs:
+      bump_type:
+        description: "Version bump type"
+        required: true
+        type: choice
+        default: prerelease
+        options:
+          - prerelease
+          - patch
+          - minor
+          - major
+      prerelease_label:
+        description: "Prerelease label (alpha, beta, rc) — used only when bump_type=prerelease"
+        required: false
+        type: string
+        default: "alpha"
+      draft:
+        description: "Create as draft release"
+        required: false
+        type: boolean
+        default: false
 
 jobs:
   release:
     runs-on: ubuntu-latest
-    if: github.event_name == 'workflow_dispatch' || !contains(github.event.head_commit.message, '[skip-release]')
     permissions:
       contents: write
 
@@ -73,86 +91,137 @@ jobs:
           echo "latest_tag=$LATEST_TAG" >> $GITHUB_OUTPUT
           echo "Latest v2 tag: $LATEST_TAG"
 
-      - name: Determine version bump
-        id: version_bump
-        run: |
-          LATEST_TAG="${{ steps.get_tag.outputs.latest_tag }}"
-          COMMITS=$(git log --pretty=format:"%s" ${LATEST_TAG}..HEAD -- v2/ 2>/dev/null || echo "")
-
-          echo "Commits since $LATEST_TAG (v2 only):"
-          echo "$COMMITS"
-
-          MAJOR_BUMP=false
-          MINOR_BUMP=false
-          PATCH_BUMP=false
-          PRERELEASE_BUMP=false
-
-          if echo "$COMMITS" | grep -qiE "(breaking|!|BREAKING)"; then
-            MAJOR_BUMP=true
-            echo "Major version bump detected (breaking changes)"
-          elif echo "$COMMITS" | grep -qiE "^feat|^feature|^add"; then
-            MINOR_BUMP=true
-            echo "Minor version bump detected (new features)"
-          elif echo "$COMMITS" | grep -qiE "^fix|^bug|^patch|^docs|^style|^refactor|^perf|^test|^chore"; then
-            PATCH_BUMP=true
-            echo "Patch version bump detected (fixes/improvements)"
-          else
-            PRERELEASE_BUMP=true
-            echo "Prerelease bump (initial or other changes)"
-          fi
-
-          echo "major_bump=$MAJOR_BUMP" >> $GITHUB_OUTPUT
-          echo "minor_bump=$MINOR_BUMP" >> $GITHUB_OUTPUT
-          echo "patch_bump=$PATCH_BUMP" >> $GITHUB_OUTPUT
-          echo "prerelease_bump=$PRERELEASE_BUMP" >> $GITHUB_OUTPUT
-
       - name: Calculate new version
         id: new_version
         run: |
           LATEST_TAG="${{ steps.get_tag.outputs.latest_tag }}"
+          BUMP_TYPE="${{ github.event.inputs.bump_type }}"
+          PRE_LABEL="${{ github.event.inputs.prerelease_label }}"
 
-          # Extract version from tag (format: v2/v2.x.y or v2/v2.x.y-prerelease.N)
+          # Extract version from tag (format: v2/v2.x.y or v2/v2.x.y-alpha.N)
           VERSION=${LATEST_TAG#v2/v}
 
-          # Handle prerelease versions
+          # Split base version and prerelease suffix
           BASE_VERSION="${VERSION%%-*}"
-          PRERELEASE=""
+          EXISTING_PRE=""
           if [[ "$VERSION" == *"-"* ]]; then
-            PRERELEASE="-${VERSION#*-}"
+            EXISTING_PRE="-${VERSION#*-}"
           fi
 
           IFS='.' read -r MAJOR MINOR PATCH <<< "$BASE_VERSION"
 
-          if [ "${{ steps.version_bump.outputs.major_bump }}" = "true" ]; then
+          echo "Current: v${MAJOR}.${MINOR}.${PATCH}${EXISTING_PRE}"
+          echo "Bump type: ${BUMP_TYPE}"
+
+          if [ "$BUMP_TYPE" = "major" ]; then
             MAJOR=$((MAJOR + 1))
             MINOR=0
             PATCH=0
-          elif [ "${{ steps.version_bump.outputs.minor_bump }}" = "true" ]; then
+            NEW_VERSION="v${MAJOR}.${MINOR}.${PATCH}"
+            IS_PRERELEASE=false
+          elif [ "$BUMP_TYPE" = "minor" ]; then
             MINOR=$((MINOR + 1))
             PATCH=0
-          elif [ "${{ steps.version_bump.outputs.patch_bump }}" = "true" ]; then
+            NEW_VERSION="v${MAJOR}.${MINOR}.${PATCH}"
+            IS_PRERELEASE=false
+          elif [ "$BUMP_TYPE" = "patch" ]; then
             PATCH=$((PATCH + 1))
+            NEW_VERSION="v${MAJOR}.${MINOR}.${PATCH}"
+            IS_PRERELEASE=false
+          elif [ "$BUMP_TYPE" = "prerelease" ]; then
+            # Increment prerelease number or start a new prerelease series.
+            # If the existing version has a prerelease suffix with the same
+            # label, increment the number. Otherwise, bump the patch and
+            # start at .0 with the new label.
+            if [[ "$EXISTING_PRE" == "-${PRE_LABEL}."* ]]; then
+              # Same label: increment the prerelease number
+              PRE_NUM=$(echo "$EXISTING_PRE" | sed "s/-${PRE_LABEL}\.//")
+              PRE_NUM=$((PRE_NUM + 1))
+              NEW_VERSION="v${MAJOR}.${MINOR}.${PATCH}-${PRE_LABEL}.${PRE_NUM}"
+            elif [[ "$EXISTING_PRE" == "-${PRE_LABEL}" ]]; then
+              # Same label without number: start at .1
+              NEW_VERSION="v${MAJOR}.${MINOR}.${PATCH}-${PRE_LABEL}.1"
+            else
+              # Different label or no existing prerelease: bump patch
+              # and start new prerelease series at .0
+              PATCH=$((PATCH + 1))
+              NEW_VERSION="v${MAJOR}.${MINOR}.${PATCH}-${PRE_LABEL}.0"
+            fi
+            IS_PRERELEASE=true
+          else
+            echo "ERROR: unknown bump type: $BUMP_TYPE"
+            exit 1
           fi
 
-          NEW_VERSION="v2/v${MAJOR}.${MINOR}.${PATCH}"
+          TAG="v2/${NEW_VERSION}"
+          echo "new_tag=$TAG" >> $GITHUB_OUTPUT
           echo "new_version=$NEW_VERSION" >> $GITHUB_OUTPUT
-          echo "New version: $NEW_VERSION"
+          echo "is_prerelease=$IS_PRERELEASE" >> $GITHUB_OUTPUT
+          echo "New tag: $TAG"
+          echo "Is prerelease: $IS_PRERELEASE"
+
+      - name: Check tag does not already exist
+        run: |
+          TAG="${{ steps.new_version.outputs.new_tag }}"
+          if git rev-parse "$TAG" >/dev/null 2>&1; then
+            echo "ERROR: tag $TAG already exists"
+            exit 1
+          fi
+          echo "Tag $TAG is available"
+
+      - name: Generate release notes
+        id: release_notes
+        run: |
+          LATEST_TAG="${{ steps.get_tag.outputs.latest_tag }}"
+          {
+            echo "body<<EOF"
+            echo "## What's Changed"
+            echo ""
+            echo "### Breaking Changes"
+            git log --pretty=format:"- %s (%h)" ${LATEST_TAG}..HEAD -- v2/ | grep -iE "^[a-z]+(\(.+\))?!:" || echo "_None_"
+            echo ""
+            echo "### Features"
+            git log --pretty=format:"- %s (%h)" ${LATEST_TAG}..HEAD -- v2/ | grep -iE "^feat" || echo "_None_"
+            echo ""
+            echo "### Bug Fixes"
+            git log --pretty=format:"- %s (%h)" ${LATEST_TAG}..HEAD -- v2/ | grep -iE "^fix" || echo "_None_"
+            echo ""
+            echo "### Documentation"
+            git log --pretty=format:"- %s (%h)" ${LATEST_TAG}..HEAD -- v2/ | grep -iE "^docs" || echo "_None_"
+            echo ""
+            echo "### Refactors"
+            git log --pretty=format:"- %s (%h)" ${LATEST_TAG}..HEAD -- v2/ | grep -iE "^refactor" || echo "_None_"
+            echo ""
+            echo "### Other"
+            git log --pretty=format:"- %s (%h)" ${LATEST_TAG}..HEAD -- v2/ | grep -viE "^(feat|fix|docs|refactor|style|chore|ci|merge|break)" || echo "_None_"
+            echo ""
+            echo "**Full Changelog**: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/compare/${LATEST_TAG}...${{ steps.new_version.outputs.new_tag }}"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
 
       - name: Create and push tag
-        if: steps.new_version.outputs.new_version != steps.get_tag.outputs.latest_tag
         run: |
-          NEW_VERSION="${{ steps.new_version.outputs.new_version }}"
-          git tag -a "$NEW_VERSION" -m "Release $NEW_VERSION"
-          git push origin "$NEW_VERSION"
-          echo "Created and pushed tag: $NEW_VERSION"
+          TAG="${{ steps.new_version.outputs.new_tag }}"
+          git tag -a "$TAG" -m "Release $TAG"
+          git push origin "$TAG"
+          echo "Created and pushed tag: $TAG"
 
-      - name: Create Release
-        if: steps.new_version.outputs.new_version != steps.get_tag.outputs.latest_tag
-        uses: actions/create-release@v1
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.new_version.outputs.new_tag }}
+          name: Release ${{ steps.new_version.outputs.new_tag }}
+          body: ${{ steps.release_notes.outputs.body }}
+          draft: ${{ github.event.inputs.draft == 'true' }}
+          prerelease: ${{ steps.new_version.outputs.is_prerelease == 'true' }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          tag_name: ${{ steps.new_version.outputs.new_version }}
-          release_name: Release ${{ steps.new_version.outputs.new_version }}
-          draft: false
-          prerelease: true
+
+      - name: Summary
+        run: |
+          echo "## v2 Release Summary" >> $GITHUB_STEP_SUMMARY
+          echo "- **Previous tag:** ${{ steps.get_tag.outputs.latest_tag }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **New tag:** ${{ steps.new_version.outputs.new_tag }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Bump type:** ${{ github.event.inputs.bump_type }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Prerelease:** ${{ steps.new_version.outputs.is_prerelease }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Draft:** ${{ github.event.inputs.draft }}" >> $GITHUB_STEP_SUMMARY

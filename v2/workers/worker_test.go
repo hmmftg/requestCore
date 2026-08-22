@@ -3,9 +3,12 @@ package workers
 import (
 	"context"
 	"errors"
+	"log/slog"
 	"sync/atomic"
 	"testing"
 	"time"
+
+	"github.com/hmmftg/requestCore/webFramework"
 )
 
 func TestInProcessWorker_Success(t *testing.T) {
@@ -384,16 +387,13 @@ func TestInProcessWorker_TransactionSink(t *testing.T) {
 	err := w.Submit(context.Background(), Job{
 		Name: "sink-test",
 		Handler: func(ctx *JobContext) error {
-			// The WebFramework should be available for AddLog calls.
-			if ctx.WebFramework == nil {
-				return errors.New("nil WebFramework")
-			}
-			if ctx.WebFramework.Parser() == nil {
+			// The WebFramework should have a non-nil Parser for AddLog calls.
+			if ctx.WebFramework.Parser == nil {
 				return errors.New("nil Parser")
 			}
 			// Simulate an AddLog call via the background parser.
-			ctx.WebFramework.Parser().SetLocal("test", "value")
-			if v := ctx.WebFramework.Parser().GetLocal("test"); v != "value" {
+			ctx.WebFramework.Parser.SetLocal("test", "value")
+			if v := ctx.WebFramework.Parser.GetLocal("test"); v != "value" {
 				return errors.New("SetLocal/GetLocal failed")
 			}
 			return nil
@@ -406,5 +406,210 @@ func TestInProcessWorker_TransactionSink(t *testing.T) {
 	stats := w.Stats()
 	if stats.Succeeded != 1 {
 		t.Fatalf("expected 1 succeeded, got %d", stats.Succeeded)
+	}
+}
+
+// attrKeys returns the keys of a slice of slog.Attr for debugging.
+func attrKeys(attrs []slog.Attr) []string {
+	keys := make([]string, len(attrs))
+	for i, a := range attrs {
+		keys[i] = a.Key
+	}
+	return keys
+}
+
+// TestInProcessWorker_RealAddLog verifies that webFramework.AddLog calls
+// made inside a job handler are collected into the transaction sink
+// via CollectLogArrays, proving the real Splunk pipeline works.
+func TestInProcessWorker_RealAddLog(t *testing.T) {
+	w := NewInProcessWorker(Config{
+		WorkerCount: 1,
+		QueueSize:   10,
+	})
+	defer func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		_ = w.Shutdown(ctx)
+	}()
+
+	var sinkEntries []slog.Attr
+	var gotEntries atomic.Bool
+
+	err := w.Submit(context.Background(), Job{
+		Name: "addlog-test",
+		Handler: func(ctx *JobContext) error {
+			// Use the real webFramework.AddLog pipeline.
+			webFramework.AddLog(ctx.WebFramework, webFramework.HandlerLogTag,
+				slog.String("test-key", "test-value"))
+			// Collect logs from the parser into the transaction sink.
+			webFramework.CollectLogArrays(ctx.WebFramework, webFramework.HandlerLogTag)
+			// Verify entries were collected.
+			entries := ctx.transactionSink.Entries()
+			if len(entries) == 0 {
+				return errors.New("no entries collected in sink")
+			}
+			sinkEntries = entries
+			gotEntries.Store(true)
+			return nil
+		},
+	})
+	if err != nil {
+		t.Fatalf("Submit: %v", err)
+	}
+	time.Sleep(100 * time.Millisecond)
+	if !gotEntries.Load() {
+		t.Fatal("expected AddLog entries to be collected in sink")
+	}
+	// CollectLogArrays wraps the array as slog.Any("handler", arr),
+	// so the sink should contain an entry with key "handler".
+	found := false
+	for _, e := range sinkEntries {
+		if e.Key == webFramework.HandlerLogTag {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatalf("expected '%s' attribute in sink entries, got keys: %v", webFramework.HandlerLogTag, attrKeys(sinkEntries))
+	}
+}
+
+// TestInProcessWorker_ContextValuePropagation verifies that context
+// values from the submission context survive into the job handler
+// when PropagateCancel is false (the default).
+func TestInProcessWorker_ContextValuePropagation(t *testing.T) {
+	w := NewInProcessWorker(Config{
+		WorkerCount: 1,
+		QueueSize:   10,
+	})
+	defer func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		_ = w.Shutdown(ctx)
+	}()
+
+	type ctxKey string
+	submitCtx := context.WithValue(context.Background(), ctxKey("trace-id"), "abc123")
+
+	var seenValue atomic.Value
+	err := w.Submit(submitCtx, Job{
+		Name: "ctx-propagation-test",
+		Handler: func(ctx *JobContext) error {
+			v := ctx.Context.Value(ctxKey("trace-id"))
+			seenValue.Store(v)
+			return nil
+		},
+	})
+	if err != nil {
+		t.Fatalf("Submit: %v", err)
+	}
+	time.Sleep(100 * time.Millisecond)
+	v := seenValue.Load()
+	if v != "abc123" {
+		t.Fatalf("expected trace-id 'abc123' to propagate, got %v", v)
+	}
+}
+
+// TestInProcessWorker_CancelPropagation verifies that when PropagateCancel
+// is true, cancelling the submit context cancels the job.
+func TestInProcessWorker_CancelPropagation(t *testing.T) {
+	w := NewInProcessWorker(Config{
+		WorkerCount: 1,
+		QueueSize:   10,
+	})
+	defer func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		_ = w.Shutdown(ctx)
+	}()
+
+	submitCtx, cancel := context.WithCancel(context.Background())
+	var wasCancelled atomic.Bool
+
+	err := w.Submit(submitCtx, Job{
+		Name: "cancel-test",
+		Handler: func(ctx *JobContext) error {
+			<-ctx.Context.Done()
+			wasCancelled.Store(true)
+			return ctx.Context.Err()
+		},
+		Options: JobOptions{
+			PropagateCancel: true,
+		},
+	})
+	if err != nil {
+		t.Fatalf("Submit: %v", err)
+	}
+	time.Sleep(50 * time.Millisecond)
+	cancel()
+	time.Sleep(100 * time.Millisecond)
+	if !wasCancelled.Load() {
+		t.Fatal("expected job to observe cancellation")
+	}
+}
+
+// TestInProcessWorker_RetryCancellation verifies that retry timers
+// observe job context cancellation.
+func TestInProcessWorker_RetryCancellation(t *testing.T) {
+	w := NewInProcessWorker(Config{
+		WorkerCount: 1,
+		QueueSize:   10,
+	})
+	defer func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		_ = w.Shutdown(ctx)
+	}()
+
+	submitCtx, cancel := context.WithCancel(context.Background())
+	var attempts atomic.Int32
+	var onFailureCalled atomic.Bool
+
+	err := w.Submit(submitCtx, Job{
+		Name: "retry-cancel-test",
+		Handler: func(ctx *JobContext) error {
+			attempts.Add(1)
+			return errors.New("fail")
+		},
+		Options: JobOptions{
+			MaxAttempts:     10,
+			InitialBackoff:  1 * time.Second,
+			MaxBackoff:      5 * time.Second,
+			Jitter:          false,
+			PropagateCancel: true,
+			OnFailure: func(err error, atts int) {
+				onFailureCalled.Store(true)
+			},
+		},
+	})
+	if err != nil {
+		t.Fatalf("Submit: %v", err)
+	}
+	time.Sleep(50 * time.Millisecond)
+	cancel()
+	time.Sleep(200 * time.Millisecond)
+
+	if attempts.Load() > 2 {
+		t.Fatalf("expected at most 2 attempts before cancellation, got %d", attempts.Load())
+	}
+	if !onFailureCalled.Load() {
+		t.Fatal("expected OnFailure to be called on cancellation")
+	}
+}
+
+// TestInProcessWorker_RepeatedShutdown verifies that multiple Shutdown
+// calls return the same result without creating new goroutines.
+func TestInProcessWorker_RepeatedShutdown(t *testing.T) {
+	w := NewInProcessWorker(Config{
+		WorkerCount: 2,
+		QueueSize:   10,
+	})
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	for i := 0; i < 5; i++ {
+		if err := w.Shutdown(ctx); err != nil {
+			t.Fatalf("Shutdown call %d: %v", i, err)
+		}
 	}
 }

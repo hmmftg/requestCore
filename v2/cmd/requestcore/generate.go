@@ -58,8 +58,7 @@ func (h *{PASCAL}Handler) Finalizer(req *handlers.HandlerRequest[{PASCAL}Req, {P
 // Simulation handles simulation mode.
 func (h *{PASCAL}Handler) Simulation(req *handlers.HandlerRequest[{PASCAL}Req, {PASCAL}Resp]) ({PASCAL}Resp, error) {
 	return {PASCAL}Resp{}, nil
-}
-`
+}`
 
 	content := strings.NewReplacer(
 		"{PASCAL}", pascalName,
@@ -81,7 +80,10 @@ func (h *{PASCAL}Handler) Simulation(req *handlers.HandlerRequest[{PASCAL}Req, {
 	return nil
 }
 
-// generateResource generates a new resource file with 7 operations.
+// generateResource generates a new resource file with 7 CRUD operations
+// matching the resources.Resource[ID] interface. The __BT__ placeholder
+// is replaced with a backtick after the raw-string template is processed,
+// because Go raw string literals cannot contain backticks.
 func generateResource(name string) error {
 	pascalName := toPascalCase(name)
 	camelName := toCamelCase(name)
@@ -90,87 +92,174 @@ func generateResource(name string) error {
 package resources
 
 import (
+	"github.com/hmmftg/requestCore/libRequest"
+	"github.com/hmmftg/requestCore/v2/handlers"
 	"github.com/hmmftg/requestCore/v2/resources"
 )
 
 // {PASCAL}Resource implements resources.Resource[string] for the {NAME} resource.
 type {PASCAL}Resource struct{}
 
-// Index returns a list of {NAME}.
-func (r *{PASCAL}Resource) Index() resources.IndexOperation {
-	return resources.IndexOperation{
-		Title: "list-{NAME}",
-		Handler: func(trx *resources.ResourceContext) (any, error) {
-			return []map[string]any{}, nil
+// {PASCAL}ListReq is the request body for listing {NAME}.
+type {PASCAL}ListReq struct{}
+
+// {PASCAL}ListResp is the response body for listing {NAME}.
+type {PASCAL}ListResp struct {
+	Items []map[string]any __BT__json:"items"__BT__
+}
+
+// List returns a list of {NAME}.
+func (r *{PASCAL}Resource) List() *handlers.Endpoint {
+	return handlers.NewEndpoint[{PASCAL}ListReq, {PASCAL}ListResp](
+		"list-{NAME}",
+		libRequest.JSON,
+		func(req *{PASCAL}ListReq, trx *handlers.HandlerRequest[{PASCAL}ListReq, {PASCAL}ListResp]) ({PASCAL}ListResp, error) {
+			return {PASCAL}ListResp{Items: []map[string]any{}}, nil
 		},
-	}
+	)
+}
+
+// {PASCAL}ShowReq is the request body for showing a {NAME}.
+type {PASCAL}ShowReq struct{}
+
+// {PASCAL}ShowResp is the response body for showing a {NAME}.
+type {PASCAL}ShowResp struct {
+	ID string __BT__json:"id"__BT__
 }
 
 // Show returns a single {NAME} by ID.
-func (r *{PASCAL}Resource) Show() resources.ShowOperation[string] {
-	return resources.ShowOperation[string]{
-		Title: "show-{NAME}",
-		Handler: func(id string, trx *resources.ResourceContext) (any, error) {
-			return map[string]any{"id": id}, nil
+func (r *{PASCAL}Resource) Show() *handlers.Endpoint {
+	return handlers.NewEndpoint[{PASCAL}ShowReq, {PASCAL}ShowResp](
+		"show-{NAME}",
+		libRequest.JSON,
+		func(req *{PASCAL}ShowReq, trx *handlers.HandlerRequest[{PASCAL}ShowReq, {PASCAL}ShowResp]) ({PASCAL}ShowResp, error) {
+			id, err := resources.GetParsedID[string](trx.V2, "id")
+			if err != nil {
+				return {PASCAL}ShowResp{}, err
+			}
+			return {PASCAL}ShowResp{ID: id}, nil
 		},
-	}
+	)
 }
 
-// Create creates a new {NAME}.
-func (r *{PASCAL}Resource) Create() resources.CreateOperation {
-	return resources.CreateOperation{
-		Title: "create-{NAME}",
-		Handler: func(trx *resources.ResourceContext) (any, error) {
-			return map[string]any{"created": true}, nil
-		},
-	}
-}
+// {PASCAL}NewReq is the request body for the new {NAME} form.
+type {PASCAL}NewReq struct{}
 
-// Update replaces a {NAME} by ID.
-func (r *{PASCAL}Resource) Update() resources.UpdateOperation[string] {
-	return resources.UpdateOperation[string]{
-		Title: "update-{NAME}",
-		Handler: func(id string, trx *resources.ResourceContext) (any, error) {
-			return map[string]any{"id": id, "updated": true}, nil
-		},
-	}
-}
-
-// Patch partially updates a {NAME} by ID.
-func (r *{PASCAL}Resource) Patch() resources.PatchOperation[string] {
-	return resources.PatchOperation[string]{
-		Title: "patch-{NAME}",
-		Handler: func(id string, trx *resources.ResourceContext) (any, error) {
-			return map[string]any{"id": id, "patched": true}, nil
-		},
-	}
-}
-
-// Destroy deletes a {NAME} by ID.
-func (r *{PASCAL}Resource) Destroy() resources.DestroyOperation[string] {
-	return resources.DestroyOperation[string]{
-		Title: "delete-{NAME}",
-		Handler: func(id string, trx *resources.ResourceContext) (any, error) {
-			return map[string]any{"id": id, "deleted": true}, nil
-		},
-	}
+// {PASCAL}NewResp is the response body for the new {NAME} form.
+type {PASCAL}NewResp struct {
+	Form string __BT__json:"form"__BT__
 }
 
 // New returns the form for creating a new {NAME}.
-func (r *{PASCAL}Resource) New() resources.NewOperation {
-	return resources.NewOperation{
-		Title: "new-{NAME}",
-		Handler: func(trx *resources.ResourceContext) (any, error) {
-			return map[string]any{"form": "new-{NAME}"}, nil
+func (r *{PASCAL}Resource) New() *handlers.Endpoint {
+	return handlers.NewEndpoint[{PASCAL}NewReq, {PASCAL}NewResp](
+		"new-{NAME}",
+		libRequest.JSON,
+		func(req *{PASCAL}NewReq, trx *handlers.HandlerRequest[{PASCAL}NewReq, {PASCAL}NewResp]) ({PASCAL}NewResp, error) {
+			return {PASCAL}NewResp{Form: "new-{NAME}"}, nil
 		},
-	}
+	)
 }
-`
+
+// {PASCAL}CreateReq is the request body for creating a {NAME}.
+type {PASCAL}CreateReq struct {
+	// Add create fields here
+}
+
+// {PASCAL}CreateResp is the response body for creating a {NAME}.
+type {PASCAL}CreateResp struct {
+	Created bool __BT__json:"created"__BT__
+}
+
+// Create creates a new {NAME}.
+func (r *{PASCAL}Resource) Create() *handlers.Endpoint {
+	return handlers.NewEndpoint[{PASCAL}CreateReq, {PASCAL}CreateResp](
+		"create-{NAME}",
+		libRequest.JSON,
+		func(req *{PASCAL}CreateReq, trx *handlers.HandlerRequest[{PASCAL}CreateReq, {PASCAL}CreateResp]) ({PASCAL}CreateResp, error) {
+			return {PASCAL}CreateResp{Created: true}, nil
+		},
+	)
+}
+
+// {PASCAL}EditReq is the request body for editing a {NAME}.
+type {PASCAL}EditReq struct{}
+
+// {PASCAL}EditResp is the response body for editing a {NAME}.
+type {PASCAL}EditResp struct {
+	ID string __BT__json:"id"__BT__
+}
+
+// Edit returns the form for editing a {NAME} by ID.
+func (r *{PASCAL}Resource) Edit() *handlers.Endpoint {
+	return handlers.NewEndpoint[{PASCAL}EditReq, {PASCAL}EditResp](
+		"edit-{NAME}",
+		libRequest.JSON,
+		func(req *{PASCAL}EditReq, trx *handlers.HandlerRequest[{PASCAL}EditReq, {PASCAL}EditResp]) ({PASCAL}EditResp, error) {
+			id, err := resources.GetParsedID[string](trx.V2, "id")
+			if err != nil {
+				return {PASCAL}EditResp{}, err
+			}
+			return {PASCAL}EditResp{ID: id}, nil
+		},
+	)
+}
+
+// {PASCAL}UpdateReq is the request body for updating a {NAME}.
+type {PASCAL}UpdateReq struct {
+	// Add update fields here
+}
+
+// {PASCAL}UpdateResp is the response body for updating a {NAME}.
+type {PASCAL}UpdateResp struct {
+	ID      string __BT__json:"id"__BT__
+	Updated bool   __BT__json:"updated"__BT__
+}
+
+// Update replaces a {NAME} by ID.
+func (r *{PASCAL}Resource) Update() *handlers.Endpoint {
+	return handlers.NewEndpoint[{PASCAL}UpdateReq, {PASCAL}UpdateResp](
+		"update-{NAME}",
+		libRequest.JSON,
+		func(req *{PASCAL}UpdateReq, trx *handlers.HandlerRequest[{PASCAL}UpdateReq, {PASCAL}UpdateResp]) ({PASCAL}UpdateResp, error) {
+			id, err := resources.GetParsedID[string](trx.V2, "id")
+			if err != nil {
+				return {PASCAL}UpdateResp{}, err
+			}
+			return {PASCAL}UpdateResp{ID: id, Updated: true}, nil
+		},
+	)
+}
+
+// {PASCAL}DestroyReq is the request body for deleting a {NAME}.
+type {PASCAL}DestroyReq struct{}
+
+// {PASCAL}DestroyResp is the response body for deleting a {NAME}.
+type {PASCAL}DestroyResp struct {
+	ID      string __BT__json:"id"__BT__
+	Deleted bool   __BT__json:"deleted"__BT__
+}
+
+// Destroy deletes a {NAME} by ID.
+func (r *{PASCAL}Resource) Destroy() *handlers.Endpoint {
+	return handlers.NewEndpoint[{PASCAL}DestroyReq, {PASCAL}DestroyResp](
+		"delete-{NAME}",
+		libRequest.JSON,
+		func(req *{PASCAL}DestroyReq, trx *handlers.HandlerRequest[{PASCAL}DestroyReq, {PASCAL}DestroyResp]) ({PASCAL}DestroyResp, error) {
+			id, err := resources.GetParsedID[string](trx.V2, "id")
+			if err != nil {
+				return {PASCAL}DestroyResp{}, err
+			}
+			return {PASCAL}DestroyResp{ID: id, Deleted: true}, nil
+		},
+	)
+}`
 
 	content := strings.NewReplacer(
 		"{PASCAL}", pascalName,
 		"{NAME}", name,
 		"{CAMEL}", camelName,
+		"__BT__", "`",
 	).Replace(template)
 
 	dir := "resources"
@@ -213,8 +302,7 @@ func {PASCAL}Middleware() routing.Middleware {
 			return err
 		}
 	}
-}
-`
+}`
 
 	content := strings.NewReplacer(
 		"{PASCAL}", pascalName,
@@ -285,8 +373,7 @@ func main() {
 		log.Fatalf("Server: %v", err)
 	}
 	_ = os.Stdout
-}
-`
+}`
 
 	if err := writeFile(filepath.Join(name, "cmd", name, "main.go"), mainTemplate); err != nil {
 		return fmt.Errorf("write main.go: %w", err)

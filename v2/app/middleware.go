@@ -1,9 +1,6 @@
 package app
 
 import (
-	"context"
-	"net/http"
-
 	"github.com/hmmftg/requestCore/v2/routing"
 	"github.com/hmmftg/requestCore/v2/session"
 	v2wf "github.com/hmmftg/requestCore/v2/webFramework"
@@ -13,58 +10,27 @@ import (
 const DefaultSessionCookieName = "session"
 
 // SessionMiddleware creates a middleware that loads the session from the
-// request cookie and stores it in the RequestContext. The session is
-// saved back to the store after the handler completes.
+// request cookie and registers a before-commit hook to persist any dirty
+// session state back to the response cookie before headers/body are written.
 //
-// The middleware uses the session cookie name specified (default: "session").
-// If no session cookie is present, a new session is created.
+// This is a thin wrapper around session.Middleware that also sets the
+// Session and Flash fields on the v2 RequestContext for handler access.
+// The session is saved via a before-commit hook, not after the handler
+// returns, ensuring cookies are set before the response body is written.
 func SessionMiddleware(mgr *session.Manager, cookieName string) routing.Middleware {
 	if cookieName == "" {
 		cookieName = DefaultSessionCookieName
 	}
+	inner := session.Middleware(mgr, cookieName)
 	return func(next routing.Handler) routing.Handler {
-		return func(ctx *v2wf.RequestContext) error {
-			// Get the session cookie from the request
-			var cookieValue string
-
-			type cookieGetter interface {
-				GetCookie(name string) string
-			}
-			if cg, ok := ctx.Parser.(cookieGetter); ok {
-				cookieValue = cg.GetCookie(cookieName)
-			}
-
-			// Load or create session and flash
-			sess, flash, err := mgr.LoadFromCookie(ctx.Context, cookieName, cookieValue)
-			if err != nil {
-				return err
-			}
-			ctx.Session = sess
-			ctx.Flash = flash
-
-			// Run the handler
-			err = next(ctx)
-
-			// Save the session and get the cookie to set
-			saveCookie, saveErr := mgr.SaveToCookie(context.Background(), sess, flash, cookieName)
-			if saveErr != nil {
-				if err == nil {
-					err = saveErr
-				}
-			}
-
-			// Set the session cookie if needed
-			if saveCookie != nil {
-				type cookieSetter interface {
-					SetCookie(*http.Cookie)
-				}
-				if cs, ok := ctx.Parser.(cookieSetter); ok {
-					cs.SetCookie(saveCookie)
-				}
-			}
-
-			return err
-		}
+		return inner(func(ctx *v2wf.RequestContext) error {
+			// Populate ctx.Session and ctx.Flash from the parser locals
+			// that session.Middleware set, so handlers can access them
+			// directly from the RequestContext.
+			ctx.Session = session.FromContext(ctx)
+			ctx.Flash = session.FlashFromContext(ctx)
+			return next(ctx)
+		})
 	}
 }
 

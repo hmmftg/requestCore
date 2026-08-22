@@ -2,10 +2,10 @@
 // tracing, and mandatory observability through webFramework.AddLog.
 //
 // Workers run outside HTTP request contexts, so each job receives a
-// job-owned WebFramework backed by a concurrency-safe BackgroundParser.
-// This ensures that webFramework.AddLog calls (including those from
-// external API calls via handlers.CallAPI) flow into the Splunk
-// transaction pipeline.
+// job-owned webFramework.WebFramework backed by a concurrency-safe
+// BackgroundParser. This ensures that webFramework.AddLog calls
+// (including those from external API calls via handlers.CallAPI) flow
+// into the Splunk transaction pipeline.
 package workers
 
 import (
@@ -16,10 +16,12 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/hmmftg/requestCore/webFramework"
 )
 
 // JobHandler is the function executed by a worker job.
-// The JobContext provides a context and a job-owned WebFramework
+// The JobContext provides a context and a job-owned webFramework.WebFramework
 // for mandatory AddLog calls.
 type JobHandler func(*JobContext) error
 
@@ -28,11 +30,11 @@ type JobContext struct {
 	// Context carries cancellation and tracing.
 	Context context.Context
 
-	// WebFramework is a job-owned WebFramework with a BackgroundParser
-	// that supports webFramework.AddLog calls. This ensures that
-	// external API calls and critical business events within jobs
-	// are logged to the Splunk transaction pipeline.
-	WebFramework WebFramework
+	// WebFramework is a job-owned root webFramework.WebFramework with a
+	// BackgroundParser that supports webFramework.AddLog calls. This
+	// ensures that external API calls and critical business events
+	// within jobs are logged to the Splunk transaction pipeline.
+	WebFramework webFramework.WebFramework
 
 	// JobName is the name of the job.
 	JobName string
@@ -47,22 +49,6 @@ type JobContext struct {
 	// It is flushed after each attempt to emit the mandatory
 	// worker-<name>-req / worker-<name>-req-failed log entries.
 	transactionSink *TransactionSink
-}
-
-// WebFramework is the minimal interface required by worker jobs for
-// mandatory AddLog observability. It is satisfied by the root
-// webFramework.WebFramework struct when constructed with a BackgroundParser.
-type WebFramework interface {
-	// Parser returns the request parser used for AddLog local storage.
-	Parser() Parser
-}
-
-// Parser is the minimal parser interface required by the worker's
-// BackgroundParser for AddLog local storage.
-type Parser interface {
-	GetLocal(name string) any
-	SetLocal(name string, value any)
-	AddCustomAttributes(attr slog.Attr)
 }
 
 // TransactionSink collects AddLog entries emitted during a job attempt
@@ -226,15 +212,32 @@ func (errShutdown) Is(target error) bool {
 // ErrInvalidJob is returned when a job has an empty name or nil handler.
 var ErrInvalidJob = errors.New("workers: invalid job (empty name or nil handler)")
 
+// CallAPILogEntry mirrors the v1 handlers.CallAPILogEntry constant so
+// worker jobs can collect API-call log arrays in the finalizer without
+// importing the v1 handlers package directly.
+const CallAPILogEntry string = "ApiCall"
+
+// jobEnvelope carries a Job and its submission context through the queue
+// so that context values and tracing survive into the worker goroutine.
+type jobEnvelope struct {
+	job       Job
+	submitCtx context.Context
+}
+
 // InProcessWorker is a bounded goroutine pool implementation of Worker.
 type InProcessWorker struct {
 	config   Config
-	queue    chan Job
+	queue    chan jobEnvelope
 	wg       sync.WaitGroup
 	shutdown atomic.Bool
 	shutOnce sync.Once
 	stats    Stats
 	mu       sync.Mutex
+
+	// shutDone is cached on first Shutdown call to avoid creating a
+	// waiter goroutine on every Shutdown invocation.
+	shutDoneOnce sync.Once
+	shutDone     chan struct{}
 
 	// clock and jitter sources for deterministic testing.
 	clock        func() time.Time
@@ -251,7 +254,8 @@ func NewInProcessWorker(config Config) *InProcessWorker {
 	}
 	w := &InProcessWorker{
 		config:       config,
-		queue:        make(chan Job, config.QueueSize),
+		queue:        make(chan jobEnvelope, config.QueueSize),
+		shutDone:     make(chan struct{}),
 		clock:        config.Clock,
 		jitterSource: config.JitterSource,
 	}
@@ -274,14 +278,15 @@ func (w *InProcessWorker) start() {
 
 func (w *InProcessWorker) workerLoop() {
 	defer w.wg.Done()
-	for job := range w.queue {
+	for env := range w.queue {
 		atomic.AddInt64(&w.stats.InFlight, 1)
-		w.executeJob(job)
+		w.executeJob(env)
 		atomic.AddInt64(&w.stats.InFlight, -1)
 	}
 }
 
-func (w *InProcessWorker) executeJob(job Job) {
+func (w *InProcessWorker) executeJob(env jobEnvelope) {
+	job := env.job
 	opts := job.Options
 	if opts.MaxAttempts <= 0 {
 		opts.MaxAttempts = 1
@@ -296,21 +301,33 @@ func (w *InProcessWorker) executeJob(job Job) {
 		opts.Attributes = make(map[string]string)
 	}
 
+	// Derive the job context from the submission context.
+	// By default, use context.WithoutCancel so values/tracing survive
+	// without cancellation. When PropagateCancel is true, use the
+	// submit context directly so cancellation propagates.
+	var jobCtx context.Context
+	if opts.PropagateCancel {
+		jobCtx = env.submitCtx
+	} else {
+		jobCtx = context.WithoutCancel(env.submitCtx)
+	}
+	if jobCtx == nil {
+		jobCtx = context.Background()
+	}
+
 	var lastErr error
 	for attempt := 1; attempt <= opts.MaxAttempts; attempt++ {
 		// Build the job context with a BackgroundParser and TransactionSink.
 		sink := NewTransactionSink()
-		bgParser := newBackgroundParser(sink)
+		bgParser := newBackgroundParser(sink, jobCtx)
 
-		ctx := context.WithoutCancel(context.Background())
-		if opts.PropagateCancel {
-			ctx = context.Background()
+		wf := webFramework.WebFramework{
+			Parser: bgParser,
+			Ctx:    jobCtx,
 		}
 
-		wf := &jobWebFramework{parser: bgParser}
-
-		jobCtx := &JobContext{
-			Context:         ctx,
+		jctx := &JobContext{
+			Context:         jobCtx,
 			WebFramework:    wf,
 			JobName:         job.Name,
 			Attempt:         attempt,
@@ -319,11 +336,16 @@ func (w *InProcessWorker) executeJob(job Job) {
 		}
 
 		start := w.clock()
-		err := w.runWithObservability(jobCtx, job.Handler)
+		err := w.runWithObservability(jctx, job.Handler)
 		elapsed := w.clock().Sub(start)
 
+		// Collect logs from the parser into the transaction sink.
+		webFramework.CollectLogArrays(wf, webFramework.HandlerLogTag)
+		webFramework.CollectLogTags(wf, webFramework.HandlerLogTag)
+		webFramework.CollectLogArrays(wf, CallAPILogEntry)
+
 		// Flush the transaction sink with mandatory AddLog entries.
-		w.flushTransaction(jobCtx, err, elapsed)
+		w.flushTransaction(jctx, err, elapsed)
 
 		if err == nil {
 			atomic.AddInt64(&w.stats.Succeeded, 1)
@@ -337,8 +359,13 @@ func (w *InProcessWorker) executeJob(job Job) {
 			timer := time.NewTimer(backoff)
 			select {
 			case <-timer.C:
-			case <-ctx.Done():
+			case <-jobCtx.Done():
 				timer.Stop()
+				// Cancellation is a terminal failure.
+				atomic.AddInt64(&w.stats.Failed, 1)
+				if opts.OnFailure != nil {
+					w.runOnFailure(opts.OnFailure, jobCtx.Err(), attempt)
+				}
 				return
 			}
 		}
@@ -352,7 +379,12 @@ func (w *InProcessWorker) executeJob(job Job) {
 
 // flushTransaction emits the mandatory worker-<name>-req (success) or
 // worker-<name>-req-failed (failure) log entry with attempt, elapsed time,
-// terminal state, and sanitized error.
+// terminal state, and collected transaction attributes.
+//
+// The final entry is emitted via slog (supplementary) since the worker
+// has no HTTP response pipeline. The collected attributes from
+// webFramework.AddLog calls are included in the entry so they flow
+// into the Splunk transaction pipeline via the slog handler.
 func (w *InProcessWorker) flushTransaction(ctx *JobContext, err error, elapsed time.Duration) {
 	if ctx.transactionSink == nil {
 		return
@@ -365,7 +397,7 @@ func (w *InProcessWorker) flushTransaction(ctx *JobContext, err error, elapsed t
 	}
 
 	// Build the transaction log attribute group.
-	attrs := make([]any, 0, len(entries)+3)
+	attrs := make([]slog.Attr, 0, len(entries)+4)
 	attrs = append(attrs, slog.Int("attempt", ctx.Attempt))
 	attrs = append(attrs, slog.String("elapsed", elapsed.String()))
 	if err != nil {
@@ -374,24 +406,12 @@ func (w *InProcessWorker) flushTransaction(ctx *JobContext, err error, elapsed t
 	} else {
 		attrs = append(attrs, slog.String("state", "succeeded"))
 	}
-	for _, e := range entries {
-		attrs = append(attrs, e)
-	}
+	attrs = append(attrs, entries...)
 
-	// Emit via slog since we don't have a real Splunk pipeline in tests.
-	// In production, the BackgroundParser's AddCustomAttributes would
-	// flow through the v1 WebFramework's Splunk transaction pipeline.
-	slog.LogAttrs(context.Background(), slog.LevelInfo, key, toAttrs(attrs)...)
-}
-
-func toAttrs(values []any) []slog.Attr {
-	attrs := make([]slog.Attr, 0, len(values))
-	for _, v := range values {
-		if a, ok := v.(slog.Attr); ok {
-			attrs = append(attrs, a)
-		}
-	}
-	return attrs
+	// Emit via slog as the supplementary log. The real AddLog entries
+	// were already collected via webFramework.AddLog into the parser's
+	// local storage and flushed via CollectLogArrays into the sink.
+	slog.LogAttrs(context.Background(), slog.LevelInfo, key, attrs...)
 }
 
 func (w *InProcessWorker) runWithObservability(ctx *JobContext, handler JobHandler) (err error) {
@@ -417,13 +437,23 @@ func (w *InProcessWorker) runOnFailure(fn func(error, int), err error, attempts 
 // Submit enqueues a job for asynchronous execution. Returns an error if
 // the queue is full, the worker is shutting down, or the job is invalid.
 // Only accepted submissions increment the Submitted counter.
+//
+// The shutdown check and queue send are synchronized under mu to prevent
+// a send on a closed channel when Shutdown runs concurrently.
 func (w *InProcessWorker) Submit(ctx context.Context, job Job) error {
 	if job.Name == "" || job.Handler == nil {
 		return ErrInvalidJob
 	}
+	if ctx == nil {
+		ctx = context.Background()
+	}
+
+	env := jobEnvelope{job: job, submitCtx: ctx}
 
 	// Synchronized admission: check shutdown under the same lock that
-	// guards the queue send. This prevents the check-then-close race.
+	// guards the queue send. This prevents the check-then-close race
+	// where a goroutine sees shutdown=false, then Shutdown closes the
+	// channel, and the goroutine sends on the closed channel.
 	w.mu.Lock()
 	if w.shutdown.Load() {
 		w.mu.Unlock()
@@ -435,51 +465,66 @@ func (w *InProcessWorker) Submit(ctx context.Context, job Job) error {
 
 	if w.config.BlockOnFull {
 		// BlockOnFull: send while holding the lock to prevent
-		// a close during the send.
+		// a close during the send. Use a select to respect context
+		// cancellation.
 		select {
-		case w.queue <- job:
+		case w.queue <- env:
 			w.mu.Unlock()
 			return nil
 		case <-ctx.Done():
 			w.mu.Unlock()
+			// Decrement since we counted it above but won't enqueue.
+			atomic.AddInt64(&w.stats.Submitted, -1)
 			return ctx.Err()
 		}
 	}
 
 	// Non-blocking: try to send, return ErrQueueFull if full.
 	select {
-	case w.queue <- job:
+	case w.queue <- env:
 		w.mu.Unlock()
 		return nil
 	default:
 		w.mu.Unlock()
+		// Decrement since we counted it above but won't enqueue.
+		atomic.AddInt64(&w.stats.Submitted, -1)
+		// Check if shutdown started while we were trying to send.
+		if w.shutdown.Load() {
+			return ErrShutdown
+		}
 		return ErrQueueFull
 	}
 }
 
 // Shutdown stops accepting new jobs, drains the queue, and waits for
 // in-flight jobs to complete or the context to expire. Shutdown is
-// idempotent; calling it multiple times is safe.
+// idempotent; calling it multiple times is safe and returns the same
+// result.
 func (w *InProcessWorker) Shutdown(ctx context.Context) error {
 	if ctx == nil {
 		ctx = context.Background()
 	}
 
 	w.shutOnce.Do(func() {
+		// Hold the mutex while setting shutdown and closing the queue
+		// to prevent Submit from sending on a closed channel.
 		w.mu.Lock()
 		w.shutdown.Store(true)
 		close(w.queue)
 		w.mu.Unlock()
 	})
 
-	done := make(chan struct{})
-	go func() {
-		w.wg.Wait()
-		close(done)
-	}()
+	// Cache the completion channel so repeated Shutdown calls don't
+	// create new waiter goroutines.
+	w.shutDoneOnce.Do(func() {
+		go func() {
+			w.wg.Wait()
+			close(w.shutDone)
+		}()
+	})
 
 	select {
-	case <-done:
+	case <-w.shutDone:
 		return nil
 	case <-ctx.Done():
 		return ctx.Err()

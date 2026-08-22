@@ -29,6 +29,9 @@ type FakeParserV2 struct {
 
 	// SetCookies captures cookies set via SetCookie.
 	SetCookies []*http.Cookie
+
+	// commitState tracks whether the response has been written.
+	commitState *CommitState
 }
 
 // NewFakeParserV2 creates a FakeParserV2 with initialized maps.
@@ -46,17 +49,33 @@ func NewFakeParserV2() *FakeParserV2 {
 }
 
 // SendResponse captures the response parameters for test assertions.
+// If a CommitState is bound and already committed, returns nil without writing.
 func (f *FakeParserV2) SendResponse(status int, contentType string, body []byte) error {
+	if f.commitState != nil && f.commitState.Committed() {
+		return nil
+	}
 	f.ResponseStatus = status
 	f.ResponseContentType = contentType
 	f.ResponseBody = body
 	f.ResponseWritten = true
+	if f.commitState != nil {
+		f.commitState.MarkCommitted(status)
+	}
 	return nil
 }
 
 // Committed reports whether SendResponse has been called.
 func (f *FakeParserV2) Committed() bool {
+	if f.commitState != nil {
+		return f.commitState.Committed()
+	}
 	return f.ResponseWritten
+}
+
+// SetCommitState binds the request's CommitState to this parser so that
+// SendResponse can check and update the committed status.
+func (f *FakeParserV2) SetCommitState(cs *CommitState) {
+	f.commitState = cs
 }
 
 // GetCookie returns the value of the named request cookie.

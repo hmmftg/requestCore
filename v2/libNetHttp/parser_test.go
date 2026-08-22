@@ -252,3 +252,37 @@ func TestGetHTTPRequest(t *testing.T) {
 		t.Fatal("expected non-nil *http.Request from GetHTTPRequest")
 	}
 }
+
+func TestNetHTTPRouter_MethodNotAllowed(t *testing.T) {
+	router := NewRouter()
+
+	router.MethodNotAllowed(func(ctx *v2wf.RequestContext) error {
+		return ctx.Parser.SendResponse(http.StatusMethodNotAllowed, "text/plain", []byte("method not allowed"))
+	})
+
+	router.Post("/items", func(ctx *v2wf.RequestContext) error {
+		return ctx.Parser.SendResponse(http.StatusOK, "text/plain", []byte("created"))
+	})
+
+	// Use Native() which wraps with 405 interception.
+	handler, ok := router.Native().(http.Handler)
+	if !ok {
+		t.Fatal("expected Native() to implement http.Handler")
+	}
+	server := httptest.NewServer(handler)
+	defer server.Close()
+
+	resp, err := http.Get(server.URL + "/items")
+	if err != nil {
+		t.Fatalf("http.Get: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusMethodNotAllowed {
+		t.Fatalf("expected 405, got %d", resp.StatusCode)
+	}
+	body, _ := io.ReadAll(resp.Body)
+	if string(body) != "method not allowed" {
+		t.Fatalf("expected 'method not allowed', got %s", string(body))
+	}
+}

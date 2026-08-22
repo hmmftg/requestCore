@@ -2,6 +2,8 @@ package handlers
 
 import (
 	"context"
+	"fmt"
+	"reflect"
 	"time"
 
 	"go.opentelemetry.io/otel/trace"
@@ -28,8 +30,6 @@ type Endpoint struct {
 	Path            string
 	Body            libRequest.Type
 	ValidateHeader  bool
-	HasReceipt      bool
-	FileResponse    bool
 	LogArrays       []string
 	LogTags         []string
 	EnableTracing   bool
@@ -56,6 +56,13 @@ type Endpoint struct {
 	// locals. It receives the v2 RequestContext directly to avoid
 	// generic type constraints. Set by resource registration.
 	idParser func(ctx *v2wf.RequestContext) error
+
+	// reqType and respType record the reflect.Type of the Req and Resp
+	// type parameters passed to NewEndpoint. WithInitializer,
+	// WithFinalizer, and WithPersistence check these at registration
+	// time to prevent mismatched type hooks from panicking at runtime.
+	reqType  reflect.Type
+	respType reflect.Type
 
 	// buildCarrier constructs an endpointTrxCarrier bound to the typed
 	// HandlerRequest[Req, Resp]. Set by NewEndpoint.
@@ -85,8 +92,10 @@ func NewEndpoint[Req, Resp any](
 	handler func(req *Req, trx *HandlerRequest[Req, Resp]) (Resp, error),
 ) *Endpoint {
 	e := &Endpoint{
-		Title: title,
-		Body:  body,
+		Title:    title,
+		Body:     body,
+		reqType:  reflect.TypeOf((*Req)(nil)).Elem(),
+		respType: reflect.TypeOf((*Resp)(nil)).Elem(),
 		run: func(er *endpointRun) (any, error) {
 			trx := er.trx.(*HandlerRequest[Req, Resp])
 			return handler(trx.Request, trx)
@@ -176,18 +185,6 @@ func (e *Endpoint) WithHeaderValidation() *Endpoint {
 	return e
 }
 
-// WithReceipt enables receipt-based responses.
-func (e *Endpoint) WithReceipt() *Endpoint {
-	e.HasReceipt = true
-	return e
-}
-
-// WithFileResponse enables file-attachment responses.
-func (e *Endpoint) WithFileResponse() *Endpoint {
-	e.FileResponse = true
-	return e
-}
-
 // WithTracing enables tracing with the given span name.
 func (e *Endpoint) WithTracing(spanName string) *Endpoint {
 	e.EnableTracing = true
@@ -211,7 +208,9 @@ func (e *Endpoint) WithLogTags(tags ...string) *Endpoint {
 // WithInitializer sets an initializer that runs after parsing and before
 // the main handler. This is a free function because Go methods cannot have
 // type parameters; the Req/Resp types must match those passed to NewEndpoint.
+// A panic occurs at registration time if the types do not match.
 func WithInitializer[Req, Resp any](e *Endpoint, fn func(trx *HandlerRequest[Req, Resp]) error) *Endpoint {
+	checkEndpointTypes[Req, Resp](e, "WithInitializer")
 	e.initializer = func(er *endpointRun) error {
 		return fn(er.trx.(*HandlerRequest[Req, Resp]))
 	}
@@ -220,7 +219,9 @@ func WithInitializer[Req, Resp any](e *Endpoint, fn func(trx *HandlerRequest[Req
 
 // WithFinalizer sets a finalizer that runs after the response is sent.
 // This is a free function because Go methods cannot have type parameters.
+// A panic occurs at registration time if the types do not match.
 func WithFinalizer[Req, Resp any](e *Endpoint, fn func(trx *HandlerRequest[Req, Resp])) *Endpoint {
+	checkEndpointTypes[Req, Resp](e, "WithFinalizer")
 	e.finalizer = func(er *endpointRun) {
 		fn(er.trx.(*HandlerRequest[Req, Resp]))
 	}
@@ -229,9 +230,24 @@ func WithFinalizer[Req, Resp any](e *Endpoint, fn func(trx *HandlerRequest[Req, 
 
 // WithPersistence sets the request persister for insert/update lifecycle.
 // This is a free function because Go methods cannot have type parameters.
+// A panic occurs at registration time if the types do not match.
 func WithPersistence[Req, Resp any](e *Endpoint, p RequestPersister[Req, Resp]) *Endpoint {
+	checkEndpointTypes[Req, Resp](e, "WithPersistence")
 	e.persistence = p
 	return e
+}
+
+// checkEndpointTypes panics if the Req/Resp type parameters of a
+// WithInitializer/WithFinalizer/WithPersistence call do not match the
+// types captured by NewEndpoint. This provides early, clear feedback
+// instead of a runtime type-assertion panic during request processing.
+func checkEndpointTypes[Req, Resp any](e *Endpoint, caller string) {
+	wantReq := reflect.TypeOf((*Req)(nil)).Elem()
+	wantResp := reflect.TypeOf((*Resp)(nil)).Elem()
+	if e.reqType != wantReq || e.respType != wantResp {
+		panic(fmt.Sprintf("%s: type mismatch: endpoint is %s/%s but hook is %s/%s",
+			caller, e.reqType, e.respType, wantReq, wantResp))
+	}
 }
 
 // WithRecoveryHandler sets a custom panic recovery handler.

@@ -609,3 +609,100 @@ func TestCookieStore_EncryptionKeyWrongSize(t *testing.T) {
 		t.Fatal("expected error for 16-byte encryption key")
 	}
 }
+
+// slowStore simulates a store with latency to exercise the Save snapshot
+// race window.
+type slowStore struct {
+	NoOpStore
+	delay time.Duration
+}
+
+func (s slowStore) Save(_ context.Context, sess *Session) (string, error) {
+	time.Sleep(s.delay)
+	return sess.id, nil
+}
+
+// TestSession_SaveConcurrentMutation verifies that if a concurrent
+// mutation occurs during Save, the dirty flag is NOT cleared — ensuring
+// the next Save will persist the new data.
+func TestSession_SaveConcurrentMutation(t *testing.T) {
+	store := slowStore{delay: 50 * time.Millisecond}
+	s := NewSession(store)
+	s.Set("k1", "v1")
+
+	// Start Save in a goroutine; it will sleep in the store.
+	done := make(chan struct{})
+	var token string
+	var saveErr error
+	go func() {
+		token, saveErr = s.Save(context.Background())
+		close(done)
+	}()
+
+	// While Save is sleeping, mutate the session.
+	time.Sleep(10 * time.Millisecond)
+	s.Set("k2", "v2")
+
+	<-done
+	if saveErr != nil {
+		t.Fatalf("Save: %v", saveErr)
+	}
+	_ = token
+
+	// The dirty flag should still be set because a concurrent mutation
+	// occurred during Save.
+	if !s.IsDirty() {
+		t.Fatal("expected session to remain dirty after concurrent mutation during Save")
+	}
+}
+
+// TestSession_SaveNoConcurrentMutation verifies that Save clears the
+// dirty flag when no concurrent mutation occurs.
+func TestSession_SaveNoConcurrentMutation(t *testing.T) {
+	s := NewSession(NoOpStore{})
+	s.Set("k1", "v1")
+	if !s.IsDirty() {
+		t.Fatal("expected dirty after Set")
+	}
+	if _, err := s.Save(context.Background()); err != nil {
+		t.Fatalf("Save: %v", err)
+	}
+	if s.IsDirty() {
+		t.Fatal("expected clean after Save with no concurrent mutation")
+	}
+}
+
+// TestSession_SaveDoesNotHoldLockDuringStore verifies that the session
+// lock is not held during the store's Save call, allowing concurrent
+// reads to proceed.
+func TestSession_SaveDoesNotHoldLockDuringStore(t *testing.T) {
+	store := slowStore{delay: 50 * time.Millisecond}
+	s := NewSession(store)
+	s.Set("k1", "v1")
+
+	done := make(chan struct{})
+	go func() {
+		_, _ = s.Save(context.Background())
+		close(done)
+	}()
+
+	// Wait for Save to enter the store.
+	time.Sleep(10 * time.Millisecond)
+
+	// This read should not block because Save should have released the
+	// read lock before calling store.Save.
+	readDone := make(chan struct{})
+	go func() {
+		_ = s.GetString("k1")
+		close(readDone)
+	}()
+
+	select {
+	case <-readDone:
+		// Success: read completed while Save was in progress.
+	case <-time.After(100 * time.Millisecond):
+		t.Fatal("GetString blocked during Save — lock held during store Save")
+	}
+
+	<-done
+}

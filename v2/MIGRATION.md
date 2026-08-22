@@ -111,28 +111,67 @@ handlers.GetEndpoint[NoReq, MyResp](application.Router, core, application.RespHa
 
 ## Step 4: Migrate to Resources
 
-For CRUD endpoints, use the resource pattern:
+For CRUD endpoints, use the resource pattern. Each operation returns
+a `*handlers.Endpoint` with its own typed request and response:
 
 ```go
-import "github.com/hmmftg/requestCore/v2/resources"
+import (
+    "github.com/hmmftg/requestCore/libRequest"
+    "github.com/hmmftg/requestCore/v2/handlers"
+    "github.com/hmmftg/requestCore/v2/resources"
+)
 
 type UserResource struct{}
 
-func (r *UserResource) Index() resources.IndexOperation { ... }
-func (r *UserResource) Show() resources.ShowOperation[string] { ... }
-func (r *UserResource) Create() resources.CreateOperation { ... }
-func (r *UserResource) Update() resources.UpdateOperation[string] { ... }
-func (r *UserResource) Patch() resources.PatchOperation[string] { ... }
-func (r *UserResource) Destroy() resources.DestroyOperation[string] { ... }
-func (r *UserResource) New() resources.NewOperation { ... }
+type UserListReq struct{}
+type UserListResp struct {
+    Users []User `json:"users"`
+}
+
+func (r *UserResource) List() *handlers.Endpoint {
+    return handlers.NewEndpoint[UserListReq, UserListResp](
+        "list-users",
+        libRequest.JSON,
+        func(req *UserListReq, trx *handlers.HandlerRequest[UserListReq, UserListResp]) (UserListResp, error) {
+            return UserListResp{Users: []User{}}, nil
+        },
+    )
+}
+
+type UserShowReq struct{}
+type UserShowResp struct {
+    ID   string `json:"id"`
+    Name string `json:"name"`
+}
+
+func (r *UserResource) Show() *handlers.Endpoint {
+    return handlers.NewEndpoint[UserShowReq, UserShowResp](
+        "show-user",
+        libRequest.JSON,
+        func(req *UserShowReq, trx *handlers.HandlerRequest[UserShowReq, UserShowResp]) (UserShowResp, error) {
+            id, err := resources.GetParsedID[string](trx.V2, "id")
+            if err != nil {
+                return UserShowResp{}, err
+            }
+            return UserShowResp{ID: id, Name: "example"}, nil
+        },
+    )
+}
+
+// ... similarly for New, Create, Edit, Update, Destroy
 
 // Register all 7 routes at once
 resources.Register[string](application.Router, resources.Config[string]{
     Path:        "/users",
     Resource:    &UserResource{},
     RespHandler: application.RespHandler,
+    Defaults:    &resources.ResourceDefaults{Registry: application.Registry},
 })
 ```
+
+Operations returning nil are registered with a default 405 handler when
+`Defaults` is set. Use `EnablePatchAlias: true` to register PATCH as an
+alias for Update.
 
 ## Step 5: Switch Frameworks
 
@@ -170,15 +209,30 @@ api := application.Register("/api",
 
 ## Step 7: Add Background Workers
 
-```go
-import "github.com/hmmftg/requestCore/v2/workers"
+Workers run outside HTTP request contexts but still have full
+`webFramework.AddLog` observability. Each job receives a job-owned
+`webFramework.WebFramework` backed by a concurrency-safe
+`BackgroundParser`:
 
-// Workers are created automatically by Bootstrap
+```go
+import (
+    "log/slog"
+    "github.com/hmmftg/requestCore/webFramework"
+    "github.com/hmmftg/requestCore/v2/workers"
+)
+
+// Workers are created automatically by Bootstrap.
 // Submit jobs:
 err := application.Worker.Submit(context.Background(), workers.Job{
     Name: "send-email",
     Handler: func(ctx *workers.JobContext) error {
-        // send email
+        // webFramework.AddLog works inside worker jobs.
+        // Entries are collected and flushed as a transaction log.
+        webFramework.AddLog(ctx.WebFramework, webFramework.HandlerLogTag,
+            slog.String("recipient", email))
+
+        // ... send email ...
+
         return nil
     },
     Options: workers.JobOptions{
@@ -186,6 +240,11 @@ err := application.Worker.Submit(context.Background(), workers.Job{
     },
 })
 ```
+
+The worker pool emits mandatory `worker-<name>-req` (success) and
+`worker-<name>-req-failed` (failure) log entries after each attempt,
+including collected `AddLog` attributes, elapsed time, and sanitized
+error text.
 
 ## Observability: AddLog is Mandatory
 
@@ -250,6 +309,7 @@ This allows importing both v1 and v2 packages simultaneously during migration.
 - [ ] Migrate CRUD endpoints to `resources.Register`
 - [ ] Add session middleware if needed
 - [ ] Add background workers if needed
-- [ ] Verify `webFramework.AddLog` calls in all handlers
+- [ ] Verify `webFramework.AddLog` calls in all handlers and worker jobs
+- [ ] Use `app.Shutdown` for coordinated HTTP + worker shutdown
 - [ ] Run cross-framework conformance tests
 - [ ] Update CI to test v2 module

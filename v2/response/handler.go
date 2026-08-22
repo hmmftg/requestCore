@@ -61,13 +61,18 @@ func (h *Handler) LegacyHandler() legacyResponse.WebHanlder {
 
 // commit sends a response through the parser after running before-commit
 // hooks. It marks the context committed and emits a mandatory AddLog failure
-// entry if the parser write fails.
+// entry if the parser write fails. If the response is already committed,
+// this method returns nil without writing.
 func (h *Handler) commit(req *v2wf.RequestContext, status int, contentType string, body []byte) error {
 	if req == nil {
 		return errors.New("response: nil request context")
 	}
 	if req.Parser == nil {
 		return errors.New("response: nil parser")
+	}
+	// If already committed (e.g. handler wrote directly), skip double-write.
+	if req.Committed() {
+		return nil
 	}
 	// Run before-commit hooks (session cookie persistence, etc.).
 	// Hook errors are logged but do not block the commit.
@@ -78,6 +83,9 @@ func (h *Handler) commit(req *v2wf.RequestContext, status int, contentType strin
 		addLogFailure(req, "response-write", err)
 		return err
 	}
+	// Parser's SendResponse already updates CommitState when bound,
+	// but call MarkCommitted for backward compat with parsers that
+	// don't have the commit state bound.
 	req.MarkCommitted(status)
 	return nil
 }
@@ -180,4 +188,43 @@ func SanitizeError(err error) error {
 		legacyResponse.SystemFault,
 		"internal server error",
 	)
+}
+
+// DispatchError is the shared adapter error-dispatch helper. It routes an
+// error through the v2 response handler's registry if one is configured,
+// emits mandatory AddLog failure entries, and falls back to a sanitized
+// 500 JSON response if the registry fails or is unset.
+//
+// All framework adapters (Gin, Fiber, chi, net/http) should call this
+// instead of duplicating hard-coded fallback logic.
+func DispatchError(h *Handler, ctx *v2wf.RequestContext, err error) {
+	if err == nil || ctx == nil {
+		return
+	}
+	if h != nil {
+		if rErr := h.Error(ctx, err); rErr != nil {
+			// Registry itself failed — emit mandatory AddLog.
+			addLogFailure(ctx, "registry-dispatch", rErr)
+		}
+		if ctx.Committed() {
+			return
+		}
+	}
+	// Final sanitized fallback.
+	addLogFailure(ctx, "adapter-fallback", err)
+	_ = ctx.Parser.SendResponse(http.StatusInternalServerError, "application/json",
+		[]byte(`{"errors":[{"code":"INTERNAL","description":"Internal server error"}]}`))
+	ctx.MarkCommitted(http.StatusInternalServerError)
+}
+
+// FallbackInternalServerError writes a hard-coded 500 JSON response and
+// marks the context committed. It is used when no response handler is
+// configured.
+func FallbackInternalServerError(ctx *v2wf.RequestContext) {
+	if ctx == nil || ctx.Parser == nil {
+		return
+	}
+	_ = ctx.Parser.SendResponse(http.StatusInternalServerError, "application/json",
+		[]byte(`{"errors":[{"code":"INTERNAL","description":"Internal server error"}]}`))
+	ctx.MarkCommitted(http.StatusInternalServerError)
 }

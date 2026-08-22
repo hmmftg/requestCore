@@ -3,6 +3,7 @@ package libNetHttp
 import (
 	"context"
 	"net/http"
+	"net/http/httptest"
 
 	legacyLibNetHttp "github.com/hmmftg/requestCore/libNetHttp"
 	legacy "github.com/hmmftg/requestCore/webFramework"
@@ -51,8 +52,12 @@ func (r *NetHTTPRouter) SetErrorHandler(handler *response.Handler) {
 	r.registry = handler.Registry()
 }
 
-// Native returns the underlying http.ServeMux.
+// Native returns the underlying http.ServeMux, wrapped with 405
+// interception if a MethodNotAllowed handler has been configured.
 func (r *NetHTTPRouter) Native() any {
+	if r.methodNA != nil {
+		return r.intercept405(r.mux)
+	}
 	return r.mux
 }
 
@@ -133,10 +138,52 @@ func (r *NetHTTPRouter) NotFound(handler routing.Handler) {
 }
 
 // MethodNotAllowed sets the handler for disallowed methods.
-// Go 1.22+ ServeMux handles 405 automatically; this stores the handler
-// for manual dispatch if needed.
+// Go 1.22+ ServeMux handles 405 automatically by writing a 405 response.
+// We wrap the mux to intercept 405 responses and route them through the
+// v2 response handler/registry.
 func (r *NetHTTPRouter) MethodNotAllowed(handler routing.Handler) {
 	r.methodNA = handler
+}
+
+// intercept405 wraps the mux handler to intercept 405 responses from
+// Go 1.22+ ServeMux and dispatch them through the v2 handler. It buffers
+// the mux's response so the 405 body can be replaced with the v2 handler's
+// response.
+func (r *NetHTTPRouter) intercept405(next http.Handler) http.Handler {
+	if r.methodNA == nil {
+		return next
+	}
+	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		rec := httptest.NewRecorder()
+		next.ServeHTTP(rec, req)
+		if rec.Code == http.StatusMethodNotAllowed && r.methodNA != nil {
+			// Dispatch the 405 handler through the v2 pipeline with
+			// the real ResponseWriter.
+			parser := r.responseWriterFactory(req, w)
+			commit := &v2wf.CommitState{}
+			parser.SetCommitState(commit)
+			legacyCtx := legacyLibNetHttp.WithRequestResponse(req.Context(), req, w)
+			reqCtx := &v2wf.RequestContext{
+				Context:       req.Context(),
+				LegacyContext: legacyCtx,
+				Parser:        parser,
+				Legacy: legacy.WebFramework{
+					Parser: parser,
+				},
+			}
+			reqCtx.SetCommitState(commit)
+			if err := r.methodNA(reqCtx); err != nil {
+				r.dispatchError(reqCtx, err)
+			}
+			return
+		}
+		// Forward the buffered response to the real writer.
+		for k, v := range rec.Header() {
+			w.Header()[k] = v
+		}
+		w.WriteHeader(rec.Code)
+		_, _ = w.Write(rec.Body.Bytes())
+	})
 }
 
 // wrapHandler converts a v2 routing.Handler to an http.HandlerFunc.
@@ -144,6 +191,7 @@ func (r *NetHTTPRouter) wrapHandler(h routing.Handler, mws []routing.Middleware)
 	return func(w http.ResponseWriter, req *http.Request) {
 		parser := r.responseWriterFactory(req, w)
 		commit := &v2wf.CommitState{}
+		parser.SetCommitState(commit)
 
 		// LegacyContext must be a context.Context carrying the
 		// request and response writer via libNetHttp.WithRequestResponse,
@@ -174,18 +222,11 @@ func (r *NetHTTPRouter) wrapHandler(h routing.Handler, mws []routing.Middleware)
 	}
 }
 
-// dispatchError routes an error through the v2 response registry if one is
-// configured; otherwise it falls back to a sanitized 500 response.
+// dispatchError routes an error through the shared adapter error-dispatch
+// helper, which uses the v2 response registry if configured and falls back
+// to a sanitized 500 response.
 func (r *NetHTTPRouter) dispatchError(ctx *v2wf.RequestContext, err error) {
-	if r.respHandler != nil {
-		_ = r.respHandler.Error(ctx, err)
-		if ctx.Committed() {
-			return
-		}
-	}
-	_ = ctx.Parser.SendResponse(500, "application/json",
-		[]byte(`{"errors":[{"code":"INTERNAL","description":"Internal server error"}]}`))
-	ctx.MarkCommitted(500)
+	response.DispatchError(r.respHandler, ctx, err)
 }
 
 // netHTTPSubGroup implements RouteGroup for a prefixed sub-group.

@@ -20,12 +20,21 @@ import (
 // Renderers produce encoded bytes; the parser's SendResponse method
 // writes them to the framework-specific transport. This avoids leaking
 // net/http types (like http.ResponseWriter) into Fiber/fasthttp adapters.
+//
+// All SendResponse implementations must check and update the bound
+// CommitState so that error dispatch, panic recovery, and session
+// middleware can reliably avoid double-writes across v2 and legacy
+// response paths.
 type RequestParser interface {
 	legacy.RequestParser
 
 	// SendResponse writes a raw response with the given status code,
 	// content type, and body bytes. The adapter handles framework-specific
 	// transport mechanics (gin.Context.Writer, fiber.Ctx, http.ResponseWriter).
+	//
+	// If a CommitState has been bound via SetCommitState and the response
+	// is already committed, this method returns nil without writing.
+	// On successful write, the commit state is marked committed.
 	SendResponse(status int, contentType string, body []byte) error
 
 	// GetCookie returns the value of the named request cookie.
@@ -34,6 +43,12 @@ type RequestParser interface {
 
 	// SetCookie sets an HTTP response cookie.
 	SetCookie(cookie *http.Cookie)
+
+	// SetCommitState binds the request's CommitState to this parser so
+	// that SendResponse can check and update the committed status.
+	// Adapters call this during request setup, after creating the parser
+	// and before running handlers.
+	SetCommitState(cs *CommitState)
 }
 
 // RequestContext holds the per-request state passed through the v2

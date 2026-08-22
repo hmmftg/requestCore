@@ -27,9 +27,7 @@ type HandlerParameters[Req, Resp any] struct {
 	Body            libRequest.Type
 	ValidateHeader  bool
 	Path            string
-	HasReceipt      bool
 	RecoveryHandler func(any)
-	FileResponse    bool
 	LogArrays       []string
 	LogTags         []string
 	Persistence     RequestPersister[Req, Resp]
@@ -56,7 +54,6 @@ type HandlerRequest[Req, Resp any] struct {
 	V2       *v2wf.RequestContext
 	Args     []any
 	RespSent bool
-	Builder  func(status int, rawResp []byte, headers map[string]string) (*Resp, error)
 	Outcome  HandlerOutcome
 	Duration time.Duration
 	Span     trace.Span

@@ -1,6 +1,8 @@
 package libFiber
 
 import (
+	"strings"
+
 	"github.com/gofiber/fiber/v2"
 
 	legacy "github.com/hmmftg/requestCore/webFramework"
@@ -17,6 +19,16 @@ type FiberRouter struct {
 	middlewares []routing.Middleware
 	registry    response.Registry
 	respHandler *response.Handler
+	notFound    routing.Handler
+	methodNA    routing.Handler
+	// registeredRoutes tracks method+pattern pairs for 405 dispatch.
+	registeredRoutes []routeEntry
+}
+
+// routeEntry records a registered method and pattern for 405 checks.
+type routeEntry struct {
+	method  string
+	pattern string
 }
 
 // NewRouter creates a new FiberRouter from a Fiber app.
@@ -85,6 +97,7 @@ func (r *FiberRouter) Handle(method, pattern string, handler routing.Handler) er
 	wrapped := r.wrapHandler(handler)
 
 	r.group.Add(method, fiberPattern, wrapped)
+	r.registeredRoutes = append(r.registeredRoutes, routeEntry{method: method, pattern: fiberPattern})
 	return nil
 }
 
@@ -120,16 +133,97 @@ func (r *FiberRouter) Head(pattern string, handler routing.Handler) error {
 
 // NotFound sets the handler for unmatched routes.
 func (r *FiberRouter) NotFound(handler routing.Handler) {
+	r.notFound = handler
 	r.app.Use("*", r.wrapHandler(handler))
 }
 
 // MethodNotAllowed sets the handler for disallowed methods.
-// Fiber v2 does not have a built-in 405 handler; we register a catch-all
-// that checks the method against registered routes. For now, the handler
-// is stored and applied as a Use middleware after all routes.
+// Fiber v2 does not have a built-in 405 handler, so we register a
+// catch-all that checks the method against registered routes and
+// dispatches the 405 handler when the path matches but the method doesn't.
 func (r *FiberRouter) MethodNotAllowed(handler routing.Handler) {
-	// Fiber v2 does not natively support 405. The handler is stored
-	// but not wired; applications should use chi or gin for 405 support.
+	r.methodNA = handler
+	// Register a catch-all that fires after all specific routes.
+	// It checks if the path matches a registered route with a different
+	// method and dispatches the 405 handler if so.
+	r.app.Use("*", func(c *fiber.Ctx) error {
+		// If a response was already sent by a matched route, skip.
+		if c.Response().StatusCode() != 404 {
+			return nil
+		}
+		// Check if the path matches any registered route pattern.
+		path := c.Path()
+		method := c.Method()
+		pathMatches := false
+		for _, entry := range r.registeredRoutes {
+			if fiberPathMatches(entry.pattern, path) {
+				if entry.method == method {
+					// Route matches exactly; should have been handled.
+					pathMatches = false
+					break
+				}
+				pathMatches = true
+			}
+		}
+		if !pathMatches {
+			return nil
+		}
+		// Dispatch the 405 handler through the v2 pipeline.
+		parser := InitContextV2(c)
+		commit := &v2wf.CommitState{}
+		parser.SetCommitState(commit)
+		reqCtx := &v2wf.RequestContext{
+			LegacyContext: c,
+			Parser:        parser,
+			Legacy: legacy.WebFramework{
+				Parser: parser,
+			},
+		}
+		reqCtx.SetCommitState(commit)
+		reqCtx.Context = c.UserContext()
+		if err := handler(reqCtx); err != nil {
+			r.dispatchError(reqCtx, err)
+		}
+		return nil
+	})
+}
+
+// fiberPathMatches checks if a Fiber pattern matches the given path.
+// This is a simplified check that handles Fiber's parameter syntax.
+func fiberPathMatches(pattern, path string) bool {
+	// Exact match.
+	if pattern == path {
+		return true
+	}
+	// Handle parameter patterns like /users/:id.
+	patternParts := splitPath(pattern)
+	pathParts := splitPath(path)
+	if len(patternParts) != len(pathParts) {
+		return false
+	}
+	for i, pp := range patternParts {
+		if strings.HasPrefix(pp, ":") || strings.HasPrefix(pp, "*") {
+			continue
+		}
+		if pp != pathParts[i] {
+			return false
+		}
+	}
+	return true
+}
+
+// splitPath splits a URL path into segments.
+func splitPath(p string) []string {
+	if len(p) == 0 {
+		return nil
+	}
+	if p[0] == '/' {
+		p = p[1:]
+	}
+	if len(p) == 0 {
+		return nil
+	}
+	return strings.Split(p, "/")
 }
 
 // wrapHandler converts a v2 routing.Handler to a fiber.Handler,
@@ -138,6 +232,7 @@ func (r *FiberRouter) wrapHandler(h routing.Handler) fiber.Handler {
 	return func(c *fiber.Ctx) error {
 		parser := InitContextV2(c)
 		commit := &v2wf.CommitState{}
+		parser.SetCommitState(commit)
 		// LegacyContext is the native *fiber.Ctx expected by
 		// libContext.InitContext (it switches on *fiber.Ctx).
 		reqCtx := &v2wf.RequestContext{
@@ -165,18 +260,11 @@ func (r *FiberRouter) wrapHandler(h routing.Handler) fiber.Handler {
 	}
 }
 
-// dispatchError routes an error through the v2 response registry if one is
-// configured; otherwise it falls back to a sanitized 500 response.
+// dispatchError routes an error through the shared adapter error-dispatch
+// helper, which uses the v2 response registry if configured and falls back
+// to a sanitized 500 response.
 func (r *FiberRouter) dispatchError(ctx *v2wf.RequestContext, err error) {
-	if r.respHandler != nil {
-		_ = r.respHandler.Error(ctx, err)
-		if ctx.Committed() {
-			return
-		}
-	}
-	_ = ctx.Parser.SendResponse(500, "application/json",
-		[]byte(`{"errors":[{"code":"INTERNAL","description":"Internal server error"}]}`))
-	ctx.MarkCommitted(500)
+	response.DispatchError(r.respHandler, ctx, err)
 }
 
 // Ensure FiberRouter implements routing.Router.

@@ -20,7 +20,7 @@ type GinRouter struct {
 	middlewares  []routing.Middleware
 	notFound     routing.Handler
 	methodNA     routing.Handler
-	legacyParser func(any) GinParserV2
+	legacyParser func(any) *GinParserV2
 	registry     response.Registry
 	respHandler  *response.Handler
 }
@@ -133,22 +133,27 @@ func (r *GinRouter) Head(pattern string, handler routing.Handler) error {
 	return r.Handle("HEAD", pattern, handler)
 }
 
-// NotFound sets the handler for unmatched routes.
+// NotFound sets the handler for unmatched routes. This requires an engine
+// scope; calling it on a group-only router (created via NewRouterFromGroup)
+// panics because 404 registration is engine-wide.
 func (r *GinRouter) NotFound(handler routing.Handler) {
-	r.notFound = handler
-	if r.engine != nil {
-		r.engine.NoRoute(r.wrapHandler(handler))
+	if r.engine == nil {
+		panic("libGin: NotFound requires an engine-scoped router; use NewRouter instead of NewRouterFromGroup")
 	}
+	r.notFound = handler
+	r.engine.NoRoute(r.wrapHandler(handler))
 }
 
-// MethodNotAllowed sets the handler for disallowed methods.
+// MethodNotAllowed sets the handler for disallowed methods. This requires
+// an engine scope; calling it on a group-only router panics.
 func (r *GinRouter) MethodNotAllowed(handler routing.Handler) {
-	r.methodNA = handler
-	if r.engine != nil {
-		engine := r.engine
-		engine.HandleMethodNotAllowed = true
-		engine.NoMethod(r.wrapHandler(handler))
+	if r.engine == nil {
+		panic("libGin: MethodNotAllowed requires an engine-scoped router; use NewRouter instead of NewRouterFromGroup")
 	}
+	r.methodNA = handler
+	engine := r.engine
+	engine.HandleMethodNotAllowed = true
+	engine.NoMethod(r.wrapHandler(handler))
 }
 
 // wrapHandler converts a v2 routing.Handler to a gin.HandlerFunc,
@@ -157,6 +162,7 @@ func (r *GinRouter) wrapHandler(h routing.Handler) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		parser := r.legacyParser(c)
 		commit := &v2wf.CommitState{}
+		parser.SetCommitState(commit)
 		reqCtx := &v2wf.RequestContext{
 			// LegacyContext is the native *gin.Context expected by
 			// libContext.InitContext.
@@ -187,19 +193,11 @@ func (r *GinRouter) wrapHandler(h routing.Handler) gin.HandlerFunc {
 	}
 }
 
-// dispatchError routes an error through the v2 response registry if one is
-// configured; otherwise it falls back to a sanitized 500 response.
+// dispatchError routes an error through the shared adapter error-dispatch
+// helper, which uses the v2 response registry if configured and falls back
+// to a sanitized 500 response.
 func (r *GinRouter) dispatchError(ctx *v2wf.RequestContext, err error) {
-	if r.respHandler != nil {
-		_ = r.respHandler.Error(ctx, err)
-		if ctx.Committed() {
-			return
-		}
-	}
-	// Final sanitized fallback.
-	_ = ctx.Parser.SendResponse(500, "application/json",
-		[]byte(`{"errors":[{"code":"INTERNAL","description":"Internal server error"}]}`))
-	ctx.MarkCommitted(500)
+	response.DispatchError(r.respHandler, ctx, err)
 }
 
 // Ensure GinRouter implements routing.Router.

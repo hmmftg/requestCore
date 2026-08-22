@@ -37,7 +37,11 @@ func Middleware(manager *Manager, cookieName string) func(next func(*v2wf.Reques
 				flash = NewFlash()
 			}
 
-			// Store session and flash on the parser locals for handlers.
+			// Store session and flash on both the parser locals (for
+			// FromContext/FlashFromContext) and the RequestContext fields
+			// (for direct access via ctx.Session/ctx.Flash).
+			ctx.Session = sess
+			ctx.Flash = flash
 			if ctx.Parser != nil {
 				ctx.Parser.SetLocal(SessionKey, sess)
 				ctx.Parser.SetLocal(FlashKey, flash)

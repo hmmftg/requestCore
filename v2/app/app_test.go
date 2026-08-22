@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -11,6 +12,7 @@ import (
 	"github.com/hmmftg/requestCore/response"
 	"github.com/hmmftg/requestCore/v2/renderers"
 	v2wf "github.com/hmmftg/requestCore/v2/webFramework"
+	"github.com/hmmftg/requestCore/v2/workers"
 )
 
 func TestBootstrap_Chi(t *testing.T) {
@@ -221,4 +223,128 @@ func TestApp_StartShutdown(t *testing.T) {
 	defer shutdownCancel()
 	_ = app.Shutdown(shutdownCtx)
 	cancel()
+}
+
+// TestApp_DefaultNotFound verifies that the default 404 handler emits
+// a JSON error response when no custom NotFound is configured.
+func TestApp_DefaultNotFound(t *testing.T) {
+	app, err := Bootstrap(Config{
+		Framework: FrameworkChi,
+	})
+	if err != nil {
+		t.Fatalf("Bootstrap: %v", err)
+	}
+	defer app.Close()
+
+	native := app.Router.Native()
+	mux, ok := native.(http.Handler)
+	if !ok {
+		t.Fatal("expected chi mux to implement http.Handler")
+	}
+
+	server := httptest.NewServer(mux)
+	defer server.Close()
+
+	resp, err := http.Get(server.URL + "/nonexistent")
+	if err != nil {
+		t.Fatalf("HTTP request: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusNotFound {
+		t.Fatalf("expected 404, got %d", resp.StatusCode)
+	}
+
+	var result map[string]any
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if result["error"] != "not_found" {
+		t.Fatalf("expected error='not_found', got %v", result["error"])
+	}
+}
+
+// TestApp_DefaultMethodNotAllowed verifies that the default 405 handler
+// emits a JSON error response when no custom MethodNotAllowed is configured.
+func TestApp_DefaultMethodNotAllowed(t *testing.T) {
+	app, err := Bootstrap(Config{
+		Framework: FrameworkChi,
+	})
+	if err != nil {
+		t.Fatalf("Bootstrap: %v", err)
+	}
+	defer app.Close()
+
+	err = app.Router.Post("/items", func(ctx *v2wf.RequestContext) error {
+		return app.RespHandler.OK(ctx, map[string]string{"status": "created"})
+	})
+	if err != nil {
+		t.Fatalf("Post: %v", err)
+	}
+
+	native := app.Router.Native()
+	mux, ok := native.(http.Handler)
+	if !ok {
+		t.Fatal("expected chi mux to implement http.Handler")
+	}
+
+	server := httptest.NewServer(mux)
+	defer server.Close()
+
+	resp, err := http.Get(server.URL + "/items")
+	if err != nil {
+		t.Fatalf("HTTP request: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusMethodNotAllowed {
+		t.Fatalf("expected 405, got %d", resp.StatusCode)
+	}
+
+	var result map[string]any
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if result["error"] != "method_not_allowed" {
+		t.Fatalf("expected error='method_not_allowed', got %v", result["error"])
+	}
+}
+
+// TestApp_ShutdownStopsWorker verifies that Shutdown also shuts down
+// the worker pool, not just the HTTP server.
+func TestApp_ShutdownStopsWorker(t *testing.T) {
+	app, err := Bootstrap(Config{
+		Framework: FrameworkChi,
+	})
+	if err != nil {
+		t.Fatalf("Bootstrap: %v", err)
+	}
+
+	app.Router.Get("/health", func(ctx *v2wf.RequestContext) error {
+		return app.RespHandler.OK(ctx, map[string]string{"status": "healthy"})
+	})
+
+	ctx, cancel := context.WithCancel(context.Background())
+	go func() {
+		_ = app.StartWithContext(ctx, ":0")
+	}()
+	time.Sleep(100 * time.Millisecond)
+
+	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer shutdownCancel()
+	if err := app.Shutdown(shutdownCtx); err != nil {
+		t.Fatalf("Shutdown: %v", err)
+	}
+	cancel()
+
+	// After Shutdown, submitting a job should fail with ErrShutdown.
+	err = app.Worker.Submit(context.Background(), workers.Job{
+		Name: "post-shutdown",
+		Handler: func(ctx *workers.JobContext) error {
+			return nil
+		},
+	})
+	if !errors.Is(err, workers.ErrShutdown) {
+		t.Fatalf("expected ErrShutdown from worker after Shutdown, got %v", err)
+	}
 }

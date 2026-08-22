@@ -20,6 +20,7 @@ import (
 	v2response "github.com/hmmftg/requestCore/v2/response"
 	"github.com/hmmftg/requestCore/v2/routing"
 	"github.com/hmmftg/requestCore/v2/session"
+	v2wf "github.com/hmmftg/requestCore/v2/webFramework"
 	"github.com/hmmftg/requestCore/v2/workers"
 )
 
@@ -135,12 +136,17 @@ func Bootstrap(config Config) (*App, error) {
 		router = &middlewareRouter{router: router, middlewares: config.Middlewares}
 	}
 
-	// Set not found / method not allowed handlers
+	// Set not found / method not allowed handlers. Defaults provide
+	// JSON error responses consistent with the v2 response format.
 	if config.NotFound != nil {
 		router.NotFound(config.NotFound)
+	} else {
+		router.NotFound(defaultNotFound(respHandler))
 	}
 	if config.MethodNotAllowed != nil {
 		router.MethodNotAllowed(config.MethodNotAllowed)
+	} else {
+		router.MethodNotAllowed(defaultMethodNotAllowed(respHandler))
 	}
 
 	return &App{
@@ -162,6 +168,28 @@ func wireErrorHandler(router routing.Router, handler *v2response.Handler) {
 	}
 	if s, ok := router.(errorHandlerSetter); ok {
 		s.SetErrorHandler(handler)
+	}
+}
+
+// defaultNotFound returns a 404 handler that emits a JSON error response
+// through the v2 response handler.
+func defaultNotFound(h *v2response.Handler) routing.Handler {
+	return func(ctx *v2wf.RequestContext) error {
+		return h.OKWithStatus(ctx, http.StatusNotFound, map[string]any{
+			"error":   "not_found",
+			"message": "The requested resource was not found",
+		})
+	}
+}
+
+// defaultMethodNotAllowed returns a 405 handler that emits a JSON error
+// response through the v2 response handler.
+func defaultMethodNotAllowed(h *v2response.Handler) routing.Handler {
+	return func(ctx *v2wf.RequestContext) error {
+		return h.OKWithStatus(ctx, http.StatusMethodNotAllowed, map[string]any{
+			"error":   "method_not_allowed",
+			"message": "The HTTP method is not allowed for this resource",
+		})
 	}
 }
 
@@ -301,26 +329,63 @@ func (a *App) StartWithContext(ctx context.Context, addr string) error {
 	}
 }
 
-// Shutdown gracefully shuts down the application.
+// Shutdown gracefully shuts down the application: it stops the HTTP
+// server, then shuts down the worker pool. Both operations are bounded
+// by the given context.
+//
+// Shutdown is safe to call concurrently with StartWithContext. If the
+// server has not yet been registered (StartWithContext hasn't stored it
+// yet), Shutdown waits briefly for it to appear, then proceeds to shut
+// down the worker pool.
 func (a *App) Shutdown(ctx context.Context) error {
+	// Wait for the server to be registered if StartWithContext is
+	// concurrently in progress. This closes the race window where
+	// Shutdown sees nil nativeServer because Start hasn't stored it yet.
+	deadline, hasDeadline := ctx.Deadline()
+	for i := 0; i < 50; i++ { // up to ~500ms
+		a.serverMu.Lock()
+		server := a.nativeServer
+		a.serverMu.Unlock()
+		if server != nil {
+			break
+		}
+		if hasDeadline && time.Now().After(deadline) {
+			break
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+
 	a.serverMu.Lock()
 	server := a.nativeServer
 	a.serverMu.Unlock()
 
-	if server == nil {
-		return nil
+	var httpErr error
+	if server != nil {
+		if httpServer, ok := server.(*http.Server); ok {
+			httpErr = httpServer.Shutdown(ctx)
+		} else {
+			// Fiber shutdown
+			httpErr = shutdownFiber(server, ctx)
+		}
 	}
 
-	if httpServer, ok := server.(*http.Server); ok {
-		return httpServer.Shutdown(ctx)
-	}
+	// Shut down the worker pool after the HTTP server stops accepting
+	// new requests, so in-flight jobs can complete within the context.
+	workerErr := a.Worker.Shutdown(ctx)
 
-	// Fiber shutdown
-	return shutdownFiber(server, ctx)
+	// Return the first non-nil error, preferring the HTTP error.
+	if httpErr != nil {
+		return httpErr
+	}
+	return workerErr
 }
 
 // Close stops the worker pool and releases resources.
 // It uses a 10-second timeout for the worker shutdown.
+//
+// For full graceful shutdown including the HTTP server, use Shutdown
+// instead. Close is primarily useful in tests where the HTTP server
+// was never started.
 func (a *App) Close() error {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()

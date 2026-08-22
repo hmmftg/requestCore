@@ -124,6 +124,12 @@ func main() {
 	if err := application.StartWithContext(ctx, ":"+port); err != nil {
 		log.Fatalf("Server: %v", err)
 	}
+
+	// Coordinated shutdown: stop HTTP server and drain worker pool.
+	// application.Close() only drains the worker pool; for full
+	// graceful shutdown including the HTTP server, use Shutdown.
+	// StartWithContext already calls Shutdown when ctx is cancelled,
+	// so Close() here is a safety net for the worker pool.
 }
 
 // HealthResp is the response for the health check endpoint.

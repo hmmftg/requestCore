@@ -8,12 +8,17 @@ import (
 	"net/http"
 
 	legacyLibNetHttp "github.com/hmmftg/requestCore/libNetHttp"
+	v2wf "github.com/hmmftg/requestCore/v2/webFramework"
 )
 
 // NetHTTPParserV2 extends the v1 NetHTTPParser with raw response writing
 // and cookie access for v2 renderer and session support.
 type NetHTTPParserV2 struct {
 	*legacyLibNetHttp.NetHTTPParser
+
+	// commitState tracks whether the response has been written.
+	// SendResponse checks and updates this to avoid double-writes.
+	commitState *v2wf.CommitState
 }
 
 // InitContextV2 creates a NetHTTPParserV2 from an HTTP request and response writer.
@@ -24,17 +29,24 @@ func InitContextV2(r *http.Request, w http.ResponseWriter) *NetHTTPParserV2 {
 }
 
 // SendResponse writes a raw response with the given status, content type,
-// and body bytes to the HTTP response writer.
+// and body bytes to the HTTP response writer. If a CommitState is bound and
+// already committed, returns nil without writing.
 func (p *NetHTTPParserV2) SendResponse(status int, contentType string, body []byte) error {
+	if p.commitState != nil && p.commitState.Committed() {
+		return nil
+	}
 	if contentType != "" {
 		p.Response.Header().Set("Content-Type", contentType)
 	}
 	p.Response.WriteHeader(status)
+	var err error
 	if len(body) > 0 {
-		_, err := p.Response.Write(body)
-		return err
+		_, err = p.Response.Write(body)
 	}
-	return nil
+	if err == nil && p.commitState != nil {
+		p.commitState.MarkCommitted(status)
+	}
+	return err
 }
 
 // GetCookie returns the value of the named request cookie.
@@ -68,4 +80,10 @@ func (p *NetHTTPParserV2) CheckURLParam(name string) (string, bool) {
 // SetCookie sets an HTTP response cookie.
 func (p *NetHTTPParserV2) SetCookie(cookie *http.Cookie) {
 	http.SetCookie(p.Response, cookie)
+}
+
+// SetCommitState binds the request's CommitState to this parser so that
+// SendResponse can check and update the committed status.
+func (p *NetHTTPParserV2) SetCommitState(cs *v2wf.CommitState) {
+	p.commitState = cs
 }

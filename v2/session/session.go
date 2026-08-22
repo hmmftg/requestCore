@@ -23,6 +23,12 @@ type Session struct {
 	mu        sync.RWMutex
 	dirty     bool
 	createdAt time.Time
+
+	// revision is incremented on every mutation (Set/Delete/Clear/
+	// flash persistence). Save uses it to detect concurrent changes:
+	// if the revision has advanced since the snapshot was taken, the
+	// dirty flag is not cleared.
+	revision uint64
 }
 
 // ID returns the opaque session identifier.
@@ -73,6 +79,7 @@ func (s *Session) Set(key string, value any) {
 	}
 	s.data[key] = value
 	s.dirty = true
+	s.revision++
 }
 
 // Delete removes a key from the session and marks it dirty.
@@ -81,6 +88,7 @@ func (s *Session) Delete(key string) {
 	defer s.mu.Unlock()
 	delete(s.data, key)
 	s.dirty = true
+	s.revision++
 }
 
 // Clear removes all data from the session and marks it dirty.
@@ -89,6 +97,7 @@ func (s *Session) Clear() {
 	defer s.mu.Unlock()
 	s.data = make(map[string]any)
 	s.dirty = true
+	s.revision++
 }
 
 // IsDirty reports whether the session has unsaved changes.
@@ -104,15 +113,45 @@ func (s *Session) CreatedAt() time.Time {
 }
 
 // Save persists the session through its store and returns the opaque token.
+// It takes a snapshot of the session data under the read lock, then saves
+// the snapshot outside the lock. After saving, it reacquires the lock and
+// clears the dirty flag only if the revision has not advanced (i.e., no
+// concurrent mutations occurred during the save).
 func (s *Session) Save(ctx context.Context) (string, error) {
+	// Snapshot under the read lock.
 	s.mu.RLock()
-	defer s.mu.RUnlock()
-	token, err := s.store.Save(ctx, s)
+	snapshot := &Session{
+		id:        s.id,
+		data:      copyMap(s.data),
+		store:     s.store,
+		createdAt: s.createdAt,
+		revision:  s.revision,
+	}
+	s.mu.RUnlock()
+
+	// Save the detached snapshot outside the lock.
+	token, err := s.store.Save(ctx, snapshot)
 	if err != nil {
 		return "", fmt.Errorf("session: save: %w", err)
 	}
-	s.dirty = false
+
+	// Reacquire the write lock and clear dirty only if no concurrent
+	// mutations occurred during the save.
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.revision == snapshot.revision {
+		s.dirty = false
+	}
 	return token, nil
+}
+
+// copyMap creates a shallow copy of a map[string]any.
+func copyMap(m map[string]any) map[string]any {
+	result := make(map[string]any, len(m))
+	for k, v := range m {
+		result[k] = v
+	}
+	return result
 }
 
 // Destroy deletes the session from its store.
