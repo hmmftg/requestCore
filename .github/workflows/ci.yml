@@ -60,3 +60,77 @@ jobs:
       - name: Build v2
         working-directory: v2
         run: go build ./...
+
+  # Verifies that v1 and v2 can coexist in vendor mode (-mod=vendor)
+  # in a downstream consumer project. This addresses the concern that
+  # nested module dependencies (v2 imports v1) might not vendor correctly.
+  vendor-coexistence:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: v2/go.mod
+          cache: true
+      # Force standalone module mode: remove go.work so both modules
+      # resolve from their own go.mod files.
+      - name: Force standalone modules
+        run: |
+          if [ -f go.work ]; then rm go.work; fi
+          if [ -f go.work.sum ]; then rm go.work.sum; fi
+      - name: Tidy v1 and v2
+        run: |
+          go mod tidy
+          (cd v2 && go mod tidy)
+      - name: Create consumer test module
+        run: |
+          mkdir -p /tmp/consumer-test
+          cd /tmp/consumer-test
+          cat > go.mod <<'GOMOD'
+          module consumer-test
+
+          go 1.25.5
+
+          require (
+            github.com/hmmftg/requestCore v0.0.0
+            github.com/hmmftg/requestCore/v2 v0.0.0
+          )
+          GOMOD
+          # Use local replace directives pointing at the checked-out repo
+          # so we don't depend on a published tag.
+          echo "replace github.com/hmmftg/requestCore => $GITHUB_WORKSPACE" >> go.mod
+          echo "replace github.com/hmmftg/requestCore/v2 => $GITHUB_WORKSPACE/v2" >> go.mod
+      - name: Create consumer main.go
+        run: |
+          cd /tmp/consumer-test
+          cat > main.go <<'GOFILE'
+          package main
+
+          import (
+            _ "github.com/hmmftg/requestCore/webFramework"
+            _ "github.com/hmmftg/requestCore/v2/app"
+          )
+
+          func main() {}
+          GOFILE
+      - name: Tidy consumer
+        working-directory: /tmp/consumer-test
+        run: go mod tidy
+      - name: Vendor consumer
+        working-directory: /tmp/consumer-test
+        run: go mod vendor
+      - name: Verify vendor contains both modules
+        working-directory: /tmp/consumer-test
+        run: |
+          if [ ! -d "vendor/github.com/hmmftg/requestCore" ]; then
+            echo "ERROR: v1 not found in vendor/"
+            exit 1
+          fi
+          if [ ! -d "vendor/github.com/hmmftg/requestCore/v2" ]; then
+            echo "ERROR: v2 not found in vendor/"
+            exit 1
+          fi
+          echo "Both v1 and v2 are present in vendor/"
+      - name: Build with vendor mode
+        working-directory: /tmp/consumer-test
+        run: go build -mod=vendor ./...

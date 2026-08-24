@@ -60,6 +60,29 @@ type Resource[ID any] interface {
 // handler emits a 405 Method Not Allowed response.
 type ResourceDefaults struct{}
 
+// CustomOperation defines a non-CRUD action registered alongside a
+// resource. Common use cases include Reload, Validate, Approve, or
+// other domain-specific actions that don't fit the 7 standard
+// operations.
+//
+// The Path is appended to the resource's base Path. For example, if
+// the resource Path is "/parameters" and the CustomOperation Path is
+// "/reload", the full route is "POST /parameters/reload".
+//
+// Custom operations are registered before /{id} routes to ensure
+// correct precedence (e.g. "/parameters/reload" won't match "/{id}").
+type CustomOperation struct {
+	// Method is the HTTP method (GET, POST, PUT, DELETE, PATCH).
+	Method string
+
+	// Path is the sub-path appended to the resource base path.
+	// Must start with "/". For example: "/reload", "/validate".
+	Path string
+
+	// Endpoint is the typed endpoint descriptor for the operation.
+	Endpoint *handlers.Endpoint
+}
+
 // Config holds the configuration for registering a resource.
 type Config[ID any] struct {
 	// Path is the base path for the resource (e.g. "/users").
@@ -90,6 +113,11 @@ type Config[ID any] struct {
 	// Defaults provides 405 handlers for unsupported operations.
 	// If nil, unsupported operations are silently skipped.
 	Defaults *ResourceDefaults
+
+	// Custom registers non-CRUD operations (e.g. Reload, Validate)
+	// alongside the standard 7 operations. Custom operations are
+	// registered before /{id} routes for correct path precedence.
+	Custom []CustomOperation
 }
 
 // Register registers all seven resource operations on the given router.
@@ -126,6 +154,17 @@ func Register[ID any](router routing.RouteGroup, config Config[ID]) error {
 	} else if config.Defaults != nil {
 		if err := registerDefault405(router, config.Defaults, config.RespHandler, "GET", basePath+"/{"+idParam+"}/edit"); err != nil {
 			return err
+		}
+	}
+
+	// Custom operations (non-CRUD actions like Reload, Validate).
+	// Registered before /{id} routes to ensure correct precedence
+	// (e.g. POST /parameters/reload must not match /{id}).
+	for _, cop := range config.Custom {
+		copPath := basePath + cop.Path
+		ep := cop.Endpoint.WithPath(copPath)
+		if err := handlers.RegisterEndpoint(router, config.Core, config.RespHandler, cop.Method, copPath, ep); err != nil {
+			return fmt.Errorf("resources: custom operation %s %s: %w", cop.Method, copPath, err)
 		}
 	}
 

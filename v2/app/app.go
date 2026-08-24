@@ -77,13 +77,14 @@ type Config struct {
 }
 
 // App is the v2 application instance. It composes the router,
-// response handler, worker pool, and session manager.
+// response handler, worker pool, scheduler, and session manager.
 type App struct {
 	Router      routing.Router
 	RespHandler *v2response.Handler
 	Registry    v2response.Registry
 	Renderer    renderers.Renderer
 	Worker      workers.Worker
+	Scheduler   *workers.Scheduler
 	Sessions    *session.Manager
 	Middlewares []routing.Middleware
 
@@ -128,6 +129,9 @@ func Bootstrap(config Config) (*App, error) {
 	// Create worker pool
 	worker := workers.NewInProcessWorker(config.WorkerConfig)
 
+	// Create scheduler for periodic background tasks
+	scheduler := workers.NewScheduler()
+
 	// Create session manager
 	sessionMgr := session.NewManager(config.SessionStore)
 
@@ -167,6 +171,7 @@ func Bootstrap(config Config) (*App, error) {
 		Registry:         registry,
 		Renderer:         config.Renderer,
 		Worker:           worker,
+		Scheduler:        scheduler,
 		Sessions:         sessionMgr,
 		Middlewares:      config.Middlewares,
 		serverRegistered: make(chan struct{}),
@@ -359,6 +364,11 @@ func (a *App) StartWithContext(ctx context.Context, addr string) error {
 		a.Registry.Freeze()
 	}
 
+	// Start the scheduler so registered periodic jobs begin ticking.
+	if a.Scheduler != nil {
+		a.Scheduler.Start()
+	}
+
 	native := a.Router.Native()
 
 	switch server := native.(type) {
@@ -446,15 +456,25 @@ func (a *App) Shutdown(ctx context.Context) error {
 	// new requests, so in-flight jobs can complete within the context.
 	workerErr := a.Worker.Shutdown(ctx)
 
+	// Shut down the scheduler after the worker pool, so periodic
+	// tasks stop ticking and in-flight ticks complete.
+	var schedulerErr error
+	if a.Scheduler != nil {
+		schedulerErr = a.Scheduler.Shutdown(ctx)
+	}
+
 	// Return the first non-nil error, preferring the HTTP error.
 	if httpErr != nil {
 		return httpErr
 	}
-	return workerErr
+	if workerErr != nil {
+		return workerErr
+	}
+	return schedulerErr
 }
 
-// Close stops the worker pool and releases resources.
-// It uses a 10-second timeout for the worker shutdown.
+// Close stops the worker pool and scheduler, and releases resources.
+// It uses a 10-second timeout for the shutdown.
 //
 // For full graceful shutdown including the HTTP server, use Shutdown
 // instead. Close is primarily useful in tests where the HTTP server
@@ -462,5 +482,13 @@ func (a *App) Shutdown(ctx context.Context) error {
 func (a *App) Close() error {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	return a.Worker.Shutdown(ctx)
+	workerErr := a.Worker.Shutdown(ctx)
+	var schedulerErr error
+	if a.Scheduler != nil {
+		schedulerErr = a.Scheduler.Shutdown(ctx)
+	}
+	if workerErr != nil {
+		return workerErr
+	}
+	return schedulerErr
 }

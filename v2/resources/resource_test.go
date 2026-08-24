@@ -410,3 +410,155 @@ func (r *panicResourceImpl) Create() *handlers.Endpoint  { return nil }
 func (r *panicResourceImpl) Edit() *handlers.Endpoint    { return nil }
 func (r *panicResourceImpl) Update() *handlers.Endpoint  { return nil }
 func (r *panicResourceImpl) Destroy() *handlers.Endpoint { return nil }
+
+// reloadResp is the response type for the custom Reload operation.
+type reloadResp struct {
+	Reloaded bool `json:"reloaded"`
+}
+
+// TestRegister_CustomOperation verifies that a custom (non-CRUD)
+// operation like Reload is registered and accessible.
+func TestRegister_CustomOperation(t *testing.T) {
+	engine := gin.New()
+	router := v2libGin.NewRouter(engine)
+	respHandler := testRespHandler()
+	r := newTestResource()
+
+	reloadEndpoint := handlers.NewEndpoint[struct{}, reloadResp](
+		"reload-items",
+		libRequest.NoBinding,
+		func(req *struct{}, trx *handlers.HandlerRequest[struct{}, reloadResp]) (reloadResp, error) {
+			return reloadResp{Reloaded: true}, nil
+		},
+	)
+
+	err := Register[string](router, Config[string]{
+		Path:        "/items",
+		Resource:    r,
+		RespHandler: respHandler,
+		Custom: []CustomOperation{
+			{Method: "POST", Path: "/reload", Endpoint: reloadEndpoint},
+		},
+	})
+	if err != nil {
+		t.Fatalf("Register: %v", err)
+	}
+
+	// POST /items/reload should return 200 with reloaded=true.
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest("POST", "/items/reload", nil)
+	engine.ServeHTTP(w, req)
+	if w.Code != 200 {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+	var resp reloadResp
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if !resp.Reloaded {
+		t.Fatal("expected reloaded=true")
+	}
+}
+
+// TestRegister_CustomOperationPrecedence verifies that a custom
+// operation path (e.g. /items/reload) does not conflict with the
+// /{id} route. "reload" should match the custom route, not be
+// treated as an ID.
+func TestRegister_CustomOperationPrecedence(t *testing.T) {
+	engine := gin.New()
+	router := v2libGin.NewRouter(engine)
+	respHandler := testRespHandler()
+	r := newTestResource()
+
+	reloadEndpoint := handlers.NewEndpoint[struct{}, reloadResp](
+		"reload-items",
+		libRequest.NoBinding,
+		func(req *struct{}, trx *handlers.HandlerRequest[struct{}, reloadResp]) (reloadResp, error) {
+			return reloadResp{Reloaded: true}, nil
+		},
+	)
+
+	err := Register[string](router, Config[string]{
+		Path:        "/items",
+		Resource:    r,
+		RespHandler: respHandler,
+		Custom: []CustomOperation{
+			{Method: "POST", Path: "/reload", Endpoint: reloadEndpoint},
+		},
+	})
+	if err != nil {
+		t.Fatalf("Register: %v", err)
+	}
+
+	// POST /items/reload should hit the custom route (200), not Show (404).
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest("POST", "/items/reload", nil)
+	engine.ServeHTTP(w, req)
+	if w.Code != 200 {
+		t.Fatalf("POST /items/reload: expected 200 (custom route), got %d: %s", w.Code, w.Body.String())
+	}
+
+	// GET /items/1 should still hit Show (200).
+	w2 := httptest.NewRecorder()
+	req2 := httptest.NewRequest("GET", "/items/1", nil)
+	engine.ServeHTTP(w2, req2)
+	if w2.Code != 200 {
+		t.Fatalf("GET /items/1: expected 200 (Show), got %d: %s", w2.Code, w2.Body.String())
+	}
+}
+
+// TestRegister_MultipleCustomOperations verifies that multiple custom
+// operations can be registered on the same resource.
+func TestRegister_MultipleCustomOperations(t *testing.T) {
+	engine := gin.New()
+	router := v2libGin.NewRouter(engine)
+	respHandler := testRespHandler()
+	r := newTestResource()
+
+	err := Register[string](router, Config[string]{
+		Path:        "/items",
+		Resource:    r,
+		RespHandler: respHandler,
+		Custom: []CustomOperation{
+			{
+				Method: "POST",
+				Path:   "/reload",
+				Endpoint: handlers.NewEndpoint[struct{}, reloadResp](
+					"reload-items", libRequest.NoBinding,
+					func(req *struct{}, trx *handlers.HandlerRequest[struct{}, reloadResp]) (reloadResp, error) {
+						return reloadResp{Reloaded: true}, nil
+					},
+				),
+			},
+			{
+				Method: "POST",
+				Path:   "/validate",
+				Endpoint: handlers.NewEndpoint[struct{}, map[string]bool](
+					"validate-items", libRequest.NoBinding,
+					func(req *struct{}, trx *handlers.HandlerRequest[struct{}, map[string]bool]) (map[string]bool, error) {
+						return map[string]bool{"valid": true}, nil
+					},
+				),
+			},
+		},
+	})
+	if err != nil {
+		t.Fatalf("Register: %v", err)
+	}
+
+	// POST /items/reload
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest("POST", "/items/reload", nil)
+	engine.ServeHTTP(w, req)
+	if w.Code != 200 {
+		t.Fatalf("POST /items/reload: expected 200, got %d", w.Code)
+	}
+
+	// POST /items/validate
+	w2 := httptest.NewRecorder()
+	req2 := httptest.NewRequest("POST", "/items/validate", nil)
+	engine.ServeHTTP(w2, req2)
+	if w2.Code != 200 {
+		t.Fatalf("POST /items/validate: expected 200, got %d", w2.Code)
+	}
+}

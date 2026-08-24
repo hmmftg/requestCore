@@ -23,19 +23,26 @@ v2 is a **separate Go module** that lives in the `v2/` directory. It is fully ba
 ## Step 1: Add v2 as a dependency
 
 The v2 module is released via a manual, prerelease-aware GitHub Actions
-workflow (`release-v2.yml`). Until the first stable v2 tag is published,
-pin to the latest prerelease tag:
+workflow (`release-v2.yml`). The workflow creates tags in the format
+`v2/v2.0.0-alpha.0` (subdirectory module format). Go strips the `v2/`
+prefix when resolving, so the consumer command uses the version portion
+without the `v2/` prefix.
+
+Until the first stable v2 tag is published, pin to the latest prerelease
+tag:
 
 ```bash
 cd your-project
-# Replace v2.0.0-alpha with the latest published v2 prerelease tag.
+# Replace v2.0.0-alpha.0 with the latest published v2 prerelease tag.
 # Check available tags at:
 #   https://github.com/hmmftg/requestCore/releases
-go get github.com/hmmftg/requestCore/v2@v2.0.0-alpha
+go get github.com/hmmftg/requestCore/v2@v2.0.0-alpha.0
 ```
 
 > **Note:** `go get ...@latest` will not resolve until the first
 > non-prerelease v2 tag is published. Always pin to a specific tag.
+> If no tags have been published yet, the release workflow must be
+> triggered manually from the GitHub Actions tab.
 
 ## Step 2: Bootstrap the v2 App
 
@@ -75,54 +82,77 @@ func MyHandler(c context.Context) {
 engine.GET("/users", libGin.Gin(MyHandler))
 ```
 
-### v2 Handler (Framework-agnostic)
+### v2 Handler (Framework-agnostic, typed endpoint)
+
+v2 uses typed endpoint functions instead of the v1 struct-based
+`HandlerInterface` pattern. Each handler is a function that receives
+a typed `*HandlerRequest[Req, Resp]` and returns `(Resp, error)`.
 
 ```go
-import "github.com/hmmftg/requestCore/v2/handlers"
+import (
+    "github.com/hmmftg/requestCore/libRequest"
+    "github.com/hmmftg/requestCore/v2/handlers"
+)
 
-type MyHandler struct{}
-
-func (h *MyHandler) Parameters() handlers.HandlerParameters[MyReq, MyResp] {
-    return handlers.HandlerParameters[MyReq, MyResp]{
-        Title: "my-handler",
-        Path:  "/users",
-        Body:  libRequest.JSON,
-    }
+// Define your request and response types.
+type MyReq struct {
+    Name string `json:"name"`
+}
+type MyResp struct {
+    ID string `json:"id"`
 }
 
-func (h *MyHandler) Initializer(req *handlers.HandlerRequest[MyReq, MyResp]) error {
-    return nil
+// MyHandler is the handler function for the endpoint.
+func MyHandler(req *MyReq, trx *handlers.HandlerRequest[MyReq, MyResp]) (MyResp, error) {
+    // trx.W is the legacy webFramework.WebFramework for AddLog calls.
+    // trx.V2 is the v2 RequestContext for direct parser access.
+    return MyResp{ID: "1"}, nil
 }
 
-func (h *MyHandler) Handler(req *handlers.HandlerRequest[MyReq, MyResp]) (MyResp, error) {
-    return MyResp{...}, nil
-}
+// Register as a POST endpoint with JSON body binding:
+handlers.PostEndpoint[MyReq, MyResp](
+    application.Router, core, application.RespHandler,
+    "/users",
+    MyHandler,
+)
 
-func (h *MyHandler) Finalizer(req *handlers.HandlerRequest[MyReq, MyResp]) {}
-func (h *MyHandler) Simulation(req *handlers.HandlerRequest[MyReq, MyResp]) (MyResp, error) {
-    return MyResp{}, nil
-}
-
-// Registration
-h := handlers.BaseHandler[MyReq, MyResp](core, &MyHandler{}, false, application.RespHandler)
-application.Router.Get("/users", h)
-```
-
-### Simple Endpoint (shorthand)
-
-```go
-handlers.GetEndpoint[NoReq, MyResp](application.Router, core, application.RespHandler,
+// Or as a GET endpoint with no body binding:
+handlers.GetEndpoint[struct{}, MyResp](
+    application.Router, core, application.RespHandler,
     "/health",
-    func(req *NoReq, trx *handlers.HandlerRequest[NoReq, MyResp]) (MyResp, error) {
-        return MyResp{Status: "ok"}, nil
+    func(req *struct{}, trx *handlers.HandlerRequest[struct{}, MyResp]) (MyResp, error) {
+        return MyResp{ID: "ok"}, nil
     },
 )
+```
+
+### Lifecycle Hooks (Initializer, Finalizer)
+
+For handlers that need initialization or finalization, use
+`NewEndpoint` with `WithInitializer` and `WithFinalizer`:
+
+```go
+e := handlers.NewEndpoint[MyReq, MyResp]("my-handler", libRequest.JSON, MyHandler).
+    WithPath("/users")
+
+handlers.WithInitializer[MyReq, MyResp](e, func(trx *handlers.HandlerRequest[MyReq, MyResp]) error {
+    // Runs after parsing, before the main handler.
+    return nil
+})
+
+handlers.WithFinalizer[MyReq, MyResp](e, func(trx *handlers.HandlerRequest[MyReq, MyResp]) {
+    // Always runs, even on panic. Best-effort.
+})
+
+handlers.RegisterEndpoint(application.Router, core, application.RespHandler, "POST", "/users", e)
 ```
 
 ## Step 4: Migrate to Resources
 
 For CRUD endpoints, use the resource pattern. Each operation returns
-a `*handlers.Endpoint` with its own typed request and response:
+a `*handlers.Endpoint` with its own typed request and response. Read
+operations (List, Show, New, Edit, Destroy) use `libRequest.NoBinding`;
+write operations (Create, Update) use `libRequest.JSON`:
 
 ```go
 import (
@@ -141,7 +171,7 @@ type UserListResp struct {
 func (r *UserResource) List() *handlers.Endpoint {
     return handlers.NewEndpoint[UserListReq, UserListResp](
         "list-users",
-        libRequest.JSON,
+        libRequest.NoBinding,
         func(req *UserListReq, trx *handlers.HandlerRequest[UserListReq, UserListResp]) (UserListResp, error) {
             return UserListResp{Users: []User{}}, nil
         },
@@ -157,7 +187,7 @@ type UserShowResp struct {
 func (r *UserResource) Show() *handlers.Endpoint {
     return handlers.NewEndpoint[UserShowReq, UserShowResp](
         "show-user",
-        libRequest.JSON,
+        libRequest.NoBinding,
         func(req *UserShowReq, trx *handlers.HandlerRequest[UserShowReq, UserShowResp]) (UserShowResp, error) {
             id, err := resources.GetParsedID[string](trx.V2, "id")
             if err != nil {
@@ -175,13 +205,43 @@ resources.Register[string](application.Router, resources.Config[string]{
     Path:        "/users",
     Resource:    &UserResource{},
     RespHandler: application.RespHandler,
-    Defaults:    &resources.ResourceDefaults{Registry: application.Registry},
+    Defaults:    &resources.ResourceDefaults{},
 })
 ```
 
 Operations returning nil are registered with a default 405 handler when
 `Defaults` is set. Use `EnablePatchAlias: true` to register PATCH as an
 alias for Update.
+
+### Custom Operations (non-CRUD actions)
+
+For non-standard actions like `Reload` that don't fit the 7 CRUD
+operations, use the `Custom` field on `Config`:
+
+```go
+resources.Register[string](application.Router, resources.Config[string]{
+    Path:        "/parameters",
+    Resource:    &ParameterResource{},
+    RespHandler: application.RespHandler,
+    Custom: []resources.CustomOperation{
+        {
+            Method: "POST",
+            Path:   "/reload",
+            Endpoint: handlers.NewEndpoint[struct{}, ReloadResp](
+                "reload-parameters",
+                libRequest.NoBinding,
+                func(req *struct{}, trx *handlers.HandlerRequest[struct{}, ReloadResp]) (ReloadResp, error) {
+                    return ReloadResp{Reloaded: true}, nil
+                },
+            ),
+        },
+    },
+})
+```
+
+Custom operations are registered before `/{id}` routes to ensure
+correct precedence (e.g. `POST /parameters/reload` won't match
+`/{id}`).
 
 ## Step 5: Switch Frameworks
 
@@ -205,16 +265,37 @@ All handlers, resources, and middleware work unchanged across frameworks.
 ```go
 import "github.com/hmmftg/requestCore/v2/session"
 
-store := session.NewCookieStore([]byte("your-32-byte-secret-key"))
-application, _ := app.Bootstrap(app.Config{
+store, err := session.NewCookieStore(session.CookieStoreConfig{
+    SecretKey: []byte("your-32-byte-secret-key-here-32-bytes"),
+})
+if err != nil {
+    log.Fatal(err)
+}
+application, err := app.Bootstrap(app.Config{
     Framework:    app.FrameworkChi,
     SessionStore: store,
+    SessionSecret: "your-signing-secret",
 })
+if err != nil {
+    log.Fatal(err)
+}
 
 // Add session middleware to a route group
 api := application.Register("/api",
-    app.SessionMiddleware(application.Sessions, "session"),
+    session.Middleware(application.Sessions, "session"),
 )
+```
+
+For configurable session save failure handling, use
+`session.MiddlewareWithConfig` with `SaveStrict` (default, propagates
+save failures) or `SaveBestEffort` (logs but does not propagate):
+
+```go
+session.MiddlewareWithConfig(session.MiddlewareConfig{
+    Manager:         application.Sessions,
+    CookieName:      "session",
+    SaveFailureMode: session.SaveBestEffort,
+})
 ```
 
 ## Step 7: Add Background Workers
@@ -258,25 +339,28 @@ error text.
 
 ## Observability: AddLog is Mandatory
 
-The v2 `BaseHandler` calls `webFramework.AddLog` for the handler title and path. For custom logging within handlers, continue using `webFramework.AddLog`:
+The v2 handler lifecycle calls `webFramework.AddLog` for the handler
+title and path. For custom logging within handlers, continue using
+`webFramework.AddLog`:
 
 ```go
-func (h *MyHandler) Handler(req *handlers.HandlerRequest[MyReq, MyResp]) (MyResp, error) {
+func MyHandler(req *MyReq, trx *handlers.HandlerRequest[MyReq, MyResp]) (MyResp, error) {
     // Log to Splunk transaction pipeline
-    webFramework.AddLog(req.W, "my-handler-step", slog.String("status", "processing"))
+    webFramework.AddLog(trx.W, "my-handler-step", slog.String("status", "processing"))
 
     // ... business logic
 
     // Log API calls (mandatory for external API calls)
-    webFramework.AddLog(req.W, "my-api-call-req", slog.String("url", apiURL))
+    webFramework.AddLog(trx.W, "my-api-call-req", slog.String("url", apiURL))
     // ... make API call
-    webFramework.AddLog(req.W, "my-api-call-req", slog.String("status", "success"))
+    webFramework.AddLog(trx.W, "my-api-call-req", slog.String("status", "success"))
 
     return MyResp{}, nil
 }
 ```
 
-**Never** replace `webFramework.AddLog` with `slog.*` or `log.*` — those do not flow into the Splunk transaction pipeline.
+**Never** replace `webFramework.AddLog` with `slog.*` or `log.*` —
+those do not flow into the Splunk transaction pipeline.
 
 ## Using the CLI
 
@@ -310,16 +394,90 @@ go work use . v2
 
 This allows importing both v1 and v2 packages simultaneously during migration.
 
+When using `-mod=vendor`, both modules coexist in the `vendor/`
+directory. Run `go mod vendor` after adding both dependencies; Go
+handles the nested module correctly.
+
+## Periodic Background Tasks (Scheduler)
+
+For long-running poller loops (e.g. periodic data sync, health checks),
+use the `workers.Scheduler` instead of the job-submission
+`InProcessWorker`. The Scheduler runs a handler at fixed intervals with
+the same mandatory `AddLog` observability:
+
+```go
+err := application.Scheduler.Schedule(workers.ScheduledJob{
+    Name:     "shahkar-analyze",
+    Interval: 60 * time.Second,
+    Handler: func(ctx *workers.JobContext) error {
+        webFramework.AddLog(ctx.WebFramework, webFramework.HandlerLogTag,
+            slog.String("status", "polling"))
+        // ... poll and process ...
+        return nil
+    },
+})
+```
+
+The Scheduler is shut down automatically by `app.Shutdown` alongside
+the HTTP server and worker pool.
+
+## FAQ / Troubleshooting
+
+### Go version requirement
+
+Both v1 and v2 require **Go 1.25.5**. This is inherited from the v1
+`go.mod` — v2 does not impose a newer version. The `context.WithoutCancel`
+function (used by v2 workers) was added in Go 1.21, so any Go 1.21+
+toolchain would technically work, but the `go.mod` directive enforces
+1.25.5 for consistency with v1.
+
+### API call infrastructure (issues.md capabilities)
+
+The 9 capabilities described in the v1 `issues.md` file (base header
+builder, instrumented HTTP client, standardized API call logging,
+status code extraction, error normalization, timeout guards, retry
+framework, URL tracker-ID extraction, skip-pattern matching) are
+**already implemented** in the v1 module:
+
+- `handlers.BuildBaseRemoteHeaders` — base header builder
+- `libCallApi.NewInstrumentedHTTPClient` — instrumented HTTP client
+- `handlers.LogApiCall` — standardized API call logging
+- `handlers.ExtractStatusCode` / `handlers.DeriveStatusCode` — status extraction
+- `handlers.NormalizeCallError` / `handlers.BuildTimeoutError` — error normalization
+- `libRetry` — retry framework with backoff and jitter
+
+These are available to v2 consumers via the v1 import since v2
+delegates to v1 for infrastructure.
+
+### Worker audit-trail limitation
+
+Worker jobs run outside HTTP request contexts and do not automatically
+insert rows into the `request` persistence table. If your worker jobs
+need audit-trail persistence (the same `request` table inserts that
+HTTP handlers get), call `core.Responder()` or your persistence layer
+manually inside the job handler. This is a known design tradeoff:
+worker observability is via `webFramework.AddLog` (Splunk pipeline),
+not via the persistence audit trail.
+
+### No tags published yet
+
+If `go get github.com/hmmftg/requestCore/v2@v2.0.0-alpha.0` fails with
+"unknown revision", no v2 tags have been published yet. The repository
+maintainer must trigger the `Release v2` workflow from the GitHub
+Actions tab (manual dispatch) to create the first prerelease tag.
+
 ## Checklist
 
-- [ ] Add v2 dependency
+- [ ] Add v2 dependency (pin to a specific prerelease tag)
 - [ ] Bootstrap v2 App with legacy core
-- [ ] Migrate critical handlers to v2 `BaseHandler`
+- [ ] Migrate critical handlers to v2 typed endpoints
 - [ ] Register routes via v2 `Router`
 - [ ] Migrate CRUD endpoints to `resources.Register`
+- [ ] Add custom operations for non-CRUD actions (e.g. Reload)
 - [ ] Add session middleware if needed
-- [ ] Add background workers if needed
+- [ ] Add background workers (InProcessWorker for jobs, Scheduler for pollers)
 - [ ] Verify `webFramework.AddLog` calls in all handlers and worker jobs
-- [ ] Use `app.Shutdown` for coordinated HTTP + worker shutdown
+- [ ] Use `app.Shutdown` for coordinated HTTP + worker + scheduler shutdown
 - [ ] Run cross-framework conformance tests
 - [ ] Update CI to test v2 module
+- [ ] Verify vendor mode coexistence if using `-mod=vendor`
