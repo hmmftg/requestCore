@@ -11,11 +11,15 @@ v2 is a **separate Go module** that lives in the `v2/` directory. It is fully ba
 | Feature | v1 | v2 |
 |---------|----|----|
 | Module path | `github.com/hmmftg/requestCore` | `github.com/hmmftg/requestCore/v2` |
+| Go version | 1.25.5 | **1.27.0** (required for generic methods) |
 | Framework coupling | Gin-specific (`libContext.InitContext`) | Framework-agnostic (`RequestContext`) |
 | Response writing | `response.WebHanlder` | `v2/response.Handler` with pluggable renderers |
 | Routing | Framework-specific | `routing.Router` interface (Gin, Fiber, chi, net/http) |
-| Handlers | `BaseHandler` returns `any` | `BaseHandler` returns `error` |
-| Resources | Manual route registration | `resources.Register` with 7 operations |
+| Handlers | `BaseHandler` returns `any` | Generic `Endpoint[Req, Resp]` — fully typed lifecycle |
+| Lifecycle hooks | N/A (manual) | `WithInitializer`/`WithFinalizer`/`WithPersistence` typed methods |
+| Response helpers | `OK(any)` | `OK(any)` + `OKTyped[Resp]` generic method |
+| Resources | Manual route registration | `ResourceBuilder[ID]` + `Resource[ID cmp.Ordered]` (TypedResource is advanced, 14 type params) |
+| Session access | N/A | `SessionContext` interface + `GetTyped[T]`/`SetTyped[T]` generic accessors |
 | Sessions | Not built-in | `session.Manager` with `CookieStore` |
 | Workers | Not built-in | `workers.InProcessWorker` with retry |
 | CLI | None | `requestcore` CLI for code generation |
@@ -147,18 +151,42 @@ e := handlers.NewEndpoint[MyReq, MyResp]("my-handler", libRequest.JSON, MyHandle
 handlers.RegisterEndpoint(application.Router, core, application.RespHandler, "POST", "/users", e)
 ```
 
+### Typed Response Helpers
+
+For compile-time type-safe responses, use the generic `OKTyped[Resp]`
+and `OKWithStatusTyped[Resp]` methods on `response.Handler`:
+
+```go
+// Instead of: respHandler.OK(req, MyResp{ID: "1"})
+// Use the typed version:
+err := application.RespHandler.OKTyped(req, MyResp{ID: "1"})
+
+// With a custom status:
+err := application.RespHandler.OKWithStatusTyped(req, http.StatusCreated, MyResp{ID: "1"})
+```
+
+These are convenience wrappers around `OK`/`OKWithStatus` that preserve
+type information at the call site. The `any`-based methods remain
+available for dynamic response types.
+
 ## Step 4: Migrate to Resources
 
-For CRUD endpoints, use the resource pattern. Each operation returns
-a `handlers.EndpointRuntime` (satisfied by `*handlers.Endpoint[Req, Resp]`)
-with its own typed request and response. Read operations (List, Show,
-New, Edit, Destroy) use `libRequest.NoBinding`; write operations
-(Create, Update) use `libRequest.JSON`:
+For CRUD endpoints, use the resource pattern. Implement `Resource[ID]`
+(each operation returns `handlers.EndpointRuntime`) and register via
+`ResourceBuilder` — this is the recommended path for v2 migration.
+
+> **Avoid `TypedResource` for simple resources.** The 14 type parameters
+> (7 request + 7 response types) are overkill for simple CRUD + custom
+> (non-CRUD) resources like Reload. Use `Resource[ID]` + `ResourceBuilder`
+> instead. See [Advanced: TypedResource](#advanced-typedresource-14-type-parameters)
+> below for when it's warranted.
+
+Each operation has its own typed request and response. Read operations
+(List, Show, New, Edit, Destroy) use `libRequest.NoBinding`; write
+operations (Create, Update) use `libRequest.JSON`:
 
 ```go
 import (
-    "cmp"
-
     "github.com/hmmftg/requestCore/libRequest"
     "github.com/hmmftg/requestCore/v2/handlers"
     "github.com/hmmftg/requestCore/v2/resources"
@@ -202,71 +230,87 @@ func (r *UserResource) Show() handlers.EndpointRuntime {
 }
 
 // ... similarly for New, Create, Edit, Update, Destroy
+```
 
-// Register all 7 routes at once
-resources.Register[string](application.Router, resources.Config[string]{
-    Path:        "/users",
-    Resource:    &UserResource{},
-    RespHandler: application.RespHandler,
-    Defaults:    &resources.ResourceDefaults{},
-})
+### Registration via ResourceBuilder (Recommended)
+
+Register all 7 routes (plus optional custom operations) using the
+`ResourceBuilder` fluent API:
+
+```go
+err := resources.NewResource[string]("/users").
+    EnablePatch().
+    WithDefaults(&resources.ResourceDefaults{}).
+    Register(application.Router, core, application.RespHandler, &UserResource{})
 ```
 
 Operations returning nil are registered with a default 405 handler when
-`Defaults` is set. Use `EnablePatchAlias: true` to register PATCH as an
-alias for Update.
+`WithDefaults` is set. `EnablePatch()` registers PATCH as an alias for
+Update.
 
 ### Custom Operations (non-CRUD actions)
 
 For non-standard actions like `Reload` that don't fit the 7 CRUD
-operations, use the `Custom` field on `Config`:
+operations, use `WithCustom` on the builder:
 
 ```go
-resources.Register[string](application.Router, resources.Config[string]{
-    Path:        "/parameters",
-    Resource:    &ParameterResource{},
-    RespHandler: application.RespHandler,
-    Custom: []resources.CustomOperation{
-        {
-            Method: "POST",
-            Path:   "/reload",
-            Endpoint: handlers.NewEndpoint[struct{}, ReloadResp](
-                "reload-parameters",
-                libRequest.NoBinding,
-                func(req *struct{}, trx *handlers.HandlerRequest[struct{}, ReloadResp]) (ReloadResp, error) {
-                    return ReloadResp{Reloaded: true}, nil
-                },
-            ),
+reloadOp := resources.CustomOperation{
+    Method: "POST",
+    Path:   "/reload",
+    Endpoint: handlers.NewEndpoint[struct{}, ReloadResp](
+        "reload-parameters",
+        libRequest.NoBinding,
+        func(req *struct{}, trx *handlers.HandlerRequest[struct{}, ReloadResp]) (ReloadResp, error) {
+            return ReloadResp{Reloaded: true}, nil
         },
-    },
-})
+    ),
+}
+
+err := resources.NewResource[string]("/parameters").
+    WithCustom(reloadOp).
+    Register(application.Router, core, application.RespHandler, &ParameterResource{})
 ```
 
 Custom operations are registered before `/{id}` routes to ensure
 correct precedence (e.g. `POST /parameters/reload` won't match
 `/{id}`).
 
-### ResourceBuilder (Fluent API)
+### Raw Config (Alternative)
 
-For a more ergonomic registration experience, use `ResourceBuilder`:
+`ResourceBuilder` is a thin wrapper around `resources.Register` with
+`Config[ID]`. If you prefer explicit configuration:
 
 ```go
-resources.NewResource[string]("/users").
-    WithIDParam("user_id").
-    EnablePatch().
-    WithCustom(resources.CustomOperation{
-        Method: "POST",
-        Path:   "/validate",
-        Endpoint: handlers.NewEndpoint[struct{}, ValidateResp](...),
-    }).
-    Register(application.Router, core, application.RespHandler, &UserResource{})
+resources.Register[string](application.Router, resources.Config[string]{
+    Path:             "/users",
+    Resource:         &UserResource{},
+    RespHandler:      application.RespHandler,
+    EnablePatchAlias: true,
+    Defaults:         &resources.ResourceDefaults{},
+})
 ```
 
-### TypedResource (Strict Type Safety)
+`ResourceBuilder` is preferred for readability — the fluent chain makes
+the configuration intent clearer than a struct literal.
 
-For maximum compile-time type safety, implement `TypedResource` with
-all 14 type parameters (7 request + 7 response types). Any
-`TypedResource` automatically satisfies `Resource[ID]`:
+### Advanced: TypedResource (14 type parameters)
+
+`TypedResource` is an advanced interface with 14 type parameters
+(7 request + 7 response types). Each operation returns a fully typed
+`*handlers.Endpoint[Req, Resp]` instead of `handlers.EndpointRuntime`.
+
+**When to use TypedResource:** only when you need the strictest
+compile-time guarantees on every operation's request/response types
+simultaneously — for example, a shared library resource where callers
+must not be able to pass the wrong endpoint type to any operation.
+
+**When NOT to use TypedResource:** for simple CRUD + custom resources
+(e.g. a User resource with a Reload action). The 14 type parameters add
+verbosity without practical benefit. Use `Resource[ID]` +
+`ResourceBuilder` instead.
+
+Any `TypedResource` automatically satisfies `Resource[ID]` because
+`*handlers.Endpoint[Req, Resp]` implements `handlers.EndpointRuntime`:
 
 ```go
 type UserResource struct{}
@@ -478,11 +522,12 @@ the HTTP server and worker pool.
 
 ### Go version requirement
 
-Both v1 and v2 require **Go 1.25.5**. This is inherited from the v1
-`go.mod` — v2 does not impose a newer version. The `context.WithoutCancel`
-function (used by v2 workers) was added in Go 1.21, so any Go 1.21+
-toolchain would technically work, but the `go.mod` directive enforces
-1.25.5 for consistency with v1.
+Both v1 and v2 now require **Go 1.27.0**. v2 uses generic methods on
+`*handlers.Endpoint[Req, Resp]` (e.g. `WithInitializer`, `WithFinalizer`,
+`WithPersistence`, `OKTyped[Resp]`), which require Go 1.27+. The v1
+module's `go.mod` was updated to 1.27.0 for consistency. If you cannot
+upgrade to Go 1.27, use the last v2 prerelease tag before the generics
+refactor.
 
 ### API call infrastructure (issues.md capabilities)
 
@@ -525,7 +570,7 @@ Actions tab (manual dispatch) to create the first prerelease tag.
 - [ ] Bootstrap v2 App with legacy core
 - [ ] Migrate critical handlers to v2 typed endpoints
 - [ ] Register routes via v2 `Router`
-- [ ] Migrate CRUD endpoints to `resources.Register`
+- [ ] Migrate CRUD endpoints to `ResourceBuilder` + `Resource[ID]` (not TypedResource)
 - [ ] Add custom operations for non-CRUD actions (e.g. Reload)
 - [ ] Add session middleware if needed
 - [ ] Add background workers (InProcessWorker for jobs, Scheduler for pollers)

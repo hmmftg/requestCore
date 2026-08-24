@@ -18,12 +18,26 @@
 // with a default 405 response via ResourceDefaults.
 //
 // Two resource interfaces are provided:
-//   - Resource[ID]: simple interface returning handlers.EndpointRuntime.
-//     Implement this when you want flexibility.
-//   - TypedResource[ID, ...]: strict interface with per-operation type
-//     parameters (14 type params). Implement this for maximum compile-time
-//     type safety. Any TypedResource automatically satisfies Resource[ID]
-//     because *Endpoint[Req, Resp] implements EndpointRuntime.
+//   - Resource[ID]: the recommended interface for v2 migration. Each
+//     operation returns handlers.EndpointRuntime. Implement this for
+//     simple CRUD + custom (non-CRUD) resources. Pair with
+//     ResourceBuilder for fluent registration.
+//   - TypedResource[ID, ...]: advanced interface with per-operation type
+//     parameters (14 type params). Each operation returns a fully typed
+//     *handlers.Endpoint[Req, Resp]. This is overkill for most resources
+//     — use it only when you need the strictest compile-time guarantees
+//     on every operation's request/response types. Any TypedResource
+//     automatically satisfies Resource[ID].
+//
+// For v2 migration, the recommended path is:
+//
+//	resources.NewResource[string]("/users").            // ResourceBuilder
+//	    EnablePatch().
+//	    WithCustom(reloadOp).
+//	    Register(router, core, respHandler, &UserResource{}) // implements Resource[ID]
+//
+// Avoid TypedResource unless you have a specific need for 14-type-parameter
+// strictness — the verbosity outweighs the benefit for simple CRUD resources.
 package resources
 
 import (
@@ -66,7 +80,7 @@ type Resource[ID cmp.Ordered] interface {
 	Destroy() handlers.EndpointRuntime
 }
 
-// TypedResource is a strict resource interface with per-operation type
+// TypedResource is an advanced resource interface with per-operation type
 // parameters. Implementing this interface gives compile-time type safety
 // for all 7 operations — each operation returns a fully typed
 // *handlers.Endpoint[Req, Resp].
@@ -75,8 +89,11 @@ type Resource[ID cmp.Ordered] interface {
 // *handlers.Endpoint[Req, Resp] implements handlers.EndpointRuntime.
 //
 // The 14 type parameters (7 request + 7 response types) make this
-// verbose to spell out, but it provides the strongest type safety.
-// Users who prefer simplicity can implement Resource[ID] directly.
+// verbose to spell out. For most v2 migration use cases (simple CRUD +
+// custom operations like Reload), prefer Resource[ID] with
+// ResourceBuilder — the 14 type parameters are overkill. Use
+// TypedResource only when you need the strictest compile-time guarantees
+// on every operation's request/response types simultaneously.
 type TypedResource[
 	ID cmp.Ordered,
 	ListReq, ListResp any,
@@ -393,8 +410,17 @@ func GetParsedID[ID cmp.Ordered](ctx *v2wf.RequestContext, idParam string) (ID, 
 }
 
 // ResourceBuilder provides a fluent API for constructing and registering
-// resources without spelling out all type parameters at the call site.
-// It is the recommended way to register resources in application code.
+// resources. It is the recommended way to register resources in v2
+// application code — prefer it over passing raw Config[ID] to Register.
+//
+// The typical v2 migration path is:
+//
+//	resources.NewResource[string]("/users").
+//	    EnablePatch().
+//	    WithCustom(reloadOp).
+//	    Register(router, core, respHandler, &UserResource{})
+//
+// where UserResource implements Resource[string] (not TypedResource).
 type ResourceBuilder[ID cmp.Ordered] struct {
 	path       string
 	idParam    string

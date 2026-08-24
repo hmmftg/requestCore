@@ -254,7 +254,7 @@ func TestGenerateHandler_Compiles(t *testing.T) {
 	// a local replace directive.
 	modContent := `module test-handler
 
-go 1.25.5
+go 1.27.0
 
 require github.com/hmmftg/requestCore/v2 v2.0.0-alpha
 

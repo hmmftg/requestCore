@@ -196,7 +196,7 @@ The repository is centered around a thin root façade and multiple focused subpa
 
 ## Requirements
 
-- Go 1.25+
+- Go 1.27+
 - A supported SQL database driver, depending on your chosen DB mode
 - Optional:
   - OpenTelemetry
@@ -502,6 +502,57 @@ Suggested areas for contribution:
 - request lifecycle helpers
 - database integrations
 - tests and examples
+
+---
+
+## v2: Generics-First Module
+
+The `v2/` directory contains a separate Go module
+(`github.com/hmmftg/requestCore/v2`) that builds on the root module with
+a **generics-first** API. It requires **Go 1.27+** for generic methods.
+
+### What v2 adds
+
+- **Generic typed endpoints** — `handlers.Endpoint[Req, Resp]` with typed lifecycle hooks (`WithInitializer`, `WithFinalizer`, `WithPersistence`)
+- **Generic resources** — `resources.ResourceBuilder[ID]` + `resources.Resource[ID cmp.Ordered]` with 7 CRUD operations (`TypedResource` with 14 type params is an advanced alternative, overkill for simple CRUD)
+- **Typed session access** — `session.GetTyped[T]` / `session.SetTyped[T]` (no runtime type assertions)
+- **Generic response helpers** — `response.Handler.OKTyped[Resp]` / `OKWithStatusTyped[Resp]`
+- **Framework-agnostic routing** — Gin, Fiber, chi, net/http via adapters
+- **Pluggable renderers** — JSON, XML, text, CSV
+- **Background workers** — bounded pool with retry, tracing, and mandatory `webFramework.AddLog` observability
+- **Scheduler** — periodic background tasks
+- **CLI** — `requestcore` code generator for handlers, resources, middleware, projects
+
+### Quick example
+
+```go
+import (
+    "github.com/hmmftg/requestCore/v2/app"
+    "github.com/hmmftg/requestCore/v2/handlers"
+    "github.com/hmmftg/requestCore/v2/renderers"
+)
+
+application, _ := app.Bootstrap(app.Config{
+    Framework: app.FrameworkChi,
+    Renderer:  renderers.JSONRenderer{},
+})
+defer application.Close()
+
+// Typed GET endpoint — compile-time type safety
+handlers.GetEndpoint[struct{}, HealthResp](
+    application.Router, nil, application.RespHandler, "/health",
+    func(req *struct{}, trx *handlers.HandlerRequest[struct{}, HealthResp]) (HealthResp, error) {
+        return HealthResp{Status: "ok"}, nil
+    },
+)
+```
+
+### Documentation
+
+- [v2/README.md](v2/README.md) — full v2 module documentation
+- [v2/MIGRATION.md](v2/MIGRATION.md) — v1-to-v2 migration guide
+- [v2/examples/simple/](v2/examples/simple/) — runnable example with typed endpoints, CRUD resource, sessions, and workers
+- [v2/examples/README.md](v2/examples/README.md) — example documentation and smoke tests
 
 ---
 

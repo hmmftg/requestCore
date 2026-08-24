@@ -389,7 +389,7 @@ func main() {
 	}
 
 	// go.mod
-	goModContent := fmt.Sprintf("module %s\n\ngo 1.25.5\n\nrequire github.com/hmmftg/requestCore/v2 %s\n", name, Version)
+	goModContent := fmt.Sprintf("module %s\n\ngo 1.27.0\n\nrequire github.com/hmmftg/requestCore/v2 %s\n", name, Version)
 
 	if err := writeFile(filepath.Join(name, "go.mod"), goModContent); err != nil {
 		return fmt.Errorf("write go.mod: %w", err)
