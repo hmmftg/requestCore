@@ -128,21 +128,21 @@ handlers.GetEndpoint[struct{}, MyResp](
 
 ### Lifecycle Hooks (Initializer, Finalizer)
 
-For handlers that need initialization or finalization, use
-`NewEndpoint` with `WithInitializer` and `WithFinalizer`:
+For handlers that need initialization or finalization, use the typed
+`WithInitializer` and `WithFinalizer` **methods** on `*Endpoint[Req, Resp]`.
+These are fully typed and compile-time checked — no reflection, no
+runtime type-mismatch panics:
 
 ```go
 e := handlers.NewEndpoint[MyReq, MyResp]("my-handler", libRequest.JSON, MyHandler).
-    WithPath("/users")
-
-handlers.WithInitializer[MyReq, MyResp](e, func(trx *handlers.HandlerRequest[MyReq, MyResp]) error {
-    // Runs after parsing, before the main handler.
-    return nil
-})
-
-handlers.WithFinalizer[MyReq, MyResp](e, func(trx *handlers.HandlerRequest[MyReq, MyResp]) {
-    // Always runs, even on panic. Best-effort.
-})
+    WithPath("/users").
+    WithInitializer(func(trx *handlers.HandlerRequest[MyReq, MyResp]) error {
+        // Runs after parsing, before the main handler.
+        return nil
+    }).
+    WithFinalizer(func(trx *handlers.HandlerRequest[MyReq, MyResp]) {
+        // Always runs, even on panic. Best-effort.
+    })
 
 handlers.RegisterEndpoint(application.Router, core, application.RespHandler, "POST", "/users", e)
 ```
@@ -150,12 +150,15 @@ handlers.RegisterEndpoint(application.Router, core, application.RespHandler, "PO
 ## Step 4: Migrate to Resources
 
 For CRUD endpoints, use the resource pattern. Each operation returns
-a `*handlers.Endpoint` with its own typed request and response. Read
-operations (List, Show, New, Edit, Destroy) use `libRequest.NoBinding`;
-write operations (Create, Update) use `libRequest.JSON`:
+a `handlers.EndpointRuntime` (satisfied by `*handlers.Endpoint[Req, Resp]`)
+with its own typed request and response. Read operations (List, Show,
+New, Edit, Destroy) use `libRequest.NoBinding`; write operations
+(Create, Update) use `libRequest.JSON`:
 
 ```go
 import (
+    "cmp"
+
     "github.com/hmmftg/requestCore/libRequest"
     "github.com/hmmftg/requestCore/v2/handlers"
     "github.com/hmmftg/requestCore/v2/resources"
@@ -168,7 +171,7 @@ type UserListResp struct {
     Users []User `json:"users"`
 }
 
-func (r *UserResource) List() *handlers.Endpoint {
+func (r *UserResource) List() handlers.EndpointRuntime {
     return handlers.NewEndpoint[UserListReq, UserListResp](
         "list-users",
         libRequest.NoBinding,
@@ -184,7 +187,7 @@ type UserShowResp struct {
     Name string `json:"name"`
 }
 
-func (r *UserResource) Show() *handlers.Endpoint {
+func (r *UserResource) Show() handlers.EndpointRuntime {
     return handlers.NewEndpoint[UserShowReq, UserShowResp](
         "show-user",
         libRequest.NoBinding,
@@ -243,6 +246,34 @@ Custom operations are registered before `/{id}` routes to ensure
 correct precedence (e.g. `POST /parameters/reload` won't match
 `/{id}`).
 
+### ResourceBuilder (Fluent API)
+
+For a more ergonomic registration experience, use `ResourceBuilder`:
+
+```go
+resources.NewResource[string]("/users").
+    WithIDParam("user_id").
+    EnablePatch().
+    WithCustom(resources.CustomOperation{
+        Method: "POST",
+        Path:   "/validate",
+        Endpoint: handlers.NewEndpoint[struct{}, ValidateResp](...),
+    }).
+    Register(application.Router, core, application.RespHandler, &UserResource{})
+```
+
+### TypedResource (Strict Type Safety)
+
+For maximum compile-time type safety, implement `TypedResource` with
+all 14 type parameters (7 request + 7 response types). Any
+`TypedResource` automatically satisfies `Resource[ID]`:
+
+```go
+type UserResource struct{}
+// Implements TypedResource[string, ListReq, ListResp, ShowReq, ShowResp, ...]
+// Each method returns *handlers.Endpoint[Req, Resp] (not EndpointRuntime).
+```
+
 ## Step 5: Switch Frameworks
 
 v2 makes it trivial to switch frameworks. Just change the `Framework` field:
@@ -297,6 +328,28 @@ session.MiddlewareWithConfig(session.MiddlewareConfig{
     SaveFailureMode: session.SaveBestEffort,
 })
 ```
+
+### Typed Session Access
+
+Session values are stored as `any`. Use the generic `GetTyped[T]` and
+`SetTyped[T]` accessors for compile-time type safety (no runtime type
+assertions):
+
+```go
+// Store a typed value
+session.SetTyped(sess, "user_id", 42)
+
+// Retrieve with compile-time type checking
+userID, err := session.GetTyped[int](sess, "user_id")
+if err != nil {
+    // key not found or type mismatch
+    return err
+}
+```
+
+The `RequestContext.Session` field is typed as `webFramework.SessionContext`
+(an interface), not `any`. You can call `Get`, `Set`, `Delete`, etc.
+directly without type-asserting to `*session.Session`.
 
 ## Step 7: Add Background Workers
 

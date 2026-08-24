@@ -1,6 +1,6 @@
 module github.com/hmmftg/requestCore
 
-go 1.25.5
+go 1.27.0
 
 require (
 	github.com/DATA-DOG/go-sqlmock v1.5.2

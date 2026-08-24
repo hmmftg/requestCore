@@ -61,7 +61,7 @@ func {PASCAL}Handler(req *{PASCAL}Req, trx *handlers.HandlerRequest[{PASCAL}Req,
 // {PASCAL}Endpoint returns a typed Endpoint for the {NAME} handler.
 // Use this with handlers.RegisterEndpoint for custom HTTP methods or
 // when you need to attach lifecycle hooks.
-func {PASCAL}Endpoint() *handlers.Endpoint {
+func {PASCAL}Endpoint() *handlers.Endpoint[{PASCAL}Req, {PASCAL}Resp] {
 	return handlers.NewEndpoint[{PASCAL}Req, {PASCAL}Resp](
 		"{NAME}",
 		libRequest.JSON,
@@ -118,7 +118,7 @@ type {PASCAL}ListResp struct {
 }
 
 // List returns a list of {NAME}.
-func (r *{PASCAL}Resource) List() *handlers.Endpoint {
+func (r *{PASCAL}Resource) List() handlers.EndpointRuntime {
 	return handlers.NewEndpoint[{PASCAL}ListReq, {PASCAL}ListResp](
 		"list-{NAME}",
 		libRequest.NoBinding,
@@ -137,7 +137,7 @@ type {PASCAL}ShowResp struct {
 }
 
 // Show returns a single {NAME} by ID.
-func (r *{PASCAL}Resource) Show() *handlers.Endpoint {
+func (r *{PASCAL}Resource) Show() handlers.EndpointRuntime {
 	return handlers.NewEndpoint[{PASCAL}ShowReq, {PASCAL}ShowResp](
 		"show-{NAME}",
 		libRequest.NoBinding,
@@ -160,7 +160,7 @@ type {PASCAL}NewResp struct {
 }
 
 // New returns the form for creating a new {NAME}.
-func (r *{PASCAL}Resource) New() *handlers.Endpoint {
+func (r *{PASCAL}Resource) New() handlers.EndpointRuntime {
 	return handlers.NewEndpoint[{PASCAL}NewReq, {PASCAL}NewResp](
 		"new-{NAME}",
 		libRequest.NoBinding,
@@ -181,7 +181,7 @@ type {PASCAL}CreateResp struct {
 }
 
 // Create creates a new {NAME}.
-func (r *{PASCAL}Resource) Create() *handlers.Endpoint {
+func (r *{PASCAL}Resource) Create() handlers.EndpointRuntime {
 	return handlers.NewEndpoint[{PASCAL}CreateReq, {PASCAL}CreateResp](
 		"create-{NAME}",
 		libRequest.JSON,
@@ -200,7 +200,7 @@ type {PASCAL}EditResp struct {
 }
 
 // Edit returns the form for editing a {NAME} by ID.
-func (r *{PASCAL}Resource) Edit() *handlers.Endpoint {
+func (r *{PASCAL}Resource) Edit() handlers.EndpointRuntime {
 	return handlers.NewEndpoint[{PASCAL}EditReq, {PASCAL}EditResp](
 		"edit-{NAME}",
 		libRequest.NoBinding,
@@ -226,7 +226,7 @@ type {PASCAL}UpdateResp struct {
 }
 
 // Update replaces a {NAME} by ID.
-func (r *{PASCAL}Resource) Update() *handlers.Endpoint {
+func (r *{PASCAL}Resource) Update() handlers.EndpointRuntime {
 	return handlers.NewEndpoint[{PASCAL}UpdateReq, {PASCAL}UpdateResp](
 		"update-{NAME}",
 		libRequest.JSON,
@@ -250,7 +250,7 @@ type {PASCAL}DestroyResp struct {
 }
 
 // Destroy deletes a {NAME} by ID.
-func (r *{PASCAL}Resource) Destroy() *handlers.Endpoint {
+func (r *{PASCAL}Resource) Destroy() handlers.EndpointRuntime {
 	return handlers.NewEndpoint[{PASCAL}DestroyReq, {PASCAL}DestroyResp](
 		"delete-{NAME}",
 		libRequest.NoBinding,

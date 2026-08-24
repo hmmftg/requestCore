@@ -1,6 +1,6 @@
 module github.com/hmmftg/requestCore/v2
 
-go 1.25.5
+go 1.27.0
 
 require (
 	github.com/gin-gonic/gin v1.10.1

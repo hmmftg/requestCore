@@ -169,8 +169,7 @@ func TestEndpoint_WithInitializer(t *testing.T) {
 			}
 			return TestResp{Status: "ok"}, nil
 		},
-	).WithPath("/init")
-	WithInitializer[struct{}, TestResp](e, func(trx *HandlerRequest[struct{}, TestResp]) error {
+	).WithPath("/init").WithInitializer(func(trx *HandlerRequest[struct{}, TestResp]) error {
 		initRan = true
 		return nil
 	})
@@ -198,8 +197,7 @@ func TestEndpoint_WithFinalizer(t *testing.T) {
 		func(req *struct{}, trx *HandlerRequest[struct{}, TestResp]) (TestResp, error) {
 			return TestResp{Status: "ok"}, nil
 		},
-	).WithPath("/fin")
-	WithFinalizer[struct{}, TestResp](e, func(trx *HandlerRequest[struct{}, TestResp]) {
+	).WithPath("/fin").WithFinalizer(func(trx *HandlerRequest[struct{}, TestResp]) {
 		finalized = true
 	})
 	if err := RegisterEndpoint(router, nil, respHandler, "GET", "/fin", e); err != nil {
@@ -233,8 +231,7 @@ func TestEndpoint_WithPersistence(t *testing.T) {
 			}
 			return CreateResp{ID: "1", Name: req.Name}, nil
 		},
-	).WithPath("/persist")
-	WithPersistence[CreateReq, CreateResp](e, NewPersister[CreateReq, CreateResp](
+	).WithPath("/persist").WithPersistence(NewPersister[CreateReq, CreateResp](
 		func(path string, trx *HandlerRequest[CreateReq, CreateResp]) error {
 			inserted = true
 			return nil
@@ -271,8 +268,7 @@ func TestEndpoint_InitializerError(t *testing.T) {
 		func(req *struct{}, trx *HandlerRequest[struct{}, TestResp]) (TestResp, error) {
 			return TestResp{}, errors.New("handler should not run")
 		},
-	).WithPath("/init-err")
-	WithInitializer[struct{}, TestResp](e, func(trx *HandlerRequest[struct{}, TestResp]) error {
+	).WithPath("/init-err").WithInitializer(func(trx *HandlerRequest[struct{}, TestResp]) error {
 		return errors.New("initializer failed")
 	})
 	if err := RegisterEndpoint(router, nil, respHandler, "GET", "/init-err", e); err != nil {
@@ -300,8 +296,7 @@ func TestEndpoint_PersistenceInsertError(t *testing.T) {
 			handlerRan = true
 			return CreateResp{}, nil
 		},
-	).WithPath("/persist-err")
-	WithPersistence[CreateReq, CreateResp](e, NewPersister[CreateReq, CreateResp](
+	).WithPath("/persist-err").WithPersistence(NewPersister[CreateReq, CreateResp](
 		func(path string, trx *HandlerRequest[CreateReq, CreateResp]) error {
 			return errors.New("insert failed")
 		},
@@ -349,8 +344,7 @@ func TestEndpoint_FinalizerAlwaysRuns(t *testing.T) {
 		func(req *struct{}, trx *HandlerRequest[struct{}, TestResp]) (TestResp, error) {
 			return TestResp{}, errors.New("handler error")
 		},
-	).WithPath("/fin-err")
-	WithFinalizer[struct{}, TestResp](e, func(trx *HandlerRequest[struct{}, TestResp]) {
+	).WithPath("/fin-err").WithFinalizer(func(trx *HandlerRequest[struct{}, TestResp]) {
 		finalized = true
 	})
 	if err := RegisterEndpoint(router, nil, respHandler, "GET", "/fin-err", e); err != nil {
@@ -380,8 +374,7 @@ func TestEndpoint_FinalizerRunsOnPanic(t *testing.T) {
 		func(req *struct{}, trx *HandlerRequest[struct{}, TestResp]) (TestResp, error) {
 			panic("boom")
 		},
-	).WithPath("/fin-panic")
-	WithFinalizer[struct{}, TestResp](e, func(trx *HandlerRequest[struct{}, TestResp]) {
+	).WithPath("/fin-panic").WithFinalizer(func(trx *HandlerRequest[struct{}, TestResp]) {
 		finalized = true
 	})
 	if err := RegisterEndpoint(router, nil, respHandler, "GET", "/fin-panic", e); err != nil {
@@ -412,8 +405,7 @@ func TestEndpoint_DurationSet(t *testing.T) {
 			time.Sleep(1 * time.Millisecond)
 			return TestResp{Status: "ok"}, nil
 		},
-	).WithPath("/dur")
-	WithFinalizer[struct{}, TestResp](e, func(trx *HandlerRequest[struct{}, TestResp]) {
+	).WithPath("/dur").WithFinalizer(func(trx *HandlerRequest[struct{}, TestResp]) {
 		capturedDuration = trx.Duration
 	})
 	if err := RegisterEndpoint(router, nil, respHandler, "GET", "/dur", e); err != nil {
@@ -462,43 +454,6 @@ func TestEndpoint_RecoveryHandlerNotificationOnly(t *testing.T) {
 	}
 }
 
-// TestEndpoint_MismatchedHookTypes verifies that WithInitializer panics
-// at registration time when the Req/Resp types don't match the endpoint.
-func TestEndpoint_MismatchedHookTypes(t *testing.T) {
-	e := NewEndpoint[struct{}, TestResp]("mismatch", libRequest.NoBinding,
-		func(req *struct{}, trx *HandlerRequest[struct{}, TestResp]) (TestResp, error) {
-			return TestResp{}, nil
-		},
-	)
-	defer func() {
-		if r := recover(); r == nil {
-			t.Fatal("expected panic for mismatched types")
-		}
-	}()
-	WithInitializer[CreateReq, CreateResp](e, func(trx *HandlerRequest[CreateReq, CreateResp]) error {
-		return nil
-	})
-}
-
-// TestEndpoint_MismatchedPersistenceTypes verifies that WithPersistence
-// panics at registration time when types don't match.
-func TestEndpoint_MismatchedPersistenceTypes(t *testing.T) {
-	e := NewEndpoint[struct{}, TestResp]("mismatch-persist", libRequest.NoBinding,
-		func(req *struct{}, trx *HandlerRequest[struct{}, TestResp]) (TestResp, error) {
-			return TestResp{}, nil
-		},
-	)
-	defer func() {
-		if r := recover(); r == nil {
-			t.Fatal("expected panic for mismatched persistence types")
-		}
-	}()
-	WithPersistence[CreateReq, CreateResp](e, NewPersister[CreateReq, CreateResp](
-		func(path string, trx *HandlerRequest[CreateReq, CreateResp]) error { return nil },
-		nil,
-	))
-}
-
 // TestEndpoint_TracingSpanCompletion verifies that tracing spans are
 // completed (ended) after request processing.
 func TestEndpoint_TracingSpanCompletion(t *testing.T) {
@@ -541,8 +496,7 @@ func TestEndpoint_OutcomeOnSuccess(t *testing.T) {
 		func(req *struct{}, trx *HandlerRequest[struct{}, TestResp]) (TestResp, error) {
 			return TestResp{Status: "ok"}, nil
 		},
-	).WithPath("/outcome")
-	WithFinalizer[struct{}, TestResp](e, func(trx *HandlerRequest[struct{}, TestResp]) {
+	).WithPath("/outcome").WithFinalizer(func(trx *HandlerRequest[struct{}, TestResp]) {
 		outcome = trx.Outcome
 	})
 	if err := RegisterEndpoint(router, nil, respHandler, "GET", "/outcome", e); err != nil {
@@ -573,8 +527,7 @@ func TestEndpoint_OutcomeOnError(t *testing.T) {
 		func(req *struct{}, trx *HandlerRequest[struct{}, TestResp]) (TestResp, error) {
 			return TestResp{}, errors.New("handler error")
 		},
-	).WithPath("/outcome-err")
-	WithFinalizer[struct{}, TestResp](e, func(trx *HandlerRequest[struct{}, TestResp]) {
+	).WithPath("/outcome-err").WithFinalizer(func(trx *HandlerRequest[struct{}, TestResp]) {
 		outcome = trx.Outcome
 	})
 	if err := RegisterEndpoint(router, nil, respHandler, "GET", "/outcome-err", e); err != nil {

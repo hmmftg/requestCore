@@ -13,6 +13,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"slices"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -76,7 +77,7 @@ func (s *TransactionSink) Add(attr slog.Attr) {
 func (s *TransactionSink) Entries() []slog.Attr {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	return append([]slog.Attr(nil), s.entries...)
+	return slices.Clone(s.entries)
 }
 
 // Reset clears the sink.

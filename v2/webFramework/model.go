@@ -85,16 +85,18 @@ type RequestContext struct {
 	Legacy legacy.WebFramework
 
 	// Session is the per-request session, loaded by session middleware.
-	// May be nil if session middleware has not run. Typed as any to
-	// avoid an import cycle with the session package; callers should
-	// type-assert to *session.Session.
-	Session any
+	// May be nil if session middleware has not run. Typed as SessionContext
+	// interface to avoid an import cycle with the session package while
+	// providing typed access (no type assertions needed in handlers).
+	// The concrete type is *session.Session, which satisfies SessionContext.
+	Session SessionContext
 
 	// Flash is the per-request flash, loaded by session middleware.
-	// May be nil if session middleware has not run. Typed as any to
-	// avoid an import cycle with the session package; callers should
-	// type-assert to *session.Flash.
-	Flash any
+	// May be nil if session middleware has not run. Typed as FlashContext
+	// interface to avoid an import cycle with the session package while
+	// providing typed access. The concrete type is *session.Flash, which
+	// satisfies FlashContext.
+	Flash FlashContext
 
 	// commit tracks whether the response has been written. Adapters
 	// update this from SendResponse so error dispatch and panic recovery
@@ -124,4 +126,33 @@ func (c *RequestContext) LegacyWebFramework() legacy.WebFramework {
 // and error handlers that need both v1 and v2 access.
 type WebFrameworkV2 struct {
 	RequestContext
+}
+
+// SessionContext is a minimal interface for session access from handlers.
+// It avoids an import cycle with the session package while providing
+// typed access — no `any` type assertions needed in handlers.
+//
+// The concrete *session.Session type satisfies this interface implicitly.
+type SessionContext interface {
+	Get(key string) any
+	GetString(key string) string
+	Set(key string, value any)
+	Delete(key string)
+	Clear()
+	IsDirty() bool
+	ID() string
+}
+
+// FlashContext is a minimal interface for flash message access from
+// handlers. It avoids an import cycle with the session package while
+// providing typed access.
+//
+// The concrete *session.Flash type satisfies this interface implicitly.
+type FlashContext interface {
+	Add(key, value string)
+	Get(key string) string
+	Peek(key string) string
+	Has(key string) bool
+	Clear()
+	GetAll() map[string]string
 }

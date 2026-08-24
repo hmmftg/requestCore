@@ -318,11 +318,10 @@ func (m *middlewareRouter) Head(pattern string, handler routing.Handler) error {
 // direct route registration (Handle/Get/Post/...) inherits bootstrap
 // middleware, matching the behavior of Group and With.
 func (m *middlewareRouter) wrap(h routing.Handler) routing.Handler {
-	chain := h
-	for i := len(m.middlewares) - 1; i >= 0; i-- {
-		chain = m.middlewares[i](chain)
+	if len(m.middlewares) == 0 {
+		return h
 	}
-	return chain
+	return routing.Chain(m.middlewares...)(h)
 }
 
 func (m *middlewareRouter) NotFound(handler routing.Handler) {

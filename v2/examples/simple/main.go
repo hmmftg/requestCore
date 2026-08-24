@@ -160,7 +160,7 @@ type ItemResp struct {
 // ItemResource implements resources.Resource[string] for items.
 type ItemResource struct{}
 
-func (r *ItemResource) List() *handlers.Endpoint {
+func (r *ItemResource) List() handlers.EndpointRuntime {
 	return handlers.NewEndpoint[struct{}, []ItemResp]("list-items", libRequest.NoBinding,
 		func(req *struct{}, trx *handlers.HandlerRequest[struct{}, []ItemResp]) ([]ItemResp, error) {
 			return []ItemResp{
@@ -171,7 +171,7 @@ func (r *ItemResource) List() *handlers.Endpoint {
 	)
 }
 
-func (r *ItemResource) Show() *handlers.Endpoint {
+func (r *ItemResource) Show() handlers.EndpointRuntime {
 	return handlers.NewEndpoint[struct{}, ItemResp]("show-item", libRequest.NoBinding,
 		func(req *struct{}, trx *handlers.HandlerRequest[struct{}, ItemResp]) (ItemResp, error) {
 			id, err := resources.GetParsedID[string](trx.V2, "id")
@@ -183,7 +183,7 @@ func (r *ItemResource) Show() *handlers.Endpoint {
 	)
 }
 
-func (r *ItemResource) New() *handlers.Endpoint {
+func (r *ItemResource) New() handlers.EndpointRuntime {
 	return handlers.NewEndpoint[struct{}, map[string]any]("new-item", libRequest.NoBinding,
 		func(req *struct{}, trx *handlers.HandlerRequest[struct{}, map[string]any]) (map[string]any, error) {
 			return map[string]any{"form": "item-form"}, nil
@@ -191,7 +191,7 @@ func (r *ItemResource) New() *handlers.Endpoint {
 	)
 }
 
-func (r *ItemResource) Create() *handlers.Endpoint {
+func (r *ItemResource) Create() handlers.EndpointRuntime {
 	return handlers.NewEndpoint[ItemResp, ItemResp]("create-item", libRequest.JSON,
 		func(req *ItemResp, trx *handlers.HandlerRequest[ItemResp, ItemResp]) (ItemResp, error) {
 			return ItemResp{ID: req.ID, Name: req.Name}, nil
@@ -199,7 +199,7 @@ func (r *ItemResource) Create() *handlers.Endpoint {
 	)
 }
 
-func (r *ItemResource) Edit() *handlers.Endpoint {
+func (r *ItemResource) Edit() handlers.EndpointRuntime {
 	return handlers.NewEndpoint[struct{}, ItemResp]("edit-item", libRequest.NoBinding,
 		func(req *struct{}, trx *handlers.HandlerRequest[struct{}, ItemResp]) (ItemResp, error) {
 			id, err := resources.GetParsedID[string](trx.V2, "id")
@@ -211,7 +211,7 @@ func (r *ItemResource) Edit() *handlers.Endpoint {
 	)
 }
 
-func (r *ItemResource) Update() *handlers.Endpoint {
+func (r *ItemResource) Update() handlers.EndpointRuntime {
 	return handlers.NewEndpoint[ItemResp, ItemResp]("update-item", libRequest.JSON,
 		func(req *ItemResp, trx *handlers.HandlerRequest[ItemResp, ItemResp]) (ItemResp, error) {
 			id, err := resources.GetParsedID[string](trx.V2, "id")
@@ -224,7 +224,7 @@ func (r *ItemResource) Update() *handlers.Endpoint {
 	)
 }
 
-func (r *ItemResource) Destroy() *handlers.Endpoint {
+func (r *ItemResource) Destroy() handlers.EndpointRuntime {
 	return handlers.NewEndpoint[struct{}, map[string]any]("delete-item", libRequest.NoBinding,
 		func(req *struct{}, trx *handlers.HandlerRequest[struct{}, map[string]any]) (map[string]any, error) {
 			id, err := resources.GetParsedID[string](trx.V2, "id")

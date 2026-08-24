@@ -1,20 +1,14 @@
 package handlers
 
 import (
-	"context"
 	"errors"
 	"log/slog"
 	"net/http"
 	"time"
 
-	"go.opentelemetry.io/otel/attribute"
-	"go.opentelemetry.io/otel/trace"
-
-	"github.com/hmmftg/requestCore/libContext"
 	"github.com/hmmftg/requestCore/libError"
 	"github.com/hmmftg/requestCore/libLogger"
 	"github.com/hmmftg/requestCore/libRequest"
-	"github.com/hmmftg/requestCore/libTracing"
 	"github.com/hmmftg/requestCore/response"
 	"github.com/hmmftg/requestCore/status"
 	legacy "github.com/hmmftg/requestCore/webFramework"
@@ -23,146 +17,43 @@ import (
 	v2wf "github.com/hmmftg/requestCore/v2/webFramework"
 )
 
-// buildEndpointHandler constructs a routing.Handler that runs the full v2
-// BaseHandler lifecycle for the given Endpoint. The core argument may be a
-// requestCore.RequestCoreInterface or nil; when nil, legacy infrastructure
-// is unavailable and persistence/tracing that requires it is skipped.
-func buildEndpointHandler(
-	core any,
-	respHandler *v2response.Handler,
-	endpoint *Endpoint,
-	args []any,
-) func(ctx *v2wf.RequestContext) error {
-	if respHandler == nil {
-		// Install a handler with a default fallback so the registry
-		// never encounters a fallback-less state. This prevents
-		// silent failures when respHandler is not explicitly configured.
-		reg := v2response.NewRegistry(nil)
-		reg.SetFallback(v2response.LegacyFallback(response.WebHanlder{}))
-		respHandler = v2response.NewHandler(reg, nil, response.WebHanlder{})
-	}
-	return func(ctx *v2wf.RequestContext) (err error) {
-		start := time.Now()
-
-		// Initialize the legacy WebFramework from the v2 RequestContext's
-		// LegacyContext. This preserves the v1 parser/tracing pipeline.
-		var w legacy.WebFramework
-		if ctx.LegacyContext != nil {
-			if endpoint.persistence != nil {
-				w = libContext.InitContext(ctx.LegacyContext)
-			} else {
-				w = libContext.InitContextNoAuditTrail(ctx.LegacyContext)
-			}
-		} else {
-			// Fall back to the v2-carried legacy framework (tests).
-			w = ctx.Legacy
-		}
-		// Ensure the v2 parser and legacy parser are the same instance.
-		if ctx.Legacy.Parser == nil && w.Parser != nil {
-			ctx.Legacy.Parser = w.Parser
-		}
-		libContext.AddWebLogs(w, endpoint.Title, legacy.HandlerLogTag)
-
-		// Initialize tracing if enabled. The span is ended via defer
-		// so it always completes, even on panic.
-		var span trace.Span
-		var spanCtx context.Context
-		if endpoint.EnableTracing {
-			spanName := endpoint.TracingSpanName
-			if spanName == "" {
-				spanName = endpoint.Title
-			}
-			tm := libTracing.GetGlobalTracingManager()
-			if tm != nil {
-				spanCtx, span = tm.StartSpanWithAttributes(w.Ctx, spanName, map[string]string{
-					"handler.title": endpoint.Title,
-					"handler.path":  endpoint.Path,
-				})
-			}
-			if span != nil && span.IsRecording() {
-				span.SetAttributes(
-					attribute.String("handler.title", endpoint.Title),
-					attribute.String("handler.path", endpoint.Path),
-					attribute.Bool("handler.validate_header", endpoint.ValidateHeader),
-					attribute.Bool("handler.has_persistence", endpoint.persistence != nil),
-				)
-			}
-			defer func() {
-				if span != nil {
-					if err != nil {
-						span.RecordError(err)
-						span.SetAttributes(attribute.Int("handler.error_status", committedStatus(ctx)))
-					}
-					span.SetAttributes(attribute.Int("handler.status", committedStatus(ctx)))
-					span.End()
-				}
-			}()
-		}
-
-		// Build the typed trx carrier via the endpoint's captured closure.
-		trxCarrier := endpoint.buildCarrier(core, w, ctx, args, span, spanCtx)
-
-		// Panic recovery + finalization + log collection.
-		var requestInserted bool
-		var panicVal any
-		func() {
-			defer func() {
-				panicVal = recover()
-			}()
-			err = runLifecycle(endpoint, respHandler, w, ctx, trxCarrier, &requestInserted, start)
-		}()
-
-		finalize(endpoint, respHandler, w, ctx, trxCarrier, start, requestInserted, panicVal)
-
-		// If a panic occurred, it was converted to a sanitized error
-		// response in finalize. Return nil so the router does not
-		// double-write. If the lifecycle returned an error and nothing
-		// was committed, the router registry will handle it.
-		if panicVal != nil {
-			return nil
-		}
-		if err != nil && !ctx.Committed() {
-			return err
-		}
-		return nil
-	}
-}
-
 // runLifecycle executes the parse → log → persist → init → handle → render
-// sequence. It returns an error if any step fails; the caller handles
-// response writing for errors.
-func runLifecycle(
-	endpoint *Endpoint,
+// sequence for a typed Endpoint. It returns an error if any step fails;
+// the caller handles response writing for errors.
+//
+// This is fully typed — no type assertions, no carrier struct, no
+// reflection. The Req and Resp types flow directly from Endpoint[Req, Resp].
+func runLifecycle[Req, Resp any](
+	endpoint *Endpoint[Req, Resp],
 	respHandler *v2response.Handler,
 	w legacy.WebFramework,
 	ctx *v2wf.RequestContext,
-	trxCarrier *endpointTrxCarrier,
+	trx *HandlerRequest[Req, Resp],
 	requestInserted *bool,
 	start time.Time,
 ) error {
-	// Parse the request through the root libRequest.ParseRequest using
-	// the typed closure captured in the endpoint.
-	reqPtr, header, errParse := trxCarrier.parseRequest(w)
+	// Parse the request through the root libRequest.ParseRequest.
+	req, header, errParse := libRequest.ParseRequest[Req](w, endpoint.Body, endpoint.ValidateHeader)
 	if errParse != nil {
-		if wErr := respondErrorV2(respHandler, w, ctx, trxCarrier, endpoint.Title, errParse); wErr != nil {
+		if wErr := respondErrorV2(respHandler, w, ctx, trx, endpoint.Title, errParse); wErr != nil {
 			legacy.AddLog(w, endpoint.Title+"-req-failed", slog.Any("write-error", wErr))
 			return wErr
 		}
 		legacy.AddLog(w, endpoint.Title+"-req-failed", slog.Any("error", errParse))
 		return errParse
 	}
-	trxCarrier.setHeader(header)
-	trxCarrier.setRequest(reqPtr)
+	trx.Header = header
+	trx.Request = req
 
-	w.Parser.SetLocal(libLogger.SlogRequestBody, reqPtr)
-	legacy.AddLog(w, legacy.HandlerLogTag, slog.Any("request", reqPtr))
+	w.Parser.SetLocal(libLogger.SlogRequestBody, trx.Request)
+	legacy.AddLog(w, legacy.HandlerLogTag, slog.Any("request", trx.Request))
 
 	// ID parser (runs before initializer, used by resource registration
 	// to parse URL parameters like resource IDs).
 	if endpoint.idParser != nil {
 		if errID := endpoint.idParser(ctx); errID != nil {
 			legacy.AddLog(w, legacy.HandlerLogTag, slog.Any("id-parse", errID))
-			if wErr := respondErrorV2(respHandler, w, ctx, trxCarrier, endpoint.Title, errID); wErr != nil {
+			if wErr := respondErrorV2(respHandler, w, ctx, trx, endpoint.Title, errID); wErr != nil {
 				legacy.AddLog(w, endpoint.Title+"-req-failed", slog.Any("write-error", wErr))
 				return wErr
 			}
@@ -172,9 +63,9 @@ func runLifecycle(
 	}
 
 	// Persistence insert (best-effort, but failures abort).
-	if endpoint.persistence != nil && trxCarrier.insertPersistence != nil {
-		if errInsert := trxCarrier.insertPersistence(trxCarrier); errInsert != nil {
-			if wErr := respondErrorV2(respHandler, w, ctx, trxCarrier, endpoint.Title, errInsert); wErr != nil {
+	if endpoint.persistence != nil {
+		if errInsert := endpoint.persistence.Insert(endpoint.Path, trx); errInsert != nil {
+			if wErr := respondErrorV2(respHandler, w, ctx, trx, endpoint.Title, errInsert); wErr != nil {
 				legacy.AddLog(w, endpoint.Title+"-req-failed", slog.Any("write-error", wErr))
 				return wErr
 			}
@@ -185,10 +76,10 @@ func runLifecycle(
 	}
 
 	// Initializer.
-	if trxCarrier.runInitializer != nil {
-		if errInit := trxCarrier.runInitializer(trxCarrier); errInit != nil {
+	if endpoint.initializer != nil {
+		if errInit := endpoint.initializer(trx); errInit != nil {
 			legacy.AddLog(w, legacy.HandlerLogTag, slog.Any("initialize", errInit))
-			if wErr := respondErrorV2(respHandler, w, ctx, trxCarrier, endpoint.Title, errInit); wErr != nil {
+			if wErr := respondErrorV2(respHandler, w, ctx, trx, endpoint.Title, errInit); wErr != nil {
 				legacy.AddLog(w, endpoint.Title+"-req-failed", slog.Any("write-error", wErr))
 				return wErr
 			}
@@ -198,22 +89,22 @@ func runLifecycle(
 		legacy.AddLog(w, legacy.HandlerLogTag, slog.Any("initialize", nil))
 	}
 
-	// Main handler.
-	resp, err := trxCarrier.runHandler(trxCarrier)
+	// Main handler — typed direct call, no type assertion.
+	resp, err := endpoint.handler(trx.Request, trx)
 	legacy.AddLog(w, legacy.HandlerLogTag, slog.Any("main-handler", err))
 	if err != nil {
-		if wErr := respondErrorV2(respHandler, w, ctx, trxCarrier, endpoint.Title, err); wErr != nil {
+		if wErr := respondErrorV2(respHandler, w, ctx, trx, endpoint.Title, err); wErr != nil {
 			legacy.AddLog(w, endpoint.Title+"-req-failed", slog.Any("write-error", wErr))
 			return wErr
 		}
 		legacy.AddLog(w, endpoint.Title+"-req-failed", slog.Any("error", err))
 		return err
 	}
-	trxCarrier.setResponse(resp)
+	trx.Response = resp
 	legacy.AddLog(w, legacy.HandlerLogTag, slog.Any("response", resp))
 
 	// Render success through the v2 responder.
-	if wErr := respondOKV2(respHandler, w, ctx, trxCarrier, endpoint.Title, resp); wErr != nil {
+	if wErr := respondOKV2(respHandler, w, ctx, trx, endpoint.Title, resp); wErr != nil {
 		legacy.AddLog(w, endpoint.Title+"-req-failed", slog.Any("write-error", wErr))
 		return wErr
 	}
@@ -222,18 +113,18 @@ func runLifecycle(
 
 // finalize runs the finalizer, collects logs, updates persistence
 // best-effort, and handles panic conversion to a sanitized error response.
-func finalize(
-	endpoint *Endpoint,
+func finalize[Req, Resp any](
+	endpoint *Endpoint[Req, Resp],
 	respHandler *v2response.Handler,
 	w legacy.WebFramework,
 	ctx *v2wf.RequestContext,
-	trxCarrier *endpointTrxCarrier,
+	trx *HandlerRequest[Req, Resp],
 	start time.Time,
 	requestInserted bool,
 	panicVal any,
 ) {
 	elapsed := time.Since(start)
-	trxCarrier.setDuration(elapsed)
+	trx.Duration = elapsed
 	legacy.AddLogTag(w, legacy.HandlerLogTag, slog.String("elapsed", elapsed.String()))
 
 	// Convert panic to a sanitized error. The recovery handler is
@@ -273,11 +164,11 @@ func finalize(
 				"panic in %s",
 				endpoint.Title)
 		}
-		trxCarrier.setOutcome(panicErr, http.StatusInternalServerError)
+		trx.SetOutcome(panicErr, http.StatusInternalServerError)
 	}
 
 	// Finalizer (best-effort, documented guarantee: always runs).
-	if trxCarrier.runFinalizer != nil {
+	if endpoint.finalizer != nil {
 		func() {
 			defer func() {
 				if r := recover(); r != nil {
@@ -286,7 +177,7 @@ func finalize(
 						slog.Any("panic", r))
 				}
 			}()
-			trxCarrier.runFinalizer(trxCarrier)
+			endpoint.finalizer(trx)
 		}()
 	}
 
@@ -304,8 +195,8 @@ func finalize(
 	}
 
 	// Persistence update (best-effort).
-	if endpoint.persistence != nil && requestInserted && trxCarrier.updatePersistence != nil {
-		if errUpdate := trxCarrier.updatePersistence(trxCarrier); errUpdate != nil {
+	if endpoint.persistence != nil && requestInserted {
+		if errUpdate := endpoint.persistence.Update(endpoint.Path, trx); errUpdate != nil {
 			slog.Error("request persistence update failed",
 				slog.String("handler", endpoint.Title),
 				slog.String("path", endpoint.Path),
@@ -318,7 +209,7 @@ func finalize(
 	if panicVal != nil && panicErr != nil {
 		legacy.AddLog(w, endpoint.Title+"-req-failed", slog.Any("error", panicErr))
 		if !ctx.Committed() {
-			_ = respondErrorV2(respHandler, w, ctx, trxCarrier, endpoint.Title, panicErr)
+			_ = respondErrorV2(respHandler, w, ctx, trx, endpoint.Title, panicErr)
 		}
 	}
 }
@@ -326,39 +217,53 @@ func finalize(
 // respondErrorV2 routes an error through the v2 response handler and records
 // the outcome on the typed trx. It returns any transport write error so the
 // caller can propagate it via mandatory AddLog.
-func respondErrorV2(respHandler *v2response.Handler, w legacy.WebFramework, ctx *v2wf.RequestContext, trxCarrier *endpointTrxCarrier, title string, err error) error {
+func respondErrorV2[Req, Resp any](
+	respHandler *v2response.Handler,
+	w legacy.WebFramework,
+	ctx *v2wf.RequestContext,
+	trx *HandlerRequest[Req, Resp],
+	title string,
+	err error,
+) error {
 	if err == nil {
 		return nil
 	}
 	if wErr := respHandler.Error(ctx, err); wErr != nil {
 		// Transport write failed — record the write failure.
 		legacy.AddLog(w, title+"-req-failed", slog.Any("write-error", wErr))
-		trxCarrier.setOutcome(wErr, http.StatusInternalServerError)
+		trx.SetOutcome(wErr, http.StatusInternalServerError)
 		return wErr
 	}
 	httpStatus := committedStatus(ctx)
 	if httpStatus == 0 {
 		httpStatus = http.StatusInternalServerError
 	}
-	trxCarrier.setOutcome(err, httpStatus)
+	trx.SetOutcome(err, httpStatus)
 	return nil
 }
 
 // respondOKV2 renders a successful response through the v2 responder and
 // records the outcome. It returns any transport write or renderer error.
-func respondOKV2(respHandler *v2response.Handler, w legacy.WebFramework, ctx *v2wf.RequestContext, trxCarrier *endpointTrxCarrier, title string, resp any) error {
+func respondOKV2[Req, Resp any](
+	respHandler *v2response.Handler,
+	w legacy.WebFramework,
+	ctx *v2wf.RequestContext,
+	trx *HandlerRequest[Req, Resp],
+	title string,
+	resp Resp,
+) error {
 	if wErr := respHandler.OK(ctx, resp); wErr != nil {
 		// Renderer encode or transport write failed.
 		legacy.AddLog(w, title+"-req-failed", slog.Any("write-error", wErr))
-		trxCarrier.setOutcome(wErr, http.StatusInternalServerError)
+		trx.SetOutcome(wErr, http.StatusInternalServerError)
 		return wErr
 	}
 	httpStatus := committedStatus(ctx)
 	if httpStatus == 0 {
 		httpStatus = http.StatusOK
 	}
-	trxCarrier.setOutcome(nil, httpStatus)
-	trxCarrier.markRespSent()
+	trx.SetOutcome(nil, httpStatus)
+	trx.RespSent = true
 	return nil
 }
 
@@ -379,25 +284,3 @@ func committedStatus(ctx *v2wf.RequestContext) int {
 // handlers can collect API-call log arrays in the finalizer without
 // importing the v1 handlers package directly.
 const CallAPILogEntry string = "ApiCall"
-
-// endpointTrxCarrier is a generic-free carrier that holds a pointer to the
-// typed HandlerRequest[Req, Resp]. It is populated by the endpoint's
-// captured closure so the lifecycle can mutate typed state without exposing
-// generics on the non-generic Endpoint.
-type endpointTrxCarrier struct {
-	trx any // *HandlerRequest[Req, Resp]
-
-	// typed accessors set by the endpoint closure.
-	setHeader         func(*libRequest.RequestHeader)
-	setRequest        func(any)
-	setResponse       func(any)
-	setOutcome        func(error, int)
-	setDuration       func(time.Duration)
-	markRespSent      func()
-	parseRequest      func(legacy.WebFramework) (any, *libRequest.RequestHeader, error)
-	insertPersistence func(*endpointTrxCarrier) error
-	updatePersistence func(*endpointTrxCarrier) error
-	runInitializer    func(*endpointTrxCarrier) error
-	runHandler        func(*endpointTrxCarrier) (any, error)
-	runFinalizer      func(*endpointTrxCarrier)
-}

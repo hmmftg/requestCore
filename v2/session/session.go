@@ -11,6 +11,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"maps"
 	"sync"
 	"time"
 )
@@ -147,11 +148,7 @@ func (s *Session) Save(ctx context.Context) (string, error) {
 
 // copyMap creates a shallow copy of a map[string]any.
 func copyMap(m map[string]any) map[string]any {
-	result := make(map[string]any, len(m))
-	for k, v := range m {
-		result[k] = v
-	}
-	return result
+	return maps.Clone(m)
 }
 
 // Destroy deletes the session from its store.
@@ -163,11 +160,7 @@ func (s *Session) Destroy(ctx context.Context) error {
 func (s *Session) Data() map[string]any {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	result := make(map[string]any, len(s.data))
-	for k, v := range s.data {
-		result[k] = v
-	}
-	return result
+	return maps.Clone(s.data)
 }
 
 // Store is the persistence backend for sessions.
@@ -194,4 +187,29 @@ func NewSession(store Store) *Session {
 		store:     store,
 		createdAt: time.Now(),
 	}
+}
+
+// GetTyped retrieves a value and type-asserts it to T.
+// Returns an error if the key does not exist or the value is not of type T.
+// This eliminates the need for runtime type assertions in handlers.
+func GetTyped[T any](s *Session, key string) (T, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	v, ok := s.data[key]
+	if !ok {
+		var zero T
+		return zero, fmt.Errorf("session: key %q not found", key)
+	}
+	t, ok := v.(T)
+	if !ok {
+		var zero T
+		return zero, fmt.Errorf("session: key %q is %T, not %T", key, v, zero)
+	}
+	return t, nil
+}
+
+// SetTyped stores a value of type T. This is a convenience wrapper
+// around Set that preserves compile-time type information at the call site.
+func SetTyped[T any](s *Session, key string, value T) {
+	s.Set(key, value)
 }

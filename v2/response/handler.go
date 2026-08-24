@@ -238,3 +238,16 @@ func FallbackInternalServerError(ctx *v2wf.RequestContext) {
 		[]byte(`{"errors":[{"code":"INTERNAL","description":"Internal server error"}]}`))
 	ctx.MarkCommitted(http.StatusInternalServerError)
 }
+
+// OKTyped renders a typed response with the default renderer at HTTP 200.
+// This is a convenience wrapper around OK that preserves compile-time type
+// information at the call site, eliminating the `any` parameter.
+func (h *Handler) OKTyped[Resp any](req *v2wf.RequestContext, resp Resp) error {
+	return h.OK(req, resp)
+}
+
+// OKWithStatusTyped renders a typed response with the default renderer at
+// the given status. This preserves compile-time type information.
+func (h *Handler) OKWithStatusTyped[Resp any](req *v2wf.RequestContext, status int, resp Resp) error {
+	return h.OKWithStatus(req, status, resp)
+}

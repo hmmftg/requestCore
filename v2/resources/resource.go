@@ -13,20 +13,28 @@
 // PATCH is an optional alias of Update, not a separate seventh operation.
 //
 // Each operation is independently typed with its own request and response
-// types via handlers.Endpoint, providing type safety without requiring a
-// single mega-struct. Operations that are not supported return explicit
-// 405 responses via ResourceDefaults.
+// types via handlers.Endpoint[Req, Resp], providing compile-time type
+// safety. Operations that are not supported return nil and are registered
+// with a default 405 response via ResourceDefaults.
+//
+// Two resource interfaces are provided:
+//   - Resource[ID]: simple interface returning handlers.EndpointRuntime.
+//     Implement this when you want flexibility.
+//   - TypedResource[ID, ...]: strict interface with per-operation type
+//     parameters (14 type params). Implement this for maximum compile-time
+//     type safety. Any TypedResource automatically satisfies Resource[ID]
+//     because *Endpoint[Req, Resp] implements EndpointRuntime.
 package resources
 
 import (
+	"cmp"
 	"fmt"
 	"strconv"
 
+	"github.com/hmmftg/requestCore"
 	"github.com/hmmftg/requestCore/libError"
 	"github.com/hmmftg/requestCore/libRequest"
-	"github.com/hmmftg/requestCore/response"
 	"github.com/hmmftg/requestCore/status"
-	"github.com/hmmftg/requestCore/webFramework"
 
 	"github.com/hmmftg/requestCore/v2/handlers"
 	v2response "github.com/hmmftg/requestCore/v2/response"
@@ -35,24 +43,57 @@ import (
 )
 
 // Resource defines the seven standard CRUD operations for a resource.
-// Each operation returns an Endpoint descriptor that captures its own
-// request and response types. Operations returning nil are not supported
-// and will be registered with a default 405 handler.
-type Resource[ID any] interface {
+// Each operation returns an EndpointRuntime — a type-erased interface
+// that can be registered on a router. Operations returning nil are not
+// supported and will be registered with a default 405 handler.
+//
+// ID must be cmp.Ordered (string, int, int64, float64, etc.) to ensure
+// IDs can be compared and sorted at compile time.
+type Resource[ID cmp.Ordered] interface {
 	// List returns a list of resources.
-	List() *handlers.Endpoint
+	List() handlers.EndpointRuntime
 	// Show returns a single resource by ID.
-	Show() *handlers.Endpoint
+	Show() handlers.EndpointRuntime
 	// New returns the form/data for creating a new resource.
-	New() *handlers.Endpoint
+	New() handlers.EndpointRuntime
 	// Create creates a new resource.
-	Create() *handlers.Endpoint
+	Create() handlers.EndpointRuntime
 	// Edit returns the form/data for editing a resource by ID.
-	Edit() *handlers.Endpoint
+	Edit() handlers.EndpointRuntime
 	// Update replaces a resource by ID.
-	Update() *handlers.Endpoint
+	Update() handlers.EndpointRuntime
 	// Destroy deletes a resource by ID.
-	Destroy() *handlers.Endpoint
+	Destroy() handlers.EndpointRuntime
+}
+
+// TypedResource is a strict resource interface with per-operation type
+// parameters. Implementing this interface gives compile-time type safety
+// for all 7 operations — each operation returns a fully typed
+// *handlers.Endpoint[Req, Resp].
+//
+// Any TypedResource automatically satisfies Resource[ID] because
+// *handlers.Endpoint[Req, Resp] implements handlers.EndpointRuntime.
+//
+// The 14 type parameters (7 request + 7 response types) make this
+// verbose to spell out, but it provides the strongest type safety.
+// Users who prefer simplicity can implement Resource[ID] directly.
+type TypedResource[
+	ID cmp.Ordered,
+	ListReq, ListResp any,
+	ShowReq, ShowResp any,
+	NewReq, NewResp any,
+	CreateReq, CreateResp any,
+	EditReq, EditResp any,
+	UpdateReq, UpdateResp any,
+	DestroyReq, DestroyResp any,
+] interface {
+	List() *handlers.Endpoint[ListReq, ListResp]
+	Show() *handlers.Endpoint[ShowReq, ShowResp]
+	New() *handlers.Endpoint[NewReq, NewResp]
+	Create() *handlers.Endpoint[CreateReq, CreateResp]
+	Edit() *handlers.Endpoint[EditReq, EditResp]
+	Update() *handlers.Endpoint[UpdateReq, UpdateResp]
+	Destroy() *handlers.Endpoint[DestroyReq, DestroyResp]
 }
 
 // ResourceDefaults holds default endpoint handlers for unsupported operations.
@@ -80,11 +121,11 @@ type CustomOperation struct {
 	Path string
 
 	// Endpoint is the typed endpoint descriptor for the operation.
-	Endpoint *handlers.Endpoint
+	Endpoint handlers.EndpointRuntime
 }
 
 // Config holds the configuration for registering a resource.
-type Config[ID any] struct {
+type Config[ID cmp.Ordered] struct {
 	// Path is the base path for the resource (e.g. "/users").
 	Path string
 
@@ -92,8 +133,8 @@ type Config[ID any] struct {
 	Resource Resource[ID]
 
 	// Core is the v1 RequestCoreInterface for infrastructure access.
-	// May be nil.
-	Core any
+	// May be nil for pure v2 applications.
+	Core requestCore.RequestCoreInterface
 
 	// RespHandler is the v2 response handler.
 	RespHandler *v2response.Handler
@@ -123,7 +164,7 @@ type Config[ID any] struct {
 // Register registers all seven resource operations on the given router.
 // Static routes (/new, /{id}/edit) are registered before /{id} routes
 // to ensure correct precedence on all adapters.
-func Register[ID any](router routing.RouteGroup, config Config[ID]) error {
+func Register[ID cmp.Ordered](router routing.RouteGroup, config Config[ID]) error {
 	idParam := config.IDParam
 	if idParam == "" {
 		idParam = "id"
@@ -134,8 +175,8 @@ func Register[ID any](router routing.RouteGroup, config Config[ID]) error {
 	// Register static routes first (before /{id}) for correct precedence.
 	// New: GET /{resource}/new
 	if op := config.Resource.New(); op != nil {
-		op = op.WithPath(basePath + "/new")
-		if err := handlers.RegisterEndpoint(router, config.Core, config.RespHandler, "GET", basePath+"/new", op); err != nil {
+		setEndpointPath(op, basePath+"/new")
+		if err := handlers.RegisterRuntime(router, config.Core, config.RespHandler, "GET", basePath+"/new", op); err != nil {
 			return err
 		}
 	} else if config.Defaults != nil {
@@ -146,9 +187,9 @@ func Register[ID any](router routing.RouteGroup, config Config[ID]) error {
 
 	// Edit: GET /{resource}/{id}/edit
 	if op := config.Resource.Edit(); op != nil {
-		op = op.WithPath(basePath + "/{" + idParam + "}/edit")
-		op = withIDParser[ID](op, config, idParam)
-		if err := handlers.RegisterEndpoint(router, config.Core, config.RespHandler, "GET", basePath+"/{"+idParam+"}/edit", op); err != nil {
+		setEndpointPath(op, basePath+"/{"+idParam+"}/edit")
+		withIDParser[ID](op, config, idParam)
+		if err := handlers.RegisterRuntime(router, config.Core, config.RespHandler, "GET", basePath+"/{"+idParam+"}/edit", op); err != nil {
 			return err
 		}
 	} else if config.Defaults != nil {
@@ -162,16 +203,16 @@ func Register[ID any](router routing.RouteGroup, config Config[ID]) error {
 	// (e.g. POST /parameters/reload must not match /{id}).
 	for _, cop := range config.Custom {
 		copPath := basePath + cop.Path
-		ep := cop.Endpoint.WithPath(copPath)
-		if err := handlers.RegisterEndpoint(router, config.Core, config.RespHandler, cop.Method, copPath, ep); err != nil {
+		setEndpointPath(cop.Endpoint, copPath)
+		if err := handlers.RegisterRuntime(router, config.Core, config.RespHandler, cop.Method, copPath, cop.Endpoint); err != nil {
 			return fmt.Errorf("resources: custom operation %s %s: %w", cop.Method, copPath, err)
 		}
 	}
 
 	// List: GET /{resource}
 	if op := config.Resource.List(); op != nil {
-		op = op.WithPath(basePath)
-		if err := handlers.RegisterEndpoint(router, config.Core, config.RespHandler, "GET", basePath, op); err != nil {
+		setEndpointPath(op, basePath)
+		if err := handlers.RegisterRuntime(router, config.Core, config.RespHandler, "GET", basePath, op); err != nil {
 			return err
 		}
 	} else if config.Defaults != nil {
@@ -182,8 +223,8 @@ func Register[ID any](router routing.RouteGroup, config Config[ID]) error {
 
 	// Create: POST /{resource}
 	if op := config.Resource.Create(); op != nil {
-		op = op.WithPath(basePath)
-		if err := handlers.RegisterEndpoint(router, config.Core, config.RespHandler, "POST", basePath, op); err != nil {
+		setEndpointPath(op, basePath)
+		if err := handlers.RegisterRuntime(router, config.Core, config.RespHandler, "POST", basePath, op); err != nil {
 			return err
 		}
 	} else if config.Defaults != nil {
@@ -194,9 +235,9 @@ func Register[ID any](router routing.RouteGroup, config Config[ID]) error {
 
 	// Show: GET /{resource}/{id}
 	if op := config.Resource.Show(); op != nil {
-		op = op.WithPath(idPath)
-		op = withIDParser[ID](op, config, idParam)
-		if err := handlers.RegisterEndpoint(router, config.Core, config.RespHandler, "GET", idPath, op); err != nil {
+		setEndpointPath(op, idPath)
+		withIDParser[ID](op, config, idParam)
+		if err := handlers.RegisterRuntime(router, config.Core, config.RespHandler, "GET", idPath, op); err != nil {
 			return err
 		}
 	} else if config.Defaults != nil {
@@ -207,14 +248,14 @@ func Register[ID any](router routing.RouteGroup, config Config[ID]) error {
 
 	// Update: PUT /{resource}/{id}
 	if op := config.Resource.Update(); op != nil {
-		op = op.WithPath(idPath)
-		op = withIDParser[ID](op, config, idParam)
-		if err := handlers.RegisterEndpoint(router, config.Core, config.RespHandler, "PUT", idPath, op); err != nil {
+		setEndpointPath(op, idPath)
+		withIDParser[ID](op, config, idParam)
+		if err := handlers.RegisterRuntime(router, config.Core, config.RespHandler, "PUT", idPath, op); err != nil {
 			return err
 		}
 		// Optional PATCH alias.
 		if config.EnablePatchAlias {
-			if err := handlers.RegisterEndpoint(router, config.Core, config.RespHandler, "PATCH", idPath, op); err != nil {
+			if err := handlers.RegisterRuntime(router, config.Core, config.RespHandler, "PATCH", idPath, op); err != nil {
 				return err
 			}
 		}
@@ -226,9 +267,9 @@ func Register[ID any](router routing.RouteGroup, config Config[ID]) error {
 
 	// Destroy: DELETE /{resource}/{id}
 	if op := config.Resource.Destroy(); op != nil {
-		op = op.WithPath(idPath)
-		op = withIDParser[ID](op, config, idParam)
-		if err := handlers.RegisterEndpoint(router, config.Core, config.RespHandler, "DELETE", idPath, op); err != nil {
+		setEndpointPath(op, idPath)
+		withIDParser[ID](op, config, idParam)
+		if err := handlers.RegisterRuntime(router, config.Core, config.RespHandler, "DELETE", idPath, op); err != nil {
 			return err
 		}
 	} else if config.Defaults != nil {
@@ -240,13 +281,24 @@ func Register[ID any](router routing.RouteGroup, config Config[ID]) error {
 	return nil
 }
 
-// withIDParser wraps an endpoint to parse the ID parameter before the
-// handler runs. The parsed ID is stored in the request context's Legacy
-// parser locals under the IDParam key.
-func withIDParser[ID any](e *handlers.Endpoint, config Config[ID], idParam string) *handlers.Endpoint {
-	// We inject ID parsing via WithIDParser, which runs before the
-	// initializer and receives the v2 RequestContext directly.
-	e.WithIDParser(func(ctx *v2wf.RequestContext) error {
+// setEndpointPath sets the path on an EndpointRuntime if it also
+// implements ConfigurableEndpoint. Endpoints that don't support
+// configuration are left unchanged.
+func setEndpointPath(ep handlers.EndpointRuntime, path string) {
+	if setter, ok := ep.(handlers.ConfigurableEndpoint); ok {
+		setter.SetPath(path)
+	}
+}
+
+// withIDParser injects an ID parser into an EndpointRuntime if it
+// also implements ConfigurableEndpoint. The parsed ID is stored in
+// the request context's parser locals under the IDParam key.
+func withIDParser[ID cmp.Ordered](ep handlers.EndpointRuntime, config Config[ID], idParam string) {
+	setter, ok := ep.(handlers.ConfigurableEndpoint)
+	if !ok {
+		return
+	}
+	setter.SetIDParser(func(ctx *v2wf.RequestContext) error {
 		raw := ctx.Parser.GetURLParam(idParam)
 		id, err := parseID[ID](config, raw)
 		if err != nil {
@@ -262,14 +314,13 @@ func withIDParser[ID any](e *handlers.Endpoint, config Config[ID], idParam strin
 		}
 		return nil
 	})
-	return e
 }
 
 // parseID converts a string URL parameter to the ID type.
 // If IDParser is configured, it is used. Otherwise, the string is used
 // directly for string IDs. For non-string IDs without an IDParser, a
 // 400 error is returned.
-func parseID[ID any](config Config[ID], raw string) (ID, error) {
+func parseID[ID cmp.Ordered](config Config[ID], raw string) (ID, error) {
 	if config.IDParser != nil {
 		return config.IDParser(raw)
 	}
@@ -319,7 +370,7 @@ func registerDefault405(router routing.RouteGroup, defaults *ResourceDefaults, r
 // GetParsedID retrieves a parsed ID from the request context's locals.
 // This is used by resource handlers to access the ID parsed by withIDParser.
 // The RequestContext is available on the HandlerRequest's V2 field.
-func GetParsedID[ID any](ctx *v2wf.RequestContext, idParam string) (ID, error) {
+func GetParsedID[ID cmp.Ordered](ctx *v2wf.RequestContext, idParam string) (ID, error) {
 	key := idParam + "_parsed"
 	// Check ctx.Parser first (the v2 parser), then ctx.Legacy.Parser.
 	var v any
@@ -341,7 +392,76 @@ func GetParsedID[ID any](ctx *v2wf.RequestContext, idParam string) (ID, error) {
 	return id, nil
 }
 
+// ResourceBuilder provides a fluent API for constructing and registering
+// resources without spelling out all type parameters at the call site.
+// It is the recommended way to register resources in application code.
+type ResourceBuilder[ID cmp.Ordered] struct {
+	path       string
+	idParam    string
+	idParser   func(string) (ID, error)
+	patchAlias bool
+	defaults   *ResourceDefaults
+	customs    []CustomOperation
+}
+
+// NewResource creates a ResourceBuilder for the given base path.
+// The ID type parameter must be cmp.Ordered (string, int, int64, etc.).
+func NewResource[ID cmp.Ordered](path string) *ResourceBuilder[ID] {
+	return &ResourceBuilder[ID]{path: path, idParam: "id"}
+}
+
+// WithIDParam sets the URL parameter name for the resource ID.
+// Default: "id".
+func (b *ResourceBuilder[ID]) WithIDParam(name string) *ResourceBuilder[ID] {
+	b.idParam = name
+	return b
+}
+
+// WithIDParser sets a custom ID parser function.
+func (b *ResourceBuilder[ID]) WithIDParser(fn func(string) (ID, error)) *ResourceBuilder[ID] {
+	b.idParser = fn
+	return b
+}
+
+// EnablePatch enables PATCH as an alias for Update on the /{id} path.
+func (b *ResourceBuilder[ID]) EnablePatch() *ResourceBuilder[ID] {
+	b.patchAlias = true
+	return b
+}
+
+// WithDefaults sets the ResourceDefaults for 405 handlers on
+// unsupported operations.
+func (b *ResourceBuilder[ID]) WithDefaults(d *ResourceDefaults) *ResourceBuilder[ID] {
+	b.defaults = d
+	return b
+}
+
+// WithCustom adds custom (non-CRUD) operations to the resource.
+func (b *ResourceBuilder[ID]) WithCustom(ops ...CustomOperation) *ResourceBuilder[ID] {
+	b.customs = append(b.customs, ops...)
+	return b
+}
+
+// Register registers all resource operations on the given router using
+// the builder's configuration.
+func (b *ResourceBuilder[ID]) Register(
+	router routing.RouteGroup,
+	core requestCore.RequestCoreInterface,
+	respHandler *v2response.Handler,
+	resource Resource[ID],
+) error {
+	return Register(router, Config[ID]{
+		Path:             b.path,
+		Resource:         resource,
+		Core:             core,
+		RespHandler:      respHandler,
+		IDParam:          b.idParam,
+		IDParser:         b.idParser,
+		EnablePatchAlias: b.patchAlias,
+		Defaults:         b.defaults,
+		Custom:           b.customs,
+	})
+}
+
 // Suppress unused import warnings for types used in signatures.
 var _ = libRequest.JSON
-var _ = webFramework.WebFramework{}
-var _ response.ResponseHandler

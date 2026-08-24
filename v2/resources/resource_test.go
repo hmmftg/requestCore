@@ -51,7 +51,7 @@ func newTestResource() *TestResource {
 	}
 }
 
-func (r *TestResource) List() *handlers.Endpoint {
+func (r *TestResource) List() handlers.EndpointRuntime {
 	return handlers.NewEndpoint[struct{}, []TestItem]("list", libRequest.NoBinding,
 		func(req *struct{}, trx *handlers.HandlerRequest[struct{}, []TestItem]) ([]TestItem, error) {
 			items := make([]TestItem, 0, len(r.items))
@@ -63,7 +63,7 @@ func (r *TestResource) List() *handlers.Endpoint {
 	)
 }
 
-func (r *TestResource) Show() *handlers.Endpoint {
+func (r *TestResource) Show() handlers.EndpointRuntime {
 	return handlers.NewEndpoint[struct{}, TestItem]("show", libRequest.NoBinding,
 		func(req *struct{}, trx *handlers.HandlerRequest[struct{}, TestItem]) (TestItem, error) {
 			id, err := GetParsedID[string](trx.V2, "id")
@@ -79,7 +79,7 @@ func (r *TestResource) Show() *handlers.Endpoint {
 	)
 }
 
-func (r *TestResource) New() *handlers.Endpoint {
+func (r *TestResource) New() handlers.EndpointRuntime {
 	return handlers.NewEndpoint[struct{}, TestItem]("new", libRequest.NoBinding,
 		func(req *struct{}, trx *handlers.HandlerRequest[struct{}, TestItem]) (TestItem, error) {
 			return TestItem{}, nil
@@ -87,7 +87,7 @@ func (r *TestResource) New() *handlers.Endpoint {
 	)
 }
 
-func (r *TestResource) Create() *handlers.Endpoint {
+func (r *TestResource) Create() handlers.EndpointRuntime {
 	return handlers.NewEndpoint[TestItem, TestItem]("create", libRequest.JSON,
 		func(req *TestItem, trx *handlers.HandlerRequest[TestItem, TestItem]) (TestItem, error) {
 			r.items[req.ID] = *req
@@ -96,7 +96,7 @@ func (r *TestResource) Create() *handlers.Endpoint {
 	)
 }
 
-func (r *TestResource) Edit() *handlers.Endpoint {
+func (r *TestResource) Edit() handlers.EndpointRuntime {
 	return handlers.NewEndpoint[struct{}, TestItem]("edit", libRequest.NoBinding,
 		func(req *struct{}, trx *handlers.HandlerRequest[struct{}, TestItem]) (TestItem, error) {
 			id, err := GetParsedID[string](trx.V2, "id")
@@ -112,7 +112,7 @@ func (r *TestResource) Edit() *handlers.Endpoint {
 	)
 }
 
-func (r *TestResource) Update() *handlers.Endpoint {
+func (r *TestResource) Update() handlers.EndpointRuntime {
 	return handlers.NewEndpoint[TestItem, TestItem]("update", libRequest.JSON,
 		func(req *TestItem, trx *handlers.HandlerRequest[TestItem, TestItem]) (TestItem, error) {
 			id, err := GetParsedID[string](trx.V2, "id")
@@ -129,7 +129,7 @@ func (r *TestResource) Update() *handlers.Endpoint {
 	)
 }
 
-func (r *TestResource) Destroy() *handlers.Endpoint {
+func (r *TestResource) Destroy() handlers.EndpointRuntime {
 	return handlers.NewEndpoint[struct{}, struct{}]("destroy", libRequest.NoBinding,
 		func(req *struct{}, trx *handlers.HandlerRequest[struct{}, struct{}]) (struct{}, error) {
 			id, err := GetParsedID[string](trx.V2, "id")
@@ -199,16 +199,16 @@ func TestRegister_NilHandlerSkipped(t *testing.T) {
 	// A resource that returns nil for Create.
 	partialResource := struct {
 		*TestResource
-		CreateFn func() *handlers.Endpoint
+		CreateFn func() handlers.EndpointRuntime
 	}{
 		TestResource: newTestResource(),
-		CreateFn:     func() *handlers.Endpoint { return nil },
+		CreateFn:     func() handlers.EndpointRuntime { return nil },
 	}
 
 	// Use a wrapper that returns nil for Create.
 	wrapper := &partialResourceWrapper{
 		TestResource: partialResource.TestResource,
-		createFn:     func() *handlers.Endpoint { return nil },
+		createFn:     func() handlers.EndpointRuntime { return nil },
 	}
 
 	err := Register[string](router, Config[string]{
@@ -232,10 +232,10 @@ func TestRegister_NilHandlerSkipped(t *testing.T) {
 
 type partialResourceWrapper struct {
 	*TestResource
-	createFn func() *handlers.Endpoint
+	createFn func() handlers.EndpointRuntime
 }
 
-func (w *partialResourceWrapper) Create() *handlers.Endpoint {
+func (w *partialResourceWrapper) Create() handlers.EndpointRuntime {
 	return w.createFn()
 }
 
@@ -283,13 +283,13 @@ func TestRegister_Defaults405(t *testing.T) {
 
 type emptyResourceImpl struct{}
 
-func (e *emptyResourceImpl) List() *handlers.Endpoint    { return nil }
-func (e *emptyResourceImpl) Show() *handlers.Endpoint    { return nil }
-func (e *emptyResourceImpl) New() *handlers.Endpoint     { return nil }
-func (e *emptyResourceImpl) Create() *handlers.Endpoint  { return nil }
-func (e *emptyResourceImpl) Edit() *handlers.Endpoint    { return nil }
-func (e *emptyResourceImpl) Update() *handlers.Endpoint  { return nil }
-func (e *emptyResourceImpl) Destroy() *handlers.Endpoint { return nil }
+func (e *emptyResourceImpl) List() handlers.EndpointRuntime    { return nil }
+func (e *emptyResourceImpl) Show() handlers.EndpointRuntime    { return nil }
+func (e *emptyResourceImpl) New() handlers.EndpointRuntime     { return nil }
+func (e *emptyResourceImpl) Create() handlers.EndpointRuntime  { return nil }
+func (e *emptyResourceImpl) Edit() handlers.EndpointRuntime    { return nil }
+func (e *emptyResourceImpl) Update() handlers.EndpointRuntime  { return nil }
+func (e *emptyResourceImpl) Destroy() handlers.EndpointRuntime { return nil }
 
 func TestRegister_PatchAlias(t *testing.T) {
 	engine := gin.New()
@@ -349,14 +349,14 @@ func TestRegister_IntID(t *testing.T) {
 
 type intIDResource struct{}
 
-func (r *intIDResource) List() *handlers.Endpoint    { return nil }
-func (r *intIDResource) New() *handlers.Endpoint     { return nil }
-func (r *intIDResource) Create() *handlers.Endpoint  { return nil }
-func (r *intIDResource) Edit() *handlers.Endpoint    { return nil }
-func (r *intIDResource) Update() *handlers.Endpoint  { return nil }
-func (r *intIDResource) Destroy() *handlers.Endpoint { return nil }
+func (r *intIDResource) List() handlers.EndpointRuntime    { return nil }
+func (r *intIDResource) New() handlers.EndpointRuntime     { return nil }
+func (r *intIDResource) Create() handlers.EndpointRuntime  { return nil }
+func (r *intIDResource) Edit() handlers.EndpointRuntime    { return nil }
+func (r *intIDResource) Update() handlers.EndpointRuntime  { return nil }
+func (r *intIDResource) Destroy() handlers.EndpointRuntime { return nil }
 
-func (r *intIDResource) Show() *handlers.Endpoint {
+func (r *intIDResource) Show() handlers.EndpointRuntime {
 	return handlers.NewEndpoint[struct{}, map[string]int]("show", libRequest.NoBinding,
 		func(req *struct{}, trx *handlers.HandlerRequest[struct{}, map[string]int]) (map[string]int, error) {
 			id, err := GetParsedID[int](trx.V2, "id")
@@ -397,19 +397,19 @@ func TestRegister_PanicRecovery(t *testing.T) {
 
 type panicResourceImpl struct{}
 
-func (r *panicResourceImpl) List() *handlers.Endpoint {
+func (r *panicResourceImpl) List() handlers.EndpointRuntime {
 	return handlers.NewEndpoint[struct{}, []TestItem]("list", libRequest.NoBinding,
 		func(req *struct{}, trx *handlers.HandlerRequest[struct{}, []TestItem]) ([]TestItem, error) {
 			panic("resource panic")
 		},
 	)
 }
-func (r *panicResourceImpl) Show() *handlers.Endpoint    { return nil }
-func (r *panicResourceImpl) New() *handlers.Endpoint     { return nil }
-func (r *panicResourceImpl) Create() *handlers.Endpoint  { return nil }
-func (r *panicResourceImpl) Edit() *handlers.Endpoint    { return nil }
-func (r *panicResourceImpl) Update() *handlers.Endpoint  { return nil }
-func (r *panicResourceImpl) Destroy() *handlers.Endpoint { return nil }
+func (r *panicResourceImpl) Show() handlers.EndpointRuntime    { return nil }
+func (r *panicResourceImpl) New() handlers.EndpointRuntime     { return nil }
+func (r *panicResourceImpl) Create() handlers.EndpointRuntime  { return nil }
+func (r *panicResourceImpl) Edit() handlers.EndpointRuntime    { return nil }
+func (r *panicResourceImpl) Update() handlers.EndpointRuntime  { return nil }
+func (r *panicResourceImpl) Destroy() handlers.EndpointRuntime { return nil }
 
 // reloadResp is the response type for the custom Reload operation.
 type reloadResp struct {

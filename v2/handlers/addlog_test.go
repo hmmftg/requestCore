@@ -7,8 +7,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/gin-gonic/gin"
 	"log/slog"
+
+	"github.com/gin-gonic/gin"
 
 	"github.com/hmmftg/requestCore/libRequest"
 	"github.com/hmmftg/requestCore/response"
@@ -162,8 +163,7 @@ func TestAddLog_InitializerFailureEmitsReqFailed(t *testing.T) {
 			capturedParser = trx.V2.Parser
 			return TestResp{}, errors.New("handler should not run")
 		},
-	).WithPath("/init-fail")
-	WithInitializer[struct{}, TestResp](e, func(trx *HandlerRequest[struct{}, TestResp]) error {
+	).WithPath("/init-fail").WithInitializer(func(trx *HandlerRequest[struct{}, TestResp]) error {
 		capturedParser = trx.V2.Parser
 		return errors.New("initializer failed")
 	})
