@@ -3,10 +3,13 @@ package session
 import (
 	"context"
 	"errors"
+	"log/slog"
 	"net/http"
+	"strings"
 	"testing"
 
 	v2wf "github.com/hmmftg/requestCore/v2/webFramework"
+	legacy "github.com/hmmftg/requestCore/webFramework"
 )
 
 // failingStore is a Store that always returns an error on Save.
@@ -243,5 +246,58 @@ func TestMiddleware_LoadErrorCreatesFreshSession(t *testing.T) {
 		}
 	} else {
 		t.Fatal("expected *Session type assertion to succeed")
+	}
+}
+
+// TestMiddleware_LoadErrorEmitsAddLog verifies that a session load failure
+// emits a mandatory "session-load-failed" AddLog entry via the legacy
+// parser pipeline, and that the raw cookie token is never logged.
+func TestMiddleware_LoadErrorEmitsAddLog(t *testing.T) {
+	manager := NewManager(failingStore{})
+
+	parser := v2wf.NewFakeParserV2()
+	parser.Cookies["sess"] = "invalid-token"
+
+	commit := &v2wf.CommitState{}
+	parser.SetCommitState(commit)
+
+	ctx := &v2wf.RequestContext{
+		Parser: parser,
+		Legacy: legacy.WebFramework{Parser: parser},
+	}
+	ctx.SetCommitState(commit)
+	ctx.Context = context.Background()
+
+	mw := MiddlewareWithConfig(MiddlewareConfig{
+		Manager:         manager,
+		CookieName:      "sess",
+		SaveFailureMode: SaveStrict,
+	})
+	handler := mw(func(c *v2wf.RequestContext) error {
+		return nil
+	})
+
+	if err := handler(ctx); err != nil {
+		t.Fatalf("middleware: %v", err)
+	}
+
+	// Verify the session-load-failed AddLog entry was emitted.
+	key := "LOG_ARRAY_session-load-failed"
+	v := parser.GetLocal(key)
+	if v == nil {
+		t.Fatalf("expected AddLog entry for %q, got nil", key)
+	}
+	arr, ok := v.([]slog.Attr)
+	if !ok {
+		t.Fatalf("expected []slog.Attr, got %T", v)
+	}
+	if len(arr) == 0 {
+		t.Fatal("expected at least one attr in session-load-failed array")
+	}
+	// Verify the raw cookie token is never present in the logged attrs.
+	for _, a := range arr {
+		if strings.Contains(a.Value.String(), "invalid-token") {
+			t.Fatalf("raw cookie token must not be logged, found in attr %s: %s", a.Key, a.Value.String())
+		}
 	}
 }

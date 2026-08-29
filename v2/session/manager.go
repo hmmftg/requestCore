@@ -24,7 +24,12 @@ func (m *Manager) Store() Store {
 
 // LoadFromCookie extracts the session token from the named cookie
 // and loads the session from the store.
-// If the cookie is absent, a new empty session is returned.
+// If the cookie is absent, a new empty session is returned with nil error.
+// If the cookie is present but cannot be loaded (invalid signature,
+// unknown version, decryption failure, malformed/oversized token, or
+// store error), a non-nil error is returned along with a fresh empty
+// session. The caller is responsible for emitting a security/transaction
+// failure event and must never log the raw cookieValue.
 func (m *Manager) LoadFromCookie(ctx context.Context, cookieName, cookieValue string) (*Session, *Flash, error) {
 	if cookieValue == "" {
 		sess := NewSession(m.store)
@@ -33,8 +38,9 @@ func (m *Manager) LoadFromCookie(ctx context.Context, cookieName, cookieValue st
 
 	sess, err := m.store.Load(ctx, cookieValue)
 	if err != nil {
-		sess = NewSession(m.store)
-		return sess, NewFlash(), nil
+		// Return a fresh session and the error so the middleware can
+		// log the failure event before continuing with a new session.
+		return NewSession(m.store), NewFlash(), err
 	}
 
 	flash := LoadFlashFromSession(sess)

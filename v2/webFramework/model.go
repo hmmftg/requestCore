@@ -57,8 +57,10 @@ type RequestParser interface {
 	// also execute hooks such as session cookie persistence.
 	//
 	// The function is idempotent: repeated calls return nil after the
-	// first invocation. Hook errors are logged inside the runner and do
-	// not block the write.
+	// first invocation. If the runner returns a non-nil error, SendResponse
+	// must abort the write and return the error so the response is not
+	// committed as a success. This is the mechanism by which strict-mode
+	// session save failure prevents the pending success response.
 	SetBeforeCommitHookRunner(fn func() error)
 }
 

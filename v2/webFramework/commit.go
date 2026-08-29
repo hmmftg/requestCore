@@ -55,11 +55,11 @@ func (c *CommitState) Status() int {
 //   - Other hooks should be best-effort: log errors via webFramework.AddLog
 //     but return nil so the response can still be committed.
 //
-// When a hook returns a non-nil error, the parser's SendResponse still
-// proceeds with the write (the hook error is logged via addLogFailure).
-// The session middleware in strict mode returns the error before the
-// parser write path is reached, because RunBeforeCommitHooks is called
-// before SendResponse in the commit path.
+// When a hook returns a non-nil error, both response.Handler.commit and
+// the parser's SendResponse abort the write and return the error so the
+// response is NOT committed as a success. The adapter's error dispatch
+// then handles the error response. This is the mechanism by which strict
+// session save failure prevents the pending success response.
 type BeforeCommitHook func(*RequestContext) error
 
 // AddBeforeCommitHook registers a hook to be invoked before the response is
@@ -78,8 +78,11 @@ func (c *RequestContext) AddBeforeCommitHook(hook BeforeCommitHook) {
 // This method is idempotent: the first call runs all hooks and subsequent
 // calls return nil without re-running them. This ensures hooks run exactly
 // once whether triggered by the parser's SendResponse or by
-// response.Handler.commit. Errors are collected but do not abort the commit;
-// the first error is returned for logging purposes.
+// response.Handler.commit. All hooks are run even if one fails; the first
+// error is returned so the caller can decide whether to abort the commit.
+// response.Handler.commit aborts on hook error (preventing a success
+// response); response.commitError logs the error but still writes the
+// error response.
 func (c *RequestContext) RunBeforeCommitHooks() error {
 	c.hooksMu.Lock()
 	if c.hooksRan {

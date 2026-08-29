@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 
 	legacyLibNetHttp "github.com/hmmftg/requestCore/libNetHttp"
 	legacy "github.com/hmmftg/requestCore/webFramework"
@@ -24,21 +25,36 @@ type NetHTTPRouter struct {
 	responseWriterFactory func(*http.Request, http.ResponseWriter) *NetHTTPParserV2
 	registry              response.Registry
 	respHandler           *response.Handler
+	// registeredRoutes tracks method+pattern pairs for 405 dispatch when
+	// a catch-all NotFound handler would otherwise shadow method mismatches.
+	// It is a pointer so that With-derived routers share the same slice
+	// as the root router, ensuring all routes are visible to 405 detection.
+	registeredRoutes *[]routeEntry
+}
+
+// routeEntry records a registered method and pattern for 405 checks.
+type routeEntry struct {
+	method  string
+	pattern string
 }
 
 // NewRouter creates a new NetHTTPRouter with a new http.ServeMux.
 func NewRouter() *NetHTTPRouter {
+	routes := make([]routeEntry, 0)
 	return &NetHTTPRouter{
 		mux:                   http.NewServeMux(),
 		responseWriterFactory: InitContextV2,
+		registeredRoutes:      &routes,
 	}
 }
 
 // NewRouterFromMux creates a new NetHTTPRouter from an existing http.ServeMux.
 func NewRouterFromMux(mux *http.ServeMux) *NetHTTPRouter {
+	routes := make([]routeEntry, 0)
 	return &NetHTTPRouter{
 		mux:                   mux,
 		responseWriterFactory: InitContextV2,
+		registeredRoutes:      &routes,
 	}
 }
 
@@ -52,11 +68,11 @@ func (r *NetHTTPRouter) SetErrorHandler(handler *response.Handler) {
 	r.registry = handler.Registry()
 }
 
-// Native returns the underlying http.ServeMux, wrapped with 405
-// interception if a MethodNotAllowed handler has been configured.
+// Native returns the underlying http.ServeMux, wrapped with 404/405
+// interception if a NotFound or MethodNotAllowed handler has been configured.
 func (r *NetHTTPRouter) Native() any {
-	if r.methodNA != nil {
-		return r.intercept405(r.mux)
+	if r.notFound != nil || r.methodNA != nil {
+		return r.intercept404_405(r.mux)
 	}
 	return r.mux
 }
@@ -84,6 +100,7 @@ func (r *NetHTTPRouter) With(middleware ...routing.Middleware) routing.RouteGrou
 		responseWriterFactory: r.responseWriterFactory,
 		registry:              r.registry,
 		respHandler:           r.respHandler,
+		registeredRoutes:      r.registeredRoutes,
 	}
 }
 
@@ -98,6 +115,7 @@ func (r *NetHTTPRouter) Handle(method, pattern string, handler routing.Handler) 
 	muxPattern := method + " " + pattern
 	wrapped := r.wrapHandler(handler, r.middlewares)
 	r.mux.HandleFunc(muxPattern, wrapped)
+	*r.registeredRoutes = append(*r.registeredRoutes, routeEntry{method: method, pattern: pattern})
 	return nil
 }
 
@@ -131,59 +149,134 @@ func (r *NetHTTPRouter) Head(pattern string, handler routing.Handler) error {
 	return r.Handle("HEAD", pattern, handler)
 }
 
-// NotFound sets the handler for unmatched routes.
+// NotFound sets the handler for unmatched routes. The handler is dispatched
+// by the intercept404_405 wrapper returned by Native(); it is NOT registered
+// as a catch-all on the mux because that would shadow Go 1.22+ ServeMux's
+// automatic 405 responses for method mismatches on registered patterns.
 func (r *NetHTTPRouter) NotFound(handler routing.Handler) {
 	r.notFound = handler
-	r.mux.HandleFunc("/", r.wrapHandler(handler, r.middlewares))
 }
 
-// MethodNotAllowed sets the handler for disallowed methods.
-// Go 1.22+ ServeMux handles 405 automatically by writing a 405 response.
-// We wrap the mux to intercept 405 responses and route them through the
-// v2 response handler/registry.
+// MethodNotAllowed sets the handler for disallowed methods. The handler is
+// dispatched by the intercept404_405 wrapper returned by Native().
 func (r *NetHTTPRouter) MethodNotAllowed(handler routing.Handler) {
 	r.methodNA = handler
 }
 
-// intercept405 wraps the mux handler to intercept 405 responses from
-// Go 1.22+ ServeMux and dispatch them through the v2 handler. It buffers
-// the mux's response so the 405 body can be replaced with the v2 handler's
-// response.
-func (r *NetHTTPRouter) intercept405(next http.Handler) http.Handler {
-	if r.methodNA == nil {
-		return next
-	}
+// intercept404_405 wraps the mux handler to intercept 404 and 405 responses
+// from Go 1.22+ ServeMux and dispatch them through the v2 handler pipeline.
+// A 405 is dispatched to the methodNA handler; a 404 is dispatched to the
+// notFound handler. If only one of the two is configured, the other falls
+// through to the mux's default response.
+func (r *NetHTTPRouter) intercept404_405(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		rec := httptest.NewRecorder()
 		next.ServeHTTP(rec, req)
-		if rec.Code == http.StatusMethodNotAllowed && r.methodNA != nil {
-			// Dispatch the 405 handler through the v2 pipeline with
-			// the real ResponseWriter.
-			parser := r.responseWriterFactory(req, w)
-			commit := &v2wf.CommitState{}
-			parser.SetCommitState(commit)
-			legacyCtx := legacyLibNetHttp.WithRequestResponse(req.Context(), req, w)
-			reqCtx := &v2wf.RequestContext{
-				Context:       req.Context(),
-				LegacyContext: legacyCtx,
-				Parser:        parser,
-				Legacy: legacy.WebFramework{
-					Parser: parser,
-				},
+
+		var handler routing.Handler
+		switch rec.Code {
+		case http.StatusMethodNotAllowed:
+			if r.methodNA != nil {
+				handler = r.methodNA
 			}
-			reqCtx.SetCommitState(commit)
-			if err := r.methodNA(reqCtx); err != nil {
-				r.dispatchError(reqCtx, err)
+		case http.StatusNotFound:
+			// Check if the path matches a registered route with a
+			// different method → 405 takes precedence over 404.
+			if r.methodNA != nil && pathMatchesDifferentMethod(*r.registeredRoutes, req.URL.Path, req.Method) {
+				handler = r.methodNA
+			} else if r.notFound != nil {
+				handler = r.notFound
 			}
+		}
+
+		if handler == nil {
+			// Forward the buffered response to the real writer.
+			for k, v := range rec.Header() {
+				w.Header()[k] = v
+			}
+			w.WriteHeader(rec.Code)
+			_, _ = w.Write(rec.Body.Bytes())
 			return
 		}
-		// Forward the buffered response to the real writer.
-		for k, v := range rec.Header() {
-			w.Header()[k] = v
+
+		// Dispatch through the v2 pipeline with the real ResponseWriter.
+		parser := r.responseWriterFactory(req, w)
+		commit := &v2wf.CommitState{}
+		parser.SetCommitState(commit)
+		legacyCtx := legacyLibNetHttp.WithRequestResponse(req.Context(), req, w)
+		reqCtx := &v2wf.RequestContext{
+			Context:       req.Context(),
+			LegacyContext: legacyCtx,
+			Parser:        parser,
+			Legacy: legacy.WebFramework{
+				Parser: parser,
+			},
 		}
-		w.WriteHeader(rec.Code)
-		_, _ = w.Write(rec.Body.Bytes())
+		reqCtx.SetCommitState(commit)
+		if err := handler(reqCtx); err != nil {
+			r.dispatchError(reqCtx, err)
+		}
 	})
+}
+
+// pathMatchesDifferentMethod checks if the given path matches a registered
+// route pattern with a method different from the request method.
+func pathMatchesDifferentMethod(routes []routeEntry, path, method string) bool {
+	for _, entry := range routes {
+		if netHTTPPathMatches(entry.pattern, path) && entry.method != method {
+			return true
+		}
+	}
+	return false
+}
+
+// netHTTPPathMatches checks if a Go 1.22+ ServeMux pattern matches the
+// given path. The pattern may contain {param} single-segment wildcards
+// and {param...} multi-segment wildcards.
+func netHTTPPathMatches(pattern, path string) bool {
+	// Strip method prefix if present.
+	if idx := strings.Index(pattern, " "); idx >= 0 {
+		pattern = pattern[idx+1:]
+	}
+	// Exact match.
+	if pattern == path {
+		return true
+	}
+	patternParts := splitNetHTTPPath(pattern)
+	pathParts := splitNetHTTPPath(path)
+	// Multi-segment wildcard {param...} matches the rest of the path,
+	// so the pattern may have fewer segments than the path.
+	for i, pp := range patternParts {
+		if i >= len(pathParts) {
+			return false
+		}
+		// Go 1.22+ ServeMux multi-segment wildcard {param...}.
+		if strings.HasSuffix(pp, "...}") {
+			return true
+		}
+		// Single-segment wildcard {param}.
+		if strings.HasPrefix(pp, "{") && strings.HasSuffix(pp, "}") {
+			continue
+		}
+		if pp != pathParts[i] {
+			return false
+		}
+	}
+	return len(patternParts) == len(pathParts)
+}
+
+// splitNetHTTPPath splits a URL path into segments.
+func splitNetHTTPPath(p string) []string {
+	if len(p) == 0 {
+		return nil
+	}
+	if p[0] == '/' {
+		p = p[1:]
+	}
+	if len(p) == 0 {
+		return nil
+	}
+	return strings.Split(p, "/")
 }
 
 // wrapHandler converts a v2 routing.Handler to an http.HandlerFunc.
@@ -270,6 +363,7 @@ func (g *netHTTPSubGroup) Handle(method, pattern string, handler routing.Handler
 
 	wrapped := g.parent.wrapHandler(handler, allMws)
 	g.parent.mux.HandleFunc(muxPattern, wrapped)
+	*g.parent.registeredRoutes = append(*g.parent.registeredRoutes, routeEntry{method: method, pattern: fullPattern})
 	return nil
 }
 

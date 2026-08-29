@@ -2,9 +2,18 @@
 
 This guide covers migrating existing `requestCore` v1 applications to the v2 module (`github.com/hmmftg/requestCore/v2`).
 
+> **Status:** v2 has **no released tags** and is under active redesign.
+> The current API is an unreleased alpha. A breaking redesign is in progress
+> to make v2 a typed, framework-neutral HTTP toolkit. The migration guide
+> below describes the current alpha API; it will be updated as the redesign
+> progresses. v1 (the root module) remains supported and stable.
+
 ## Overview
 
-v2 is a **separate Go module** that lives in the `v2/` directory. It is fully backward-compatible — v1 code continues to work unchanged. You can adopt v2 incrementally, package by package.
+v2 is a **separate Go module** that lives in the `v2/` directory. The current
+alpha is backward-compatible at the module level — v1 code continues to work
+unchanged. The redesign will introduce a breaking canonical API before the
+first stable v2 release.
 
 ## Key Changes in v2
 

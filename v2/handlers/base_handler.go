@@ -102,6 +102,12 @@ func runLifecycle[Req, Resp any](
 	}
 	trx.Response = resp
 	legacy.AddLog(w, legacy.HandlerLogTag, slog.Any("response", resp))
+	// Emit the mandatory <title>-req success AddLog entry containing the
+	// parsed response. If the response implements slog.LogValuer, the
+	// masked projection is used so response owners control what flows
+	// into the Splunk transaction pipeline. The returned HTTP response
+	// itself is never modified by this projection.
+	legacy.AddLog(w, endpoint.Title+"-req", slog.Any("response", logValueForAddLog(resp)))
 
 	// Render success through the v2 responder.
 	if wErr := respondOKV2(respHandler, w, ctx, trx, endpoint.Title, resp); wErr != nil {
@@ -111,8 +117,39 @@ func runLifecycle[Req, Resp any](
 	return nil
 }
 
+// logValueForAddLog returns the value to log for a parsed response in the
+// mandatory <title>-req success AddLog entry. If the response implements
+// slog.LogValuer, its LogValue projection is used so response-type owners
+// can mask sensitive fields. A panic in LogValue is recovered and reported
+// as a masking failure; the raw response is never logged as a fallback.
+func logValueForAddLog(resp any) any {
+	if lv, ok := resp.(slog.LogValuer); ok {
+		var val slog.Value
+		panicked := true
+		func() {
+			defer func() {
+				if r := recover(); r != nil {
+					slog.Error("addlog: LogValue panic masked",
+						slog.Any("panic", r))
+				}
+			}()
+			val = lv.LogValue()
+			panicked = false
+		}()
+		if panicked {
+			// Masking failed; do not fall back to the raw response.
+			return slog.StringValue("<masked: logvalue-panic>")
+		}
+		return val
+	}
+	return resp
+}
+
 // finalize runs the finalizer, collects logs, updates persistence
 // best-effort, and handles panic conversion to a sanitized error response.
+// logCompletion is the closure returned by libContext.AddWebLogs; it is
+// invoked exactly once here to log elapsed+status and collect the
+// HandlerLogTag tags/arrays.
 func finalize[Req, Resp any](
 	endpoint *Endpoint[Req, Resp],
 	respHandler *v2response.Handler,
@@ -122,10 +159,10 @@ func finalize[Req, Resp any](
 	start time.Time,
 	requestInserted bool,
 	panicVal any,
+	logCompletion func(time.Time, int),
 ) {
 	elapsed := time.Since(start)
 	trx.Duration = elapsed
-	legacy.AddLogTag(w, legacy.HandlerLogTag, slog.String("elapsed", elapsed.String()))
 
 	// Convert panic to a sanitized error. The recovery handler is
 	// notification-only and must not suppress the standard error
@@ -181,9 +218,21 @@ func finalize[Req, Resp any](
 		}()
 	}
 
-	// Collect logs into custom attributes for the Splunk pipeline.
-	legacy.CollectLogTags(w, legacy.HandlerLogTag)
-	legacy.CollectLogArrays(w, legacy.HandlerLogTag)
+	// Invoke the AddWebLogs completion closure exactly once. This logs
+	// elapsed and status under HandlerLogTag and collects the tag's
+	// tags/arrays into custom attributes. The status reflects the
+	// committed response state (or 500 for panics).
+	status := committedStatus(ctx)
+	if status == 0 {
+		status = http.StatusInternalServerError
+	}
+	if logCompletion != nil {
+		logCompletion(start, status)
+	}
+
+	// Collect remaining log arrays/tags (error list, API calls, and
+	// endpoint-specific tags). HandlerLogTag collection is performed by
+	// the completion closure above.
 	legacy.CollectLogTags(w, legacy.ErrorListLogTag)
 	legacy.CollectLogArrays(w, legacy.ErrorListLogTag)
 	legacy.CollectLogArrays(w, CallAPILogEntry)

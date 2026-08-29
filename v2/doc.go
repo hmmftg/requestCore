@@ -1,9 +1,13 @@
 // Package requestcore is the v2 module of requestCore.
 //
-// v2 is a **generics-first**, framework-agnostic HTTP application toolkit
-// that builds on the root [github.com/hmmftg/requestCore] module while
-// preserving full backward compatibility. It requires **Go 1.27+** for
-// generic methods on [handlers.Endpoint].
+// v2 has no released tags and is under active redesign. The current API
+// is an unreleased alpha. A breaking redesign is in progress to make v2
+// a typed, framework-neutral HTTP toolkit. v1 (the root module) remains
+// supported and stable.
+//
+// The current alpha is a generics-first, framework-agnostic HTTP application
+// toolkit that builds on the root [github.com/hmmftg/requestCore] module.
+// It requires Go 1.27+ for generic methods on [handlers.Endpoint].
 //
 // # Core Features
 //

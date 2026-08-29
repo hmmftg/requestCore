@@ -198,7 +198,12 @@ func (e *Endpoint[Req, Resp]) RuntimeHandler(
 		if ctx.Legacy.Parser == nil && w.Parser != nil {
 			ctx.Legacy.Parser = w.Parser
 		}
-		libContext.AddWebLogs(w, e.Title, legacy.HandlerLogTag)
+		// AddWebLogs adds request metadata (title/method/path) as log tags
+		// and returns a completion closure that logs elapsed time and
+		// status and collects the HandlerLogTag tags/arrays. Capture it
+		// and invoke exactly once in finalize so status is recorded
+		// alongside elapsed in the mandatory handler log collection.
+		logCompletion := libContext.AddWebLogs(w, e.Title, legacy.HandlerLogTag)
 
 		// Initialize tracing if enabled.
 		var span trace.Span
@@ -256,7 +261,7 @@ func (e *Endpoint[Req, Resp]) RuntimeHandler(
 			err = runLifecycle(e, respHandler, w, ctx, trx, &requestInserted, start)
 		}()
 
-		finalize(e, respHandler, w, ctx, trx, start, requestInserted, panicVal)
+		finalize(e, respHandler, w, ctx, trx, start, requestInserted, panicVal, logCompletion)
 
 		// If a panic occurred, it was converted to a sanitized error
 		// response in finalize. Return nil so the router does not

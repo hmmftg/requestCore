@@ -17,6 +17,7 @@ import (
 	v2libChi "github.com/hmmftg/requestCore/v2/libChi"
 	v2libFiber "github.com/hmmftg/requestCore/v2/libFiber"
 	v2libGin "github.com/hmmftg/requestCore/v2/libGin"
+	v2libNetHttp "github.com/hmmftg/requestCore/v2/libNetHttp"
 	"github.com/hmmftg/requestCore/v2/routing"
 	v2wf "github.com/hmmftg/requestCore/v2/webFramework"
 )
@@ -66,6 +67,25 @@ func adapterFactories() []AdapterFactory {
 					server := httptest.NewServer(mux)
 					defer server.Close()
 					// Create a new request to avoid RequestURI issues with httptest.NewRequest
+					newReq, err := http.NewRequest(req.Method, server.URL+req.URL.Path, req.Body)
+					if err != nil {
+						return nil, err
+					}
+					newReq.Header = req.Header
+					return http.DefaultClient.Do(newReq)
+				}
+			},
+		},
+		{
+			Name: "nethttp",
+			NewRouter: func() (routing.Router, func(req *http.Request) (*http.Response, error)) {
+				router := v2libNetHttp.NewRouter()
+				return router, func(req *http.Request) (*http.Response, error) {
+					// Native() returns the intercept405-wrapped mux when a
+					// MethodNotAllowed handler is configured, otherwise the
+					// raw mux. Use a test server so the wrapped handler runs.
+					server := httptest.NewServer(router.Native().(http.Handler))
+					defer server.Close()
 					newReq, err := http.NewRequest(req.Method, server.URL+req.URL.Path, req.Body)
 					if err != nil {
 						return nil, err
@@ -412,10 +432,54 @@ func TestConformance_405MethodNotAllowed(t *testing.T) {
 			}
 			defer resp.Body.Close()
 
-			// Some frameworks may return 404 instead of 405 for
-			// method mismatches; accept either but prefer 405.
-			if resp.StatusCode != 405 && resp.StatusCode != 404 {
-				t.Fatalf("expected 405 or 404, got %d", resp.StatusCode)
+			// POST to a GET-only route must return exactly 405 when a
+			// MethodNotAllowed handler is configured. All official
+			// adapters must have exact 405 parity.
+			if resp.StatusCode != 405 {
+				t.Fatalf("expected 405, got %d", resp.StatusCode)
+			}
+		})
+	}
+}
+
+// TestConformance_405ThroughGroup verifies that 405 dispatch works for
+// routes registered through a With-derived group, not just the root
+// router. This catches the net/http adapter bug where With-derived
+// routers did not share the registered route table with the root.
+func TestConformance_405ThroughGroup(t *testing.T) {
+	for _, af := range adapterFactories() {
+		t.Run(af.Name, func(t *testing.T) {
+			router, serve := af.NewRouter()
+
+			// Register GET through a With group with one middleware.
+			group := router.With(func(next routing.Handler) routing.Handler {
+				return func(ctx *v2wf.RequestContext) error {
+					return next(ctx)
+				}
+			})
+			if err := group.Get("/group-test", func(ctx *v2wf.RequestContext) error {
+				return ctx.Parser.SendResponse(200, "text/plain", []byte("ok"))
+			}); err != nil {
+				t.Fatalf("group.Get: %v", err)
+			}
+
+			router.NotFound(func(ctx *v2wf.RequestContext) error {
+				return ctx.Parser.SendResponse(404, "text/plain", []byte("not-found"))
+			})
+			router.MethodNotAllowed(func(ctx *v2wf.RequestContext) error {
+				return ctx.Parser.SendResponse(405, "text/plain", []byte("method-not-allowed"))
+			})
+
+			// POST to a GET-only group route must return exactly 405.
+			req := httptest.NewRequest("POST", "/group-test", nil)
+			resp, err := serve(req)
+			if err != nil {
+				t.Fatalf("serve: %v", err)
+			}
+			defer resp.Body.Close()
+
+			if resp.StatusCode != 405 {
+				t.Fatalf("expected 405 for group route, got %d", resp.StatusCode)
 			}
 		})
 	}

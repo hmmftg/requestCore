@@ -1,0 +1,66 @@
+goos: windows
+goarch: amd64
+pkg: github.com/hmmftg/requestCore/v2/handlers
+cpu: 11th Gen Intel(R) Core(TM) i5-11400 @ 2.60GHz
+BenchmarkEndpointDirectSuccess-12      	     100	      8812 ns/op
+BenchmarkEndpointDirectSuccess-12      	     100	      7603 ns/op
+BenchmarkEndpointDirectSuccess-12      	     100	      7503 ns/op
+BenchmarkEndpointDirectSuccess-12      	     100	      8268 ns/op
+BenchmarkEndpointDirectSuccess-12      	     100	      7204 ns/op
+BenchmarkEndpointDirectSuccess-12      	     100	      7655 ns/op
+BenchmarkEndpointDirectSuccess-12      	     100	      6975 ns/op
+BenchmarkEndpointDirectSuccess-12      	     100	      8071 ns/op
+BenchmarkEndpointDirectSuccess-12      	     100	      6943 ns/op
+BenchmarkEndpointDirectSuccess-12      	     100	      7055 ns/op
+BenchmarkEndpointDirectProblem-12      	     100	     15014 ns/op
+BenchmarkEndpointDirectProblem-12      	     100	     11962 ns/op
+BenchmarkEndpointDirectProblem-12      	     100	     12438 ns/op
+BenchmarkEndpointDirectProblem-12      	     100	     13830 ns/op
+BenchmarkEndpointDirectProblem-12      	     100	     12171 ns/op
+BenchmarkEndpointDirectProblem-12      	     100	     11783 ns/op
+BenchmarkEndpointDirectProblem-12      	     100	     15871 ns/op
+BenchmarkEndpointDirectProblem-12      	     100	     12026 ns/op
+BenchmarkEndpointDirectProblem-12      	     100	     12338 ns/op
+BenchmarkEndpointDirectProblem-12      	     100	     11117 ns/op
+BenchmarkEndpointFiveMiddleware-12     	     100	      6948 ns/op
+BenchmarkEndpointFiveMiddleware-12     	     100	      7253 ns/op
+BenchmarkEndpointFiveMiddleware-12     	     100	      7760 ns/op
+BenchmarkEndpointFiveMiddleware-12     	     100	     13169 ns/op
+BenchmarkEndpointFiveMiddleware-12     	     100	      7411 ns/op
+BenchmarkEndpointFiveMiddleware-12     	     100	      7459 ns/op
+BenchmarkEndpointFiveMiddleware-12     	     100	     12569 ns/op
+BenchmarkEndpointFiveMiddleware-12     	     100	      7409 ns/op
+BenchmarkEndpointFiveMiddleware-12     	     100	      7056 ns/op
+BenchmarkEndpointFiveMiddleware-12     	     100	      7350 ns/op
+BenchmarkBindJSON-12                   	     100	     17442 ns/op
+BenchmarkBindJSON-12                   	     100	     18390 ns/op
+BenchmarkBindJSON-12                   	     100	     12948 ns/op
+BenchmarkBindJSON-12                   	     100	     12872 ns/op
+BenchmarkBindJSON-12                   	     100	     14945 ns/op
+BenchmarkBindJSON-12                   	     100	     14618 ns/op
+BenchmarkBindJSON-12                   	     100	     14026 ns/op
+BenchmarkBindJSON-12                   	     100	     13335 ns/op
+BenchmarkBindJSON-12                   	     100	     10797 ns/op
+BenchmarkBindJSON-12                   	     100	     11466 ns/op
+BenchmarkRenderJSON-12                 	     100	       257.0 ns/op
+BenchmarkRenderJSON-12                 	     100	       253.0 ns/op
+BenchmarkRenderJSON-12                 	     100	       370.0 ns/op
+BenchmarkRenderJSON-12                 	     100	       323.0 ns/op
+BenchmarkRenderJSON-12                 	     100	       263.0 ns/op
+BenchmarkRenderJSON-12                 	     100	       284.0 ns/op
+BenchmarkRenderJSON-12                 	     100	       266.0 ns/op
+BenchmarkRenderJSON-12                 	     100	       256.0 ns/op
+BenchmarkRenderJSON-12                 	     100	       268.0 ns/op
+BenchmarkRenderJSON-12                 	     100	       310.0 ns/op
+BenchmarkEnterpriseAddLogSuccess-12    	     100	      6936 ns/op
+BenchmarkEnterpriseAddLogSuccess-12    	     100	      6667 ns/op
+BenchmarkEnterpriseAddLogSuccess-12    	     100	      7073 ns/op
+BenchmarkEnterpriseAddLogSuccess-12    	     100	      7273 ns/op
+BenchmarkEnterpriseAddLogSuccess-12    	     100	      9043 ns/op
+BenchmarkEnterpriseAddLogSuccess-12    	     100	      6756 ns/op
+BenchmarkEnterpriseAddLogSuccess-12    	     100	      7163 ns/op
+BenchmarkEnterpriseAddLogSuccess-12    	     100	      6803 ns/op
+BenchmarkEnterpriseAddLogSuccess-12    	     100	      8962 ns/op
+BenchmarkEnterpriseAddLogSuccess-12    	     100	      7224 ns/op
+PASS
+ok  	github.com/hmmftg/requestCore/v2/handlers	1.185s

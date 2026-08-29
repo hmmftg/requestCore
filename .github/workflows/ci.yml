@@ -61,6 +61,54 @@ jobs:
         working-directory: v2
         run: go build ./...
 
+  # Architecture validation for v2: inventories v1 root module imports
+  # and enforces that packages in the v1FreePackages allowlist do not
+  # import v1. In Tranche 0 this is inventory mode; later tranches
+  # tighten the allowlist as canonical packages are introduced.
+  architecture-v2:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: v2/go.mod
+          cache: true
+      - name: Force standalone v2 module
+        run: |
+          if [ -f go.work ]; then rm go.work; fi
+          if [ -f go.work.sum ]; then rm go.work.sum; fi
+      - name: Architecture check (v1 import inventory)
+        working-directory: v2
+        run: go test -run TestArchitecture_V1Imports -v .
+
+  # Benchmark v2: runs the benchmark suite and records results. CI does
+  # not hard-fail on a 5% wall-time fluctuation; the controlled 5% gate
+  # runs on a release environment. Allocation changes are reported.
+  benchmark-v2:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: v2/go.mod
+          cache: true
+      - name: Force standalone v2 module
+        run: |
+          if [ -f go.work ]; then rm go.work; fi
+          if [ -f go.work.sum ]; then rm go.work.sum; fi
+          mkdir -p v2/.benchmark
+      - name: Run handler benchmarks
+        working-directory: v2/handlers
+        run: go test -bench=Benchmark -benchtime=100x -count=10 -run=^$ . | tee ../.benchmark/ci_handlers.txt
+      - name: Run routing benchmarks
+        working-directory: v2/routing
+        run: go test -bench=Benchmark -benchtime=100x -count=10 -run=^$ . | tee ../.benchmark/ci_routing.txt
+      - name: Upload benchmark results
+        uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-v2
+          path: v2/.benchmark/ci_*.txt
+
   # Verifies that v1 and v2 can coexist in vendor mode (-mod=vendor)
   # in a downstream consumer project. This addresses the concern that
   # nested module dependencies (v2 imports v1) might not vendor correctly.

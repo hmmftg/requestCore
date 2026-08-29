@@ -1,0 +1,46 @@
+goos: windows
+goarch: amd64
+pkg: github.com/hmmftg/requestCore/v2/routing
+cpu: 11th Gen Intel(R) Core(TM) i5-11400 @ 2.60GHz
+BenchmarkAdapterGin-12        	     100	       985.0 ns/op
+BenchmarkAdapterGin-12        	     100	       816.0 ns/op
+BenchmarkAdapterGin-12        	     100	      1689 ns/op
+BenchmarkAdapterGin-12        	     100	       868.0 ns/op
+BenchmarkAdapterGin-12        	     100	      1008 ns/op
+BenchmarkAdapterGin-12        	     100	       779.0 ns/op
+BenchmarkAdapterGin-12        	     100	       718.0 ns/op
+BenchmarkAdapterGin-12        	     100	       969.0 ns/op
+BenchmarkAdapterGin-12        	     100	      1248 ns/op
+BenchmarkAdapterGin-12        	     100	      1386 ns/op
+BenchmarkAdapterFiber-12      	     100	     16726 ns/op
+BenchmarkAdapterFiber-12      	     100	      8789 ns/op
+BenchmarkAdapterFiber-12      	     100	     10204 ns/op
+BenchmarkAdapterFiber-12      	     100	      8856 ns/op
+BenchmarkAdapterFiber-12      	     100	      9322 ns/op
+BenchmarkAdapterFiber-12      	     100	      7720 ns/op
+BenchmarkAdapterFiber-12      	     100	      9519 ns/op
+BenchmarkAdapterFiber-12      	     100	     13909 ns/op
+BenchmarkAdapterFiber-12      	     100	      8076 ns/op
+BenchmarkAdapterFiber-12      	     100	      9092 ns/op
+BenchmarkAdapterChi-12        	     100	      2208 ns/op
+BenchmarkAdapterChi-12        	     100	      2787 ns/op
+BenchmarkAdapterChi-12        	     100	      2442 ns/op
+BenchmarkAdapterChi-12        	     100	      4063 ns/op
+BenchmarkAdapterChi-12        	     100	      3891 ns/op
+BenchmarkAdapterChi-12        	     100	      3262 ns/op
+BenchmarkAdapterChi-12        	     100	      3891 ns/op
+BenchmarkAdapterChi-12        	     100	      3888 ns/op
+BenchmarkAdapterChi-12        	     100	      2935 ns/op
+BenchmarkAdapterChi-12        	     100	      2123 ns/op
+BenchmarkAdapterNetHTTP-12    	     100	      1976 ns/op
+BenchmarkAdapterNetHTTP-12    	     100	      2403 ns/op
+BenchmarkAdapterNetHTTP-12    	     100	      2005 ns/op
+BenchmarkAdapterNetHTTP-12    	     100	      2659 ns/op
+BenchmarkAdapterNetHTTP-12    	     100	      2595 ns/op
+BenchmarkAdapterNetHTTP-12    	     100	      2867 ns/op
+BenchmarkAdapterNetHTTP-12    	     100	      3548 ns/op
+BenchmarkAdapterNetHTTP-12    	     100	      3401 ns/op
+BenchmarkAdapterNetHTTP-12    	     100	      2434 ns/op
+BenchmarkAdapterNetHTTP-12    	     100	      2150 ns/op
+PASS
+ok  	github.com/hmmftg/requestCore/v2/routing	0.674s

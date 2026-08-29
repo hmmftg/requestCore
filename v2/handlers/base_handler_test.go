@@ -3,6 +3,7 @@ package handlers
 import (
 	"encoding/json"
 	"errors"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -17,6 +18,7 @@ import (
 	v2libGin "github.com/hmmftg/requestCore/v2/libGin"
 	"github.com/hmmftg/requestCore/v2/renderers"
 	v2response "github.com/hmmftg/requestCore/v2/response"
+	v2wf "github.com/hmmftg/requestCore/v2/webFramework"
 )
 
 func init() {
@@ -543,5 +545,62 @@ func TestEndpoint_OutcomeOnError(t *testing.T) {
 	}
 	if outcome.HTTPStatus != http.StatusInternalServerError {
 		t.Fatalf("expected 500, got %d", outcome.HTTPStatus)
+	}
+}
+
+// TestAddWebLogs_CompletionLogsStatus verifies that the AddWebLogs
+// completion closure is invoked in finalize and logs the status under
+// the HandlerLogTag, which was previously discarded.
+func TestAddWebLogs_CompletionLogsStatus(t *testing.T) {
+	engine := gin.New()
+	router := v2libGin.NewRouter(engine)
+	respHandler := testRespHandler()
+
+	var capturedParser v2wf.RequestParser
+	e := NewEndpoint[struct{}, TestResp]("test-weblogs-status", libRequest.NoBinding,
+		func(req *struct{}, trx *HandlerRequest[struct{}, TestResp]) (TestResp, error) {
+			capturedParser = trx.V2.Parser
+			return TestResp{Status: "ok"}, nil
+		},
+	).WithPath("/weblogs-status")
+	if err := RegisterEndpoint(router, nil, respHandler, "GET", "/weblogs-status", e); err != nil {
+		t.Fatalf("RegisterEndpoint: %v", err)
+	}
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest("GET", "/weblogs-status", nil)
+	engine.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", w.Code)
+	}
+	if capturedParser == nil {
+		t.Fatal("expected parser to be captured")
+	}
+	// The completion closure logs status under HandlerLogTag tags.
+	tagKey := "LOG_TAG_handler"
+	v := capturedParser.GetLocal(tagKey)
+	if v == nil {
+		t.Fatalf("expected HandlerLogTag tags, got nil")
+	}
+	arr, ok := v.([]slog.Attr)
+	if !ok {
+		t.Fatalf("expected []slog.Attr, got %T", v)
+	}
+	foundStatus := false
+	foundElapsed := false
+	for _, a := range arr {
+		if a.Key == "status" && a.Value.Int64() == int64(http.StatusOK) {
+			foundStatus = true
+		}
+		if a.Key == "elapsed" {
+			foundElapsed = true
+		}
+	}
+	if !foundStatus {
+		t.Fatalf("expected status=200 in HandlerLogTag tags, got: %+v", arr)
+	}
+	if !foundElapsed {
+		t.Fatalf("expected elapsed in HandlerLogTag tags, got: %+v", arr)
 	}
 }

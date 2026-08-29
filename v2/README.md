@@ -6,6 +6,11 @@
 A **generics-first**, framework-agnostic HTTP application toolkit for Go.
 Requires **Go 1.27+**.
 
+> **Status:** v2 has **no released tags** and is under active redesign.
+> The current API is an unreleased alpha and will change before the first
+> stable v2 release. See [MIGRATION.md](MIGRATION.md) for the redesign plan
+> and migration guidance. v1 (the root module) remains supported and stable.
+
 v2 builds on the root [requestCore](../README.md) module with fully typed
 endpoints, resources, sessions, and response helpers — eliminating runtime
 type assertions and reflection throughout the request lifecycle.
@@ -290,8 +295,14 @@ go build -o requestcore ./cmd/requestcore/cmd
 transaction steps, and critical business events. It flows into the
 Splunk transaction pipeline. Never replace it with `slog.*` or `log.*`.
 
-The handler lifecycle automatically emits `<title>-req` (success) and
-`<title>-req-failed` (failure) log entries.
+The handler lifecycle automatically emits:
+- `<title>-req` (success) — contains the parsed response. If the response
+  implements `slog.LogValuer`, the masked projection is logged instead of
+  the raw response. The returned HTTP response is never modified.
+- `<title>-req-failed` (failure) — contains the error.
+
+Session load failures emit `session-load-failed` (without the raw cookie
+token). Session save failures emit `session-save-failed`.
 
 ---
 

@@ -78,9 +78,17 @@ func MiddlewareWithConfig(cfg MiddlewareConfig) func(next func(*v2wf.RequestCont
 
 			sess, flash, err := manager.LoadFromCookie(ctx.Context, cookieName, cookieValue)
 			if err != nil {
-				// On load error, create a fresh session.
-				sess = NewSession(manager.Store())
-				flash = NewFlash()
+				// Emit a security/transaction failure event via the
+				// mandatory AddLog pipeline. The raw cookie token is
+				// never logged — only the error category and cookie name.
+				if ctx.Legacy.Parser != nil {
+					w := webFramework.WebFramework{Parser: ctx.Legacy.Parser}
+					webFramework.AddLog(w, "session-load-failed",
+						slog.Group("error",
+							slog.String("cookie", cookieName),
+							slog.Any("cause", err)))
+				}
+				// Continue with the fresh session returned by LoadFromCookie.
 			}
 
 			// Store session and flash on both the parser locals (for

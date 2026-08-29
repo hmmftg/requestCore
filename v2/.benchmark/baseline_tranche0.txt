@@ -1,0 +1,1 @@
+ok  	github.com/hmmftg/requestCore/v2	0.518s [no tests to run]
