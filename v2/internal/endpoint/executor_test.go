@@ -381,3 +381,180 @@ type capturingSink struct {
 func (s *capturingSink) Record(e telemetry.Event) {
 	s.events = append(s.events, e)
 }
+
+// failingTransport is a Transport that always returns an error from
+// WriteResponse and never reports committed. It is used to verify the
+// commit machine does not report success on transport failure.
+type failingTransport struct{}
+
+func (failingTransport) WriteResponse(int, string, http.Header, []byte) error {
+	return errors.New("transport write failed")
+}
+func (failingTransport) Committed() bool { return false }
+
+// TestExecute_DynamicStatusFromHandler verifies that an explicit
+// SetStatus on the response state overrides the endpoint-configured
+// success status.
+func TestExecute_DynamicStatusFromHandler(t *testing.T) {
+	exec := newTestExecutor()
+	ep := New[PingReq, PingResp](
+		func(ctx *request.Context, req PingReq) (PingResp, error) {
+			ctx.Response().SetStatus(http.StatusAccepted)
+			return PingResp{Message: "ok"}, nil
+		},
+		WithOperation(operation.Operation{ID: "ping", Method: "GET", Pattern: "/ping"}),
+		WithSuccessStatus(http.StatusOK),
+	)
+	ft := faketransport.New("GET", "/ping")
+	transport := &FakeTransportAdapter{FT: ft}
+	_, err := Execute(exec, ft.Context(), ep, transport)
+	if err != nil {
+		t.Fatalf("Execute failed: %v", err)
+	}
+	if ft.ResponseStatus() != http.StatusAccepted {
+		t.Errorf("status = %d, want 202 (dynamic override)", ft.ResponseStatus())
+	}
+}
+
+// TestExecute_ConfiguredStatusWhenNotOverridden verifies that the
+// endpoint-configured success status remains effective when the handler
+// does not explicitly set a status.
+func TestExecute_ConfiguredStatusWhenNotOverridden(t *testing.T) {
+	exec := newTestExecutor()
+	ep := New[PingReq, PingResp](
+		func(ctx *request.Context, req PingReq) (PingResp, error) {
+			return PingResp{Message: "ok"}, nil
+		},
+		WithOperation(operation.Operation{ID: "ping", Method: "GET", Pattern: "/ping"}),
+		WithSuccessStatus(http.StatusCreated),
+	)
+	ft := faketransport.New("GET", "/ping")
+	transport := &FakeTransportAdapter{FT: ft}
+	_, err := Execute(exec, ft.Context(), ep, transport)
+	if err != nil {
+		t.Fatalf("Execute failed: %v", err)
+	}
+	if ft.ResponseStatus() != http.StatusCreated {
+		t.Errorf("status = %d, want 201 (configured)", ft.ResponseStatus())
+	}
+}
+
+// TestExecute_HandlerResponseHeaders verifies that headers set on the
+// response state reach the transport.
+func TestExecute_HandlerResponseHeaders(t *testing.T) {
+	exec := newTestExecutor()
+	ep := New[PingReq, PingResp](
+		func(ctx *request.Context, req PingReq) (PingResp, error) {
+			ctx.Response().SetHeader("X-Custom", "value")
+			ctx.Response().AddHeader("X-Multi", "a")
+			ctx.Response().AddHeader("X-Multi", "b")
+			return PingResp{Message: "ok"}, nil
+		},
+		WithOperation(operation.Operation{ID: "ping", Method: "GET", Pattern: "/ping"}),
+	)
+	ft := faketransport.New("GET", "/ping")
+	transport := &FakeTransportAdapter{FT: ft}
+	_, err := Execute(exec, ft.Context(), ep, transport)
+	if err != nil {
+		t.Fatalf("Execute failed: %v", err)
+	}
+	if got := ft.ResponseHeaders().Get("X-Custom"); got != "value" {
+		t.Errorf("X-Custom = %q, want 'value'", got)
+	}
+	multi := ft.ResponseHeaders()["X-Multi"]
+	if len(multi) != 2 || multi[0] != "a" || multi[1] != "b" {
+		t.Errorf("X-Multi = %v, want [a, b]", multi)
+	}
+}
+
+// TestExecute_HandlerContentTypeOverrides verifies that an explicit
+// Content-Type set by the handler overrides the endpoint default.
+func TestExecute_HandlerContentTypeOverrides(t *testing.T) {
+	exec := newTestExecutor()
+	ep := New[PingReq, PingResp](
+		func(ctx *request.Context, req PingReq) (PingResp, error) {
+			ctx.Response().SetHeader("Content-Type", "application/vnd.custom+json")
+			return PingResp{Message: "ok"}, nil
+		},
+		WithOperation(operation.Operation{ID: "ping", Method: "GET", Pattern: "/ping"}),
+	)
+	ft := faketransport.New("GET", "/ping")
+	transport := &FakeTransportAdapter{FT: ft}
+	_, err := Execute(exec, ft.Context(), ep, transport)
+	if err != nil {
+		t.Fatalf("Execute failed: %v", err)
+	}
+	if ct := ft.ResponseHeaders().Get("Content-Type"); ct != "application/vnd.custom+json" {
+		t.Errorf("Content-Type = %q, want application/vnd.custom+json", ct)
+	}
+}
+
+// TestExecute_TransportFailureReturnsError verifies that a transport
+// write failure is returned and the commit machine does not report
+// success.
+func TestExecute_TransportFailureReturnsError(t *testing.T) {
+	sink := &capturingSink{}
+	exec := NewExecutor(
+		WithRegistry(operation.NewRegistry()),
+		WithTelemetrySink(sink),
+	)
+	ep := New[PingReq, PingResp](
+		func(ctx *request.Context, req PingReq) (PingResp, error) {
+			return PingResp{Message: "ok"}, nil
+		},
+		WithOperation(operation.Operation{ID: "ping", Method: "GET", Pattern: "/ping"}),
+	)
+	ft := faketransport.New("GET", "/ping")
+	// Use a failing transport to simulate a write error.
+	_, err := Execute(exec, ft.Context(), ep, failingTransport{})
+	if err == nil {
+		t.Fatal("expected transport error, got nil")
+	}
+	if !strings.Contains(err.Error(), "transport write failed") {
+		t.Fatalf("expected transport write failed error, got %v", err)
+	}
+	// Verify failure telemetry was emitted.
+	if len(sink.events) != 2 {
+		t.Fatalf("expected 2 events, got %d", len(sink.events))
+	}
+	if sink.events[1].Type != telemetry.EventFailure {
+		t.Errorf("event 1 type = %v, want failure", sink.events[1].Type)
+	}
+}
+
+// problemWriteFailingTransport is a Transport that fails on WriteResponse,
+// used to verify problem-write failures are propagated.
+type problemWriteFailingTransport struct {
+	committed bool
+}
+
+func (t *problemWriteFailingTransport) WriteResponse(int, string, http.Header, []byte) error {
+	return errors.New("problem write failed")
+}
+func (t *problemWriteFailingTransport) Committed() bool { return t.committed }
+
+// TestExecute_ProblemWriteFailurePropagated verifies that when a
+// problem response write fails, the write error is propagated alongside
+// the original domain error.
+func TestExecute_ProblemWriteFailurePropagated(t *testing.T) {
+	exec := newTestExecutor()
+	ep := New[problemReq, problemResp](
+		func(ctx *request.Context, req problemReq) (problemResp, error) {
+			return problemResp{}, errors.New("domain error")
+		},
+		WithOperation(operation.Operation{ID: "test", Method: "POST", Pattern: "/test"}),
+		WithBindingPlan(binding.DefaultJSONPlan),
+	)
+	body := `{"mode":"ok"}`
+	ft := faketransport.New("POST", "/test", faketransport.WithBody(body))
+	_, err := Execute(exec, ft.Context(), ep, &problemWriteFailingTransport{})
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if !strings.Contains(err.Error(), "domain error") {
+		t.Errorf("expected domain error in message, got %v", err)
+	}
+	if !strings.Contains(err.Error(), "problem write failed") {
+		t.Errorf("expected problem write failed in message, got %v", err)
+	}
+}

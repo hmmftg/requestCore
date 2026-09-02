@@ -11,8 +11,11 @@ import (
 // commit state.
 type Transport interface {
 	// WriteResponse writes the HTTP response with the given status,
-	// content type, and body. It is called exactly once per request.
-	WriteResponse(status int, contentType string, body []byte) error
+	// content type, headers, and body. It is called exactly once per
+	// request. Implementations must apply all header values before
+	// writing the status and body. An empty content type is ignored.
+	// A nil headers map is treated as empty.
+	WriteResponse(status int, contentType string, headers http.Header, body []byte) error
 
 	// Committed reports whether the response has already been
 	// committed to the wire. Once true, WriteResponse must not be
@@ -28,11 +31,16 @@ type FakeTransportAdapter struct {
 }
 
 // WriteResponse writes the response to the underlying FakeTransport.
-func (a *FakeTransportAdapter) WriteResponse(status int, contentType string, body []byte) error {
+func (a *FakeTransportAdapter) WriteResponse(status int, contentType string, headers http.Header, body []byte) error {
 	if a.FT.Committed() {
 		return nil
 	}
 	rec := a.FT.Recorder()
+	for k, vs := range headers {
+		for _, v := range vs {
+			rec.Header().Add(k, v)
+		}
+	}
 	if contentType != "" {
 		rec.Header().Set("Content-Type", contentType)
 	}

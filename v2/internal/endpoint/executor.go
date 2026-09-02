@@ -73,6 +73,12 @@ func Register[Req, Resp any](e *Executor, ep *Endpoint[Req, Resp]) error {
 // Telemetry events are emitted on every branch (start, success,
 // failure).
 //
+// Commit ordering on the success path is:
+// Prepare → RunHooks → MarkDurable → transport.WriteResponse →
+// Commit → Observe. The commit machine only transitions to Committed
+// after the transport write succeeds; a transport failure transitions
+// it to Failed.
+//
 // Execute is a generic standalone function because Go does not allow
 // generic methods on non-generic types.
 func Execute[Req, Resp any](e *Executor, ctx *request.Context, ep *Endpoint[Req, Resp], transport Transport) (Resp, error) {
@@ -96,9 +102,13 @@ func Execute[Req, Resp any](e *Executor, ctx *request.Context, ep *Endpoint[Req,
 	if ep.Config.BindingPlan.Mode != binding.ModeNone {
 		if err := binding.Bind(ctx, ep.Config.BindingPlan, &req); err != nil {
 			problem := e.mapBindError(err)
-			e.writeProblem(transport, problem)
-			e.emit(ep.Config.Operation.ID, ep.Config.Operation.Method, ep.Config.Operation.Pattern, ctx, telemetry.EventFailure, problem.Status, err, start)
-			return zero, err
+			werr := e.writeProblem(transport, problem)
+			finalErr := err
+			if werr != nil {
+				finalErr = fmt.Errorf("%w (problem write failed: %v)", err, werr)
+			}
+			e.emit(ep.Config.Operation.ID, ep.Config.Operation.Method, ep.Config.Operation.Pattern, ctx, telemetry.EventFailure, problem.Status, finalErr, start)
+			return zero, finalErr
 		}
 	}
 
@@ -111,9 +121,13 @@ func Execute[Req, Resp any](e *Executor, ctx *request.Context, ep *Endpoint[Req,
 				"Validation Internal Error",
 				"VALIDATION_INTERNAL",
 			)
-			e.writeProblem(transport, problem)
-			e.emit(ep.Config.Operation.ID, ep.Config.Operation.Method, ep.Config.Operation.Pattern, ctx, telemetry.EventFailure, problem.Status, err, start)
-			return zero, err
+			werr := e.writeProblem(transport, problem)
+			finalErr := err
+			if werr != nil {
+				finalErr = fmt.Errorf("%w (problem write failed: %v)", err, werr)
+			}
+			e.emit(ep.Config.Operation.ID, ep.Config.Operation.Method, ep.Config.Operation.Pattern, ctx, telemetry.EventFailure, problem.Status, finalErr, start)
+			return zero, finalErr
 		}
 		if len(violations) > 0 {
 			problem := response.NewValidationProblem(
@@ -121,9 +135,13 @@ func Execute[Req, Resp any](e *Executor, ctx *request.Context, ep *Endpoint[Req,
 				"Validation Failed",
 				violations,
 			)
-			e.writeProblem(transport, problem)
-			e.emit(ep.Config.Operation.ID, ep.Config.Operation.Method, ep.Config.Operation.Pattern, ctx, telemetry.EventFailure, problem.Status, problem, start)
-			return zero, problem
+			werr := e.writeProblem(transport, problem)
+			finalErr := error(problem)
+			if werr != nil {
+				finalErr = fmt.Errorf("%w (problem write failed: %v)", problem, werr)
+			}
+			e.emit(ep.Config.Operation.ID, ep.Config.Operation.Method, ep.Config.Operation.Pattern, ctx, telemetry.EventFailure, problem.Status, finalErr, start)
+			return zero, finalErr
 		}
 	}
 
@@ -138,9 +156,13 @@ func Execute[Req, Resp any](e *Executor, ctx *request.Context, ep *Endpoint[Req,
 				"INTERNAL",
 			)
 		}
-		e.writeProblem(transport, problem)
-		e.emit(ep.Config.Operation.ID, ep.Config.Operation.Method, ep.Config.Operation.Pattern, ctx, telemetry.EventFailure, problem.Status, err, start)
-		return zero, err
+		werr := e.writeProblem(transport, problem)
+		finalErr := err
+		if werr != nil {
+			finalErr = fmt.Errorf("%w (problem write failed: %v)", err, werr)
+		}
+		e.emit(ep.Config.Operation.ID, ep.Config.Operation.Method, ep.Config.Operation.Pattern, ctx, telemetry.EventFailure, problem.Status, finalErr, start)
+		return zero, finalErr
 	}
 
 	// 4. Encode
@@ -151,14 +173,31 @@ func Execute[Req, Resp any](e *Executor, ctx *request.Context, ep *Endpoint[Req,
 			"Response Encoding Error",
 			"ENCODE_ERROR",
 		)
-		e.writeProblem(transport, problem)
-		e.emit(ep.Config.Operation.ID, ep.Config.Operation.Method, ep.Config.Operation.Pattern, ctx, telemetry.EventFailure, problem.Status, err, start)
-		return zero, err
+		werr := e.writeProblem(transport, problem)
+		finalErr := err
+		if werr != nil {
+			finalErr = fmt.Errorf("%w (problem write failed: %v)", err, werr)
+		}
+		e.emit(ep.Config.Operation.ID, ep.Config.Operation.Method, ep.Config.Operation.Pattern, ctx, telemetry.EventFailure, problem.Status, finalErr, start)
+		return zero, finalErr
+	}
+
+	// Compute final success status and headers from the response state.
+	// The endpoint-configured status wins unless the handler explicitly
+	// set a status via ctx.Response().SetStatus.
+	finalStatus := successStatus
+	if ctx.Response().StatusSet() {
+		finalStatus = ctx.Response().Status()
+	}
+	finalHeaders := ctx.Response().Header()
+	finalContentType := contentType
+	if ct := finalHeaders.Get("Content-Type"); ct != "" {
+		finalContentType = ct
 	}
 
 	// 5-9. Commit lifecycle via the response state machine.
 	cm := response.NewCommitMachine()
-	if err := cm.Prepare(successStatus); err != nil {
+	if err := cm.Prepare(finalStatus); err != nil {
 		return zero, err
 	}
 	if err := cm.RunHooks(ctx.BeforeCommitHooks()); err != nil {
@@ -167,28 +206,36 @@ func Execute[Req, Resp any](e *Executor, ctx *request.Context, ep *Endpoint[Req,
 			"Pre-commit Hook Failed",
 			"HOOK_ERROR",
 		)
-		e.writeProblem(transport, problem)
-		e.emit(ep.Config.Operation.ID, ep.Config.Operation.Method, ep.Config.Operation.Pattern, ctx, telemetry.EventFailure, problem.Status, err, start)
-		return zero, err
+		werr := e.writeProblem(transport, problem)
+		finalErr := err
+		if werr != nil {
+			finalErr = fmt.Errorf("%w (problem write failed: %v)", err, werr)
+		}
+		e.emit(ep.Config.Operation.ID, ep.Config.Operation.Method, ep.Config.Operation.Pattern, ctx, telemetry.EventFailure, problem.Status, finalErr, start)
+		return zero, finalErr
 	}
 	if err := cm.MarkDurable(); err != nil {
 		return zero, err
 	}
-	if err := cm.Commit(successStatus); err != nil {
-		return zero, err
-	}
 
-	// Write the success response to the transport.
-	if werr := transport.WriteResponse(successStatus, contentType, body); werr != nil {
+	// Write the success response to the transport BEFORE committing.
+	// A transport failure transitions the commit machine to Failed
+	// and is reported via telemetry; the machine does not report
+	// success.
+	if werr := transport.WriteResponse(finalStatus, finalContentType, finalHeaders, body); werr != nil {
+		_ = cm.Fail(werr)
 		e.emit(ep.Config.Operation.ID, ep.Config.Operation.Method, ep.Config.Operation.Pattern, ctx, telemetry.EventFailure, http.StatusInternalServerError, werr, start)
 		return zero, werr
 	}
 
+	if err := cm.Commit(finalStatus); err != nil {
+		return zero, err
+	}
 	if err := cm.Observe(); err != nil {
 		return zero, err
 	}
 
-	e.emit(ep.Config.Operation.ID, ep.Config.Operation.Method, ep.Config.Operation.Pattern, ctx, telemetry.EventSuccess, successStatus, nil, start)
+	e.emit(ep.Config.Operation.ID, ep.Config.Operation.Method, ep.Config.Operation.Pattern, ctx, telemetry.EventSuccess, finalStatus, nil, start)
 	return resp, nil
 }
 
@@ -219,22 +266,25 @@ func (e *Executor) mapBindError(err error) *response.Problem {
 	)
 }
 
-// writeProblem writes a Problem response to the transport as JSON.
-func (e *Executor) writeProblem(transport Transport, problem *response.Problem) {
+// writeProblem writes a Problem response to the transport as JSON. It
+// returns any transport or encoding error so callers can propagate it
+// alongside the original domain error. If the transport is already
+// committed, no write is attempted and nil is returned.
+func (e *Executor) writeProblem(transport Transport, problem *response.Problem) error {
 	if transport.Committed() {
-		return
+		return nil
 	}
 	body, err := json.Marshal(problem)
 	if err != nil {
 		// Last resort: write a minimal 500.
-		transport.WriteResponse(
+		return transport.WriteResponse(
 			http.StatusInternalServerError,
 			"application/json",
+			nil,
 			[]byte(`{"title":"Internal Server Error","status":500}`),
 		)
-		return
 	}
-	transport.WriteResponse(problem.Status, response.ProblemContentType, body)
+	return transport.WriteResponse(problem.Status, response.ProblemContentType, nil, body)
 }
 
 // emit sends a telemetry event if a sink is configured.

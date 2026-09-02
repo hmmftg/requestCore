@@ -13,13 +13,15 @@ import (
 // ResponseState is safe for concurrent use, though a single request is
 // typically processed by one goroutine.
 type ResponseState struct {
-	mu      sync.RWMutex
-	status  int
-	headers http.Header
+	mu        sync.RWMutex
+	status    int
+	statusSet bool
+	headers   http.Header
 }
 
 // NewResponseState creates a ResponseState with default status 200 and
-// an empty header map.
+// an empty header map. The default status is not considered explicitly
+// set; StatusSet returns false until SetStatus is called.
 func NewResponseState() *ResponseState {
 	return &ResponseState{
 		status:  200,
@@ -34,13 +36,23 @@ func (r *ResponseState) Status() int {
 	return r.status
 }
 
+// StatusSet reports whether the status was explicitly set via SetStatus.
+// The default 200 status is not considered explicitly set.
+func (r *ResponseState) StatusSet() bool {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	return r.statusSet
+}
+
 // SetStatus sets the response status code. This is used by handlers to
 // set a dynamic status (e.g. 201 for Create). The status is read by the
-// commit engine when preparing the response.
+// commit engine when preparing the response. After this call StatusSet
+// returns true.
 func (r *ResponseState) SetStatus(status int) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	r.status = status
+	r.statusSet = true
 }
 
 // Header returns the response header map. Callers may mutate the
@@ -83,7 +95,8 @@ func (r *ResponseState) Clone() *ResponseState {
 		h[k] = append([]string(nil), v...)
 	}
 	return &ResponseState{
-		status:  r.status,
-		headers: h,
+		status:    r.status,
+		statusSet: r.statusSet,
+		headers:   h,
 	}
 }

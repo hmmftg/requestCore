@@ -139,3 +139,72 @@ func TestJSON_HTTPStatus413(t *testing.T) {
 		t.Errorf("status = %d, want 413", be.HTTPStatus())
 	}
 }
+
+func TestJSON_ContentTypeAccepted(t *testing.T) {
+	cases := []string{
+		"application/json",
+		"application/json; charset=utf-8",
+		"application/vnd.custom+json",
+		"application/vnd.custom+json; charset=ascii",
+	}
+	for _, ct := range cases {
+		t.Run(ct, func(t *testing.T) {
+			body := `{"name":"Alice"}`
+			ft := faketransport.New("POST", "/x",
+				faketransport.WithBody(body),
+				faketransport.WithHeader("Content-Type", ct),
+			)
+			var req jsonUser
+			if err := Bind(ft.Context(), DefaultJSONPlan, &req); err != nil {
+				t.Fatalf("Bind failed for %s: %v", ct, err)
+			}
+			if req.Name != "Alice" {
+				t.Errorf("Name = %q", req.Name)
+			}
+		})
+	}
+}
+
+func TestJSON_ContentTypeRejected(t *testing.T) {
+	cases := []string{
+		"text/plain",
+		"application/x-www-form-urlencoded",
+		"application/xml",
+		"multipart/form-data; boundary=xyz",
+		"not a media type",
+	}
+	for _, ct := range cases {
+		t.Run(ct, func(t *testing.T) {
+			body := `{"name":"Alice"}`
+			ft := faketransport.New("POST", "/x",
+				faketransport.WithBody(body),
+				faketransport.WithHeader("Content-Type", ct),
+			)
+			var req jsonUser
+			err := Bind(ft.Context(), DefaultJSONPlan, &req)
+			if !errors.Is(err, ErrInvalidContentType) {
+				t.Fatalf("expected ErrInvalidContentType for %s, got %v", ct, err)
+			}
+			var be *BindingError
+			if !errors.As(err, &be) {
+				t.Fatalf("expected *BindingError, got %T", err)
+			}
+			if be.HTTPStatus() != http.StatusUnsupportedMediaType {
+				t.Errorf("status = %d, want 415", be.HTTPStatus())
+			}
+		})
+	}
+}
+
+func TestJSON_ContentTypeAbsentAccepted(t *testing.T) {
+	// No Content-Type header — accepted for compatibility.
+	body := `{"name":"Alice"}`
+	ft := faketransport.New("POST", "/x", faketransport.WithBody(body))
+	var req jsonUser
+	if err := Bind(ft.Context(), DefaultJSONPlan, &req); err != nil {
+		t.Fatalf("Bind failed: %v", err)
+	}
+	if req.Name != "Alice" {
+		t.Errorf("Name = %q", req.Name)
+	}
+}

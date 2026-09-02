@@ -22,6 +22,36 @@ func TestResponseState_SetStatus(t *testing.T) {
 	if r.Status() != 201 {
 		t.Fatalf("expected 201, got %d", r.Status())
 	}
+	if !r.StatusSet() {
+		t.Fatalf("expected StatusSet true after SetStatus")
+	}
+}
+
+func TestResponseState_DefaultStatusNotSet(t *testing.T) {
+	r := NewResponseState()
+	if r.StatusSet() {
+		t.Fatalf("expected StatusSet false for default status")
+	}
+	if r.Status() != 200 {
+		t.Fatalf("expected default status 200, got %d", r.Status())
+	}
+}
+
+func TestResponseState_ClonePreservesStatusSet(t *testing.T) {
+	r := NewResponseState()
+	r.SetStatus(203)
+	clone := r.Clone()
+	if !clone.StatusSet() {
+		t.Fatalf("expected cloned StatusSet true")
+	}
+	if clone.Status() != 203 {
+		t.Fatalf("expected cloned status 203, got %d", clone.Status())
+	}
+	// Default clone should preserve unset flag.
+	defClone := NewResponseState().Clone()
+	if defClone.StatusSet() {
+		t.Fatalf("expected cloned default StatusSet false")
+	}
 }
 
 func TestResponseState_SetHeader(t *testing.T) {

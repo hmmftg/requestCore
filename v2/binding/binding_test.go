@@ -337,5 +337,72 @@ func TestBindForm_Success(t *testing.T) {
 	}
 }
 
+func TestBindForm_ContentTypeAccepted(t *testing.T) {
+	cases := []string{
+		"application/x-www-form-urlencoded",
+		"application/x-www-form-urlencoded; charset=utf-8",
+	}
+	for _, ct := range cases {
+		t.Run(ct, func(t *testing.T) {
+			body := "name=Dave&age=40"
+			ft := faketransport.New("POST", "/users",
+				faketransport.WithBody(body),
+				faketransport.WithHeader("Content-Type", ct),
+			)
+			plan := Plan{Mode: ModeForm, MaxBodyBytes: 1024}
+			var req queryReq
+			if err := Bind(ft.Context(), plan, &req); err != nil {
+				t.Fatalf("Bind failed for %s: %v", ct, err)
+			}
+			if req.Name != "Dave" {
+				t.Errorf("Name = %q", req.Name)
+			}
+		})
+	}
+}
+
+func TestBindForm_ContentTypeRejected(t *testing.T) {
+	cases := []string{
+		"text/plain",
+		"application/json",
+		"multipart/form-data; boundary=xyz",
+	}
+	for _, ct := range cases {
+		t.Run(ct, func(t *testing.T) {
+			body := "name=Dave&age=40"
+			ft := faketransport.New("POST", "/users",
+				faketransport.WithBody(body),
+				faketransport.WithHeader("Content-Type", ct),
+			)
+			plan := Plan{Mode: ModeForm, MaxBodyBytes: 1024}
+			var req queryReq
+			err := Bind(ft.Context(), plan, &req)
+			if !errors.Is(err, ErrInvalidContentType) {
+				t.Fatalf("expected ErrInvalidContentType for %s, got %v", ct, err)
+			}
+			var be *BindingError
+			if !errors.As(err, &be) {
+				t.Fatalf("expected *BindingError, got %T", err)
+			}
+			if be.HTTPStatus() != http.StatusUnsupportedMediaType {
+				t.Errorf("status = %d, want 415", be.HTTPStatus())
+			}
+		})
+	}
+}
+
+func TestBindForm_ContentTypeAbsentAccepted(t *testing.T) {
+	body := "name=Dave&age=40"
+	ft := faketransport.New("POST", "/users", faketransport.WithBody(body))
+	plan := Plan{Mode: ModeForm, MaxBodyBytes: 1024}
+	var req queryReq
+	if err := Bind(ft.Context(), plan, &req); err != nil {
+		t.Fatalf("Bind failed: %v", err)
+	}
+	if req.Name != "Dave" {
+		t.Errorf("Name = %q", req.Name)
+	}
+}
+
 // Ensure request.Context import is used.
 var _ = request.NewContext

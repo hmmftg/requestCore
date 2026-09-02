@@ -22,6 +22,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"mime"
 	"net/http"
 	"net/url"
 	"reflect"
@@ -141,7 +142,21 @@ func Bind(ctx *request.Context, plan Plan, target any) error {
 }
 
 // bindJSON reads the request body and decodes it as JSON into target.
+// When a non-empty Content-Type is present on the request, it must be
+// a JSON media type (application/json or any "+json" structured suffix);
+// otherwise ErrInvalidContentType (HTTP 415) is returned. An absent
+// Content-Type is accepted for compatibility.
 func bindJSON(ctx *request.Context, plan Plan, target any) error {
+	if ct := ctx.Header("Content-Type"); ct != "" {
+		if !isJSONContentType(ct) {
+			return &BindingError{
+				Status:  http.StatusUnsupportedMediaType,
+				Cause:   ErrInvalidContentType,
+				Message: fmt.Sprintf("content type %q is not a JSON media type", ct),
+			}
+		}
+	}
+
 	body := ctx.Body()
 	if body == "" {
 		// Empty body: leave target at zero value. This is valid for
@@ -183,6 +198,30 @@ func bindJSON(ctx *request.Context, plan Plan, target any) error {
 	return nil
 }
 
+// isJSONContentType reports whether the given Content-Type header value
+// is a JSON media type. It accepts application/json and any structured
+// suffix media type ending in +json (RFC 6839). Parameters are ignored.
+func isJSONContentType(ct string) bool {
+	mediaType, _, err := mime.ParseMediaType(ct)
+	if err != nil {
+		return false
+	}
+	if mediaType == "application/json" {
+		return true
+	}
+	return strings.HasSuffix(mediaType, "+json")
+}
+
+// isFormContentType reports whether the given Content-Type header value
+// is application/x-www-form-urlencoded. Parameters are ignored.
+func isFormContentType(ct string) bool {
+	mediaType, _, err := mime.ParseMediaType(ct)
+	if err != nil {
+		return false
+	}
+	return mediaType == "application/x-www-form-urlencoded"
+}
+
 // bindTagged binds from a multi-value source (query, path, header) into
 // target using the named struct tag. The getter returns all values for
 // a given key. Falls back to the `json` tag if the primary tag is
@@ -191,8 +230,22 @@ func bindTagged(getter func(name string) []string, tag string, target any) error
 	return bindTaggedWithFallback(getter, tag, "json", target)
 }
 
-// bindForm binds from form-encoded body data.
+// bindForm binds from form-encoded body data. When a non-empty
+// Content-Type is present on the request, it must be
+// application/x-www-form-urlencoded; otherwise ErrInvalidContentType
+// (HTTP 415) is returned. An absent Content-Type is accepted for
+// compatibility.
 func bindForm(ctx *request.Context, plan Plan, target any) error {
+	if ct := ctx.Header("Content-Type"); ct != "" {
+		if !isFormContentType(ct) {
+			return &BindingError{
+				Status:  http.StatusUnsupportedMediaType,
+				Cause:   ErrInvalidContentType,
+				Message: fmt.Sprintf("content type %q is not a form media type", ct),
+			}
+		}
+	}
+
 	body := ctx.Body()
 	if body == "" {
 		return nil
