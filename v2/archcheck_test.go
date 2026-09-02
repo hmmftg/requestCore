@@ -248,3 +248,56 @@ func TestArchitecture_DAG(t *testing.T) {
 		}
 	}
 }
+
+// alphaSurfacePatterns are import paths or identifiers that indicate
+// removed alpha surface area. If any v2 package imports these, the
+// architecture gate fails.
+var alphaSurfaceImports = []string{
+	"github.com/hmmftg/requestCore/v2/webFramework",
+}
+
+// alphaSurfaceIdentifiers are type/function identifiers from the
+// removed alpha API. If any v2 .go file references these, the gate
+// fails. This catches accidental re-introduction of alpha types.
+var alphaSurfaceIdentifiers = []string{
+	"HandlerRequest",
+	"CallAPILogEntry",
+	"webFramework.WebFramework",
+	"v2wf.RequestContext",
+	"v2wf.FakeParserV2",
+	"v2wf.CommitState",
+}
+
+// TestArchitecture_NoAlphaSurface verifies that no v2 package imports
+// the removed v2/webFramework package or references removed alpha
+// surface identifiers (HandlerRequest, CallAPILogEntry, etc.).
+func TestArchitecture_NoAlphaSurface(t *testing.T) {
+	pkgs, err := listV2Packages()
+	if err != nil {
+		t.Fatalf("go list: %v", err)
+	}
+
+	// Check for alpha surface imports.
+	for _, pkg := range pkgs {
+		for _, imp := range pkg.Imports {
+			for _, alpha := range alphaSurfaceImports {
+				if imp == alpha {
+					t.Errorf("package %s imports removed alpha surface: %s", pkg.ImportPath, imp)
+				}
+			}
+		}
+	}
+
+	// Check for alpha surface identifiers in .go files.
+	// Use grep to search all .go files (excluding this test file).
+	cmd := exec.Command("grep", "-rn", "--include=*.go",
+		"-e", strings.Join(alphaSurfaceIdentifiers, " -e "),
+		".")
+	cmd.Dir = "."
+	// Exclude this test file from the search.
+	cmd.Args = append(cmd.Args[:len(cmd.Args)-1], "--exclude=archcheck_test.go", ".")
+	out, _ := cmd.CombinedOutput()
+	if len(out) > 0 {
+		t.Errorf("alpha surface identifiers found in v2 source files:\n%s", string(out))
+	}
+}
