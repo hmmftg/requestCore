@@ -8,8 +8,8 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 
+	"github.com/hmmftg/requestCore/v2/request"
 	"github.com/hmmftg/requestCore/v2/routing"
-	v2wf "github.com/hmmftg/requestCore/v2/webFramework"
 )
 
 func TestFiberParserV2_SendResponse(t *testing.T) {
@@ -55,9 +55,9 @@ func TestFiberRouter_BasicRoute(t *testing.T) {
 	router := NewRouter(app)
 
 	called := false
-	err := router.Get("/users", func(ctx *v2wf.RequestContext) error {
+	err := router.Get("/users", func(ctx *request.Context, transport routing.Transport) error {
 		called = true
-		return ctx.Parser.SendResponse(200, "text/plain", []byte("hello"))
+		return transport.WriteResponse(200, "text/plain", nil, []byte("hello"))
 	})
 	if err != nil {
 		t.Fatalf("Get: %v", err)
@@ -80,9 +80,9 @@ func TestFiberRouter_ParamRoute(t *testing.T) {
 	app := fiber.New()
 	router := NewRouter(app)
 
-	err := router.Get("/users/{id}", func(ctx *v2wf.RequestContext) error {
-		id := ctx.Parser.GetURLParam("id")
-		return ctx.Parser.SendResponse(200, "text/plain", []byte(id))
+	err := router.Get("/users/{id}", func(ctx *request.Context, transport routing.Transport) error {
+		id := ctx.PathParam("id")
+		return transport.WriteResponse(200, "text/plain", nil, []byte(id))
 	})
 	if err != nil {
 		t.Fatalf("Get: %v", err)
@@ -104,9 +104,9 @@ func TestFiberRouter_Group(t *testing.T) {
 
 	api := router.Group("/api")
 	called := false
-	err := api.Get("/users", func(ctx *v2wf.RequestContext) error {
+	err := api.Get("/users", func(ctx *request.Context, transport routing.Transport) error {
 		called = true
-		return ctx.Parser.SendResponse(200, "text/plain", []byte("ok"))
+		return transport.WriteResponse(200, "text/plain", nil, []byte("ok"))
 	})
 	if err != nil {
 		t.Fatalf("Get: %v", err)
@@ -127,17 +127,17 @@ func TestFiberRouter_Middleware(t *testing.T) {
 
 	order := []string{}
 	mw := func(next routing.Handler) routing.Handler {
-		return func(ctx *v2wf.RequestContext) error {
+		return func(ctx *request.Context, transport routing.Transport) error {
 			order = append(order, "mw-before")
-			err := next(ctx)
+			err := next(ctx, transport)
 			order = append(order, "mw-after")
 			return err
 		}
 	}
 
-	router.With(mw).Get("/test", func(ctx *v2wf.RequestContext) error {
+	router.With(mw).Get("/test", func(ctx *request.Context, transport routing.Transport) error {
 		order = append(order, "handler")
-		return ctx.Parser.SendResponse(200, "text/plain", []byte("ok"))
+		return transport.WriteResponse(200, "text/plain", nil, []byte("ok"))
 	})
 
 	resp, _ := app.Test(httptest.NewRequest("GET", "/test", nil))
@@ -160,7 +160,7 @@ func TestFiberRouter_InvalidPattern(t *testing.T) {
 	app := fiber.New()
 	router := NewRouter(app)
 
-	err := router.Get("/users/{id", func(ctx *v2wf.RequestContext) error {
+	err := router.Get("/users/{id", func(ctx *request.Context, transport routing.Transport) error {
 		return nil
 	})
 	if err == nil {
@@ -179,8 +179,11 @@ func TestFiberRouter_Native(t *testing.T) {
 func TestFiberRouter_HandlerError(t *testing.T) {
 	app := fiber.New()
 	router := NewRouter(app)
+	router.SetErrorHandler(func(ctx *request.Context, transport routing.Transport, err error) {
+		_ = transport.WriteResponse(500, "text/plain", nil, []byte(err.Error()))
+	})
 
-	router.Get("/fail", func(ctx *v2wf.RequestContext) error {
+	router.Get("/fail", func(ctx *request.Context, transport routing.Transport) error {
 		ctx2, cancel := context.WithCancel(context.Background())
 		cancel()
 		return ctx2.Err()
@@ -197,13 +200,15 @@ func TestGetFiberCtx(t *testing.T) {
 	router := NewRouter(app)
 
 	var extracted *fiber.Ctx
-	router.Get("/test", func(ctx *v2wf.RequestContext) error {
-		extracted = GetFiberCtx(ctx.LegacyContext)
-		return ctx.Parser.SendResponse(200, "text/plain", []byte("ok"))
+	router.Get("/test", func(ctx *request.Context, transport routing.Transport) error {
+		if fc, ok := ctx.Native().(*fiber.Ctx); ok {
+			extracted = fc
+		}
+		return transport.WriteResponse(200, "text/plain", nil, []byte("ok"))
 	})
 
 	app.Test(httptest.NewRequest("GET", "/test", nil))
 	if extracted == nil {
-		t.Fatal("expected non-nil fiber.Ctx from GetFiberCtx")
+		t.Fatal("expected non-nil fiber.Ctx from ctx.Native()")
 	}
 }

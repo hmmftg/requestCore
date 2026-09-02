@@ -10,8 +10,8 @@ import (
 
 	v2libGin "github.com/hmmftg/requestCore/v2/libGin"
 	"github.com/hmmftg/requestCore/v2/renderers"
+	v2request "github.com/hmmftg/requestCore/v2/request"
 	v2routing "github.com/hmmftg/requestCore/v2/routing"
-	v2wf "github.com/hmmftg/requestCore/v2/webFramework"
 )
 
 // BenchmarkEndpointDirectSuccess measures the overhead of a successful
@@ -76,8 +76,8 @@ func BenchmarkEndpointFiveMiddleware(b *testing.B) {
 	respHandler := testRespHandler()
 
 	noopMW := func(next v2routing.Handler) v2routing.Handler {
-		return func(ctx *v2wf.RequestContext) error {
-			return next(ctx)
+		return func(ctx *v2request.Context, transport v2routing.Transport) error {
+			return next(ctx, transport)
 		}
 	}
 

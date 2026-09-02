@@ -11,7 +11,8 @@ import (
 
 	"github.com/hmmftg/requestCore/response"
 	"github.com/hmmftg/requestCore/v2/renderers"
-	v2wf "github.com/hmmftg/requestCore/v2/webFramework"
+	"github.com/hmmftg/requestCore/v2/request"
+	"github.com/hmmftg/requestCore/v2/routing"
 	"github.com/hmmftg/requestCore/v2/workers"
 )
 
@@ -162,8 +163,8 @@ func TestApp_RegisterRoute(t *testing.T) {
 	defer app.Close()
 
 	// Register a simple route
-	err = app.Router.Get("/test", func(ctx *v2wf.RequestContext) error {
-		return app.RespHandler.OK(ctx, map[string]string{"status": "ok"})
+	err = app.Router.Get("/test", func(ctx *request.Context, transport routing.Transport) error {
+		return transport.WriteResponse(http.StatusOK, "application/json", nil, []byte(`{"status":"ok"}`))
 	})
 	if err != nil {
 		t.Fatalf("Get: %v", err)
@@ -206,8 +207,8 @@ func TestApp_StartShutdown(t *testing.T) {
 		t.Fatalf("Bootstrap: %v", err)
 	}
 
-	app.Router.Get("/health", func(ctx *v2wf.RequestContext) error {
-		return app.RespHandler.OK(ctx, map[string]string{"status": "healthy"})
+	app.Router.Get("/health", func(ctx *request.Context, transport routing.Transport) error {
+		return transport.WriteResponse(http.StatusOK, "application/json", nil, []byte(`{"status":"healthy"}`))
 	})
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -275,8 +276,8 @@ func TestApp_DefaultMethodNotAllowed(t *testing.T) {
 	}
 	defer app.Close()
 
-	err = app.Router.Post("/items", func(ctx *v2wf.RequestContext) error {
-		return app.RespHandler.OK(ctx, map[string]string{"status": "created"})
+	err = app.Router.Post("/items", func(ctx *request.Context, transport routing.Transport) error {
+		return transport.WriteResponse(http.StatusOK, "application/json", nil, []byte(`{"status":"created"}`))
 	})
 	if err != nil {
 		t.Fatalf("Post: %v", err)
@@ -320,8 +321,8 @@ func TestApp_ShutdownStopsWorker(t *testing.T) {
 		t.Fatalf("Bootstrap: %v", err)
 	}
 
-	app.Router.Get("/health", func(ctx *v2wf.RequestContext) error {
-		return app.RespHandler.OK(ctx, map[string]string{"status": "healthy"})
+	app.Router.Get("/health", func(ctx *request.Context, transport routing.Transport) error {
+		return transport.WriteResponse(http.StatusOK, "application/json", nil, []byte(`{"status":"healthy"}`))
 	})
 
 	ctx, cancel := context.WithCancel(context.Background())

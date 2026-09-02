@@ -11,8 +11,6 @@ import (
 	"sync/atomic"
 	"testing"
 
-	"log/slog"
-
 	"github.com/hmmftg/requestCore/v2/binding"
 	"github.com/hmmftg/requestCore/v2/internal/endpoint"
 	v2libChi "github.com/hmmftg/requestCore/v2/libChi"
@@ -21,9 +19,8 @@ import (
 	"github.com/hmmftg/requestCore/v2/request"
 	"github.com/hmmftg/requestCore/v2/response"
 	"github.com/hmmftg/requestCore/v2/routing"
+	"github.com/hmmftg/requestCore/v2/telemetry"
 	"github.com/hmmftg/requestCore/v2/validation"
-	v2wf "github.com/hmmftg/requestCore/v2/webFramework"
-	legacy "github.com/hmmftg/requestCore/webFramework"
 )
 
 // newTestExecutor creates an executor with a fresh registry and the
@@ -76,28 +73,6 @@ type problemResp struct {
 	Result string `json:"result"`
 }
 
-// maskedResp implements slog.LogValuer to test AddLog masking.
-type maskedResp struct {
-	Status string `json:"status"`
-	Secret string `json:"secret"`
-}
-
-func (m maskedResp) LogValue() slog.Value {
-	return slog.GroupValue(
-		slog.String("status", m.Status),
-		slog.String("secret", "<masked>"),
-	)
-}
-
-// panickingLogValuer panics in LogValue to test the recovery path.
-type panickingLogValuer struct {
-	Status string `json:"status"`
-}
-
-func (panickingLogValuer) LogValue() slog.Value {
-	panic("logvalue boom")
-}
-
 // --- helpers ---
 
 // makeCreateUserEndpoint builds a standard create-user endpoint with
@@ -114,27 +89,13 @@ func makeCreateUserEndpoint() *endpoint.Endpoint[createUserReq, createUserResp] 
 	)
 }
 
-// capturingParser wraps a v2 parser to capture it for AddLog inspection.
-type capturingParser struct {
-	v2wf.RequestParser
-}
-
 // runChiRequest runs a request through a chi router and returns the
 // recorder. The router is created fresh for each call.
-func runChiRequest(t *testing.T, register func(routing.RouteGroup, *endpoint.Executor), method, path string, body io.Reader, contentType string) (*httptest.ResponseRecorder, v2wf.RequestParser) {
+func runChiRequest(t *testing.T, register func(routing.RouteGroup, *endpoint.Executor), method, path string, body io.Reader, contentType string) *httptest.ResponseRecorder {
 	t.Helper()
 	router := v2libChi.NewRouter()
 	exec := newTestExecutor()
-	// Install a capturing middleware to grab the parser.
-	var captured v2wf.RequestParser
-	captureMW := func(next routing.Handler) routing.Handler {
-		return func(rc *v2wf.RequestContext) error {
-			captured = rc.Parser
-			return next(rc)
-		}
-	}
-	group := router.With(captureMW)
-	register(group, exec)
+	register(router, exec)
 
 	w := httptest.NewRecorder()
 	req := httptest.NewRequest(method, path, body)
@@ -142,23 +103,15 @@ func runChiRequest(t *testing.T, register func(routing.RouteGroup, *endpoint.Exe
 		req.Header.Set("Content-Type", contentType)
 	}
 	serveHTTP(t, router, w, req)
-	return w, captured
+	return w
 }
 
 // runNetHTTPRequest runs a request through a net/http ServeMux router.
-func runNetHTTPRequest(t *testing.T, register func(routing.RouteGroup, *endpoint.Executor), method, path string, body io.Reader, contentType string) (*httptest.ResponseRecorder, v2wf.RequestParser) {
+func runNetHTTPRequest(t *testing.T, register func(routing.RouteGroup, *endpoint.Executor), method, path string, body io.Reader, contentType string) *httptest.ResponseRecorder {
 	t.Helper()
 	router := v2libNetHttp.NewRouter()
 	exec := newTestExecutor()
-	var captured v2wf.RequestParser
-	captureMW := func(next routing.Handler) routing.Handler {
-		return func(rc *v2wf.RequestContext) error {
-			captured = rc.Parser
-			return next(rc)
-		}
-	}
-	group := router.With(captureMW)
-	register(group, exec)
+	register(router, exec)
 
 	w := httptest.NewRecorder()
 	req := httptest.NewRequest(method, path, body)
@@ -166,7 +119,7 @@ func runNetHTTPRequest(t *testing.T, register func(routing.RouteGroup, *endpoint
 		req.Header.Set("Content-Type", contentType)
 	}
 	serveHTTP(t, router, w, req)
-	return w, captured
+	return w
 }
 
 // serveHTTP dispatches through the router's Native() handler.
@@ -180,27 +133,19 @@ func serveHTTP(t *testing.T, router routing.Router, w http.ResponseWriter, req *
 	h.ServeHTTP(w, req)
 }
 
-// assertAddLogArray retrieves a LOG_ARRAY_<key> entry from the parser.
-func assertAddLogArray(t *testing.T, parser v2wf.RequestParser, key string) []slog.Attr {
-	t.Helper()
-	if parser == nil {
-		t.Fatal("expected parser to be captured")
-	}
-	v := parser.GetLocal("LOG_ARRAY_" + key)
-	if v == nil {
-		t.Fatalf("expected AddLog entry for %q, got nil", key)
-	}
-	arr, ok := v.([]slog.Attr)
-	if !ok {
-		t.Fatalf("expected []slog.Attr, got %T", v)
-	}
-	return arr
+// capturingSink is a test telemetry sink that records events.
+type capturingSink struct {
+	events []telemetry.Event
+}
+
+func (s *capturingSink) Record(e telemetry.Event) {
+	s.events = append(s.events, e)
 }
 
 // --- success and binding tests ---
 
 func TestWrap_ChiSuccess(t *testing.T) {
-	w, _ := runChiRequest(t, func(g routing.RouteGroup, exec *endpoint.Executor) {
+	w := runChiRequest(t, func(g routing.RouteGroup, exec *endpoint.Executor) {
 		ep := makeCreateUserEndpoint()
 		if err := Register(g, exec, "POST", "/users", ep); err != nil {
 			t.Fatalf("Register: %v", err)
@@ -220,7 +165,7 @@ func TestWrap_ChiSuccess(t *testing.T) {
 }
 
 func TestWrap_NetHTTPSuccess(t *testing.T) {
-	w, _ := runNetHTTPRequest(t, func(g routing.RouteGroup, exec *endpoint.Executor) {
+	w := runNetHTTPRequest(t, func(g routing.RouteGroup, exec *endpoint.Executor) {
 		ep := makeCreateUserEndpoint()
 		if err := Register(g, exec, "POST", "/users", ep); err != nil {
 			t.Fatalf("Register: %v", err)
@@ -240,7 +185,7 @@ func TestWrap_NetHTTPSuccess(t *testing.T) {
 }
 
 func TestWrap_JSONBindingAndValidation(t *testing.T) {
-	w, _ := runChiRequest(t, func(g routing.RouteGroup, exec *endpoint.Executor) {
+	w := runChiRequest(t, func(g routing.RouteGroup, exec *endpoint.Executor) {
 		ep := makeCreateUserEndpoint()
 		if err := Register(g, exec, "POST", "/users", ep); err != nil {
 			t.Fatalf("Register: %v", err)
@@ -253,7 +198,7 @@ func TestWrap_JSONBindingAndValidation(t *testing.T) {
 }
 
 func TestWrap_UnsupportedContentType415(t *testing.T) {
-	w, _ := runChiRequest(t, func(g routing.RouteGroup, exec *endpoint.Executor) {
+	w := runChiRequest(t, func(g routing.RouteGroup, exec *endpoint.Executor) {
 		ep := makeCreateUserEndpoint()
 		if err := Register(g, exec, "POST", "/users", ep); err != nil {
 			t.Fatalf("Register: %v", err)
@@ -266,7 +211,7 @@ func TestWrap_UnsupportedContentType415(t *testing.T) {
 }
 
 func TestWrap_OversizedBody413(t *testing.T) {
-	w, _ := runChiRequest(t, func(g routing.RouteGroup, exec *endpoint.Executor) {
+	w := runChiRequest(t, func(g routing.RouteGroup, exec *endpoint.Executor) {
 		ep := endpoint.New[createUserReq, createUserResp](
 			func(ctx *request.Context, req createUserReq) (createUserResp, error) {
 				return createUserResp{}, nil
@@ -288,7 +233,7 @@ func TestWrap_OversizedBody413(t *testing.T) {
 
 func TestWrap_HandlerErrorMappedProblem(t *testing.T) {
 	notFoundErr := errors.New("user not found")
-	w, _ := runChiRequest(t, func(g routing.RouteGroup, exec *endpoint.Executor) {
+	w := runChiRequest(t, func(g routing.RouteGroup, exec *endpoint.Executor) {
 		exec.ProblemMapper = response.NewMapperRegistry()
 		exec.ProblemMapper.Register(
 			func(err error) bool { return errors.Is(err, notFoundErr) },
@@ -318,7 +263,7 @@ func TestWrap_HandlerErrorMappedProblem(t *testing.T) {
 }
 
 func TestWrap_HandlerPanicSanitized500(t *testing.T) {
-	w, _ := runChiRequest(t, func(g routing.RouteGroup, exec *endpoint.Executor) {
+	w := runChiRequest(t, func(g routing.RouteGroup, exec *endpoint.Executor) {
 		ep := endpoint.New[problemReq, problemResp](
 			func(ctx *request.Context, req problemReq) (problemResp, error) {
 				panic("boom")
@@ -340,7 +285,7 @@ func TestWrap_HandlerPanicSanitized500(t *testing.T) {
 // --- path parameter tests ---
 
 func TestWrap_ChiPathParam(t *testing.T) {
-	w, _ := runChiRequest(t, func(g routing.RouteGroup, exec *endpoint.Executor) {
+	w := runChiRequest(t, func(g routing.RouteGroup, exec *endpoint.Executor) {
 		ep := endpoint.New[pathReq, pathResp](
 			func(ctx *request.Context, req pathReq) (pathResp, error) {
 				return pathResp{ID: req.ID}, nil
@@ -366,7 +311,7 @@ func TestWrap_ChiPathParam(t *testing.T) {
 }
 
 func TestWrap_NetHTTPPathParam(t *testing.T) {
-	w, _ := runNetHTTPRequest(t, func(g routing.RouteGroup, exec *endpoint.Executor) {
+	w := runNetHTTPRequest(t, func(g routing.RouteGroup, exec *endpoint.Executor) {
 		ep := endpoint.New[pathReq, pathResp](
 			func(ctx *request.Context, req pathReq) (pathResp, error) {
 				return pathResp{ID: req.ID}, nil
@@ -394,7 +339,7 @@ func TestWrap_NetHTTPPathParam(t *testing.T) {
 // --- query parameter test ---
 
 func TestWrap_QueryParam(t *testing.T) {
-	w, _ := runChiRequest(t, func(g routing.RouteGroup, exec *endpoint.Executor) {
+	w := runChiRequest(t, func(g routing.RouteGroup, exec *endpoint.Executor) {
 		ep := endpoint.New[queryReq, queryResp](
 			func(ctx *request.Context, req queryReq) (queryResp, error) {
 				return queryResp{Page: req.Page}, nil
@@ -423,7 +368,7 @@ func TestWrap_QueryParam(t *testing.T) {
 // --- dynamic status and headers ---
 
 func TestWrap_DynamicStatusFromHandler(t *testing.T) {
-	w, _ := runChiRequest(t, func(g routing.RouteGroup, exec *endpoint.Executor) {
+	w := runChiRequest(t, func(g routing.RouteGroup, exec *endpoint.Executor) {
 		ep := endpoint.New[pingReq, pingResp](
 			func(ctx *request.Context, req pingReq) (pingResp, error) {
 				ctx.Response().SetStatus(http.StatusAccepted)
@@ -443,7 +388,7 @@ func TestWrap_DynamicStatusFromHandler(t *testing.T) {
 }
 
 func TestWrap_HandlerResponseHeaders(t *testing.T) {
-	w, _ := runChiRequest(t, func(g routing.RouteGroup, exec *endpoint.Executor) {
+	w := runChiRequest(t, func(g routing.RouteGroup, exec *endpoint.Executor) {
 		ep := endpoint.New[pingReq, pingResp](
 			func(ctx *request.Context, req pingReq) (pingResp, error) {
 				ctx.Response().SetHeader("X-Custom", "value")
@@ -462,7 +407,7 @@ func TestWrap_HandlerResponseHeaders(t *testing.T) {
 }
 
 func TestWrap_ConfiguredStatusWhenNotOverridden(t *testing.T) {
-	w, _ := runChiRequest(t, func(g routing.RouteGroup, exec *endpoint.Executor) {
+	w := runChiRequest(t, func(g routing.RouteGroup, exec *endpoint.Executor) {
 		ep := endpoint.New[pingReq, pingResp](
 			func(ctx *request.Context, req pingReq) (pingResp, error) {
 				return pingResp{Message: "ok"}, nil
@@ -484,21 +429,21 @@ func TestWrap_ConfiguredStatusWhenNotOverridden(t *testing.T) {
 
 func TestWrap_AlphaHookRunsOnce(t *testing.T) {
 	var hookCount int32
-	w, _ := runChiRequest(t, func(g routing.RouteGroup, exec *endpoint.Executor) {
+	w := runChiRequest(t, func(g routing.RouteGroup, exec *endpoint.Executor) {
 		ep := endpoint.New[pingReq, pingResp](
 			func(ctx *request.Context, req pingReq) (pingResp, error) {
 				return pingResp{Message: "ok"}, nil
 			},
 			endpoint.WithOperation(operation.Operation{ID: "ping", Method: "GET", Pattern: "/ping"}),
 		)
-		// Wrap with a middleware that adds an alpha before-commit hook.
+		// Wrap with a middleware that adds a before-commit hook.
 		hookMW := func(next routing.Handler) routing.Handler {
-			return func(rc *v2wf.RequestContext) error {
-				rc.AddBeforeCommitHook(func(*v2wf.RequestContext) error {
+			return func(ctx *request.Context, transport routing.Transport) error {
+				ctx.AddBeforeCommitHook(func() error {
 					atomic.AddInt32(&hookCount, 1)
 					return nil
 				})
-				return next(rc)
+				return next(ctx, transport)
 			}
 		}
 		if err := Register(g.With(hookMW), exec, "GET", "/ping", ep); err != nil {
@@ -515,7 +460,7 @@ func TestWrap_AlphaHookRunsOnce(t *testing.T) {
 }
 
 func TestWrap_StrictHookFailurePreventsSuccess(t *testing.T) {
-	w, _ := runChiRequest(t, func(g routing.RouteGroup, exec *endpoint.Executor) {
+	w := runChiRequest(t, func(g routing.RouteGroup, exec *endpoint.Executor) {
 		ep := endpoint.New[pingReq, pingResp](
 			func(ctx *request.Context, req pingReq) (pingResp, error) {
 				return pingResp{Message: "ok"}, nil
@@ -523,11 +468,11 @@ func TestWrap_StrictHookFailurePreventsSuccess(t *testing.T) {
 			endpoint.WithOperation(operation.Operation{ID: "ping", Method: "GET", Pattern: "/ping"}),
 		)
 		hookMW := func(next routing.Handler) routing.Handler {
-			return func(rc *v2wf.RequestContext) error {
-				rc.AddBeforeCommitHook(func(*v2wf.RequestContext) error {
+			return func(ctx *request.Context, transport routing.Transport) error {
+				ctx.AddBeforeCommitHook(func() error {
 					return errors.New("strict hook failure")
 				})
-				return next(rc)
+				return next(ctx, transport)
 			}
 		}
 		if err := Register(g.With(hookMW), exec, "GET", "/ping", ep); err != nil {
@@ -598,8 +543,10 @@ func TestRegister_MissingOperationID(t *testing.T) {
 
 // --- observability tests ---
 
-func TestWrap_SuccessEmitsTitleReq(t *testing.T) {
-	w, parser := runChiRequest(t, func(g routing.RouteGroup, exec *endpoint.Executor) {
+func TestWrap_SuccessEmitsTelemetryEvent(t *testing.T) {
+	sink := &capturingSink{}
+	w := runChiRequest(t, func(g routing.RouteGroup, exec *endpoint.Executor) {
+		exec.Telemetry = sink
 		ep := endpoint.New[pingReq, pingResp](
 			func(ctx *request.Context, req pingReq) (pingResp, error) {
 				return pingResp{Message: "ok"}, nil
@@ -614,14 +561,25 @@ func TestWrap_SuccessEmitsTitleReq(t *testing.T) {
 	if w.Code != http.StatusOK {
 		t.Fatalf("status = %d, want 200", w.Code)
 	}
-	arr := assertAddLogArray(t, parser, "ping-req")
-	if len(arr) == 0 {
-		t.Fatal("expected at least one attr in <op>-req array")
+	// Verify a success telemetry event was emitted for the "ping" operation.
+	foundSuccess := false
+	for _, e := range sink.events {
+		if e.Operation == "ping" && e.Type == telemetry.EventSuccess {
+			foundSuccess = true
+			if e.Status != http.StatusOK {
+				t.Errorf("success event status = %d, want 200", e.Status)
+			}
+		}
+	}
+	if !foundSuccess {
+		t.Fatal("expected success telemetry event for ping operation")
 	}
 }
 
-func TestWrap_FailureEmitsReqFailed(t *testing.T) {
-	w, parser := runChiRequest(t, func(g routing.RouteGroup, exec *endpoint.Executor) {
+func TestWrap_FailureEmitsTelemetryEvent(t *testing.T) {
+	sink := &capturingSink{}
+	w := runChiRequest(t, func(g routing.RouteGroup, exec *endpoint.Executor) {
+		exec.Telemetry = sink
 		ep := endpoint.New[problemReq, problemResp](
 			func(ctx *request.Context, req problemReq) (problemResp, error) {
 				return problemResp{}, errors.New("domain error")
@@ -637,70 +595,54 @@ func TestWrap_FailureEmitsReqFailed(t *testing.T) {
 	if w.Code == http.StatusOK {
 		t.Fatal("expected non-200 status")
 	}
-	arr := assertAddLogArray(t, parser, "testFail-req-failed")
-	if len(arr) == 0 {
-		t.Fatal("expected at least one attr in req-failed array")
+	// Verify a failure telemetry event was emitted for the "testFail" operation.
+	foundFailure := false
+	for _, e := range sink.events {
+		if e.Operation == "testFail" && e.Type == telemetry.EventFailure {
+			foundFailure = true
+			if e.Err == nil {
+				t.Error("expected error in failure telemetry event")
+			}
+		}
+	}
+	if !foundFailure {
+		t.Fatal("expected failure telemetry event for testFail operation")
 	}
 }
 
-func TestWrap_LogValuerMasking(t *testing.T) {
-	w, parser := runChiRequest(t, func(g routing.RouteGroup, exec *endpoint.Executor) {
-		ep := endpoint.New[pingReq, maskedResp](
-			func(ctx *request.Context, req pingReq) (maskedResp, error) {
-				return maskedResp{Status: "ok", Secret: "topsecret"}, nil
+func TestWrap_TelemetryEventsHaveNoResponseBody(t *testing.T) {
+	sink := &capturingSink{}
+	w := runChiRequest(t, func(g routing.RouteGroup, exec *endpoint.Executor) {
+		exec.Telemetry = sink
+		ep := endpoint.New[pingReq, pingResp](
+			func(ctx *request.Context, req pingReq) (pingResp, error) {
+				return pingResp{Message: "topsecret"}, nil
 			},
-			endpoint.WithOperation(operation.Operation{ID: "mask", Method: "GET", Pattern: "/mask"}),
+			endpoint.WithOperation(operation.Operation{ID: "secret", Method: "GET", Pattern: "/secret"}),
 		)
-		if err := Register(g, exec, "GET", "/mask", ep); err != nil {
+		if err := Register(g, exec, "GET", "/secret", ep); err != nil {
 			t.Fatalf("Register: %v", err)
 		}
-	}, "GET", "/mask", nil, "")
+	}, "GET", "/secret", nil, "")
 
 	if w.Code != http.StatusOK {
 		t.Fatalf("status = %d, want 200", w.Code)
 	}
-	// The HTTP response body should contain the raw secret.
+	// The HTTP response body should contain the raw response.
 	body := w.Body.String()
 	if !strings.Contains(body, "topsecret") {
-		t.Fatalf("expected raw secret in HTTP response body, got: %s", body)
+		t.Fatalf("expected raw response in HTTP body, got: %s", body)
 	}
-	// The AddLog entry should contain the masked projection.
-	arr := assertAddLogArray(t, parser, "mask-req")
-	if len(arr) == 0 {
-		t.Fatal("expected at least one attr in mask-req array")
-	}
-	respAttr := arr[len(arr)-1]
-	rendered := respAttr.Value.String()
-	if strings.Contains(rendered, "topsecret") {
-		t.Fatalf("expected masked secret in AddLog, got: %s", rendered)
-	}
-}
-
-func TestWrap_LogValuerPanicNeverLogsRaw(t *testing.T) {
-	w, parser := runChiRequest(t, func(g routing.RouteGroup, exec *endpoint.Executor) {
-		ep := endpoint.New[pingReq, panickingLogValuer](
-			func(ctx *request.Context, req pingReq) (panickingLogValuer, error) {
-				return panickingLogValuer{Status: "ok"}, nil
-			},
-			endpoint.WithOperation(operation.Operation{ID: "paniclv", Method: "GET", Pattern: "/paniclv"}),
-		)
-		if err := Register(g, exec, "GET", "/paniclv", ep); err != nil {
-			t.Fatalf("Register: %v", err)
+	// Telemetry events must never include response bodies. The Event
+	// struct has no body field, so we verify that no event's attrs
+	// contain the secret.
+	for _, e := range sink.events {
+		for _, attr := range e.Attrs {
+			rendered := attr.Value.String()
+			if strings.Contains(rendered, "topsecret") {
+				t.Errorf("telemetry event attr contains response body: %s", rendered)
+			}
 		}
-	}, "GET", "/paniclv", nil, "")
-
-	if w.Code != http.StatusOK {
-		t.Fatalf("status = %d, want 200", w.Code)
-	}
-	arr := assertAddLogArray(t, parser, "paniclv-req")
-	if len(arr) == 0 {
-		t.Fatal("expected at least one attr in paniclv-req array")
-	}
-	// The masked sentinel should appear, not the raw response.
-	respAttr := arr[len(arr)-1]
-	rendered := respAttr.Value.String()
-	if strings.Contains(rendered, `"status":"ok"`) {
-		t.Fatalf("expected masked sentinel, not raw response, got: %s", rendered)
 	}
 }
 
@@ -769,6 +711,3 @@ func TestWrap_CommittedProblemReturnsNil(t *testing.T) {
 		t.Errorf("expected exactly one problem in body, got: %s", body)
 	}
 }
-
-// Ensure legacy import is used (for AddLog constants in tests).
-var _ = legacy.HandlerLogTag

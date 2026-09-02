@@ -27,7 +27,6 @@ import (
 	"github.com/hmmftg/requestCore/v2/handlers"
 	"github.com/hmmftg/requestCore/v2/renderers"
 	"github.com/hmmftg/requestCore/v2/resources"
-	"github.com/hmmftg/requestCore/v2/routing"
 	"github.com/hmmftg/requestCore/v2/session"
 	"github.com/hmmftg/requestCore/v2/workers"
 )
@@ -121,11 +120,9 @@ func main() {
 	}
 
 	// --- Typed session access on a protected route group ---
-	// The session middleware returns a function with the same signature as
-	// routing.Middleware; we wrap it to satisfy the routing.Middleware type.
-	sessionMw := routing.Middleware(func(next routing.Handler) routing.Handler {
-		return session.Middleware(application.Sessions, "session")(next)
-	})
+	// Use the app's SessionMiddleware which is compatible with the new
+	// routing contract.
+	sessionMw := app.SessionMiddleware(application.Sessions, "session")
 	api := application.Register("/api", sessionMw)
 
 	err = handlers.GetEndpoint[struct{}, ProfileResp](

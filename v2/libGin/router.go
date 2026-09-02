@@ -1,17 +1,44 @@
+// Package libGin provides the v2 Gin framework adapter for requestCore.
+// It constructs request.Context and routing.Transport from gin.Context
+// and registers handlers with the Gin engine.
 package libGin
 
 import (
-	"context"
-	"fmt"
+	"net/http"
 
 	"github.com/gin-gonic/gin"
 
-	legacy "github.com/hmmftg/requestCore/webFramework"
-
-	"github.com/hmmftg/requestCore/v2/response"
+	"github.com/hmmftg/requestCore/v2/request"
 	"github.com/hmmftg/requestCore/v2/routing"
-	v2wf "github.com/hmmftg/requestCore/v2/webFramework"
 )
+
+// ginTransport implements routing.Transport using a gin.Context.
+type ginTransport struct {
+	c         *gin.Context
+	committed bool
+}
+
+func (t *ginTransport) WriteResponse(status int, contentType string, headers http.Header, body []byte) error {
+	if t.committed {
+		return nil
+	}
+	t.committed = true
+	for k, vs := range headers {
+		for _, v := range vs {
+			t.c.Writer.Header().Add(k, v)
+		}
+	}
+	if contentType != "" {
+		t.c.Writer.Header().Set("Content-Type", contentType)
+	}
+	t.c.Status(status)
+	_, err := t.c.Writer.Write(body)
+	return err
+}
+
+func (t *ginTransport) Committed() bool {
+	return t.committed || t.c.Writer.Written()
+}
 
 // GinRouter implements routing.Router and routing.RouteGroup for Gin.
 type GinRouter struct {
@@ -20,39 +47,28 @@ type GinRouter struct {
 	middlewares  []routing.Middleware
 	notFound     routing.Handler
 	methodNA     routing.Handler
-	legacyParser func(any) *GinParserV2
-	registry     response.Registry
-	respHandler  *response.Handler
+	errorHandler routing.ErrorHandler
 }
 
 // NewRouter creates a new GinRouter from a Gin engine.
 func NewRouter(engine *gin.Engine) *GinRouter {
-	r := &GinRouter{
-		engine:       engine,
-		group:        &engine.RouterGroup,
-		legacyParser: InitContextV2,
+	return &GinRouter{
+		engine: engine,
+		group:  &engine.RouterGroup,
 	}
-	return r
 }
 
 // NewRouterFromGroup creates a new GinRouter from an existing Gin RouterGroup.
 func NewRouterFromGroup(group *gin.RouterGroup) *GinRouter {
 	return &GinRouter{
-		engine:       nil,
-		group:        group,
-		legacyParser: InitContextV2,
+		engine: nil,
+		group:  group,
 	}
 }
 
-// SetErrorHandler installs the v2 response handler and error registry used
-// for centralized error dispatch. When set, handler errors are routed
-// through the registry instead of emitting hard-coded 500 responses.
-func (r *GinRouter) SetErrorHandler(handler *response.Handler) {
-	if handler == nil {
-		return
-	}
-	r.respHandler = handler
-	r.registry = handler.Registry()
+// SetErrorHandler sets the error handler for centralized error dispatch.
+func (r *GinRouter) SetErrorHandler(handler routing.ErrorHandler) {
+	r.errorHandler = handler
 }
 
 // Native returns the underlying Gin engine or router group.
@@ -69,9 +85,7 @@ func (r *GinRouter) Group(prefix string) routing.RouteGroup {
 		engine:       r.engine,
 		group:        r.group.Group(prefix),
 		middlewares:  r.middlewares,
-		legacyParser: r.legacyParser,
-		registry:     r.registry,
-		respHandler:  r.respHandler,
+		errorHandler: r.errorHandler,
 	}
 }
 
@@ -84,9 +98,7 @@ func (r *GinRouter) With(middleware ...routing.Middleware) routing.RouteGroup {
 		engine:       r.engine,
 		group:        r.group,
 		middlewares:  mws,
-		legacyParser: r.legacyParser,
-		registry:     r.registry,
-		respHandler:  r.respHandler,
+		errorHandler: r.errorHandler,
 	}
 }
 
@@ -95,47 +107,37 @@ func (r *GinRouter) Handle(method, pattern string, handler routing.Handler) erro
 	if err := routing.ValidatePattern(pattern); err != nil {
 		return err
 	}
-
 	ginPattern := routing.TranslatePattern(pattern, "gin")
 	wrapped := r.wrapHandler(handler)
-
 	r.group.Handle(method, ginPattern, wrapped)
 	return nil
 }
 
-// Get registers a GET handler.
 func (r *GinRouter) Get(pattern string, handler routing.Handler) error {
 	return r.Handle("GET", pattern, handler)
 }
 
-// Post registers a POST handler.
 func (r *GinRouter) Post(pattern string, handler routing.Handler) error {
 	return r.Handle("POST", pattern, handler)
 }
 
-// Put registers a PUT handler.
 func (r *GinRouter) Put(pattern string, handler routing.Handler) error {
 	return r.Handle("PUT", pattern, handler)
 }
 
-// Patch registers a PATCH handler.
 func (r *GinRouter) Patch(pattern string, handler routing.Handler) error {
 	return r.Handle("PATCH", pattern, handler)
 }
 
-// Delete registers a DELETE handler.
 func (r *GinRouter) Delete(pattern string, handler routing.Handler) error {
 	return r.Handle("DELETE", pattern, handler)
 }
 
-// Head registers a HEAD handler.
 func (r *GinRouter) Head(pattern string, handler routing.Handler) error {
 	return r.Handle("HEAD", pattern, handler)
 }
 
-// NotFound sets the handler for unmatched routes. This requires an engine
-// scope; calling it on a group-only router (created via NewRouterFromGroup)
-// panics because 404 registration is engine-wide.
+// NotFound sets the handler for unmatched routes.
 func (r *GinRouter) NotFound(handler routing.Handler) {
 	if r.engine == nil {
 		panic("libGin: NotFound requires an engine-scoped router; use NewRouter instead of NewRouterFromGroup")
@@ -144,70 +146,62 @@ func (r *GinRouter) NotFound(handler routing.Handler) {
 	r.engine.NoRoute(r.wrapHandler(handler))
 }
 
-// MethodNotAllowed sets the handler for disallowed methods. This requires
-// an engine scope; calling it on a group-only router panics.
+// MethodNotAllowed sets the handler for disallowed methods.
 func (r *GinRouter) MethodNotAllowed(handler routing.Handler) {
 	if r.engine == nil {
 		panic("libGin: MethodNotAllowed requires an engine-scoped router; use NewRouter instead of NewRouterFromGroup")
 	}
 	r.methodNA = handler
-	engine := r.engine
-	engine.HandleMethodNotAllowed = true
-	engine.NoMethod(r.wrapHandler(handler))
+	r.engine.HandleMethodNotAllowed = true
+	r.engine.NoMethod(r.wrapHandler(handler))
 }
 
-// wrapHandler converts a v2 routing.Handler to a gin.HandlerFunc,
-// running the middleware chain and building the RequestContext.
+// buildContext creates a *request.Context from a gin.Context.
+func buildContext(c *gin.Context) *request.Context {
+	pathParams := make(map[string]string)
+	for _, p := range c.Params {
+		pathParams[p.Key] = p.Value
+	}
+	opts := []request.Option{
+		request.WithMethod(c.Request.Method),
+		request.WithPath(c.Request.URL.Path),
+		request.WithRoutePattern(c.FullPath()),
+		request.WithHeader(c.Request.Header),
+		request.WithQuery(c.Request.URL.Query()),
+		request.WithRemoteAddr(c.Request.RemoteAddr),
+		request.WithNative(c),
+		request.WithBodySource(request.NewBodySource(c.Request.Body)),
+	}
+	if len(pathParams) > 0 {
+		opts = append(opts, request.WithPathParams(pathParams))
+	}
+	if len(c.Request.Cookies()) > 0 {
+		opts = append(opts, request.WithCookies(c.Request.Cookies()))
+	}
+	return request.NewContext(c.Request.Context(), opts...)
+}
+
+// wrapHandler converts a routing.Handler to a gin.HandlerFunc.
 func (r *GinRouter) wrapHandler(h routing.Handler) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		parser := r.legacyParser(c)
-		commit := &v2wf.CommitState{}
-		parser.SetCommitState(commit)
-		reqCtx := &v2wf.RequestContext{
-			// LegacyContext is the native *gin.Context expected by
-			// libContext.InitContext.
-			LegacyContext: c,
-			Parser:        parser,
-			Legacy: legacy.WebFramework{
-				Parser: parser,
-			},
-		}
-		reqCtx.SetCommitState(commit)
-		// Use the request context for cancellation/tracing.
-		reqCtx.Context = c.Request.Context()
+		ctx := buildContext(c)
+		transport := &ginTransport{c: c}
 
-		// Apply middleware chain
 		chain := h
 		for i := len(r.middlewares) - 1; i >= 0; i-- {
 			chain = r.middlewares[i](chain)
 		}
 
-		if err := chain(reqCtx); err != nil {
-			// If the handler returns an error and no response was
-			// committed, route it through the error registry.
-			if !commit.Committed() {
-				r.dispatchError(reqCtx, err)
+		if err := chain(ctx, transport); err != nil {
+			if !transport.Committed() && r.errorHandler != nil {
+				r.errorHandler(ctx, transport, err)
 			}
 			c.Abort()
 		}
 	}
 }
 
-// dispatchError routes an error through the shared adapter error-dispatch
-// helper, which uses the v2 response registry if configured and falls back
-// to a sanitized 500 response.
-func (r *GinRouter) dispatchError(ctx *v2wf.RequestContext, err error) {
-	response.DispatchError(r.respHandler, ctx, err)
-}
-
-// Ensure GinRouter implements routing.Router.
+// Ensure interface implementations.
 var _ routing.Router = (*GinRouter)(nil)
-
-// Ensure GinRouter implements routing.RouteGroup.
 var _ routing.RouteGroup = (*GinRouter)(nil)
-
-// Suppress unused import warning for context.
-var _ = context.Background
-
-// Suppress unused import warning for fmt.
-var _ = fmt.Sprintf
+var _ routing.Transport = (*ginTransport)(nil)

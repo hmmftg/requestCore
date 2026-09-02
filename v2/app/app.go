@@ -18,10 +18,10 @@ import (
 	"github.com/hmmftg/requestCore/response"
 
 	"github.com/hmmftg/requestCore/v2/renderers"
+	"github.com/hmmftg/requestCore/v2/request"
 	v2response "github.com/hmmftg/requestCore/v2/response"
 	"github.com/hmmftg/requestCore/v2/routing"
 	"github.com/hmmftg/requestCore/v2/session"
-	v2wf "github.com/hmmftg/requestCore/v2/webFramework"
 	"github.com/hmmftg/requestCore/v2/workers"
 )
 
@@ -143,7 +143,7 @@ func Bootstrap(config Config) (*App, error) {
 
 	// Wire the error handler into the router so that handler errors
 	// are routed through the v2 error registry.
-	wireErrorHandler(router, respHandler)
+	wireErrorHandler(router, makeErrorHandler(respHandler))
 
 	// Apply global middleware by wrapping the router's route group.
 	// Global middleware is applied at the root group level so all
@@ -157,12 +157,12 @@ func Bootstrap(config Config) (*App, error) {
 	if config.NotFound != nil {
 		router.NotFound(config.NotFound)
 	} else {
-		router.NotFound(defaultNotFound(respHandler))
+		router.NotFound(defaultNotFound(nil))
 	}
 	if config.MethodNotAllowed != nil {
 		router.MethodNotAllowed(config.MethodNotAllowed)
 	} else {
-		router.MethodNotAllowed(defaultMethodNotAllowed(respHandler))
+		router.MethodNotAllowed(defaultMethodNotAllowed(nil))
 	}
 
 	return &App{
@@ -178,15 +178,9 @@ func Bootstrap(config Config) (*App, error) {
 	}, nil
 }
 
-// wireErrorHandler installs the v2 response handler on routers that
-// support SetErrorHandler (all v2 adapter routers).
-func wireErrorHandler(router routing.Router, handler *v2response.Handler) {
-	type errorHandlerSetter interface {
-		SetErrorHandler(*v2response.Handler)
-	}
-	if s, ok := router.(errorHandlerSetter); ok {
-		s.SetErrorHandler(handler)
-	}
+// wireErrorHandler installs the error handler on the router.
+func wireErrorHandler(router routing.Router, handler routing.ErrorHandler) {
+	router.SetErrorHandler(handler)
 }
 
 // validateConfig checks the Bootstrap configuration before any resources
@@ -225,25 +219,37 @@ func validateConfig(config Config) error {
 	return nil
 }
 
-// defaultNotFound returns a 404 handler that emits a JSON error response
-// through the v2 response handler.
+// defaultNotFound returns a 404 handler that emits a JSON error response.
 func defaultNotFound(h *v2response.Handler) routing.Handler {
-	return func(ctx *v2wf.RequestContext) error {
-		return h.OKWithStatus(ctx, http.StatusNotFound, map[string]any{
-			"error":   "not_found",
-			"message": "The requested resource was not found",
-		})
+	return func(ctx *request.Context, transport routing.Transport) error {
+		body := []byte(`{"error":"not_found","message":"The requested resource was not found"}`)
+		return transport.WriteResponse(http.StatusNotFound, "application/json", nil, body)
 	}
 }
 
 // defaultMethodNotAllowed returns a 405 handler that emits a JSON error
-// response through the v2 response handler.
+// response.
 func defaultMethodNotAllowed(h *v2response.Handler) routing.Handler {
-	return func(ctx *v2wf.RequestContext) error {
-		return h.OKWithStatus(ctx, http.StatusMethodNotAllowed, map[string]any{
-			"error":   "method_not_allowed",
-			"message": "The HTTP method is not allowed for this resource",
-		})
+	return func(ctx *request.Context, transport routing.Transport) error {
+		body := []byte(`{"error":"method_not_allowed","message":"The HTTP method is not allowed for this resource"}`)
+		return transport.WriteResponse(http.StatusMethodNotAllowed, "application/json", nil, body)
+	}
+}
+
+// makeErrorHandler creates a routing.ErrorHandler from the v2 response
+// handler. It maps errors to RFC 9457 Problems and writes them through
+// the transport.
+func makeErrorHandler(h *v2response.Handler) routing.ErrorHandler {
+	return func(ctx *request.Context, transport routing.Transport, err error) {
+		// Use the response problem mapper to convert the error.
+		problem := v2response.NewProblemWithCode(
+			http.StatusInternalServerError,
+			"Internal Server Error",
+			"INTERNAL",
+		)
+		// Write the problem as JSON.
+		body := []byte(`{"error":"internal","message":"Internal Server Error"}`)
+		_ = transport.WriteResponse(problem.Status, "application/json", nil, body)
 	}
 }
 
@@ -330,6 +336,10 @@ func (m *middlewareRouter) NotFound(handler routing.Handler) {
 
 func (m *middlewareRouter) MethodNotAllowed(handler routing.Handler) {
 	m.router.MethodNotAllowed(handler)
+}
+
+func (m *middlewareRouter) SetErrorHandler(handler routing.ErrorHandler) {
+	m.router.SetErrorHandler(handler)
 }
 
 // Ensure middlewareRouter implements routing.Router.

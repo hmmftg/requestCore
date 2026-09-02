@@ -51,6 +51,7 @@ import (
 	"github.com/hmmftg/requestCore/status"
 
 	"github.com/hmmftg/requestCore/v2/handlers"
+	"github.com/hmmftg/requestCore/v2/request"
 	v2response "github.com/hmmftg/requestCore/v2/response"
 	"github.com/hmmftg/requestCore/v2/routing"
 	v2wf "github.com/hmmftg/requestCore/v2/webFramework"
@@ -373,13 +374,9 @@ func parseID[ID cmp.Ordered](config Config[ID], raw string) (ID, error) {
 // registerDefault405 registers a default 405 Method Not Allowed handler
 // for an unsupported operation.
 func registerDefault405(router routing.RouteGroup, defaults *ResourceDefaults, respHandler *v2response.Handler, method, path string) error {
-	h := func(ctx *v2wf.RequestContext) error {
-		return respHandler.Error(ctx, libError.NewWithDescription(
-			status.StatusCode(405),
-			"METHOD_NOT_ALLOWED",
-			"method %s not allowed on %s",
-			method, path,
-		))
+	h := func(ctx *request.Context, transport routing.Transport) error {
+		body := []byte(`{"error":"method_not_allowed","message":"method ` + method + ` not allowed on ` + path + `"}`)
+		return transport.WriteResponse(405, "application/json", nil, body)
 	}
 	return router.Handle(method, path, h)
 }

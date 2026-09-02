@@ -14,6 +14,7 @@ import (
 	"github.com/hmmftg/requestCore/response"
 	legacy "github.com/hmmftg/requestCore/webFramework"
 
+	"github.com/hmmftg/requestCore/v2/request"
 	v2response "github.com/hmmftg/requestCore/v2/response"
 	"github.com/hmmftg/requestCore/v2/routing"
 	v2wf "github.com/hmmftg/requestCore/v2/webFramework"
@@ -178,25 +179,32 @@ func (e *Endpoint[Req, Resp]) RuntimeHandler(
 		reg.SetFallback(v2response.LegacyFallback(response.WebHanlder{}))
 		respHandler = v2response.NewHandler(reg, nil, response.WebHanlder{})
 	}
-	return func(ctx *v2wf.RequestContext) (err error) {
+	return func(ctx *request.Context, transport routing.Transport) (err error) {
 		start := time.Now()
+
+		// Bridge: construct a v2wf.RequestContext from the new
+		// request.Context. The native context (gin.Context,
+		// fiber.Ctx, *http.Request) is stored as LegacyContext.
+		// This bridge is temporary and will be removed in Phase 6
+		// when handlers are rewritten to use *request.Context directly.
+		v2ctx := bridgeRequestContext(ctx)
 
 		// Initialize the legacy WebFramework from the v2 RequestContext's
 		// LegacyContext. This preserves the v1 parser/tracing pipeline.
 		var w legacy.WebFramework
-		if ctx.LegacyContext != nil {
+		if v2ctx.LegacyContext != nil {
 			if e.persistence != nil {
-				w = libContext.InitContext(ctx.LegacyContext)
+				w = libContext.InitContext(v2ctx.LegacyContext)
 			} else {
-				w = libContext.InitContextNoAuditTrail(ctx.LegacyContext)
+				w = libContext.InitContextNoAuditTrail(v2ctx.LegacyContext)
 			}
 		} else {
 			// Fall back to the v2-carried legacy framework (tests).
-			w = ctx.Legacy
+			w = v2ctx.Legacy
 		}
 		// Ensure the v2 parser and legacy parser are the same instance.
-		if ctx.Legacy.Parser == nil && w.Parser != nil {
-			ctx.Legacy.Parser = w.Parser
+		if v2ctx.Legacy.Parser == nil && w.Parser != nil {
+			v2ctx.Legacy.Parser = w.Parser
 		}
 		// AddWebLogs adds request metadata (title/method/path) as log tags
 		// and returns a completion closure that logs elapsed time and
@@ -232,9 +240,9 @@ func (e *Endpoint[Req, Resp]) RuntimeHandler(
 				if span != nil {
 					if err != nil {
 						span.RecordError(err)
-						span.SetAttributes(attribute.Int("handler.error_status", committedStatus(ctx)))
+						span.SetAttributes(attribute.Int("handler.error_status", committedStatus(v2ctx)))
 					}
-					span.SetAttributes(attribute.Int("handler.status", committedStatus(ctx)))
+					span.SetAttributes(attribute.Int("handler.status", committedStatus(v2ctx)))
 					span.End()
 				}
 			}()
@@ -246,7 +254,7 @@ func (e *Endpoint[Req, Resp]) RuntimeHandler(
 			Core:    core,
 			Args:    e.args,
 			W:       w,
-			V2:      ctx,
+			V2:      v2ctx,
 			Span:    span,
 			SpanCtx: spanCtx,
 		}
@@ -258,10 +266,10 @@ func (e *Endpoint[Req, Resp]) RuntimeHandler(
 			defer func() {
 				panicVal = recover()
 			}()
-			err = runLifecycle(e, respHandler, w, ctx, trx, &requestInserted, start)
+			err = runLifecycle(e, respHandler, w, v2ctx, trx, &requestInserted, start)
 		}()
 
-		finalize(e, respHandler, w, ctx, trx, start, requestInserted, panicVal, logCompletion)
+		finalize(e, respHandler, w, v2ctx, trx, start, requestInserted, panicVal, logCompletion)
 
 		// If a panic occurred, it was converted to a sanitized error
 		// response in finalize. Return nil so the router does not
@@ -269,7 +277,7 @@ func (e *Endpoint[Req, Resp]) RuntimeHandler(
 		if panicVal != nil {
 			return nil
 		}
-		if err != nil && !ctx.Committed() {
+		if err != nil && !v2ctx.Committed() {
 			return err
 		}
 		return nil

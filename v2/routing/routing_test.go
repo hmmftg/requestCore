@@ -3,7 +3,7 @@ package routing
 import (
 	"testing"
 
-	"github.com/hmmftg/requestCore/v2/webFramework"
+	"github.com/hmmftg/requestCore/v2/request"
 )
 
 func TestValidatePattern_Valid(t *testing.T) {
@@ -78,8 +78,8 @@ func TestChain_Empty(t *testing.T) {
 
 func TestChain_Single(t *testing.T) {
 	mw := func(next Handler) Handler {
-		return func(ctx *webFramework.RequestContext) error {
-			return next(ctx)
+		return func(ctx *request.Context, transport Transport) error {
+			return next(ctx, transport)
 		}
 	}
 	result := Chain(mw)
@@ -91,17 +91,17 @@ func TestChain_Single(t *testing.T) {
 func TestChain_Multiple(t *testing.T) {
 	order := []string{}
 	mw1 := func(next Handler) Handler {
-		return func(ctx *webFramework.RequestContext) error {
+		return func(ctx *request.Context, transport Transport) error {
 			order = append(order, "mw1-before")
-			err := next(ctx)
+			err := next(ctx, transport)
 			order = append(order, "mw1-after")
 			return err
 		}
 	}
 	mw2 := func(next Handler) Handler {
-		return func(ctx *webFramework.RequestContext) error {
+		return func(ctx *request.Context, transport Transport) error {
 			order = append(order, "mw2-before")
-			err := next(ctx)
+			err := next(ctx, transport)
 			order = append(order, "mw2-after")
 			return err
 		}
@@ -111,12 +111,12 @@ func TestChain_Multiple(t *testing.T) {
 		t.Fatal("expected non-nil chain")
 	}
 
-	handler := chain(func(ctx *webFramework.RequestContext) error {
+	handler := chain(func(ctx *request.Context, transport Transport) error {
 		order = append(order, "handler")
 		return nil
 	})
 
-	if err := handler(nil); err != nil {
+	if err := handler(nil, nil); err != nil {
 		t.Fatalf("handler: %v", err)
 	}
 

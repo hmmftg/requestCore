@@ -18,8 +18,8 @@ import (
 	v2libFiber "github.com/hmmftg/requestCore/v2/libFiber"
 	v2libGin "github.com/hmmftg/requestCore/v2/libGin"
 	v2libNetHttp "github.com/hmmftg/requestCore/v2/libNetHttp"
+	"github.com/hmmftg/requestCore/v2/request"
 	"github.com/hmmftg/requestCore/v2/routing"
-	v2wf "github.com/hmmftg/requestCore/v2/webFramework"
 )
 
 // AdapterFactory creates a router and provides a way to make HTTP requests
@@ -104,9 +104,9 @@ func TestConformance_BasicRoute(t *testing.T) {
 			router, serve := af.NewRouter()
 
 			called := false
-			if err := router.Get("/test", func(ctx *v2wf.RequestContext) error {
+			if err := router.Get("/test", func(ctx *request.Context, transport routing.Transport) error {
 				called = true
-				return ctx.Parser.SendResponse(200, "text/plain", []byte("ok"))
+				return transport.WriteResponse(200, "text/plain", nil, []byte("ok"))
 			}); err != nil {
 				t.Fatalf("Get: %v", err)
 			}
@@ -137,9 +137,9 @@ func TestConformance_ParamRoute(t *testing.T) {
 		t.Run(af.Name, func(t *testing.T) {
 			router, serve := af.NewRouter()
 
-			if err := router.Get("/users/{id}", func(ctx *v2wf.RequestContext) error {
-				id := ctx.Parser.GetURLParam("id")
-				return ctx.Parser.SendResponse(200, "text/plain", []byte(id))
+			if err := router.Get("/users/{id}", func(ctx *request.Context, transport routing.Transport) error {
+				id := ctx.PathParam("id")
+				return transport.WriteResponse(200, "text/plain", nil, []byte(id))
 			}); err != nil {
 				t.Fatalf("Get: %v", err)
 			}
@@ -168,8 +168,8 @@ func TestConformance_Group(t *testing.T) {
 			router, serve := af.NewRouter()
 
 			api := router.Group("/api")
-			if err := api.Get("/users", func(ctx *v2wf.RequestContext) error {
-				return ctx.Parser.SendResponse(200, "text/plain", []byte("group-ok"))
+			if err := api.Get("/users", func(ctx *request.Context, transport routing.Transport) error {
+				return transport.WriteResponse(200, "text/plain", nil, []byte("group-ok"))
 			}); err != nil {
 				t.Fatalf("Get: %v", err)
 			}
@@ -199,17 +199,17 @@ func TestConformance_MiddlewareOrder(t *testing.T) {
 
 			order := []string{}
 			mw := func(next routing.Handler) routing.Handler {
-				return func(ctx *v2wf.RequestContext) error {
+				return func(ctx *request.Context, transport routing.Transport) error {
 					order = append(order, "mw-before")
-					err := next(ctx)
+					err := next(ctx, transport)
 					order = append(order, "mw-after")
 					return err
 				}
 			}
 
-			router.With(mw).Get("/test", func(ctx *v2wf.RequestContext) error {
+			router.With(mw).Get("/test", func(ctx *request.Context, transport routing.Transport) error {
 				order = append(order, "handler")
-				return ctx.Parser.SendResponse(200, "text/plain", []byte("ok"))
+				return transport.WriteResponse(200, "text/plain", nil, []byte("ok"))
 			})
 
 			req := httptest.NewRequest("GET", "/test", nil)
@@ -241,7 +241,14 @@ func TestConformance_HandlerError(t *testing.T) {
 		t.Run(af.Name, func(t *testing.T) {
 			router, serve := af.NewRouter()
 
-			router.Get("/fail", func(ctx *v2wf.RequestContext) error {
+			// With the new routing contract, handler errors are routed
+			// through the configured ErrorHandler. Install one that maps
+			// any error to a 500 response.
+			router.SetErrorHandler(func(ctx *request.Context, transport routing.Transport, err error) {
+				_ = transport.WriteResponse(500, "text/plain", nil, []byte(err.Error()))
+			})
+
+			router.Get("/fail", func(ctx *request.Context, transport routing.Transport) error {
 				ctx2, cancel := context.WithCancel(context.Background())
 				cancel()
 				return ctx2.Err()
@@ -266,7 +273,7 @@ func TestConformance_InvalidPattern(t *testing.T) {
 		t.Run(af.Name, func(t *testing.T) {
 			router, _ := af.NewRouter()
 
-			err := router.Get("/users/{id", func(ctx *v2wf.RequestContext) error {
+			err := router.Get("/users/{id", func(ctx *request.Context, transport routing.Transport) error {
 				return nil
 			})
 			if err == nil {
@@ -285,9 +292,9 @@ func TestConformance_NoDoubleWrite(t *testing.T) {
 		t.Run(af.Name, func(t *testing.T) {
 			router, serve := af.NewRouter()
 
-			router.Get("/test", func(ctx *v2wf.RequestContext) error {
+			router.Get("/test", func(ctx *request.Context, transport routing.Transport) error {
 				// Write a 200 response directly.
-				_ = ctx.Parser.SendResponse(200, "text/plain", []byte("first"))
+				_ = transport.WriteResponse(200, "text/plain", nil, []byte("first"))
 				// Return an error after committing.
 				return errors.New("should be ignored")
 			})
@@ -311,20 +318,26 @@ func TestConformance_NoDoubleWrite(t *testing.T) {
 }
 
 // TestConformance_HookRunsOnce verifies that before-commit hooks run
-// exactly once per request, even when the handler writes directly.
+// exactly once per request. Under the new routing contract the transport
+// does not auto-run hooks (unlike the old Parser.SendResponse), so the
+// handler runs them explicitly before committing the response.
 func TestConformance_HookRunsOnce(t *testing.T) {
 	for _, af := range adapterFactories() {
 		t.Run(af.Name, func(t *testing.T) {
 			router, serve := af.NewRouter()
 
 			hookCalls := 0
-			router.Get("/test", func(ctx *v2wf.RequestContext) error {
-				ctx.AddBeforeCommitHook(func(c *v2wf.RequestContext) error {
+			router.Get("/test", func(ctx *request.Context, transport routing.Transport) error {
+				ctx.AddBeforeCommitHook(func() error {
 					hookCalls++
 					return nil
 				})
-				// Direct write triggers the hook runner in SendResponse.
-				return ctx.Parser.SendResponse(200, "text/plain", []byte("ok"))
+				// Run hooks before committing the response through the
+				// transport. RunBeforeCommitHooks is idempotent.
+				if err := ctx.RunBeforeCommitHooks(); err != nil {
+					return err
+				}
+				return transport.WriteResponse(200, "text/plain", nil, []byte("ok"))
 			})
 
 			req := httptest.NewRequest("GET", "/test", nil)
@@ -351,8 +364,8 @@ func TestConformance_204NoContent(t *testing.T) {
 		t.Run(af.Name, func(t *testing.T) {
 			router, serve := af.NewRouter()
 
-			router.Get("/test", func(ctx *v2wf.RequestContext) error {
-				return ctx.Parser.SendResponse(204, "", nil)
+			router.Get("/test", func(ctx *request.Context, transport routing.Transport) error {
+				return transport.WriteResponse(204, "", nil, nil)
 			})
 
 			req := httptest.NewRequest("GET", "/test", nil)
@@ -380,13 +393,13 @@ func TestConformance_404NotFound(t *testing.T) {
 		t.Run(af.Name, func(t *testing.T) {
 			router, serve := af.NewRouter()
 
-			router.Get("/exists", func(ctx *v2wf.RequestContext) error {
-				return ctx.Parser.SendResponse(200, "text/plain", []byte("ok"))
+			router.Get("/exists", func(ctx *request.Context, transport routing.Transport) error {
+				return transport.WriteResponse(200, "text/plain", nil, []byte("ok"))
 			})
 
 			// Register a 404 handler.
-			router.NotFound(func(ctx *v2wf.RequestContext) error {
-				return ctx.Parser.SendResponse(404, "text/plain", []byte("not-found"))
+			router.NotFound(func(ctx *request.Context, transport routing.Transport) error {
+				return transport.WriteResponse(404, "text/plain", nil, []byte("not-found"))
 			})
 
 			req := httptest.NewRequest("GET", "/nonexistent", nil)
@@ -412,16 +425,16 @@ func TestConformance_405MethodNotAllowed(t *testing.T) {
 			router, serve := af.NewRouter()
 
 			// Register only GET.
-			router.Get("/test", func(ctx *v2wf.RequestContext) error {
-				return ctx.Parser.SendResponse(200, "text/plain", []byte("ok"))
+			router.Get("/test", func(ctx *request.Context, transport routing.Transport) error {
+				return transport.WriteResponse(200, "text/plain", nil, []byte("ok"))
 			})
 
 			// Register 404 and 405 handlers.
-			router.NotFound(func(ctx *v2wf.RequestContext) error {
-				return ctx.Parser.SendResponse(404, "text/plain", []byte("not-found"))
+			router.NotFound(func(ctx *request.Context, transport routing.Transport) error {
+				return transport.WriteResponse(404, "text/plain", nil, []byte("not-found"))
 			})
-			router.MethodNotAllowed(func(ctx *v2wf.RequestContext) error {
-				return ctx.Parser.SendResponse(405, "text/plain", []byte("method-not-allowed"))
+			router.MethodNotAllowed(func(ctx *request.Context, transport routing.Transport) error {
+				return transport.WriteResponse(405, "text/plain", nil, []byte("method-not-allowed"))
 			})
 
 			// POST to a GET-only route should return 405.
@@ -453,21 +466,21 @@ func TestConformance_405ThroughGroup(t *testing.T) {
 
 			// Register GET through a With group with one middleware.
 			group := router.With(func(next routing.Handler) routing.Handler {
-				return func(ctx *v2wf.RequestContext) error {
-					return next(ctx)
+				return func(ctx *request.Context, transport routing.Transport) error {
+					return next(ctx, transport)
 				}
 			})
-			if err := group.Get("/group-test", func(ctx *v2wf.RequestContext) error {
-				return ctx.Parser.SendResponse(200, "text/plain", []byte("ok"))
+			if err := group.Get("/group-test", func(ctx *request.Context, transport routing.Transport) error {
+				return transport.WriteResponse(200, "text/plain", nil, []byte("ok"))
 			}); err != nil {
 				t.Fatalf("group.Get: %v", err)
 			}
 
-			router.NotFound(func(ctx *v2wf.RequestContext) error {
-				return ctx.Parser.SendResponse(404, "text/plain", []byte("not-found"))
+			router.NotFound(func(ctx *request.Context, transport routing.Transport) error {
+				return transport.WriteResponse(404, "text/plain", nil, []byte("not-found"))
 			})
-			router.MethodNotAllowed(func(ctx *v2wf.RequestContext) error {
-				return ctx.Parser.SendResponse(405, "text/plain", []byte("method-not-allowed"))
+			router.MethodNotAllowed(func(ctx *request.Context, transport routing.Transport) error {
+				return transport.WriteResponse(405, "text/plain", nil, []byte("method-not-allowed"))
 			})
 
 			// POST to a GET-only group route must return exactly 405.

@@ -8,8 +8,8 @@ import (
 
 	"github.com/gin-gonic/gin"
 
+	"github.com/hmmftg/requestCore/v2/request"
 	"github.com/hmmftg/requestCore/v2/routing"
-	v2wf "github.com/hmmftg/requestCore/v2/webFramework"
 )
 
 func init() {
@@ -78,9 +78,9 @@ func TestGinRouter_BasicRoute(t *testing.T) {
 	router := NewRouter(engine)
 
 	called := false
-	err := router.Get("/users", func(ctx *v2wf.RequestContext) error {
+	err := router.Get("/users", func(ctx *request.Context, transport routing.Transport) error {
 		called = true
-		return ctx.Parser.SendResponse(200, "text/plain", []byte("hello"))
+		return transport.WriteResponse(200, "text/plain", nil, []byte("hello"))
 	})
 	if err != nil {
 		t.Fatalf("Get: %v", err)
@@ -105,9 +105,9 @@ func TestGinRouter_ParamRoute(t *testing.T) {
 	engine := gin.New()
 	router := NewRouter(engine)
 
-	err := router.Get("/users/{id}", func(ctx *v2wf.RequestContext) error {
-		id := ctx.Parser.GetURLParam("id")
-		return ctx.Parser.SendResponse(200, "text/plain", []byte(id))
+	err := router.Get("/users/{id}", func(ctx *request.Context, transport routing.Transport) error {
+		id := ctx.PathParam("id")
+		return transport.WriteResponse(200, "text/plain", nil, []byte(id))
 	})
 	if err != nil {
 		t.Fatalf("Get: %v", err)
@@ -131,9 +131,9 @@ func TestGinRouter_Group(t *testing.T) {
 
 	api := router.Group("/api")
 	called := false
-	err := api.Get("/users", func(ctx *v2wf.RequestContext) error {
+	err := api.Get("/users", func(ctx *request.Context, transport routing.Transport) error {
 		called = true
-		return ctx.Parser.SendResponse(200, "text/plain", []byte("ok"))
+		return transport.WriteResponse(200, "text/plain", nil, []byte("ok"))
 	})
 	if err != nil {
 		t.Fatalf("Get: %v", err)
@@ -157,17 +157,17 @@ func TestGinRouter_Middleware(t *testing.T) {
 
 	order := []string{}
 	mw := func(next routing.Handler) routing.Handler {
-		return func(ctx *v2wf.RequestContext) error {
+		return func(ctx *request.Context, transport routing.Transport) error {
 			order = append(order, "mw-before")
-			err := next(ctx)
+			err := next(ctx, transport)
 			order = append(order, "mw-after")
 			return err
 		}
 	}
 
-	router.With(mw).Get("/test", func(ctx *v2wf.RequestContext) error {
+	router.With(mw).Get("/test", func(ctx *request.Context, transport routing.Transport) error {
 		order = append(order, "handler")
-		return ctx.Parser.SendResponse(200, "text/plain", []byte("ok"))
+		return transport.WriteResponse(200, "text/plain", nil, []byte("ok"))
 	})
 
 	w := httptest.NewRecorder()
@@ -189,8 +189,8 @@ func TestGinRouter_NotFound(t *testing.T) {
 	engine := gin.New()
 	router := NewRouter(engine)
 
-	router.NotFound(func(ctx *v2wf.RequestContext) error {
-		return ctx.Parser.SendResponse(404, "text/plain", []byte("not found"))
+	router.NotFound(func(ctx *request.Context, transport routing.Transport) error {
+		return transport.WriteResponse(404, "text/plain", nil, []byte("not found"))
 	})
 
 	w := httptest.NewRecorder()
@@ -209,7 +209,7 @@ func TestGinRouter_InvalidPattern(t *testing.T) {
 	engine := gin.New()
 	router := NewRouter(engine)
 
-	err := router.Get("/users/{id", func(ctx *v2wf.RequestContext) error {
+	err := router.Get("/users/{id", func(ctx *request.Context, transport routing.Transport) error {
 		return nil
 	})
 	if err == nil {
@@ -229,8 +229,11 @@ func TestGinRouter_Native(t *testing.T) {
 func TestGinRouter_HandlerError(t *testing.T) {
 	engine := gin.New()
 	router := NewRouter(engine)
+	router.SetErrorHandler(func(ctx *request.Context, transport routing.Transport, err error) {
+		_ = transport.WriteResponse(500, "text/plain", nil, []byte(err.Error()))
+	})
 
-	router.Get("/fail", func(ctx *v2wf.RequestContext) error {
+	router.Get("/fail", func(ctx *request.Context, transport routing.Transport) error {
 		ctx2, cancel := context.WithCancel(context.Background())
 		cancel()
 		return ctx2.Err()
@@ -249,12 +252,12 @@ func TestGinRouter_MethodNotAllowed(t *testing.T) {
 	engine := gin.New()
 	router := NewRouter(engine)
 
-	router.MethodNotAllowed(func(ctx *v2wf.RequestContext) error {
-		return ctx.Parser.SendResponse(http.StatusMethodNotAllowed, "text/plain", []byte("method not allowed"))
+	router.MethodNotAllowed(func(ctx *request.Context, transport routing.Transport) error {
+		return transport.WriteResponse(http.StatusMethodNotAllowed, "text/plain", nil, []byte("method not allowed"))
 	})
 
-	router.Post("/items", func(ctx *v2wf.RequestContext) error {
-		return ctx.Parser.SendResponse(http.StatusOK, "text/plain", []byte("created"))
+	router.Post("/items", func(ctx *request.Context, transport routing.Transport) error {
+		return transport.WriteResponse(http.StatusOK, "text/plain", nil, []byte("created"))
 	})
 
 	w := httptest.NewRecorder()
@@ -275,7 +278,7 @@ func TestGinRouter_NewRouterFromGroup_NotFoundPanics(t *testing.T) {
 			t.Fatal("expected panic for NotFound on group-only router")
 		}
 	}()
-	router.NotFound(func(ctx *v2wf.RequestContext) error {
+	router.NotFound(func(ctx *request.Context, transport routing.Transport) error {
 		return nil
 	})
 }

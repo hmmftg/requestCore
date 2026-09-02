@@ -7,8 +7,8 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/hmmftg/requestCore/v2/request"
 	"github.com/hmmftg/requestCore/v2/routing"
-	v2wf "github.com/hmmftg/requestCore/v2/webFramework"
 )
 
 func TestNetHTTPParserV2_SendResponse(t *testing.T) {
@@ -68,9 +68,9 @@ func TestNetHTTPRouter_BasicRoute(t *testing.T) {
 	router := NewRouter()
 
 	called := false
-	err := router.Get("/users", func(ctx *v2wf.RequestContext) error {
+	err := router.Get("/users", func(ctx *request.Context, transport routing.Transport) error {
 		called = true
-		return ctx.Parser.SendResponse(200, "text/plain", []byte("hello"))
+		return transport.WriteResponse(200, "text/plain", nil, []byte("hello"))
 	})
 	if err != nil {
 		t.Fatalf("Get: %v", err)
@@ -100,9 +100,9 @@ func TestNetHTTPRouter_BasicRoute(t *testing.T) {
 func TestNetHTTPRouter_ParamRoute(t *testing.T) {
 	router := NewRouter()
 
-	err := router.Get("/users/{id}", func(ctx *v2wf.RequestContext) error {
-		id := ctx.Parser.GetURLParam("id")
-		return ctx.Parser.SendResponse(200, "text/plain", []byte(id))
+	err := router.Get("/users/{id}", func(ctx *request.Context, transport routing.Transport) error {
+		id := ctx.PathParam("id")
+		return transport.WriteResponse(200, "text/plain", nil, []byte(id))
 	})
 	if err != nil {
 		t.Fatalf("Get: %v", err)
@@ -131,9 +131,9 @@ func TestNetHTTPRouter_Group(t *testing.T) {
 
 	api := router.Group("/api")
 	called := false
-	err := api.Get("/users", func(ctx *v2wf.RequestContext) error {
+	err := api.Get("/users", func(ctx *request.Context, transport routing.Transport) error {
 		called = true
-		return ctx.Parser.SendResponse(200, "text/plain", []byte("ok"))
+		return transport.WriteResponse(200, "text/plain", nil, []byte("ok"))
 	})
 	if err != nil {
 		t.Fatalf("Get: %v", err)
@@ -161,17 +161,17 @@ func TestNetHTTPRouter_Middleware(t *testing.T) {
 
 	order := []string{}
 	mw := func(next routing.Handler) routing.Handler {
-		return func(ctx *v2wf.RequestContext) error {
+		return func(ctx *request.Context, transport routing.Transport) error {
 			order = append(order, "mw-before")
-			err := next(ctx)
+			err := next(ctx, transport)
 			order = append(order, "mw-after")
 			return err
 		}
 	}
 
-	router.With(mw).Get("/test", func(ctx *v2wf.RequestContext) error {
+	router.With(mw).Get("/test", func(ctx *request.Context, transport routing.Transport) error {
 		order = append(order, "handler")
-		return ctx.Parser.SendResponse(200, "text/plain", []byte("ok"))
+		return transport.WriteResponse(200, "text/plain", nil, []byte("ok"))
 	})
 
 	server := httptest.NewServer(router.mux)
@@ -197,7 +197,7 @@ func TestNetHTTPRouter_Middleware(t *testing.T) {
 func TestNetHTTPRouter_InvalidPattern(t *testing.T) {
 	router := NewRouter()
 
-	err := router.Get("/users/{id", func(ctx *v2wf.RequestContext) error {
+	err := router.Get("/users/{id", func(ctx *request.Context, transport routing.Transport) error {
 		return nil
 	})
 	if err == nil {
@@ -215,7 +215,11 @@ func TestNetHTTPRouter_Native(t *testing.T) {
 func TestNetHTTPRouter_HandlerError(t *testing.T) {
 	router := NewRouter()
 
-	router.Get("/fail", func(ctx *v2wf.RequestContext) error {
+	router.SetErrorHandler(func(ctx *request.Context, transport routing.Transport, err error) {
+		_ = transport.WriteResponse(http.StatusInternalServerError, "text/plain", nil, []byte(err.Error()))
+	})
+
+	router.Get("/fail", func(ctx *request.Context, transport routing.Transport) error {
 		ctx2, cancel := context.WithCancel(context.Background())
 		cancel()
 		return ctx2.Err()
@@ -239,9 +243,9 @@ func TestGetHTTPRequest(t *testing.T) {
 	router := NewRouter()
 
 	var extracted *http.Request
-	router.Get("/test", func(ctx *v2wf.RequestContext) error {
-		extracted = GetHTTPRequest(ctx.LegacyContext)
-		return ctx.Parser.SendResponse(200, "text/plain", []byte("ok"))
+	router.Get("/test", func(ctx *request.Context, transport routing.Transport) error {
+		extracted, _ = ctx.Native().(*http.Request)
+		return transport.WriteResponse(200, "text/plain", nil, []byte("ok"))
 	})
 
 	server := httptest.NewServer(router.mux)
@@ -256,12 +260,12 @@ func TestGetHTTPRequest(t *testing.T) {
 func TestNetHTTPRouter_MethodNotAllowed(t *testing.T) {
 	router := NewRouter()
 
-	router.MethodNotAllowed(func(ctx *v2wf.RequestContext) error {
-		return ctx.Parser.SendResponse(http.StatusMethodNotAllowed, "text/plain", []byte("method not allowed"))
+	router.MethodNotAllowed(func(ctx *request.Context, transport routing.Transport) error {
+		return transport.WriteResponse(http.StatusMethodNotAllowed, "text/plain", nil, []byte("method not allowed"))
 	})
 
-	router.Post("/items", func(ctx *v2wf.RequestContext) error {
-		return ctx.Parser.SendResponse(http.StatusOK, "text/plain", []byte("created"))
+	router.Post("/items", func(ctx *request.Context, transport routing.Transport) error {
+		return transport.WriteResponse(http.StatusOK, "text/plain", nil, []byte("created"))
 	})
 
 	// Use Native() which wraps with 405 interception.

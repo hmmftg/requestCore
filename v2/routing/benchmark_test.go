@@ -13,8 +13,8 @@ import (
 	v2libFiber "github.com/hmmftg/requestCore/v2/libFiber"
 	v2libGin "github.com/hmmftg/requestCore/v2/libGin"
 	v2libNetHttp "github.com/hmmftg/requestCore/v2/libNetHttp"
+	"github.com/hmmftg/requestCore/v2/request"
 	"github.com/hmmftg/requestCore/v2/routing"
-	v2wf "github.com/hmmftg/requestCore/v2/webFramework"
 )
 
 func init() {
@@ -22,10 +22,10 @@ func init() {
 }
 
 // noopHandler is a minimal handler that writes a 200 response directly
-// through the parser, used for adapter overhead benchmarks.
+// through the transport, used for adapter overhead benchmarks.
 func noopHandler() routing.Handler {
-	return func(ctx *v2wf.RequestContext) error {
-		return ctx.Parser.SendResponse(200, "text/plain", []byte("ok"))
+	return func(ctx *request.Context, transport routing.Transport) error {
+		return transport.WriteResponse(200, "text/plain", nil, []byte("ok"))
 	}
 }
 

@@ -3,24 +3,55 @@
 //
 // Canonical parameter syntax is {id}, which adapters translate to their
 // framework-specific syntax (:id for Gin/Fiber, {id} for chi).
+//
+// routing imports only the request package from the v2 kernel. It does
+// not import webFramework, response, endpoint, handlers, or any v1
+// package.
 package routing
 
 import (
 	"fmt"
+	"net/http"
 	"strings"
 
-	"github.com/hmmftg/requestCore/v2/webFramework"
+	"github.com/hmmftg/requestCore/v2/request"
 )
 
-// Handler is a v2 route handler that receives a RequestContext and returns
-// an error. If the handler returns a non-nil error, the error is routed
-// through the error handler registry.
-type Handler func(*webFramework.RequestContext) error
+// Transport abstracts the response-writing side of an HTTP request. It
+// is structurally compatible with response.Transport and
+// endpoint.Transport so that the same concrete transports satisfy all
+// three interfaces without adapter wrappers.
+type Transport interface {
+	// WriteResponse writes the HTTP response with the given status,
+	// content type, headers, and body. It is called exactly once per
+	// request. Implementations must apply all header values (using add
+	// semantics for multi-value headers like Set-Cookie) before writing
+	// the status and body. An empty content type is ignored. A nil
+	// headers map is treated as empty.
+	WriteResponse(status int, contentType string, headers http.Header, body []byte) error
+
+	// Committed reports whether the response has already been
+	// committed to the wire. Once true, WriteResponse must not be
+	// called again.
+	Committed() bool
+}
+
+// Handler is a v2 route handler that receives a request.Context and a
+// response Transport, and returns an error. If the handler returns a
+// non-nil error, the error is routed through the configured
+// ErrorHandler.
+type Handler func(*request.Context, Transport) error
 
 // Middleware wraps a Handler with additional behavior.
 // Middleware functions are composed in registration order: the first
 // registered middleware is the outermost wrapper.
 type Middleware func(Handler) Handler
+
+// ErrorHandler handles errors returned by route handlers and middleware.
+// It receives the request context, the response transport, and the
+// error. The error handler is responsible for writing an appropriate
+// error response (typically an RFC 9457 Problem) through the transport.
+type ErrorHandler func(*request.Context, Transport, error)
 
 // RouteGroup represents a group of routes with a shared path prefix
 // and middleware chain.
@@ -47,7 +78,8 @@ type RouteGroup interface {
 	Head(pattern string, handler Handler) error
 }
 
-// Router extends RouteGroup with not-found and method-not-allowed handlers.
+// Router extends RouteGroup with not-found, method-not-allowed, and
+// error-handling configuration.
 type Router interface {
 	RouteGroup
 
@@ -57,6 +89,11 @@ type Router interface {
 	// MethodNotAllowed sets the handler for disallowed methods on
 	// matched paths.
 	MethodNotAllowed(handler Handler)
+
+	// SetErrorHandler sets the error handler invoked when a route
+	// handler or middleware returns a non-nil error. This replaces
+	// the previous reflection-based error-handler wiring.
+	SetErrorHandler(handler ErrorHandler)
 
 	// Native returns the underlying framework-specific router object
 	// (e.g. *gin.Engine, *fiber.App, *chi.Mux). This is an escape hatch
