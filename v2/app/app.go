@@ -15,14 +15,11 @@ import (
 	"sync"
 	"time"
 
-	"github.com/hmmftg/requestCore"
-	"github.com/hmmftg/requestCore/response"
-
 	"github.com/hmmftg/requestCore/v2/endpoint"
 	"github.com/hmmftg/requestCore/v2/operation"
 	"github.com/hmmftg/requestCore/v2/renderers"
 	"github.com/hmmftg/requestCore/v2/request"
-	v2response "github.com/hmmftg/requestCore/v2/response"
+	"github.com/hmmftg/requestCore/v2/response"
 	"github.com/hmmftg/requestCore/v2/routing"
 	"github.com/hmmftg/requestCore/v2/session"
 	"github.com/hmmftg/requestCore/v2/telemetry"
@@ -44,7 +41,8 @@ type Config struct {
 	// Framework specifies the underlying web framework.
 	Framework Framework
 
-	// Renderer is the default response renderer.
+	// Renderer is the default response renderer. It is also used as
+	// the executor's default encoder.
 	// Default: JSONRenderer.
 	Renderer renderers.Renderer
 
@@ -60,23 +58,28 @@ type Config struct {
 	// Required if SessionStore is not NoOpStore.
 	SessionSecret string
 
-	// LegacyCore is the v1 RequestCoreInterface for infrastructure access.
-	// May be nil for pure v2 applications.
-	LegacyCore requestCore.RequestCoreInterface
+	// ProblemMapper is the error-to-Problem mapper registry used by
+	// the routing error handler and the executor.
+	// If nil, response.DefaultMapperRegistry() is used.
+	ProblemMapper *response.MapperRegistry
 
-	// LegacyHandler is the v1 WebHanlder for error response formatting.
-	// Default: empty WebHanlder.
-	LegacyHandler response.WebHanlder
+	// OperationRegistry is the operation metadata registry used by
+	// the executor. If nil, operation.NewRegistry() is used.
+	OperationRegistry operation.Registry
+
+	// Executor is the canonical endpoint executor. If nil, one is
+	// created with the above defaults (and the Renderer as encoder).
+	Executor *endpoint.Executor
 
 	// Middlewares are global middleware applied to all routes.
 	Middlewares []routing.Middleware
 
 	// NotFound is the handler for unmatched routes.
-	// If nil, a default 404 JSON response is used.
+	// If nil, a default 404 RFC 9457 Problem response is used.
 	NotFound routing.Handler
 
 	// MethodNotAllowed is the handler for disallowed methods.
-	// If nil, a default 405 JSON response is used.
+	// If nil, a default 405 RFC 9457 Problem response is used.
 	MethodNotAllowed routing.Handler
 
 	// Logger is the base logger for worker and scheduler jobs.
@@ -84,24 +87,23 @@ type Config struct {
 	Logger *slog.Logger
 
 	// TelemetrySink is the telemetry sink for worker and scheduler
-	// lifecycle events. If nil, the executor's sink is used; if the
-	// executor's sink is also nil, telemetry.NopSink{} is used.
+	// lifecycle events. If nil, telemetry.NewSlogSink(Logger) is used.
 	TelemetrySink telemetry.Sink
 }
 
 // App is the v2 application instance. It composes the router,
-// endpoint executor, response handler, worker pool, scheduler, and
-// session manager.
+// endpoint executor, problem mapper, operation registry, worker pool,
+// scheduler, and session manager.
 type App struct {
-	Router      routing.Router
-	RespHandler *v2response.Handler
-	Registry    v2response.Registry
-	Renderer    renderers.Renderer
-	Executor    *endpoint.Executor
-	Worker      workers.Worker
-	Scheduler   *workers.Scheduler
-	Sessions    *session.Manager
-	Middlewares []routing.Middleware
+	Router            routing.Router
+	Renderer          renderers.Renderer
+	Executor          *endpoint.Executor
+	ProblemMapper     *response.MapperRegistry
+	OperationRegistry operation.Registry
+	Worker            workers.Worker
+	Scheduler         *workers.Scheduler
+	Sessions          *session.Manager
+	Middlewares       []routing.Middleware
 
 	// nativeServer holds the underlying framework server (e.g. *http.Server,
 	// *fiber.App). Set by Start to enable graceful shutdown.
@@ -117,11 +119,13 @@ type App struct {
 }
 
 // Bootstrap creates a new v2 App with the given configuration.
-// It initializes the router, response handler, worker pool, and session
+// It initializes the router, executor, worker pool, and session
 // manager based on the specified framework.
 //
 // The returned App is ready for route registration via Register()
-// or direct router access via Router.
+// or direct router access via Router. Operation and mapper registries
+// are frozen at StartWithContext, not here, so routes can still be
+// registered between Bootstrap and Start.
 func Bootstrap(config Config) (*App, error) {
 	// Validate configuration before allocating any resources.
 	if err := validateConfig(config); err != nil {
@@ -136,25 +140,33 @@ func Bootstrap(config Config) (*App, error) {
 		config.SessionStore = session.NoOpStore{}
 	}
 
-	// Create response handler
-	registry := v2response.NewRegistry(nil)
-	registry.SetFallback(v2response.LegacyFallback(config.LegacyHandler))
-	respHandler := v2response.NewHandler(registry, config.Renderer, config.LegacyHandler)
+	// Default the problem mapper registry.
+	if config.ProblemMapper == nil {
+		config.ProblemMapper = response.DefaultMapperRegistry()
+	}
 
-	// Create endpoint executor with the default problem mapper and
-	// operation registry. The executor runs the canonical lifecycle
-	// (bind → validate → execute → encode → commit → observe) and
-	// provides telemetry via its configured telemetry.Sink.
-	executor := endpoint.NewExecutor(
-		endpoint.WithRegistry(operation.NewRegistry()),
-		endpoint.WithProblemMapper(v2response.DefaultMapperRegistry()),
-	)
+	// Default the operation registry.
+	if config.OperationRegistry == nil {
+		config.OperationRegistry = operation.NewRegistry()
+	}
 
-	// Determine the telemetry sink for workers and scheduler. Prefer
-	// the explicitly configured sink; fall back to the executor's sink.
-	workerSink := config.TelemetrySink
-	if workerSink == nil {
-		workerSink = executor.Telemetry
+	// Default the telemetry sink to an observable SlogSink.
+	if config.TelemetrySink == nil {
+		config.TelemetrySink = telemetry.NewSlogSink(config.Logger)
+	}
+
+	// Use or create the canonical endpoint executor. The executor
+	// runs the canonical lifecycle (bind → validate → execute →
+	// encode → commit → observe) and provides telemetry via its
+	// configured telemetry.Sink.
+	executor := config.Executor
+	if executor == nil {
+		executor = endpoint.NewExecutor(
+			endpoint.WithRegistry(config.OperationRegistry),
+			endpoint.WithProblemMapper(config.ProblemMapper),
+			endpoint.WithTelemetrySink(config.TelemetrySink),
+			endpoint.WithExecutorEncoder(config.Renderer),
+		)
 	}
 
 	// Determine the base logger for workers and scheduler.
@@ -166,13 +178,13 @@ func Bootstrap(config Config) (*App, error) {
 	// Create worker pool with telemetry observability.
 	workerConfig := config.WorkerConfig
 	workerConfig.Logger = workerLogger
-	workerConfig.Sink = workerSink
+	workerConfig.Sink = config.TelemetrySink
 	worker := workers.NewInProcessWorker(workerConfig)
 
 	// Create scheduler for periodic background tasks with telemetry.
 	scheduler := workers.NewScheduler(workers.SchedulerConfig{
 		Logger: workerLogger,
-		Sink:   workerSink,
+		Sink:   config.TelemetrySink,
 	})
 
 	// Create session manager
@@ -184,9 +196,10 @@ func Bootstrap(config Config) (*App, error) {
 		return nil, fmt.Errorf("app: failed to create router: %w", err)
 	}
 
-	// Wire the error handler into the router so that handler errors
-	// are routed through the v2 error registry.
-	wireErrorHandler(router, makeErrorHandler(respHandler))
+	// Wire the mapper-backed error handler into the router so that
+	// handler errors are mapped to RFC 9457 Problems and written
+	// through the transport.
+	wireErrorHandler(router, makeErrorHandler(config.ProblemMapper))
 
 	// Apply global middleware by wrapping the router's route group.
 	// Global middleware is applied at the root group level so all
@@ -195,30 +208,30 @@ func Bootstrap(config Config) (*App, error) {
 		router = &middlewareRouter{router: router, middlewares: config.Middlewares}
 	}
 
-	// Set not found / method not allowed handlers. Defaults provide
-	// JSON error responses consistent with the v2 response format.
+	// Set not found / method not allowed handlers. Defaults write
+	// RFC 9457 Problem responses.
 	if config.NotFound != nil {
 		router.NotFound(config.NotFound)
 	} else {
-		router.NotFound(defaultNotFound(nil))
+		router.NotFound(defaultNotFound())
 	}
 	if config.MethodNotAllowed != nil {
 		router.MethodNotAllowed(config.MethodNotAllowed)
 	} else {
-		router.MethodNotAllowed(defaultMethodNotAllowed(nil))
+		router.MethodNotAllowed(defaultMethodNotAllowed())
 	}
 
 	return &App{
-		Router:           router,
-		RespHandler:      respHandler,
-		Registry:         registry,
-		Renderer:         config.Renderer,
-		Executor:         executor,
-		Worker:           worker,
-		Scheduler:        scheduler,
-		Sessions:         sessionMgr,
-		Middlewares:      config.Middlewares,
-		serverRegistered: make(chan struct{}),
+		Router:            router,
+		Renderer:          config.Renderer,
+		Executor:          executor,
+		ProblemMapper:     config.ProblemMapper,
+		OperationRegistry: config.OperationRegistry,
+		Worker:            worker,
+		Scheduler:         scheduler,
+		Sessions:          sessionMgr,
+		Middlewares:       config.Middlewares,
+		serverRegistered:  make(chan struct{}),
 	}, nil
 }
 
@@ -263,30 +276,30 @@ func validateConfig(config Config) error {
 	return nil
 }
 
-// defaultNotFound returns a 404 handler that emits a JSON error response.
-func defaultNotFound(h *v2response.Handler) routing.Handler {
+// defaultNotFound returns a 404 handler that writes an RFC 9457
+// Problem response.
+func defaultNotFound() routing.Handler {
 	return func(ctx *request.Context, transport routing.Transport) error {
-		body := []byte(`{"error":"not_found","message":"The requested resource was not found"}`)
-		return transport.WriteResponse(http.StatusNotFound, "application/json", nil, body)
+		problem := response.NewProblemWithCode(http.StatusNotFound, "Not Found", "NOT_FOUND")
+		return response.WriteProblem(ctx, transport, problem)
 	}
 }
 
-// defaultMethodNotAllowed returns a 405 handler that emits a JSON error
-// response.
-func defaultMethodNotAllowed(h *v2response.Handler) routing.Handler {
+// defaultMethodNotAllowed returns a 405 handler that writes an RFC 9457
+// Problem response.
+func defaultMethodNotAllowed() routing.Handler {
 	return func(ctx *request.Context, transport routing.Transport) error {
-		body := []byte(`{"error":"method_not_allowed","message":"The HTTP method is not allowed for this resource"}`)
-		return transport.WriteResponse(http.StatusMethodNotAllowed, "application/json", nil, body)
+		problem := response.NewProblemWithCode(http.StatusMethodNotAllowed, "Method Not Allowed", "METHOD_NOT_ALLOWED")
+		return response.WriteProblem(ctx, transport, problem)
 	}
 }
 
-// makeErrorHandler creates a routing.ErrorHandler from the v2 response
-// handler. It maps errors to RFC 9457 Problems and writes them through
-// the transport.
-func makeErrorHandler(h *v2response.Handler) routing.ErrorHandler {
-	mapper := v2response.DefaultMapperRegistry()
+// makeErrorHandler creates a routing.ErrorHandler that maps errors to
+// RFC 9457 Problems via the given MapperRegistry and writes them
+// through the transport.
+func makeErrorHandler(mapper *response.MapperRegistry) routing.ErrorHandler {
 	return func(ctx *request.Context, transport routing.Transport, err error) {
-		_ = v2response.WriteProblemFromError(ctx, transport, mapper, err)
+		_ = response.WriteProblemFromError(ctx, transport, mapper, err)
 	}
 }
 
@@ -401,13 +414,19 @@ func (a *App) Start(addr string) error {
 // StartWithContext starts the HTTP server with the given context.
 // When the context is cancelled, the server shuts down gracefully.
 //
-// The error handler registry is frozen before the server starts so
-// that route handlers cannot modify error handlers at runtime.
+// The operation registry and problem mapper are frozen before the
+// server starts so that routes and error mappings cannot be modified
+// at runtime. Freezing happens here (not at Bootstrap) so routes can
+// still be registered between Bootstrap and Start.
 func (a *App) StartWithContext(ctx context.Context, addr string) error {
-	// Freeze the registry so no new error handlers can be registered
-	// after startup. This prevents accidental mutation during serving.
-	if a.Registry != nil {
-		a.Registry.Freeze()
+	// Freeze the operation registry and problem mapper so no new
+	// entries can be registered after startup. This prevents
+	// accidental mutation during serving.
+	if a.OperationRegistry != nil {
+		a.OperationRegistry.Freeze()
+	}
+	if a.ProblemMapper != nil {
+		a.ProblemMapper.Freeze()
 	}
 
 	// Start the scheduler so registered periodic jobs begin ticking.

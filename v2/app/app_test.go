@@ -9,12 +9,24 @@ import (
 	"testing"
 	"time"
 
-	"github.com/hmmftg/requestCore/response"
+	"github.com/hmmftg/requestCore/v2/endpoint"
+	"github.com/hmmftg/requestCore/v2/operation"
 	"github.com/hmmftg/requestCore/v2/renderers"
 	"github.com/hmmftg/requestCore/v2/request"
+	"github.com/hmmftg/requestCore/v2/response"
 	"github.com/hmmftg/requestCore/v2/routing"
 	"github.com/hmmftg/requestCore/v2/workers"
 )
+
+// newTestExecutor creates an executor with the given registry and mapper,
+// using nop telemetry to suppress output during tests.
+func newTestExecutor(registry operation.Registry, mapper *response.MapperRegistry) *endpoint.Executor {
+	return endpoint.NewExecutor(
+		endpoint.WithRegistry(registry),
+		endpoint.WithProblemMapper(mapper),
+		endpoint.WithNopTelemetry(),
+	)
+}
 
 func TestBootstrap_Chi(t *testing.T) {
 	app, err := Bootstrap(Config{
@@ -28,8 +40,14 @@ func TestBootstrap_Chi(t *testing.T) {
 	if app.Router == nil {
 		t.Fatal("expected non-nil router")
 	}
-	if app.RespHandler == nil {
-		t.Fatal("expected non-nil response handler")
+	if app.Executor == nil {
+		t.Fatal("expected non-nil executor")
+	}
+	if app.ProblemMapper == nil {
+		t.Fatal("expected non-nil problem mapper")
+	}
+	if app.OperationRegistry == nil {
+		t.Fatal("expected non-nil operation registry")
 	}
 	if app.Worker == nil {
 		t.Fatal("expected non-nil worker")
@@ -119,22 +137,30 @@ func TestBootstrap_CustomRenderer(t *testing.T) {
 	}
 }
 
-func TestBootstrap_WithLegacyHandler(t *testing.T) {
-	legacy := response.WebHanlder{
-		MessageDesc: map[string]string{"test": "Test message"},
-		ErrorDesc:   map[string]string{"test": "Test error"},
-	}
+func TestBootstrap_WithCustomRegistries(t *testing.T) {
+	mapper := response.DefaultMapperRegistry()
+	registry := operation.NewRegistry()
+	executor := newTestExecutor(registry, mapper)
+
 	app, err := Bootstrap(Config{
-		Framework:     FrameworkChi,
-		LegacyHandler: legacy,
+		Framework:         FrameworkChi,
+		ProblemMapper:     mapper,
+		OperationRegistry: registry,
+		Executor:          executor,
 	})
 	if err != nil {
 		t.Fatalf("Bootstrap: %v", err)
 	}
 	defer app.Close()
 
-	if app.RespHandler.LegacyHandler().MessageDesc["test"] != "Test message" {
-		t.Fatal("expected legacy handler to be passed through")
+	if app.ProblemMapper != mapper {
+		t.Fatal("expected custom problem mapper to be passed through")
+	}
+	if app.OperationRegistry != registry {
+		t.Fatal("expected custom operation registry to be passed through")
+	}
+	if app.Executor != executor {
+		t.Fatal("expected custom executor to be passed through")
 	}
 }
 
@@ -226,8 +252,8 @@ func TestApp_StartShutdown(t *testing.T) {
 	cancel()
 }
 
-// TestApp_DefaultNotFound verifies that the default 404 handler emits
-// a JSON error response when no custom NotFound is configured.
+// TestApp_DefaultNotFound verifies that the default 404 handler writes
+// an RFC 9457 Problem response when no custom NotFound is configured.
 func TestApp_DefaultNotFound(t *testing.T) {
 	app, err := Bootstrap(Config{
 		Framework: FrameworkChi,
@@ -260,13 +286,17 @@ func TestApp_DefaultNotFound(t *testing.T) {
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
 		t.Fatalf("decode: %v", err)
 	}
-	if result["error"] != "not_found" {
-		t.Fatalf("expected error='not_found', got %v", result["error"])
+	if result["status"] != float64(http.StatusNotFound) {
+		t.Fatalf("expected status=404, got %v", result["status"])
+	}
+	if result["title"] != "Not Found" {
+		t.Fatalf("expected title='Not Found', got %v", result["title"])
 	}
 }
 
 // TestApp_DefaultMethodNotAllowed verifies that the default 405 handler
-// emits a JSON error response when no custom MethodNotAllowed is configured.
+// writes an RFC 9457 Problem response when no custom MethodNotAllowed
+// is configured.
 func TestApp_DefaultMethodNotAllowed(t *testing.T) {
 	app, err := Bootstrap(Config{
 		Framework: FrameworkChi,
@@ -306,8 +336,11 @@ func TestApp_DefaultMethodNotAllowed(t *testing.T) {
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
 		t.Fatalf("decode: %v", err)
 	}
-	if result["error"] != "method_not_allowed" {
-		t.Fatalf("expected error='method_not_allowed', got %v", result["error"])
+	if result["status"] != float64(http.StatusMethodNotAllowed) {
+		t.Fatalf("expected status=405, got %v", result["status"])
+	}
+	if result["title"] != "Method Not Allowed" {
+		t.Fatalf("expected title='Method Not Allowed', got %v", result["title"])
 	}
 }
 
