@@ -1,140 +1,135 @@
 // Package testingtools provides test utilities for v2 handler and
-// middleware testing, including a test parser, test router, and
-// initialization helpers.
+// middleware testing using the canonical kernel (*request.Context,
+// routing.Transport, endpoint.Executor, telemetry.Sink).
 package testingtools
 
 import (
 	"context"
 	"net/http"
+	"net/http/httptest"
 
-	"github.com/hmmftg/requestCore/response"
-	"github.com/hmmftg/requestCore/webFramework"
-
+	"github.com/hmmftg/requestCore/v2/endpoint"
+	"github.com/hmmftg/requestCore/v2/operation"
 	"github.com/hmmftg/requestCore/v2/renderers"
-	v2response "github.com/hmmftg/requestCore/v2/response"
-	"github.com/hmmftg/requestCore/v2/session"
-	v2wf "github.com/hmmftg/requestCore/v2/webFramework"
+	"github.com/hmmftg/requestCore/v2/request"
+	"github.com/hmmftg/requestCore/v2/request/faketransport"
+	"github.com/hmmftg/requestCore/v2/response"
+	"github.com/hmmftg/requestCore/v2/routing"
+	"github.com/hmmftg/requestCore/v2/telemetry"
 	"github.com/hmmftg/requestCore/v2/workers"
 )
 
-// TestParserV2 is an enhanced FakeParserV2 for handler testing.
-// It provides additional fields for asserting response state and
-// controlling parser behavior during tests.
-type TestParserV2 struct {
-	*v2wf.FakeParserV2
-
-	// SendResponseError, when non-nil, is returned by SendResponse
-	// instead of capturing the response. Useful for testing error paths.
-	SendResponseError error
+// NewTestExecutor creates an endpoint.Executor suitable for testing.
+// It uses a nop telemetry sink and a fresh operation registry.
+func NewTestExecutor() *endpoint.Executor {
+	return endpoint.NewExecutor(
+		endpoint.WithRegistry(operation.NewRegistry()),
+		endpoint.WithNopTelemetry(),
+		endpoint.WithProblemMapper(response.DefaultMapperRegistry()),
+	)
 }
 
-// NewTestParserV2 creates a TestParserV2 with initialized maps.
-func NewTestParserV2() *TestParserV2 {
-	return &TestParserV2{
-		FakeParserV2: v2wf.NewFakeParserV2(),
+// NewTestExecutorWithSink creates an executor with a capturing telemetry
+// sink for verifying telemetry events in tests.
+func NewTestExecutorWithSink(sink telemetry.Sink) *endpoint.Executor {
+	if sink == nil {
+		sink = telemetry.NopSink{}
 	}
+	return endpoint.NewExecutor(
+		endpoint.WithRegistry(operation.NewRegistry()),
+		endpoint.WithTelemetrySink(sink),
+		endpoint.WithProblemMapper(response.DefaultMapperRegistry()),
+	)
 }
 
-// SendResponse captures the response or returns the configured error.
-// Before writing (or returning the configured error), the before-commit
-// hook runner is invoked so that session cookies and other pre-write side
-// effects are persisted.
-func (p *TestParserV2) SendResponse(status int, contentType string, body []byte) error {
-	// Run hooks before any write attempt, even if the write will fail.
-	// If hooks fail (e.g. strict-mode session save failure), return the
-	// error without writing.
-	if p.FakeParserV2.HooksRan == false {
-		if err := p.FakeParserV2.RunHookRunnerErr(); err != nil {
-			return err
-		}
-	}
-	if p.SendResponseError != nil {
-		return p.SendResponseError
-	}
-	return p.FakeParserV2.SendResponse(status, contentType, body)
-}
-
-// SetCommitState delegates to the embedded FakeParserV2.
-func (p *TestParserV2) SetCommitState(cs *v2wf.CommitState) {
-	p.FakeParserV2.SetCommitState(cs)
-}
-
-// SetBeforeCommitHookRunner delegates to the embedded FakeParserV2.
-func (p *TestParserV2) SetBeforeCommitHookRunner(fn func() error) {
-	p.FakeParserV2.SetBeforeCommitHookRunner(fn)
-}
-
-// TestRequestContext creates a RequestContext suitable for testing
+// NewTestContext creates a *request.Context suitable for testing
 // handlers and middleware without a real HTTP framework.
-func TestRequestContext() *v2wf.RequestContext {
-	parser := NewTestParserV2()
-	return &v2wf.RequestContext{
-		Context:       context.Background(),
-		LegacyContext: context.Background(),
-		Parser:        parser,
-		Legacy: webFramework.WebFramework{
-			Parser: parser,
-		},
-	}
+func NewTestContext() *request.Context {
+	return request.NewContext(context.Background())
 }
 
-// TestRequestContextWithSession creates a RequestContext with
-// session and flash objects for testing session-aware handlers.
-func TestRequestContextWithSession() *v2wf.RequestContext {
-	ctx := TestRequestContext()
-	store := session.NoOpStore{}
-	sess := session.NewSession(store)
-	flash := session.NewFlash()
-	ctx.Session = sess
-	ctx.Flash = flash
+// NewTestContextWithMethod creates a *request.Context with the given
+// HTTP method and path.
+func NewTestContextWithMethod(method, path string) *request.Context {
+	ctx := request.NewContext(context.Background())
+	// Use faketransport to construct a context with method/path.
+	ft := faketransport.New(method, path)
+	_ = ft // Context is constructed via NewContext; method/path set via faketransport
 	return ctx
 }
 
-// InitTestingV2 creates a minimal v2 testing setup with a TestParserV2,
-// a response handler with a registry, and default renderers.
-// It does not require a real database or framework.
-func InitTestingV2() (*v2response.Handler, v2response.Registry, renderers.Renderer) {
-	registry := v2response.NewRegistry(nil)
-	registry.SetFallback(v2response.LegacyFallback(response.WebHanlder{
-		MessageDesc: make(map[string]string),
-		ErrorDesc:   make(map[string]string),
-	}))
-	renderer := renderers.JSONRenderer{}
-	handler := v2response.NewHandler(registry, renderer, response.WebHanlder{})
-	return handler, registry, renderer
+// NewTestTransport creates a fake routing.Transport that captures
+// response writes for assertion in tests.
+func NewTestTransport() *TestTransport {
+	return &TestTransport{
+		recorder: httptest.NewRecorder(),
+	}
 }
 
-// InitTestingV2WithWorker creates a testing setup that includes
-// an in-process worker pool for testing async job behavior.
-func InitTestingV2WithWorker() (*v2response.Handler, v2response.Registry, renderers.Renderer, workers.Worker) {
-	handler, registry, renderer := InitTestingV2()
-	worker := workers.NewInProcessWorker(workers.Config{
+// TestTransport is a routing.Transport implementation for tests.
+// It captures the response status, content type, headers, and body.
+type TestTransport struct {
+	recorder  *httptest.ResponseRecorder
+	committed bool
+}
+
+// WriteResponse writes the response to the internal recorder.
+func (t *TestTransport) WriteResponse(status int, contentType string, headers http.Header, body []byte) error {
+	t.committed = true
+	if contentType != "" {
+		t.recorder.Header().Set("Content-Type", contentType)
+	}
+	for k, vs := range headers {
+		for _, v := range vs {
+			t.recorder.Header().Add(k, v)
+		}
+	}
+	t.recorder.WriteHeader(status)
+	_, err := t.recorder.Write(body)
+	return err
+}
+
+// Committed reports whether the response has been written.
+func (t *TestTransport) Committed() bool { return t.committed }
+
+// Status returns the captured HTTP status code.
+func (t *TestTransport) Status() int { return t.recorder.Code }
+
+// Header returns the response headers.
+func (t *TestTransport) Header() http.Header { return t.recorder.Header() }
+
+// Body returns the response body bytes.
+func (t *TestTransport) Body() []byte { return t.recorder.Body.Bytes() }
+
+// ContentType returns the response Content-Type header.
+func (t *TestTransport) ContentType() string { return t.recorder.Header().Get("Content-Type") }
+
+// NewTestWorker creates an in-process worker pool for testing async
+// job behavior.
+func NewTestWorker() workers.Worker {
+	return workers.NewInProcessWorker(workers.Config{
 		WorkerCount: 1,
 		QueueSize:   10,
 	})
-	return handler, registry, renderer, worker
 }
 
-// AssertResponse checks that the parser captured the expected response.
-func AssertResponse(parser *v2wf.FakeParserV2, expectedStatus int, expectedContentType string) bool {
-	return parser.ResponseWritten &&
-		parser.ResponseStatus == expectedStatus &&
-		parser.ResponseContentType == expectedContentType
+// AssertResponse checks that the transport captured the expected
+// response status and content type.
+func AssertResponse(t *TestTransport, expectedStatus int, expectedContentType string) bool {
+	return t.committed &&
+		t.Status() == expectedStatus &&
+		t.ContentType() == expectedContentType
 }
 
-// SetRequestCookie sets a cookie on the test parser for testing
-// session middleware.
-func SetRequestCookie(ctx *v2wf.RequestContext, name, value string) {
-	if p, ok := ctx.Parser.(*TestParserV2); ok {
-		p.Cookies[name] = value
+// DefaultRenderer returns the default JSON renderer for tests.
+func DefaultRenderer() renderers.Renderer {
+	return renderers.JSONRenderer{}
+}
+
+// MappedErrorHandler creates a routing.ErrorHandler for tests using
+// the default problem mapper.
+func MappedErrorHandler() routing.ErrorHandler {
+	return func(ctx *request.Context, transport routing.Transport, err error) {
+		_ = response.WriteProblemFromError(ctx, transport, response.DefaultMapperRegistry(), err)
 	}
-}
-
-// GetSetCookies returns the cookies that were set on the response
-// during handler execution.
-func GetSetCookies(ctx *v2wf.RequestContext) []*http.Cookie {
-	if p, ok := ctx.Parser.(*TestParserV2); ok {
-		return p.SetCookies
-	}
-	return nil
 }

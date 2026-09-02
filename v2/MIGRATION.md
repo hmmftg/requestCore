@@ -1,37 +1,84 @@
 # Migrating from v1 to v2
 
-This guide covers migrating existing `requestCore` v1 applications to the v2 module (`github.com/hmmftg/requestCore/v2`).
+This guide covers migrating existing `requestCore` v1 applications to the
+v2 module (`github.com/hmmftg/requestCore/v2`) using the **canonical
+kernel API**.
 
-> **Status:** v2 has **no released tags** and is under active redesign.
-> The current API is an unreleased alpha. A breaking redesign is in progress
-> to make v2 a typed, framework-neutral HTTP toolkit. The migration guide
-> below describes the current alpha API; it will be updated as the redesign
-> progresses. v1 (the root module) remains supported and stable.
+> **Status:** v2 has **no released tags** and is under active development.
+> The canonical kernel API described here is the basis for the first stable
+> v2 release. v1 (the root module) remains supported and stable. See
+> [Deferred Tranche 5 Features](#deferred-tranche-5-features) for
+> capabilities not yet ported to the v2 kernel.
 
 ## Overview
 
-v2 is a **separate Go module** that lives in the `v2/` directory. The current
-alpha is backward-compatible at the module level — v1 code continues to work
-unchanged. The redesign will introduce a breaking canonical API before the
-first stable v2 release.
+v2 is a **separate Go module** that lives in the `v2/` directory. It
+introduces a canonical, stdlib-first kernel that is framework-neutral and
+does not import `webFramework`. v1 code continues to work unchanged; v2
+can coexist with v1 in the same project during migration.
+
+The v2 kernel replaces the alpha API (typed lifecycle hooks, `HandlerRequest`,
+`OKTyped`, `webFramework.AddLog` in v2 context, etc.) with a canonical
+handler signature, an `endpoint.Executor` lifecycle, RFC 9457 problem
+responses, and `telemetry.Sink` observability.
 
 ## Key Changes in v2
 
-| Feature | v1 | v2 |
+| Feature | v1 | v2 (canonical) |
 |---------|----|----|
 | Module path | `github.com/hmmftg/requestCore` | `github.com/hmmftg/requestCore/v2` |
-| Go version | 1.25.5 | **1.27.0** (required for generic methods) |
-| Framework coupling | Gin-specific (`libContext.InitContext`) | Framework-agnostic (`RequestContext`) |
-| Response writing | `response.WebHanlder` | `v2/response.Handler` with pluggable renderers |
-| Routing | Framework-specific | `routing.Router` interface (Gin, Fiber, chi, net/http) |
-| Handlers | `BaseHandler` returns `any` | Generic `Endpoint[Req, Resp]` — fully typed lifecycle |
-| Lifecycle hooks | N/A (manual) | `WithInitializer`/`WithFinalizer`/`WithPersistence` typed methods |
-| Response helpers | `OK(any)` | `OK(any)` + `OKTyped[Resp]` generic method |
-| Resources | Manual route registration | `ResourceBuilder[ID]` + `Resource[ID cmp.Ordered]` (TypedResource is advanced, 14 type params) |
-| Session access | N/A | `SessionContext` interface + `GetTyped[T]`/`SetTyped[T]` generic accessors |
+| Go version | 1.27.0 | **1.27.0** |
+| Framework coupling | Gin-specific (`libContext.InitContext`) | Framework-agnostic (`request.Context` + `routing.Transport`) |
+| Handler signature | `func(context.Context)` writes via v1 responder | `func(ctx *request.Context, req Req) (Resp, error)` |
+| Routing | Framework-specific | `routing.Router` / `routing.RouteGroup` with canonical `{id}` syntax |
+| Handler descriptor | `BaseHandler` returns `any` | `handlers.Endpoint[Req, Resp]` wrapping `endpoint.Endpoint[Req, Resp]` |
+| Lifecycle | Manual / v1 hooks | `endpoint.Executor`: bind → validate → execute → encode → commit → observe |
+| Lifecycle hooks | N/A | **Deferred to Tranche 5** (initializers, finalizers, persistence) |
+| Response writing | `response.WebHanlder` | `routing.Transport` + `endpoint.Executor` commit; renderer encoders |
+| Errors | `ErrorResponse` / status resolver | `response.Problem` (RFC 9457) via `response.MapperRegistry` |
+| Response helpers | `OK(any)` | Handler returns `(Resp, error)`; executor encodes and commits |
+| Observability | `webFramework.AddLog` (Splunk pipeline) | `telemetry.Sink` / `telemetry.SlogSink` (slog → Splunk) |
+| Resources | Manual route registration | `ResourceBuilder[ID]` + `Resource[ID cmp.Ordered]` |
+| Session access | N/A | `session.FromContext` + `GetTyped[T]` / `SetTyped[T]` |
 | Sessions | Not built-in | `session.Manager` with `CookieStore` |
-| Workers | Not built-in | `workers.InProcessWorker` with retry |
-| CLI | None | `requestcore` CLI for code generation |
+| Workers | Not built-in | `workers.InProcessWorker` with retry + `telemetry.Sink` |
+| Operation metadata | N/A | `operation.Operation` + `operation.Registry` (frozen at startup) |
+
+## Breaking Changes from the Alpha API
+
+If you previously used the v2 alpha API, the canonical kernel introduces
+these breaking changes:
+
+- **`HandlerRequest[Req, Resp]` removed.** Handlers no longer receive a
+  `*HandlerRequest`. The canonical signature is
+  `func(ctx *request.Context, req Req) (Resp, error)`.
+- **`WithInitializer` / `WithFinalizer` / `WithPersistence` removed.**
+  Typed lifecycle hooks are deferred to Tranche 5. Use the
+  `endpoint.Executor` lifecycle and before-commit hooks on
+  `request.Context` (`ctx.AddBeforeCommitHook`) for pre-commit work.
+- **`OKTyped[Resp]` / `OKWithStatusTyped[Resp]` removed.** Handlers return
+  `(Resp, error)` directly; the executor encodes and commits the response.
+  Set a custom success status via `endpoint.WithSuccessStatus`.
+- **`webFramework.AddLog` not used in v2.** The v2 kernel is stdlib-only.
+  Observability flows through `telemetry.Sink` (default
+  `telemetry.SlogSink`). Do not call `webFramework.AddLog` from v2
+  handler/worker code.
+- **`handlers.NewEndpoint` replaced by `handlers.New`.** The canonical
+  constructor is `handlers.New[Req, Resp](opID, method, pattern, handler)`
+  or the convenience constructors `handlers.Get`/`Post`/`Put`/`Patch`/
+  `Delete`/`Head`.
+- **`RegisterEndpoint` signature changed.** It now takes
+  `(router, exec *endpoint.Executor, ep *Endpoint[Req, Resp])` — no
+  `core` or `respHandler` arguments.
+- **`app.Bootstrap` config changed.** `LegacyCore` / `LegacyHandler` are
+  gone. The `App` exposes `Executor`, `ProblemMapper`, and
+  `OperationRegistry` instead of `RespHandler` / `Core`.
+- **`TypedResource` is not part of the recommended canonical API.** Use
+  `Resource[ID]` + `ResourceBuilder` for all CRUD resources.
+- **`resources.GetParsedID` takes `*request.Context`** (not
+  `*HandlerRequest`): `resources.GetParsedID[string](ctx, "id")`.
+- **Route patterns use canonical `{id}` syntax.** Adapters translate to
+  framework-specific syntax automatically.
 
 ## Step 1: Add v2 as a dependency
 
@@ -59,26 +106,40 @@ go get github.com/hmmftg/requestCore/v2@v2.0.0-alpha.0
 
 ## Step 2: Bootstrap the v2 App
 
-Replace your manual framework setup with `app.Bootstrap`:
+Replace your manual framework setup with `app.Bootstrap`. The canonical
+`App` composes the router, `endpoint.Executor`, `response.MapperRegistry`,
+`operation.Registry`, worker pool, scheduler, and session manager:
 
 ```go
-// Before (v1 with Gin)
-engine := gin.New()
-// ... manual route registration
-
-// After (v2)
 import "github.com/hmmftg/requestCore/v2/app"
 
 application, err := app.Bootstrap(app.Config{
-    Framework:     app.FrameworkGin, // or FrameworkChi, FrameworkFiber
-    LegacyCore:    v1Core,           // your existing v1 RequestCoreInterface
-    LegacyHandler: legacyHandler,    // your existing v1 WebHanlder
+    Framework: app.FrameworkChi, // or FrameworkGin, FrameworkFiber, FrameworkNetHTTP
+    Renderer:  renderers.JSONRenderer{},
 })
 if err != nil {
     log.Fatal(err)
 }
 defer application.Close()
 ```
+
+The `App` exposes:
+
+| Field | Type | Purpose |
+|-------|------|---------|
+| `Router` | `routing.Router` | Route registration |
+| `Executor` | `*endpoint.Executor` | Canonical lifecycle runner |
+| `ProblemMapper` | `*response.MapperRegistry` | Error-to-Problem mapping |
+| `OperationRegistry` | `operation.Registry` | Operation metadata (frozen at start) |
+| `Worker` | `workers.Worker` | Background job pool |
+| `Scheduler` | `*workers.Scheduler` | Periodic tasks |
+| `Sessions` | `*session.Manager` | Session management |
+
+Customize the executor, problem mapper, operation registry, telemetry
+sink, global middleware, and not-found / method-not-allowed handlers via
+`app.Config` fields. The operation registry and problem mapper are frozen
+at `StartWithContext` so routes and mappings can be added between
+`Bootstrap` and `Start`.
 
 ## Step 3: Migrate Handlers
 
@@ -91,185 +152,134 @@ func MyHandler(c context.Context) {
     core.Responder().OK(w, resp)
 }
 
-// Registration
 engine.GET("/users", libGin.Gin(MyHandler))
 ```
 
-### v2 Handler (Framework-agnostic, typed endpoint)
+### v2 Handler (Canonical, typed)
 
-v2 uses typed endpoint functions instead of the v1 struct-based
-`HandlerInterface` pattern. Each handler is a function that receives
-a typed `*HandlerRequest[Req, Resp]` and returns `(Resp, error)`.
+v2 handlers use the canonical signature
+`func(ctx *request.Context, req Req) (Resp, error)`. The executor handles
+binding, validation, encoding, and committing the response.
 
 ```go
 import (
-    "github.com/hmmftg/requestCore/libRequest"
     "github.com/hmmftg/requestCore/v2/handlers"
+    "github.com/hmmftg/requestCore/v2/request"
 )
 
-// Define your request and response types.
-type MyReq struct {
+type CreateUserReq struct {
     Name string `json:"name"`
 }
-type MyResp struct {
+type CreateUserResp struct {
     ID string `json:"id"`
 }
 
-// MyHandler is the handler function for the endpoint.
-func MyHandler(req *MyReq, trx *handlers.HandlerRequest[MyReq, MyResp]) (MyResp, error) {
-    // trx.W is the legacy webFramework.WebFramework for AddLog calls.
-    // trx.V2 is the v2 RequestContext for direct parser access.
-    return MyResp{ID: "1"}, nil
-}
-
-// Register as a POST endpoint with JSON body binding:
-handlers.PostEndpoint[MyReq, MyResp](
-    application.Router, core, application.RespHandler,
-    "/users",
-    MyHandler,
-)
-
-// Or as a GET endpoint with no body binding:
-handlers.GetEndpoint[struct{}, MyResp](
-    application.Router, core, application.RespHandler,
-    "/health",
-    func(req *struct{}, trx *handlers.HandlerRequest[struct{}, MyResp]) (MyResp, error) {
-        return MyResp{ID: "ok"}, nil
+// Register as a POST endpoint with JSON body binding (one-call form):
+err := handlers.PostEndpoint[CreateUserReq, CreateUserResp](
+    application.Router, application.Executor, "/users",
+    func(ctx *request.Context, req CreateUserReq) (CreateUserResp, error) {
+        return CreateUserResp{ID: "1"}, nil
     },
 )
+
+// Or create then register (useful when you need to configure the endpoint):
+ep := handlers.Post[CreateUserReq, CreateUserResp](
+    "create-user", "/users",
+    func(ctx *request.Context, req CreateUserReq) (CreateUserResp, error) {
+        return CreateUserResp{ID: "1"}, nil
+    },
+)
+err = handlers.RegisterEndpoint(application.Router, application.Executor, ep)
 ```
 
-### Lifecycle Hooks (Initializer, Finalizer)
+### Advanced Endpoint Configuration
 
-For handlers that need initialization or finalization, use the typed
-`WithInitializer` and `WithFinalizer` **methods** on `*Endpoint[Req, Resp]`.
-These are fully typed and compile-time checked — no reflection, no
-runtime type-mismatch panics:
+Access the wrapped `endpoint.Endpoint` via `Inner()` to apply
+`endpoint.Option` functions (validator, success status, encoder, declared
+problems, tags, deprecation):
 
 ```go
-e := handlers.NewEndpoint[MyReq, MyResp]("my-handler", libRequest.JSON, MyHandler).
-    WithPath("/users").
-    WithInitializer(func(trx *handlers.HandlerRequest[MyReq, MyResp]) error {
-        // Runs after parsing, before the main handler.
-        return nil
-    }).
-    WithFinalizer(func(trx *handlers.HandlerRequest[MyReq, MyResp]) {
-        // Always runs, even on panic. Best-effort.
-    })
-
-handlers.RegisterEndpoint(application.Router, core, application.RespHandler, "POST", "/users", e)
+ep := handlers.Post[CreateUserReq, CreateUserResp]("create-user", "/users", handler)
+ep.Inner().
+    WithSuccessStatus(http.StatusCreated).
+    WithTags("users", "write")
 ```
 
-### Typed Response Helpers
+### Returning Errors
 
-For compile-time type-safe responses, use the generic `OKTyped[Resp]`
-and `OKWithStatusTyped[Resp]` methods on `response.Handler`:
+Handlers return `(Resp, error)`. Returning a non-nil error routes it
+through the `response.MapperRegistry`, which maps it to an RFC 9457
+`response.Problem` and writes it through the transport. Return a
+`*response.Problem` directly for full control:
 
 ```go
-// Instead of: respHandler.OK(req, MyResp{ID: "1"})
-// Use the typed version:
-err := application.RespHandler.OKTyped(req, MyResp{ID: "1"})
-
-// With a custom status:
-err := application.RespHandler.OKWithStatusTyped(req, http.StatusCreated, MyResp{ID: "1"})
+func(ctx *request.Context, req CreateUserReq) (CreateUserResp, error) {
+    if exists(req.Name) {
+        return CreateUserResp{}, response.NewProblemWithCode(
+            http.StatusConflict, "Conflict", "USER_EXISTS",
+        ).WithDetail("a user with that name already exists")
+    }
+    return CreateUserResp{ID: "1"}, nil
+}
 ```
-
-These are convenience wrappers around `OK`/`OKWithStatus` that preserve
-type information at the call site. The `any`-based methods remain
-available for dynamic response types.
 
 ## Step 4: Migrate to Resources
 
-For CRUD endpoints, use the resource pattern. Implement `Resource[ID]`
-(each operation returns `handlers.EndpointRuntime`) and register via
-`ResourceBuilder` — this is the recommended path for v2 migration.
-
-> **Avoid `TypedResource` for simple resources.** The 14 type parameters
-> (7 request + 7 response types) are overkill for simple CRUD + custom
-> (non-CRUD) resources like Reload. Use `Resource[ID]` + `ResourceBuilder`
-> instead. See [Advanced: TypedResource](#advanced-typedresource-14-type-parameters)
-> below for when it's warranted.
-
-Each operation has its own typed request and response. Read operations
-(List, Show, New, Edit, Destroy) use `libRequest.NoBinding`; write
-operations (Create, Update) use `libRequest.JSON`:
+For CRUD endpoints, implement `resources.Resource[ID]` (each operation
+returns `handlers.EndpointRuntime`) and register via `ResourceBuilder`:
 
 ```go
 import (
-    "github.com/hmmftg/requestCore/libRequest"
     "github.com/hmmftg/requestCore/v2/handlers"
+    "github.com/hmmftg/requestCore/v2/request"
     "github.com/hmmftg/requestCore/v2/resources"
 )
 
-type UserResource struct{}
+type ItemResource struct{}
 
-type UserListReq struct{}
-type UserListResp struct {
-    Users []User `json:"users"`
-}
-
-func (r *UserResource) List() handlers.EndpointRuntime {
-    return handlers.NewEndpoint[UserListReq, UserListResp](
-        "list-users",
-        libRequest.NoBinding,
-        func(req *UserListReq, trx *handlers.HandlerRequest[UserListReq, UserListResp]) (UserListResp, error) {
-            return UserListResp{Users: []User{}}, nil
+func (r *ItemResource) List() handlers.EndpointRuntime {
+    return handlers.Get[struct{}, []ItemResp]("list-items", "/items",
+        func(ctx *request.Context, req struct{}) ([]ItemResp, error) {
+            return []ItemResp{}, nil
         },
     )
 }
 
-type UserShowReq struct{}
-type UserShowResp struct {
-    ID   string `json:"id"`
-    Name string `json:"name"`
-}
-
-func (r *UserResource) Show() handlers.EndpointRuntime {
-    return handlers.NewEndpoint[UserShowReq, UserShowResp](
-        "show-user",
-        libRequest.NoBinding,
-        func(req *UserShowReq, trx *handlers.HandlerRequest[UserShowReq, UserShowResp]) (UserShowResp, error) {
-            id, err := resources.GetParsedID[string](trx.V2, "id")
+func (r *ItemResource) Show() handlers.EndpointRuntime {
+    return handlers.Get[struct{}, ItemResp]("show-item", "/items/{id}",
+        func(ctx *request.Context, req struct{}) (ItemResp, error) {
+            id, err := resources.GetParsedID[string](ctx, "id")
             if err != nil {
-                return UserShowResp{}, err
+                return ItemResp{}, err
             }
-            return UserShowResp{ID: id, Name: "example"}, nil
+            return ItemResp{ID: id}, nil
         },
     )
 }
-
 // ... similarly for New, Create, Edit, Update, Destroy
-```
 
-### Registration via ResourceBuilder (Recommended)
-
-Register all 7 routes (plus optional custom operations) using the
-`ResourceBuilder` fluent API:
-
-```go
-err := resources.NewResource[string]("/users").
+// Register via ResourceBuilder (recommended).
+err := resources.NewResource[string]("/items").
     EnablePatch().
-    WithDefaults(&resources.ResourceDefaults{}).
-    Register(application.Router, core, application.RespHandler, &UserResource{})
+    Register(application.Router, application.Executor, &ItemResource{})
 ```
 
-Operations returning nil are registered with a default 405 handler when
-`WithDefaults` is set. `EnablePatch()` registers PATCH as an alias for
-Update.
+`EnablePatch()` registers PATCH as an alias for Update. Operations
+returning nil are skipped, or registered with a default 405 handler when
+`WithDefaults` is set. Use `WithIDParam` / `WithIDParser` for non-default
+ID parameter names or non-string ID types.
 
 ### Custom Operations (non-CRUD actions)
 
-For non-standard actions like `Reload` that don't fit the 7 CRUD
-operations, use `WithCustom` on the builder:
+For non-standard actions like `Reload`, use `WithCustom`:
 
 ```go
 reloadOp := resources.CustomOperation{
     Method: "POST",
     Path:   "/reload",
-    Endpoint: handlers.NewEndpoint[struct{}, ReloadResp](
-        "reload-parameters",
-        libRequest.NoBinding,
-        func(req *struct{}, trx *handlers.HandlerRequest[struct{}, ReloadResp]) (ReloadResp, error) {
+    Endpoint: handlers.Post[struct{}, ReloadResp](
+        "reload-parameters", "/parameters/reload",
+        func(ctx *request.Context, req struct{}) (ReloadResp, error) {
             return ReloadResp{Reloaded: true}, nil
         },
     ),
@@ -277,72 +287,26 @@ reloadOp := resources.CustomOperation{
 
 err := resources.NewResource[string]("/parameters").
     WithCustom(reloadOp).
-    Register(application.Router, core, application.RespHandler, &ParameterResource{})
+    Register(application.Router, application.Executor, &ParameterResource{})
 ```
 
-Custom operations are registered before `/{id}` routes to ensure
-correct precedence (e.g. `POST /parameters/reload` won't match
-`/{id}`).
-
-### Raw Config (Alternative)
-
-`ResourceBuilder` is a thin wrapper around `resources.Register` with
-`Config[ID]`. If you prefer explicit configuration:
-
-```go
-resources.Register[string](application.Router, resources.Config[string]{
-    Path:             "/users",
-    Resource:         &UserResource{},
-    RespHandler:      application.RespHandler,
-    EnablePatchAlias: true,
-    Defaults:         &resources.ResourceDefaults{},
-})
-```
-
-`ResourceBuilder` is preferred for readability — the fluent chain makes
-the configuration intent clearer than a struct literal.
-
-### Advanced: TypedResource (14 type parameters)
-
-`TypedResource` is an advanced interface with 14 type parameters
-(7 request + 7 response types). Each operation returns a fully typed
-`*handlers.Endpoint[Req, Resp]` instead of `handlers.EndpointRuntime`.
-
-**When to use TypedResource:** only when you need the strictest
-compile-time guarantees on every operation's request/response types
-simultaneously — for example, a shared library resource where callers
-must not be able to pass the wrong endpoint type to any operation.
-
-**When NOT to use TypedResource:** for simple CRUD + custom resources
-(e.g. a User resource with a Reload action). The 14 type parameters add
-verbosity without practical benefit. Use `Resource[ID]` +
-`ResourceBuilder` instead.
-
-Any `TypedResource` automatically satisfies `Resource[ID]` because
-`*handlers.Endpoint[Req, Resp]` implements `handlers.EndpointRuntime`:
-
-```go
-type UserResource struct{}
-// Implements TypedResource[string, ListReq, ListResp, ShowReq, ShowResp, ...]
-// Each method returns *handlers.Endpoint[Req, Resp] (not EndpointRuntime).
-```
+Custom operations are registered before `/{id}` routes to ensure correct
+precedence (e.g. `POST /parameters/reload` won't match `/{id}`).
 
 ## Step 5: Switch Frameworks
 
-v2 makes it trivial to switch frameworks. Just change the `Framework` field:
+Change the `Framework` field — all handlers, resources, and middleware
+work unchanged:
 
 ```go
-// Gin
-app.Bootstrap(app.Config{Framework: app.FrameworkGin})
-
-// Fiber
-app.Bootstrap(app.Config{Framework: app.FrameworkFiber})
-
-// chi (net/http)
-app.Bootstrap(app.Config{Framework: app.FrameworkChi})
+app.Bootstrap(app.Config{Framework: app.FrameworkGin})     // Gin
+app.Bootstrap(app.Config{Framework: app.FrameworkFiber})   // Fiber
+app.Bootstrap(app.Config{Framework: app.FrameworkChi})     // chi + net/http
+app.Bootstrap(app.Config{Framework: app.FrameworkNetHTTP}) // net/http
 ```
 
-All handlers, resources, and middleware work unchanged across frameworks.
+Route patterns use canonical `{id}` syntax; adapters translate to the
+framework-specific form (`:id` for Gin/Fiber, `{id}` for chi).
 
 ## Step 6: Add Sessions
 
@@ -355,24 +319,26 @@ store, err := session.NewCookieStore(session.CookieStoreConfig{
 if err != nil {
     log.Fatal(err)
 }
+
 application, err := app.Bootstrap(app.Config{
-    Framework:    app.FrameworkChi,
-    SessionStore: store,
-    SessionSecret: "your-signing-secret",
+    Framework:      app.FrameworkChi,
+    SessionStore:   store,
+    SessionSecret:  "your-signing-secret",
 })
 if err != nil {
     log.Fatal(err)
 }
 
-// Add session middleware to a route group
+// Add session middleware to a route group.
 api := application.Register("/api",
-    session.Middleware(application.Sessions, "session"),
+    app.SessionMiddleware(application.Sessions, "session"),
 )
 ```
 
 For configurable session save failure handling, use
-`session.MiddlewareWithConfig` with `SaveStrict` (default, propagates
-save failures) or `SaveBestEffort` (logs but does not propagate):
+`session.MiddlewareWithConfig` with `SaveStrict` (default, propagates save
+failures) or `SaveBestEffort` (logs via the telemetry sink but does not
+propagate):
 
 ```go
 session.MiddlewareWithConfig(session.MiddlewareConfig{
@@ -384,167 +350,173 @@ session.MiddlewareWithConfig(session.MiddlewareConfig{
 
 ### Typed Session Access
 
-Session values are stored as `any`. Use the generic `GetTyped[T]` and
-`SetTyped[T]` accessors for compile-time type safety (no runtime type
-assertions):
+The session is stored on the `request.Context` via a typed key. Retrieve
+it with `session.FromContext` and use the generic accessors for
+compile-time type safety:
 
 ```go
-// Store a typed value
-session.SetTyped(sess, "user_id", 42)
+func(ctx *request.Context, req struct{}) (ProfileResp, error) {
+    sess := session.FromContext(ctx)
+    if sess == nil {
+        return ProfileResp{}, errors.New("no session")
+    }
 
-// Retrieve with compile-time type checking
-userID, err := session.GetTyped[int](sess, "user_id")
-if err != nil {
-    // key not found or type mismatch
-    return err
+    session.SetTyped(sess, "visits", 1)
+
+    visits, err := session.GetTyped[int](sess, "visits")
+    if err != nil {
+        visits = 0
+    }
+    return ProfileResp{Visits: visits}, nil
 }
 ```
 
-The `RequestContext.Session` field is typed as `webFramework.SessionContext`
-(an interface), not `any`. You can call `Get`, `Set`, `Delete`, etc.
-directly without type-asserting to `*session.Session`.
-
 ## Step 7: Add Background Workers
 
-Workers run outside HTTP request contexts but still have full
-`webFramework.AddLog` observability. Each job receives a job-owned
-`webFramework.WebFramework` backed by a concurrency-safe
-`BackgroundParser`:
+Workers run outside HTTP request contexts but have full `telemetry.Sink`
+observability. Each job receives a `*workers.JobContext` with a job-scoped
+`*slog.Logger` and a `telemetry.Sink`:
 
 ```go
 import (
     "log/slog"
-    "github.com/hmmftg/requestCore/webFramework"
     "github.com/hmmftg/requestCore/v2/workers"
 )
 
-// Workers are created automatically by Bootstrap.
-// Submit jobs:
 err := application.Worker.Submit(context.Background(), workers.Job{
     Name: "send-email",
     Handler: func(ctx *workers.JobContext) error {
-        // webFramework.AddLog works inside worker jobs.
-        // Entries are collected and flushed as a transaction log.
-        webFramework.AddLog(ctx.WebFramework, webFramework.HandlerLogTag,
-            slog.String("recipient", email))
-
+        // ctx.Logger is a job-scoped *slog.Logger (TransactionSink-backed).
+        // ctx.Sink is the telemetry.Sink for lifecycle events.
+        ctx.Logger.Info("sending email", slog.String("recipient", email))
         // ... send email ...
-
         return nil
     },
     Options: workers.JobOptions{
-        MaxAttempts: 3,
+        MaxAttempts:    3,
+        InitialBackoff: 1 * time.Second,
     },
 })
 ```
 
-The worker pool emits mandatory `worker-<name>-req` (success) and
-`worker-<name>-req-failed` (failure) log entries after each attempt,
-including collected `AddLog` attributes, elapsed time, and sanitized
-error text.
+The worker pool emits `worker-<name>-req` (success) and
+`worker-<name>-req-failed` (failure) telemetry events after each attempt.
 
-## Observability: AddLog is Mandatory
+## Step 8: Periodic Background Tasks (Scheduler)
 
-The v2 handler lifecycle calls `webFramework.AddLog` for the handler
-title and path. For custom logging within handlers, continue using
-`webFramework.AddLog`:
-
-```go
-func MyHandler(req *MyReq, trx *handlers.HandlerRequest[MyReq, MyResp]) (MyResp, error) {
-    // Log to Splunk transaction pipeline
-    webFramework.AddLog(trx.W, "my-handler-step", slog.String("status", "processing"))
-
-    // ... business logic
-
-    // Log API calls (mandatory for external API calls)
-    webFramework.AddLog(trx.W, "my-api-call-req", slog.String("url", apiURL))
-    // ... make API call
-    webFramework.AddLog(trx.W, "my-api-call-req", slog.String("status", "success"))
-
-    return MyResp{}, nil
-}
-```
-
-**Never** replace `webFramework.AddLog` with `slog.*` or `log.*` —
-those do not flow into the Splunk transaction pipeline.
-
-## Using the CLI
-
-Generate scaffolding with the `requestcore` CLI:
-
-```bash
-# Build the CLI
-go build -o requestcore ./cmd/requestcore/cmd
-
-# Generate a handler
-./requestcore generate handler user-profile
-
-# Generate a resource (7 CRUD operations)
-./requestcore generate resource user
-
-# Generate middleware
-./requestcore generate middleware auth
-
-# Generate a new project
-./requestcore generate project my-app
-```
-
-## Coexistence with v1
-
-v1 and v2 can coexist in the same project. The `go.work` file manages both modules:
-
-```bash
-# From the requestCore repo root
-go work use . v2
-```
-
-This allows importing both v1 and v2 packages simultaneously during migration.
-
-When using `-mod=vendor`, both modules coexist in the `vendor/`
-directory. Run `go mod vendor` after adding both dependencies; Go
-handles the nested module correctly.
-
-## Periodic Background Tasks (Scheduler)
-
-For long-running poller loops (e.g. periodic data sync, health checks),
-use the `workers.Scheduler` instead of the job-submission
-`InProcessWorker`. The Scheduler runs a handler at fixed intervals with
-the same mandatory `AddLog` observability:
+For long-running poller loops, use `application.Scheduler` with a
+`workers.ScheduledJob`. Each tick receives a fresh `*workers.JobContext`
+with the same telemetry observability:
 
 ```go
 err := application.Scheduler.Schedule(workers.ScheduledJob{
-    Name:     "shahkar-analyze",
+    Name:     "data-sync",
     Interval: 60 * time.Second,
     Handler: func(ctx *workers.JobContext) error {
-        webFramework.AddLog(ctx.WebFramework, webFramework.HandlerLogTag,
-            slog.String("status", "polling"))
+        ctx.Logger.Info("syncing data")
         // ... poll and process ...
         return nil
     },
 })
 ```
 
-The Scheduler is shut down automatically by `app.Shutdown` alongside
-the HTTP server and worker pool.
+The scheduler is started by `StartWithContext` and shut down automatically
+by `app.Shutdown` alongside the HTTP server and worker pool.
+
+## Observability: telemetry.Sink
+
+The v2 kernel records request and transaction lifecycle events through
+`telemetry.Sink` (default `telemetry.SlogSink`), not `webFramework.AddLog`.
+The production slog handler ingests these records into Splunk, preserving
+the canonical `<operation>-req` / `<operation>-req-failed` outcome keys.
+
+The executor automatically emits start, success, and failure events for
+every request. Both success and failure paths are recorded: success events
+include the safely projected response (never raw bodies); failure events
+include the error. Request and response bodies, credentials, cookies, and
+secrets are never included in telemetry attributes.
+
+v2 packages must record lifecycle events through `telemetry.Sink`. Direct
+`slog.*` / `log.*` calls are only permitted for startup/diagnostic
+messages, not transaction tracing. `telemetry.NopSink` is acceptable in
+tests only — production executor/app construction defaults to an
+observable `SlogSink`.
+
+Configure a custom sink via `app.Config.TelemetrySink` or
+`endpoint.WithTelemetrySink`. v1 projects continue to use
+`webFramework.AddLog`; v2 projects use `telemetry.SlogSink` as the
+observability path.
+
+## Coexistence with v1
+
+v1 and v2 can coexist in the same project. The `go.work` file manages both
+modules:
+
+```bash
+# From the requestCore repo root
+go work use . v2
+```
+
+This allows importing both v1 and v2 packages simultaneously during
+migration. When using `-mod=vendor`, both modules coexist in the
+`vendor/` directory; run `go mod vendor` after adding both dependencies.
+
+## Graceful Shutdown
+
+Use `app.Shutdown` for coordinated HTTP + worker + scheduler shutdown:
+
+```go
+ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+defer cancel()
+if err := application.Shutdown(ctx); err != nil {
+    log.Fatal(err)
+}
+```
+
+`Shutdown` stops the HTTP server, then the worker pool, then the
+scheduler, returning the first non-nil error. `http.ErrServerClosed` is
+treated as a clean termination.
+
+## Deferred Tranche 5 Features
+
+The following capabilities are **not yet** part of the canonical v2 kernel
+and are deferred to Tranche 5. Until then, use v1 for these concerns or
+implement them in application code:
+
+- **Persistence** — typed persisters and the v1 `request` table audit
+  trail are not yet ported. The v2 executor lifecycle does not include a
+  persistence hook.
+- **Tracing** — OpenTelemetry trace propagation/integration is not yet
+  wired into the v2 executor. The `request.Context` carries `TraceID` but
+  no span management is provided.
+- **Initializers** — the `WithInitializer` typed pre-handler hook from
+  the alpha API is removed. Use `ctx.AddBeforeCommitHook` for pre-commit
+  work, or perform initialization inside the handler function.
+- **Finalizers** — the `WithFinalizer` typed always-run hook from the
+  alpha API is removed. Use `defer` inside the handler function, or wait
+  for the Tranche 5 finalizer hook.
+- **Recovery callbacks** — panic recovery with custom callbacks is not
+  yet exposed on the v2 executor. The scheduler recovers panics per tick;
+  the executor path will gain configurable recovery in Tranche 5.
+- **ID parsers** — `resources.ResourceBuilder.WithIDParser` exists for
+  custom ID parsing, but richer ID parser infrastructure (registry,
+  shared parsers) is deferred to Tranche 5.
 
 ## FAQ / Troubleshooting
 
 ### Go version requirement
 
-Both v1 and v2 now require **Go 1.27.0**. v2 uses generic methods on
-`*handlers.Endpoint[Req, Resp]` (e.g. `WithInitializer`, `WithFinalizer`,
-`WithPersistence`, `OKTyped[Resp]`), which require Go 1.27+. The v1
-module's `go.mod` was updated to 1.27.0 for consistency. If you cannot
-upgrade to Go 1.27, use the last v2 prerelease tag before the generics
-refactor.
+Both v1 and v2 require **Go 1.27.0**. v2 uses generic methods and
+type-parameterized constructors (`handlers.New[Req, Resp]`,
+`endpoint.Endpoint[Req, Resp]`) which require Go 1.27+.
 
-### API call infrastructure (issues.md capabilities)
+### API call infrastructure (v1 issues.md capabilities)
 
 The 9 capabilities described in the v1 `issues.md` file (base header
-builder, instrumented HTTP client, standardized API call logging,
-status code extraction, error normalization, timeout guards, retry
-framework, URL tracker-ID extraction, skip-pattern matching) are
-**already implemented** in the v1 module:
+builder, instrumented HTTP client, standardized API call logging, status
+code extraction, error normalization, timeout guards, retry framework,
+URL tracker-ID extraction, skip-pattern matching) are implemented in the
+v1 module:
 
 - `handlers.BuildBaseRemoteHeaders` — base header builder
 - `libCallApi.NewInstrumentedHTTPClient` — instrumented HTTP client
@@ -553,18 +525,17 @@ framework, URL tracker-ID extraction, skip-pattern matching) are
 - `handlers.NormalizeCallError` / `handlers.BuildTimeoutError` — error normalization
 - `libRetry` — retry framework with backoff and jitter
 
-These are available to v2 consumers via the v1 import since v2
-delegates to v1 for infrastructure.
+These are available to v2 consumers via the v1 import. A v2-native API
+call layer is deferred to a later tranche.
 
 ### Worker audit-trail limitation
 
 Worker jobs run outside HTTP request contexts and do not automatically
-insert rows into the `request` persistence table. If your worker jobs
-need audit-trail persistence (the same `request` table inserts that
-HTTP handlers get), call `core.Responder()` or your persistence layer
-manually inside the job handler. This is a known design tradeoff:
-worker observability is via `webFramework.AddLog` (Splunk pipeline),
-not via the persistence audit trail.
+insert rows into the v1 `request` persistence table. Worker observability
+is via `telemetry.Sink` (slog → Splunk), not via the persistence audit
+trail. If your worker jobs need audit-trail persistence, call your
+persistence layer manually inside the job handler. This is a known design
+tradeoff that will be revisited in Tranche 5.
 
 ### No tags published yet
 
@@ -576,14 +547,16 @@ Actions tab (manual dispatch) to create the first prerelease tag.
 ## Checklist
 
 - [ ] Add v2 dependency (pin to a specific prerelease tag)
-- [ ] Bootstrap v2 App with legacy core
-- [ ] Migrate critical handlers to v2 typed endpoints
-- [ ] Register routes via v2 `Router`
-- [ ] Migrate CRUD endpoints to `ResourceBuilder` + `Resource[ID]` (not TypedResource)
-- [ ] Add custom operations for non-CRUD actions (e.g. Reload)
-- [ ] Add session middleware if needed
-- [ ] Add background workers (InProcessWorker for jobs, Scheduler for pollers)
-- [ ] Verify `webFramework.AddLog` calls in all handlers and worker jobs
+- [ ] Bootstrap v2 App with `app.Bootstrap` (no legacy core/handler)
+- [ ] Migrate handlers to the canonical signature `func(ctx *request.Context, req Req) (Resp, error)`
+- [ ] Register routes via `handlers.RegisterEndpoint` / `*Endpoint` constructors
+- [ ] Migrate CRUD endpoints to `ResourceBuilder` + `Resource[ID]`
+- [ ] Add custom operations for non-CRUD actions (e.g. Reload) via `WithCustom`
+- [ ] Map domain errors to `response.Problem` via `response.MapperRegistry`
+- [ ] Add session middleware (`app.SessionMiddleware`) if needed
+- [ ] Use `session.FromContext` + `GetTyped[T]` / `SetTyped[T]` for session access
+- [ ] Add background workers (`application.Worker.Submit`) and schedulers
+- [ ] Verify `telemetry.Sink` is configured (default `SlogSink`); do not use `webFramework.AddLog` in v2 code
 - [ ] Use `app.Shutdown` for coordinated HTTP + worker + scheduler shutdown
 - [ ] Run cross-framework conformance tests
 - [ ] Update CI to test v2 module

@@ -1,71 +1,69 @@
 // Package requestcore is the v2 module of requestCore.
 //
-// v2 has no released tags and is under active redesign. The current API
-// is an unreleased alpha. A breaking redesign is in progress to make v2
-// a typed, framework-neutral HTTP toolkit. v1 (the root module) remains
-// supported and stable.
+// v2 is a typed, framework-neutral HTTP toolkit built on a canonical
+// kernel. It requires Go 1.22+ for the net/http ServeMux pattern
+// matching and Go 1.27+ for generic methods on typed endpoints.
 //
-// The current alpha is a generics-first, framework-agnostic HTTP application
-// toolkit that builds on the root [github.com/hmmftg/requestCore] module.
-// It requires Go 1.27+ for generic methods on [handlers.Endpoint].
+// # Architecture
+//
+// The v2 kernel is organized as a layered DAG:
+//
+//   - request — stdlib-only request state, lazy body source, typed
+//     values, response metadata, before-commit hooks.
+//   - telemetry — stdlib-only event/sink contracts and slog sink.
+//   - binding, validation, operation, renderers — leaf capabilities.
+//   - response — Problems (RFC 9457), mapper registry, commit
+//     coordinator, no-content/redirect helpers.
+//   - endpoint — typed endpoint and executor; the canonical lifecycle
+//     (bind → validate → execute → encode → commit → observe).
+//   - routing — handler/middleware/router and response-transport
+//     contracts; imports request only.
+//   - adapter — adapts typed endpoints and mapped errors to routing
+//     handlers.
+//   - libGin, libFiber, libChi, libNetHttp — native context/transport
+//     construction for each framework.
+//   - handlers — convenience constructors and the non-generic runtime
+//     endpoint boundary used by resources.
+//   - resources, session, workers, app, testingtools — high-level
+//     packages with no v1 imports.
 //
 // # Core Features
 //
-//   - **Generic typed endpoints** — [handlers.Endpoint[Req, Resp]] flows
-//     request and response types through the entire lifecycle (parse,
-//     initialize, handle, render, finalize) without type erasure.
-//     Lifecycle hooks ([handlers.Endpoint.WithInitializer],
-//     [handlers.Endpoint.WithFinalizer],
-//     [handlers.Endpoint.WithPersistence]) are fully typed methods —
-//     no reflection, no runtime type-mismatch panics.
+//   - **Typed endpoints** — [handlers.Endpoint[Req, Resp]] wraps
+//     [endpoint.Endpoint[Req, Resp]] with a canonical handler
+//     signature: func(*request.Context, Req) (Resp, error).
 //
-//   - **Generic resources** — [resources.Resource[ID]] defines 7 CRUD
-//     operations where ID is constrained to [cmp.Ordered] (string, int,
-//     int64, etc.). The recommended path for v2 migration is
-//     [resources.Resource[ID]] paired with [resources.ResourceBuilder[ID]]
-//     for fluent registration. [resources.TypedResource] (14 type
-//     parameters) is an advanced alternative for cases requiring the
-//     strictest per-operation type guarantees — it is overkill for
-//     simple CRUD + custom resources.
+//   - **Transport-aware routing** — [routing.Handler] receives
+//     (*request.Context, routing.Transport), separating request state
+//     from response writing.
 //
-//   - **Typed session access** — [session.GetTyped[T]] and
-//     [session.SetTyped[T]] provide compile-time type-safe session value
-//     access. The [webFramework.SessionContext] and
-//     [webFramework.FlashContext] interfaces eliminate `any` type
-//     assertions in handlers.
+//   - **RFC 9457 Problems** — [response.Problem] and
+//     [response.MapperRegistry] provide structured error responses
+//     with a frozen, immutable registry.
 //
-//   - **Generic response helpers** — [response.Handler.OKTyped[Resp]]
-//     and [response.Handler.OKWithStatusTyped[Resp]] render typed
-//     responses without `any` parameters.
+//   - **Telemetry via slog** — [telemetry.Sink] and
+//     [telemetry.SlogSink] replace v1's webFramework.AddLog for the
+//     Splunk transaction pipeline.
 //
-//   - **Framework-agnostic routing** — [routing.Router] and
-//     [routing.RouteGroup] interfaces work across Gin, Fiber, chi, and
-//     net/http via adapter packages ([libGin], [libFiber], [libChi],
-//     [libNetHttp]).
+//   - **Framework-agnostic** — [routing.Router] and
+//     [routing.RouteGroup] work across Gin, Fiber, chi, and net/http
+//     via adapter packages.
 //
 //   - **Pluggable renderers** — [renderers.Renderer] interface with
 //     built-in JSON, XML, text, and CSV renderers.
 //
-//   - **Error handler registry** — [response.Registry] with per-status
-//     handlers and legacy fallback.
+//   - **Sessions** — [session.Manager] with cookie store, flash
+//     messages, and typed session access via [session.FromContext].
 //
-//   - **Bounded worker pool** — [workers.InProcessWorker] with retry,
-//     tracing, and mandatory [webFramework.AddLog] observability.
+//   - **Workers and scheduler** — [workers.InProcessWorker] and
+//     [workers.Scheduler] with telemetry-based observability.
 //
-//   - **Scheduler** — [workers.Scheduler] for periodic background tasks.
+//   - **Application bootstrap** — [app.Bootstrap] composes the
+//     executor, router, worker pool, scheduler, and session manager
+//     with Problem-based error handling.
 //
-//   - **CLI code generators** — `requestcore` CLI generates handlers,
-//     resources, middleware, and project scaffolding.
+// # Migration from v1
 //
-// # Module Structure
-//
-// The v2 module lives in the v2/ directory and imports the root module
-// for delegation to existing query, persistence, response, logging, and
-// tracing infrastructure. The root module never imports v2.
-//
-// See [MIGRATION.md] for the v1-to-v2 migration guide and [README.md]
-// for the v2 module overview.
-//
-// [MIGRATION.md]: https://github.com/hmmftg/requestCore/blob/main/v2/MIGRATION.md
-// [README.md]: https://github.com/hmmftg/requestCore/blob/main/v2/README.md
+// See MIGRATION.md for a detailed migration guide. The v1 module
+// (github.com/hmmftg/requestCore) remains supported and stable.
 package requestcore
