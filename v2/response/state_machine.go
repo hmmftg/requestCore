@@ -82,15 +82,14 @@ func (s State) String() string {
 // CommitMachine implements the formal response commit state machine.
 // It is safe for concurrent use.
 //
-// CommitMachine is additive to the existing response package and does
-// not replace the existing webFramework.CommitState. It will be wired
-// into the canonical response path in Tranche 4.
+// CommitMachine is the canonical response commit state machine. It is
+// wired into the canonical response path via CommitCoordinator.
 type CommitMachine struct {
-	mu        sync.RWMutex
-	state     State
-	status    int
-	hooksRan  bool
-	failErr   error
+	mu       sync.RWMutex
+	state    State
+	status   int
+	hooksRan bool
+	failErr  error
 }
 
 // NewCommitMachine creates a CommitMachine in StateOpen.

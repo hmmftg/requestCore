@@ -229,10 +229,10 @@ func TestProblem_WriteTo(t *testing.T) {
 	}
 }
 
-func TestProblem_IntegratesWithDefaultStatusResolver(t *testing.T) {
+func TestProblem_HTTPStatusInterface(t *testing.T) {
 	p := NewProblem(418, "I'm a teapot")
-	status := DefaultStatusResolver(p)
+	status := p.HTTPStatus()
 	if status != 418 {
-		t.Fatalf("expected 418 from DefaultStatusResolver, got %d", status)
+		t.Fatalf("expected 418 from HTTPStatus, got %d", status)
 	}
 }

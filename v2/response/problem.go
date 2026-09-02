@@ -26,9 +26,9 @@ type Violation struct {
 // Problem implements RFC 9457 Problem Details for HTTP APIs. It
 // satisfies the error, Unwrap, and HTTPStatus interfaces.
 //
-// Problem is additive to the existing response package and does not
-// replace ErrorResponse. It implements HTTPStatus() int so it
-// integrates with the existing DefaultStatusResolver.
+// Problem is additive to the existing response package. It implements
+// HTTPStatus() int so it integrates with status resolution via the
+// mapper registry.
 //
 // Causes are never serialized by default. Unknown errors always become
 // sanitized 500 problems via the mapper registry.
@@ -110,7 +110,7 @@ func (p *Problem) Unwrap() error {
 }
 
 // HTTPStatus returns the HTTP status code from the Problem. This
-// integrates with DefaultStatusResolver.
+// integrates with the mapper registry's status resolution.
 func (p *Problem) HTTPStatus() int {
 	return p.Status
 }

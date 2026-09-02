@@ -1,19 +1,14 @@
 // Package requestcore_test contains architecture validation tests that
-// enforce the package dependency DAG and track v1 root module imports.
+// enforce the package dependency DAG and verify that no v2 package
+// imports the v1 root module.
 //
-// In Tranche 0, this test ran in inventory mode. Starting in Tranche 1,
-// newly introduced canonical kernel packages (request, operation,
-// telemetry, request/faketransport) are added to v1FreePackages and
-// forbidden from importing v1. Later tranches add more packages as
-// they are introduced.
+// Phase 11 removes all remaining v1 imports and dead alpha code. After
+// Phase 11, no v2 package may import any v1 package
+// (github.com/hmmftg/requestCore/*). The v2 module is self-contained.
 //
 // Run:
 //
 //	go test -run TestArchitecture -v ./...
-//
-// The V1Imports test fails if a package in v1FreePackages imports v1.
-// The DAG test verifies that kernel packages only import allowed
-// dependencies.
 package requestcore_test
 
 import (
@@ -24,66 +19,15 @@ import (
 	"testing"
 )
 
-// v1ModulePath is the v1 root module path that canonical v2 packages
-// must not import. Only compat/* packages are allowed to import v1.
+// v1ModulePath is the v1 root module path that no v2 package may import.
 const v1ModulePath = "github.com/hmmftg/requestCore"
 
 // v2ModulePath is the v2 module path.
 const v2ModulePath = "github.com/hmmftg/requestCore/v2"
 
-// v1FreePackages lists v2 packages that must NOT import the v1 root
-// module. Tranche 1 adds the new kernel packages here. Later tranches
-// add more canonical packages as they are introduced.
-//
-// internal/nextadapter is intentionally NOT in this list: it is the
-// narrow bridge package permitted to import root webFramework for
-// AddLog forwarding. See v1BridgeAllowlist.
-var v1FreePackages = map[string]bool{
-	"github.com/hmmftg/requestCore/v2/request":               true,
-	"github.com/hmmftg/requestCore/v2/request/faketransport": true,
-	"github.com/hmmftg/requestCore/v2/operation":             true,
-	"github.com/hmmftg/requestCore/v2/telemetry":             true,
-	"github.com/hmmftg/requestCore/v2/binding":               true,
-	"github.com/hmmftg/requestCore/v2/validation":            true,
-	"github.com/hmmftg/requestCore/v2/internal/endpoint":     true,
-	// Tranche 4 will add: adapter/*, routing, handlers, app
-}
-
-// v1BridgeAllowlist lists v2 packages permitted to import v1 root
-// packages, along with the exact set of v1 imports they may use.
-// internal/nextadapter is the only bridge package and may import only
-// root webFramework for AddLog forwarding.
-var v1BridgeAllowlist = map[string]map[string]bool{
-	"github.com/hmmftg/requestCore/v2/internal/nextadapter": {
-		"github.com/hmmftg/requestCore/webFramework": true,
-	},
-}
-
-// knownV1Importers lists pre-existing v2-alpha packages that already
-// imported v1 before Tranche 3. These are documented but not yet
-// constrained; Tranche 4 will migrate them to the new kernel and
-// remove them from this list. New packages must NOT be added here —
-// they must use v1BridgeAllowlist or remain v1-free.
-var knownV1Importers = map[string]bool{
-	"github.com/hmmftg/requestCore/v2":                 true,
-	"github.com/hmmftg/requestCore/v2/app":             true,
-	"github.com/hmmftg/requestCore/v2/examples/simple": true,
-	"github.com/hmmftg/requestCore/v2/handlers":        true,
-	"github.com/hmmftg/requestCore/v2/libChi":          true,
-	"github.com/hmmftg/requestCore/v2/libFiber":        true,
-	"github.com/hmmftg/requestCore/v2/libGin":          true,
-	"github.com/hmmftg/requestCore/v2/libNetHttp":      true,
-	"github.com/hmmftg/requestCore/v2/resources":       true,
-	"github.com/hmmftg/requestCore/v2/response":        true,
-	"github.com/hmmftg/requestCore/v2/session":         true,
-	"github.com/hmmftg/requestCore/v2/testingtools":    true,
-	"github.com/hmmftg/requestCore/v2/webFramework":    true,
-	"github.com/hmmftg/requestCore/v2/workers":         true,
-}
-
 // stdlibOnlyPackages lists v2 packages that must import only Go
 // standard library packages (no v1, no v2 sub-packages, no third-party).
-// This enforces the "stdlib-only" constraint on the request package.
+// This enforces the "stdlib-only" constraint on the kernel packages.
 var stdlibOnlyPackages = map[string]bool{
 	"github.com/hmmftg/requestCore/v2/request":   true,
 	"github.com/hmmftg/requestCore/v2/operation": true,
@@ -139,8 +83,6 @@ var allowedDeps = map[string]map[string]bool{
 		"github.com/hmmftg/requestCore/v2/request":           true,
 		"github.com/hmmftg/requestCore/v2/routing":           true,
 		"github.com/hmmftg/requestCore/v2/telemetry":         true,
-		"github.com/hmmftg/requestCore/v2/webFramework":      true,
-		"github.com/hmmftg/requestCore/webFramework":         true, // single bridge exception
 	},
 }
 
@@ -150,13 +92,9 @@ type goListPackage struct {
 	Imports    []string
 }
 
-// TestArchitecture_V1Imports inventories which v2 packages import the
-// v1 root module and enforces that:
-//  1. Packages in v1FreePackages do not import v1.
-//  2. Bridge packages in v1BridgeAllowlist only import their allowed
-//     v1 packages.
-//  3. No package outside v1FreePackages and v1BridgeAllowlist imports
-//     v1 (new v1 imports must be explicitly allowed).
+// TestArchitecture_V1Imports verifies that NO v2 package imports the
+// v1 root module. After Phase 11, the v2 module is fully self-contained
+// and must not depend on github.com/hmmftg/requestCore (v1).
 func TestArchitecture_V1Imports(t *testing.T) {
 	pkgs, err := listV2Packages()
 	if err != nil {
@@ -168,37 +106,17 @@ func TestArchitecture_V1Imports(t *testing.T) {
 		V1Import string
 	}
 	var violations []violation
-	var bridgeViolations []violation
-	var unlistedViolations []violation
 	inventory := make(map[string][]string)
 
 	for _, pkg := range pkgs {
 		v1Imports := filterV1Imports(pkg.Imports)
 		if len(v1Imports) > 0 {
 			inventory[pkg.ImportPath] = v1Imports
-			if v1FreePackages[pkg.ImportPath] {
-				for _, imp := range v1Imports {
-					violations = append(violations, violation{
-						Pkg:      pkg.ImportPath,
-						V1Import: imp,
-					})
-				}
-			} else if allowed, isBridge := v1BridgeAllowlist[pkg.ImportPath]; isBridge {
-				for _, imp := range v1Imports {
-					if !allowed[imp] {
-						bridgeViolations = append(bridgeViolations, violation{
-							Pkg:      pkg.ImportPath,
-							V1Import: imp,
-						})
-					}
-				}
-			} else if !knownV1Importers[pkg.ImportPath] {
-				for _, imp := range v1Imports {
-					unlistedViolations = append(unlistedViolations, violation{
-						Pkg:      pkg.ImportPath,
-						V1Import: imp,
-					})
-				}
+			for _, imp := range v1Imports {
+				violations = append(violations, violation{
+					Pkg:      pkg.ImportPath,
+					V1Import: imp,
+				})
 			}
 		}
 	}
@@ -220,17 +138,7 @@ func TestArchitecture_V1Imports(t *testing.T) {
 
 	if len(violations) > 0 {
 		for _, v := range violations {
-			t.Errorf("package %s is in v1FreePackages but imports v1: %s", v.Pkg, v.V1Import)
-		}
-	}
-	if len(bridgeViolations) > 0 {
-		for _, v := range bridgeViolations {
-			t.Errorf("package %s is a bridge but imports a non-allowed v1 package: %s", v.Pkg, v.V1Import)
-		}
-	}
-	if len(unlistedViolations) > 0 {
-		for _, v := range unlistedViolations {
-			t.Errorf("package %s imports v1 but is not in v1FreePackages or v1BridgeAllowlist: %s", v.Pkg, v.V1Import)
+			t.Errorf("package %s imports v1: %s", v.Pkg, v.V1Import)
 		}
 	}
 }
