@@ -3,13 +3,12 @@ package session
 import (
 	"context"
 	"errors"
-	"log/slog"
 	"net/http"
-	"strings"
 	"testing"
 
-	v2wf "github.com/hmmftg/requestCore/v2/webFramework"
-	legacy "github.com/hmmftg/requestCore/webFramework"
+	"github.com/hmmftg/requestCore/v2/request"
+	"github.com/hmmftg/requestCore/v2/request/faketransport"
+	"github.com/hmmftg/requestCore/v2/routing"
 )
 
 // failingStore is a Store that always returns an error on Save.
@@ -25,26 +24,57 @@ func (failingStore) Delete(_ context.Context, _ string) error {
 	return nil
 }
 
-// runMiddleware executes the session middleware with the given config
-// against a fake request context and returns the result.
-func runMiddleware(t *testing.T, cfg MiddlewareConfig, makeDirty bool, cookieValue string) (*v2wf.RequestContext, error) {
-	t.Helper()
-	parser := v2wf.NewFakeParserV2()
-	parser.SetCookie(&http.Cookie{Name: cfg.CookieName, Value: cookieValue})
+// testTransport is a minimal routing.Transport implementation that
+// delegates response writes to the fake transport's recorder. The
+// session middleware does not write the response itself (it only
+// mutates ctx.Response() and registers before-commit hooks), so this
+// transport is primarily passed through to the inner handler.
+type testTransport struct {
+	ft *faketransport.FakeTransport
+}
 
-	commit := &v2wf.CommitState{}
-	parser.SetCommitState(commit)
-
-	ctx := &v2wf.RequestContext{
-		Parser: parser,
+func (t *testTransport) WriteResponse(status int, contentType string, headers http.Header, body []byte) error {
+	if t.ft.Committed() {
+		return nil
 	}
-	ctx.SetCommitState(commit)
-	ctx.Context = context.Background()
+	rec := t.ft.Recorder()
+	for k, vs := range headers {
+		for _, v := range vs {
+			rec.Header().Add(k, v)
+		}
+	}
+	if contentType != "" {
+		rec.Header().Set("Content-Type", contentType)
+	}
+	rec.WriteHeader(status)
+	_, _ = rec.Write(body)
+	t.ft.MarkCommitted()
+	return nil
+}
+
+func (t *testTransport) Committed() bool {
+	return t.ft.Committed()
+}
+
+// runMiddleware executes the session middleware with the given config
+// against a fake request.Context and transport, and returns the
+// context and handler error. When makeDirty is true the inner handler
+// marks the session dirty before running before-commit hooks (which
+// simulates the response commit path that persists the session cookie).
+func runMiddleware(t *testing.T, cfg MiddlewareConfig, makeDirty bool, cookieValue string) (*request.Context, error) {
+	t.Helper()
+
+	var opts []faketransport.Option
+	if cookieValue != "" {
+		opts = append(opts, faketransport.WithCookie(cfg.CookieName, cookieValue))
+	}
+	ft := faketransport.New(http.MethodGet, "/", opts...)
+	ctx := ft.Context()
 
 	mw := MiddlewareWithConfig(cfg)
-	handler := mw(func(c *v2wf.RequestContext) error {
-		if makeDirty && c.Session != nil {
-			if sess, ok := c.Session.(*Session); ok {
+	handler := mw(func(c *request.Context, _ routing.Transport) error {
+		if makeDirty {
+			if sess := FromContext(c); sess != nil {
 				sess.Set("key", "value")
 			}
 		}
@@ -53,7 +83,7 @@ func runMiddleware(t *testing.T, cfg MiddlewareConfig, makeDirty bool, cookieVal
 		return c.RunBeforeCommitHooks()
 	})
 
-	err := handler(ctx)
+	err := handler(ctx, &testTransport{ft: ft})
 	return ctx, err
 }
 
@@ -76,16 +106,16 @@ func TestMiddleware_CleanSessionNoSave(t *testing.T) {
 	if err != nil {
 		t.Fatalf("middleware: %v", err)
 	}
-	if ctx.Session == nil {
-		t.Fatal("expected session to be set")
+	if sess := FromContext(ctx); sess == nil {
+		t.Fatal("expected session to be set on context")
 	}
-	if ctx.Flash == nil {
-		t.Fatal("expected flash to be set")
+	if flash := FlashFromContext(ctx); flash == nil {
+		t.Fatal("expected flash to be set on context")
 	}
 }
 
 // TestMiddleware_DirtySessionSaves verifies that a dirty session
-// triggers a save and the cookie is set on the response.
+// triggers a save and the Set-Cookie header is set on the response.
 func TestMiddleware_DirtySessionSaves(t *testing.T) {
 	store, err := NewCookieStore(CookieStoreConfig{
 		SecretKey: []byte("0123456789abcdef0123456789abcdef0123456789abcdef"),
@@ -103,12 +133,12 @@ func TestMiddleware_DirtySessionSaves(t *testing.T) {
 	if err != nil {
 		t.Fatalf("middleware: %v", err)
 	}
-	if ctx.Session == nil {
-		t.Fatal("expected session to be set")
+	if sess := FromContext(ctx); sess == nil {
+		t.Fatal("expected session to be set on context")
 	}
-	// The cookie should have been set via SetCookie on the parser.
-	if ctx.Parser == nil {
-		t.Fatal("expected parser to be set")
+	setCookies := ctx.Response().Header()["Set-Cookie"]
+	if len(setCookies) == 0 {
+		t.Fatal("expected Set-Cookie header to be set on response after dirty save")
 	}
 }
 
@@ -148,23 +178,19 @@ func TestMiddleware_BestEffortModeSwallowsSaveFailure(t *testing.T) {
 func TestMiddleware_DefaultIsStrict(t *testing.T) {
 	manager := NewManager(failingStore{})
 
-	parser := v2wf.NewFakeParserV2()
-	commit := &v2wf.CommitState{}
-	parser.SetCommitState(commit)
-	ctx := &v2wf.RequestContext{Parser: parser}
-	ctx.SetCommitState(commit)
-	ctx.Context = context.Background()
+	ft := faketransport.New(http.MethodGet, "/")
+	ctx := ft.Context()
 
 	mw := Middleware(manager, "sess")
-	handler := mw(func(c *v2wf.RequestContext) error {
-		if sess, ok := c.Session.(*Session); ok {
+	handler := mw(func(c *request.Context, _ routing.Transport) error {
+		if sess := FromContext(c); sess != nil {
 			sess.Set("key", "value")
 		}
 		// Simulate the response commit path.
 		return c.RunBeforeCommitHooks()
 	})
 
-	err := handler(ctx)
+	err := handler(ctx, &testTransport{ft: ft})
 	if err == nil {
 		t.Fatal("expected default middleware to be strict and propagate save failure")
 	}
@@ -181,38 +207,33 @@ func TestMiddleware_FlashPersistence(t *testing.T) {
 	}
 	manager := NewManager(store)
 
-	parser := v2wf.NewFakeParserV2()
-	commit := &v2wf.CommitState{}
-	parser.SetCommitState(commit)
-	ctx := &v2wf.RequestContext{Parser: parser}
-	ctx.SetCommitState(commit)
-	ctx.Context = context.Background()
+	ft := faketransport.New(http.MethodGet, "/")
+	ctx := ft.Context()
 
 	mw := Middleware(manager, "sess")
-	handler := mw(func(c *v2wf.RequestContext) error {
+	handler := mw(func(c *request.Context, _ routing.Transport) error {
 		// Add flash data and mark session dirty.
-		if flash, ok := c.Flash.(*Flash); ok {
+		if flash := FlashFromContext(c); flash != nil {
 			flash.Add("message", "hello")
 		}
-		if sess, ok := c.Session.(*Session); ok {
+		if sess := FromContext(c); sess != nil {
 			sess.Set("trigger", "dirty")
 		}
 		// Run hooks to trigger flash persistence + session save.
 		return c.RunBeforeCommitHooks()
 	})
 
-	if err := handler(ctx); err != nil {
+	if err := handler(ctx, &testTransport{ft: ft}); err != nil {
 		t.Fatalf("middleware: %v", err)
 	}
 
 	// Verify flash was saved to session (flashKey is "_flash").
-	if sess, ok := ctx.Session.(*Session); ok {
-		flashData := sess.Get("_flash")
-		if flashData == nil {
-			t.Fatal("expected flash data to be persisted in session")
-		}
-	} else {
-		t.Fatal("expected *Session type assertion to succeed")
+	sess := FromContext(ctx)
+	if sess == nil {
+		t.Fatal("expected session to be set on context")
+	}
+	if flashData := sess.Get(flashKey); flashData == nil {
+		t.Fatal("expected flash data to be persisted in session")
 	}
 }
 
@@ -236,68 +257,119 @@ func TestMiddleware_LoadErrorCreatesFreshSession(t *testing.T) {
 	if err != nil {
 		t.Fatalf("middleware: %v", err)
 	}
-	if ctx.Session == nil {
+	sess := FromContext(ctx)
+	if sess == nil {
 		t.Fatal("expected fresh session on load error")
 	}
 	// The fresh session should have an ID.
-	if sess, ok := ctx.Session.(*Session); ok {
-		if sess.ID() == "" {
-			t.Fatal("expected fresh session to have an ID")
-		}
-	} else {
-		t.Fatal("expected *Session type assertion to succeed")
+	if sess.ID() == "" {
+		t.Fatal("expected fresh session to have an ID")
 	}
 }
 
-// TestMiddleware_LoadErrorEmitsAddLog verifies that a session load failure
-// emits a mandatory "session-load-failed" AddLog entry via the legacy
-// parser pipeline, and that the raw cookie token is never logged.
-func TestMiddleware_LoadErrorEmitsAddLog(t *testing.T) {
-	manager := NewManager(failingStore{})
-
-	parser := v2wf.NewFakeParserV2()
-	parser.Cookies["sess"] = "invalid-token"
-
-	commit := &v2wf.CommitState{}
-	parser.SetCommitState(commit)
-
-	ctx := &v2wf.RequestContext{
-		Parser: parser,
-		Legacy: legacy.WebFramework{Parser: parser},
+// TestMiddleware_MultipleSetCookieHeaders verifies that multiple
+// Set-Cookie headers added to the response are preserved alongside the
+// session cookie set by the middleware's before-commit hook.
+func TestMiddleware_MultipleSetCookieHeaders(t *testing.T) {
+	store, err := NewCookieStore(CookieStoreConfig{
+		SecretKey: []byte("0123456789abcdef0123456789abcdef0123456789abcdef"),
+	})
+	if err != nil {
+		t.Fatalf("NewCookieStore: %v", err)
 	}
-	ctx.SetCommitState(commit)
-	ctx.Context = context.Background()
+	manager := NewManager(store)
 
-	mw := MiddlewareWithConfig(MiddlewareConfig{
-		Manager:         manager,
-		CookieName:      "sess",
-		SaveFailureMode: SaveStrict,
-	})
-	handler := mw(func(c *v2wf.RequestContext) error {
-		return nil
+	ft := faketransport.New(http.MethodGet, "/")
+	ctx := ft.Context()
+
+	mw := Middleware(manager, "sess")
+	handler := mw(func(c *request.Context, _ routing.Transport) error {
+		// Add an extra Set-Cookie before the commit hooks run.
+		c.Response().AddHeader("Set-Cookie", "other=1; Path=/")
+		// Mark the session dirty so the middleware also sets a cookie.
+		if sess := FromContext(c); sess != nil {
+			sess.Set("key", "value")
+		}
+		return c.RunBeforeCommitHooks()
 	})
 
-	if err := handler(ctx); err != nil {
+	if err := handler(ctx, &testTransport{ft: ft}); err != nil {
 		t.Fatalf("middleware: %v", err)
 	}
 
-	// Verify the session-load-failed AddLog entry was emitted.
-	key := "LOG_ARRAY_session-load-failed"
-	v := parser.GetLocal(key)
-	if v == nil {
-		t.Fatalf("expected AddLog entry for %q, got nil", key)
+	setCookies := ctx.Response().Header()["Set-Cookie"]
+	if len(setCookies) < 2 {
+		t.Fatalf("expected at least 2 Set-Cookie headers to be preserved, got %d: %v", len(setCookies), setCookies)
 	}
-	arr, ok := v.([]slog.Attr)
-	if !ok {
-		t.Fatalf("expected []slog.Attr, got %T", v)
+}
+
+// TestMiddleware_FromContext verifies that session.FromContext returns
+// the session stored by the middleware.
+func TestMiddleware_FromContext(t *testing.T) {
+	store, err := NewCookieStore(CookieStoreConfig{
+		SecretKey: []byte("0123456789abcdef0123456789abcdef0123456789abcdef"),
+	})
+	if err != nil {
+		t.Fatalf("NewCookieStore: %v", err)
 	}
-	if len(arr) == 0 {
-		t.Fatal("expected at least one attr in session-load-failed array")
+	manager := NewManager(store)
+
+	ft := faketransport.New(http.MethodGet, "/")
+	ctx := ft.Context()
+
+	var seen *Session
+	mw := Middleware(manager, "sess")
+	handler := mw(func(c *request.Context, _ routing.Transport) error {
+		seen = FromContext(c)
+		return nil
+	})
+
+	if err := handler(ctx, &testTransport{ft: ft}); err != nil {
+		t.Fatalf("middleware: %v", err)
 	}
-	// Verify the raw cookie token is never present in the logged attrs.
-	for _, a := range arr {
-		if strings.Contains(a.Value.String(), "invalid-token") {
-			t.Fatalf("raw cookie token must not be logged, found in attr %s: %s", a.Key, a.Value.String())
-		}
+	if seen == nil {
+		t.Fatal("expected FromContext to return a non-nil session inside the handler")
+	}
+	if seen.ID() == "" {
+		t.Fatal("expected session from FromContext to have an ID")
+	}
+	// FromContext on the outer context should also resolve after the
+	// middleware has stored the session.
+	if FromContext(ctx) == nil {
+		t.Fatal("expected FromContext to return a non-nil session after middleware")
+	}
+}
+
+// TestMiddleware_FlashFromContext verifies that session.FlashFromContext
+// returns the flash stored by the middleware.
+func TestMiddleware_FlashFromContext(t *testing.T) {
+	store, err := NewCookieStore(CookieStoreConfig{
+		SecretKey: []byte("0123456789abcdef0123456789abcdef0123456789abcdef"),
+	})
+	if err != nil {
+		t.Fatalf("NewCookieStore: %v", err)
+	}
+	manager := NewManager(store)
+
+	ft := faketransport.New(http.MethodGet, "/")
+	ctx := ft.Context()
+
+	var seen *Flash
+	mw := Middleware(manager, "sess")
+	handler := mw(func(c *request.Context, _ routing.Transport) error {
+		seen = FlashFromContext(c)
+		return nil
+	})
+
+	if err := handler(ctx, &testTransport{ft: ft}); err != nil {
+		t.Fatalf("middleware: %v", err)
+	}
+	if seen == nil {
+		t.Fatal("expected FlashFromContext to return a non-nil flash inside the handler")
+	}
+	// FlashFromContext on the outer context should also resolve after
+	// the middleware has stored the flash.
+	if FlashFromContext(ctx) == nil {
+		t.Fatal("expected FlashFromContext to return a non-nil flash after middleware")
 	}
 }

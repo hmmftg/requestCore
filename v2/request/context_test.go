@@ -262,3 +262,38 @@ var errBoom = &testError{"boom"}
 type testError struct{ msg string }
 
 func (e *testError) Error() string { return e.msg }
+
+func TestTypedKey_SetGet(t *testing.T) {
+	ctx := NewContext(context.Background())
+	key1 := NewTypedKey()
+	key2 := NewTypedKey()
+
+	ctx.Set(key1, "hello")
+	ctx.Set(key2, 42)
+
+	v1, ok1 := ctx.Get(key1)
+	if !ok1 || v1 != "hello" {
+		t.Fatalf("expected key1=hello, got %v ok=%v", v1, ok1)
+	}
+
+	v2, ok2 := ctx.Get(key2)
+	if !ok2 || v2 != 42 {
+		t.Fatalf("expected key2=42, got %v ok=%v", v2, ok2)
+	}
+
+	// Different keys should not collide.
+	if _, ok := ctx.Get(NewTypedKey()); ok {
+		t.Fatal("expected new key to not exist")
+	}
+}
+
+func TestTypedKey_UniqueIDs(t *testing.T) {
+	keys := make(map[uint64]bool)
+	for i := 0; i < 100; i++ {
+		k := NewTypedKey()
+		if keys[k.id] {
+			t.Fatalf("duplicate key ID: %d", k.id)
+		}
+		keys[k.id] = true
+	}
+}

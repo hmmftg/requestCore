@@ -104,15 +104,10 @@ func main() {
 	err = handlers.GetEndpoint[struct{}, ProfileResp](
 		api, application.Executor, "/profile",
 		func(ctx *request.Context, req struct{}) (ProfileResp, error) {
-			// Typed session access — no runtime type assertions.
-			principal := ctx.Principal()
-			if principal == nil {
+			// Typed session access via session.FromContext.
+			sess := session.FromContext(ctx)
+			if sess == nil {
 				return ProfileResp{}, errors.New("no session")
-			}
-
-			sess, ok := principal.(*session.Session)
-			if !ok {
-				return ProfileResp{}, errors.New("session type assertion failed")
 			}
 
 			// Store a typed value.

@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"net/url"
 	"sync"
+	"sync/atomic"
 )
 
 // Context holds the per-request state passed through the redesigned v2
@@ -350,6 +351,38 @@ func (c *Context) getTyped(id uint64) (any, bool) {
 	defer c.shared.valuesMu.RUnlock()
 	v, ok := c.shared.values[id]
 	return v, ok
+}
+
+// TypedKey is a typed key for storing and retrieving values on a
+// Context. Each package that needs to store typed values should define
+// its own TypedKey variable using request.NewTypedKey.
+type TypedKey struct {
+	id uint64
+}
+
+// NewTypedKey creates a unique TypedKey. Each call returns a new key
+// with a monotonically increasing ID. Keys are unique within a process.
+func NewTypedKey() TypedKey {
+	return TypedKey{id: nextTypedKeyID()}
+}
+
+// Set stores a value under the given typed key on the context.
+func (c *Context) Set(key TypedKey, value any) {
+	c.setTyped(key.id, value)
+}
+
+// Get retrieves a value by typed key. Returns the value and true if
+// the key exists, nil and false otherwise.
+func (c *Context) Get(key TypedKey) (any, bool) {
+	return c.getTyped(key.id)
+}
+
+// nextTypedKeyID returns a monotonically increasing ID for typed keys.
+// This is process-unique and safe for concurrent use.
+var typedKeyCounter atomic.Uint64
+
+func nextTypedKeyID() uint64 {
+	return typedKeyCounter.Add(1)
 }
 
 // AddBeforeCommitHook registers a function to be invoked before the

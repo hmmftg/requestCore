@@ -2,17 +2,18 @@ package session
 
 import (
 	"log/slog"
+	"net/http"
 
-	"github.com/hmmftg/requestCore/webFramework"
-
-	v2wf "github.com/hmmftg/requestCore/v2/webFramework"
+	"github.com/hmmftg/requestCore/v2/request"
+	"github.com/hmmftg/requestCore/v2/routing"
+	"github.com/hmmftg/requestCore/v2/telemetry"
 )
 
-// SessionKey is the local storage key for the *Session on the request parser.
-const SessionKey = "_v2_session"
+// ctxSessionKey is the typed key for storing *Session on a request.Context.
+var ctxSessionKey = request.NewTypedKey()
 
-// FlashKey is the local storage key for the *Flash on the request parser.
-const FlashKey = "_v2_flash"
+// ctxFlashKey is the typed key for storing *Flash on a request.Context.
+var ctxFlashKey = request.NewTypedKey()
 
 // SaveFailureMode controls how the session middleware handles session
 // save failures in the before-commit hook.
@@ -20,12 +21,11 @@ type SaveFailureMode int
 
 const (
 	// SaveStrict (default) propagates save failures to the caller so
-	// the response is not committed as a success. The failure is also
-	// logged via webFramework.AddLog with the "session-save-failed" key.
+	// the response is not committed as a success.
 	SaveStrict SaveFailureMode = iota
-	// SaveBestEffort logs save failures via webFramework.AddLog but
-	// does not propagate the error, allowing the response to commit
-	// successfully even if the session was not persisted.
+	// SaveBestEffort logs save failures but does not propagate the
+	// error, allowing the response to commit successfully even if the
+	// session was not persisted.
 	SaveBestEffort
 )
 
@@ -40,21 +40,25 @@ type MiddlewareConfig struct {
 	// SaveFailureMode controls how session save failures are handled.
 	// Default: SaveStrict.
 	SaveFailureMode SaveFailureMode
+
+	// Sink is the telemetry sink for logging session load/save
+	// outcomes. If nil, no telemetry is emitted.
+	Sink telemetry.Sink
 }
 
-// Middleware returns a v2 middleware that loads the session from the
-// request cookie and registers a before-commit hook to persist any
-// dirty session state back to the response cookie.
+// Middleware returns a routing.Middleware that loads the session from
+// the request cookie and registers a before-commit hook to persist
+// any dirty session state back to the response cookie.
 //
-// The middleware stores the *Session and *Flash on the request parser's
-// locals (SessionKey and FlashKey) so handlers can access them via
-// FromContext.
+// The session is stored on the request.Context via the session
+// package's typed key and can be retrieved by handlers via
+// session.FromContext.
 //
-// Session save failures are handled in strict mode (default): the error
-// is logged via webFramework.AddLog and propagated to the caller so the
-// response is not committed as a success. Use MiddlewareWithConfig to
-// select best-effort mode if needed.
-func Middleware(manager *Manager, cookieName string) func(next func(*v2wf.RequestContext) error) func(*v2wf.RequestContext) error {
+// Session save failures are handled in strict mode (default): the
+// error is logged via the telemetry sink and propagated to the caller
+// so the response is not committed as a success. Use
+// MiddlewareWithConfig to select best-effort mode if needed.
+func Middleware(manager *Manager, cookieName string) routing.Middleware {
 	return MiddlewareWithConfig(MiddlewareConfig{
 		Manager:         manager,
 		CookieName:      cookieName,
@@ -62,50 +66,45 @@ func Middleware(manager *Manager, cookieName string) func(next func(*v2wf.Reques
 	})
 }
 
-// MiddlewareWithConfig returns a v2 middleware configured by the given
-// MiddlewareConfig. See Middleware for behavior details.
-func MiddlewareWithConfig(cfg MiddlewareConfig) func(next func(*v2wf.RequestContext) error) func(*v2wf.RequestContext) error {
+// MiddlewareWithConfig returns a routing.Middleware configured by the
+// given MiddlewareConfig.
+func MiddlewareWithConfig(cfg MiddlewareConfig) routing.Middleware {
 	manager := cfg.Manager
 	cookieName := cfg.CookieName
 	mode := cfg.SaveFailureMode
-	return func(next func(*v2wf.RequestContext) error) func(*v2wf.RequestContext) error {
-		return func(ctx *v2wf.RequestContext) error {
+	sink := cfg.Sink
+	return func(next routing.Handler) routing.Handler {
+		return func(ctx *request.Context, transport routing.Transport) error {
 			// Load session from request cookie.
 			var cookieValue string
-			if ctx.Parser != nil {
-				cookieValue = ctx.Parser.GetCookie(cookieName)
+			if c := ctx.Cookie(cookieName); c != nil {
+				cookieValue = c.Value
 			}
 
-			sess, flash, err := manager.LoadFromCookie(ctx.Context, cookieName, cookieValue)
+			sess, flash, err := manager.LoadFromCookie(ctx.Context(), cookieName, cookieValue)
 			if err != nil {
-				// Emit a security/transaction failure event via the
-				// mandatory AddLog pipeline. The raw cookie token is
-				// never logged — only the error category and cookie name.
-				if ctx.Legacy.Parser != nil {
-					w := webFramework.WebFramework{Parser: ctx.Legacy.Parser}
-					webFramework.AddLog(w, "session-load-failed",
-						slog.Group("error",
+				// Emit a security/transaction failure event via
+				// telemetry. The raw cookie token is never logged.
+				if sink != nil {
+					sink.Record(telemetry.Event{
+						Type:      telemetry.EventFailure,
+						Operation: "session-load",
+						Err:       err,
+						Attrs: []slog.Attr{
 							slog.String("cookie", cookieName),
-							slog.Any("cause", err)))
+						},
+					})
 				}
 				// Continue with the fresh session returned by LoadFromCookie.
 			}
 
-			// Store session and flash on both the parser locals (for
-			// FromContext/FlashFromContext) and the RequestContext fields
-			// (for direct access via ctx.Session/ctx.Flash).
-			ctx.Session = sess
-			ctx.Flash = flash
-			if ctx.Parser != nil {
-				ctx.Parser.SetLocal(SessionKey, sess)
-				ctx.Parser.SetLocal(FlashKey, flash)
-			}
+			// Store session and flash on the request.Context.
+			ctx.Set(ctxSessionKey, sess)
+			ctx.Set(ctxFlashKey, flash)
 
 			// Register a before-commit hook to persist the session
-			// cookie before the response is written. This ensures
-			// that session changes are saved even if the handler
-			// doesn't explicitly call Save.
-			ctx.AddBeforeCommitHook(func(c *v2wf.RequestContext) error {
+			// cookie before the response is written.
+			ctx.AddBeforeCommitHook(func() error {
 				// Persist flash back to session.
 				if flash != nil {
 					SaveFlashToSession(sess, flash)
@@ -116,39 +115,38 @@ func MiddlewareWithConfig(cfg MiddlewareConfig) func(next func(*v2wf.RequestCont
 					return nil
 				}
 
-				cookie, err := manager.SaveToCookie(c.Context, sess, nil, cookieName)
-				if err != nil {
-					// Log the save failure via the mandatory AddLog pipeline.
-					if c.Legacy.Parser != nil {
-						w := webFramework.WebFramework{Parser: c.Legacy.Parser}
-						webFramework.AddLog(w, "session-save-failed",
-							slog.Any("error", err))
+				cookie, saveErr := manager.SaveToCookie(ctx.Context(), sess, nil, cookieName)
+				if saveErr != nil {
+					if sink != nil {
+						sink.Record(telemetry.Event{
+							Type:      telemetry.EventFailure,
+							Operation: "session-save",
+							Err:       saveErr,
+						})
 					}
-					// In strict mode, propagate the error so the
-					// response is not committed as a success.
 					if mode == SaveStrict {
-						return err
+						return saveErr
 					}
 					return nil
 				}
-				if cookie != nil && c.Parser != nil {
-					c.Parser.SetCookie(cookie)
+				if cookie != nil {
+					ctx.Response().AddHeader("Set-Cookie", cookie.String())
 				}
 				return nil
 			})
 
-			return next(ctx)
+			return next(ctx, transport)
 		}
 	}
 }
 
-// FromContext retrieves the *Session from the request context's parser locals.
+// FromContext retrieves the *Session from a request.Context.
 // Returns nil if no session middleware was applied.
-func FromContext(ctx *v2wf.RequestContext) *Session {
-	if ctx == nil || ctx.Parser == nil {
+func FromContext(ctx *request.Context) *Session {
+	if ctx == nil {
 		return nil
 	}
-	if v := ctx.Parser.GetLocal(SessionKey); v != nil {
+	if v, ok := ctx.Get(ctxSessionKey); ok {
 		if s, ok := v.(*Session); ok {
 			return s
 		}
@@ -156,16 +154,19 @@ func FromContext(ctx *v2wf.RequestContext) *Session {
 	return nil
 }
 
-// FlashFromContext retrieves the *Flash from the request context's parser locals.
+// FlashFromContext retrieves the *Flash from a request.Context.
 // Returns nil if no session middleware was applied.
-func FlashFromContext(ctx *v2wf.RequestContext) *Flash {
-	if ctx == nil || ctx.Parser == nil {
+func FlashFromContext(ctx *request.Context) *Flash {
+	if ctx == nil {
 		return nil
 	}
-	if v := ctx.Parser.GetLocal(FlashKey); v != nil {
+	if v, ok := ctx.Get(ctxFlashKey); ok {
 		if f, ok := v.(*Flash); ok {
 			return f
 		}
 	}
 	return nil
 }
+
+// suppress unused import warning.
+var _ = http.StatusOK
