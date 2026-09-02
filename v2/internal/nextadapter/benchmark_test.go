@@ -7,7 +7,7 @@ import (
 	"testing"
 
 	"github.com/hmmftg/requestCore/v2/binding"
-	"github.com/hmmftg/requestCore/v2/internal/endpoint"
+	"github.com/hmmftg/requestCore/v2/endpoint"
 	v2libChi "github.com/hmmftg/requestCore/v2/libChi"
 	v2libNetHttp "github.com/hmmftg/requestCore/v2/libNetHttp"
 	"github.com/hmmftg/requestCore/v2/operation"
