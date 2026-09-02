@@ -39,6 +39,9 @@ var v1FreePackages = map[string]bool{
 	"github.com/hmmftg/requestCore/v2/request/faketransport": true,
 	"github.com/hmmftg/requestCore/v2/operation":             true,
 	"github.com/hmmftg/requestCore/v2/telemetry":             true,
+	"github.com/hmmftg/requestCore/v2/binding":               true,
+	"github.com/hmmftg/requestCore/v2/validation":            true,
+	"github.com/hmmftg/requestCore/v2/internal/endpoint":     true,
 	// Tranche 3 will add: internal/nextadapter/*
 	// Tranche 4 will add: adapter/*, routing, handlers, app
 }
@@ -58,6 +61,22 @@ var stdlibOnlyPackages = map[string]bool{
 var allowedDeps = map[string]map[string]bool{
 	"github.com/hmmftg/requestCore/v2/request/faketransport": {
 		"github.com/hmmftg/requestCore/v2/request": true,
+	},
+	"github.com/hmmftg/requestCore/v2/binding": {
+		"github.com/hmmftg/requestCore/v2/request": true,
+	},
+	"github.com/hmmftg/requestCore/v2/validation": {
+		"github.com/hmmftg/requestCore/v2/response": true,
+		"github.com/go-playground/validator/v10":    true,
+	},
+	"github.com/hmmftg/requestCore/v2/internal/endpoint": {
+		"github.com/hmmftg/requestCore/v2/request":               true,
+		"github.com/hmmftg/requestCore/v2/request/faketransport": true,
+		"github.com/hmmftg/requestCore/v2/operation":             true,
+		"github.com/hmmftg/requestCore/v2/response":              true,
+		"github.com/hmmftg/requestCore/v2/binding":               true,
+		"github.com/hmmftg/requestCore/v2/validation":            true,
+		"github.com/hmmftg/requestCore/v2/telemetry":             true,
 	},
 }
 

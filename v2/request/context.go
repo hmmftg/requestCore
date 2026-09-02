@@ -23,14 +23,18 @@ type Context struct {
 	ctx context.Context
 
 	// Request metadata
-	method      string
-	path        string
+	method       string
+	path         string
 	routePattern string
-	header      http.Header
-	query       url.Values
-	pathParams  map[string]string
-	cookies     []*http.Cookie
-	remoteAddr  string
+	header       http.Header
+	query        url.Values
+	pathParams   map[string]string
+	cookies      []*http.Cookie
+	remoteAddr   string
+
+	// Request body (raw string; adapters populate this from the
+	// framework-specific request body reader).
+	body string
 
 	// Response state
 	response *ResponseState
@@ -114,6 +118,12 @@ func WithRemoteAddr(addr string) Option {
 // WithNative sets the request-side native data.
 func WithNative(native any) Option {
 	return func(c *Context) { c.native = native }
+}
+
+// WithBody sets the raw request body string. Adapters and the fake
+// transport use this to provide the body for binding.
+func WithBody(body string) Option {
+	return func(c *Context) { c.body = body }
 }
 
 // Context returns the underlying Go context for cancellation and tracing.
@@ -233,6 +243,11 @@ func (c *Context) Cookies() []*http.Cookie {
 // RemoteAddr returns the remote address of the client.
 func (c *Context) RemoteAddr() string { return c.remoteAddr }
 
+// Body returns the raw request body as a string, or "" if no body
+// was set. Adapters populate this from the framework-specific request
+// body reader. The binding package uses this for JSON and form decoding.
+func (c *Context) Body() string { return c.body }
+
 // Response returns the canonical response metadata. Handlers mutate
 // status and headers through this object before returning their
 // response value.
@@ -320,4 +335,13 @@ func (c *Context) RunBeforeCommitHooks() error {
 		}
 	}
 	return firstErr
+}
+
+// BeforeCommitHooks returns the registered before-commit hooks. This
+// is intended for executors that run hooks via a state machine. The
+// returned slice is a copy; mutating it does not affect the context.
+func (c *Context) BeforeCommitHooks() []func() error {
+	c.hooksMu.Lock()
+	defer c.hooksMu.Unlock()
+	return append([]func() error(nil), c.hooks...)
 }

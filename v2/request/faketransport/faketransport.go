@@ -88,11 +88,11 @@ func New(method, path string, opts ...Option) *FakeTransport {
 	if cfg.native != nil {
 		reqOpts = append(reqOpts, request.WithNative(cfg.native))
 	}
+	if cfg.body != "" {
+		reqOpts = append(reqOpts, request.WithBody(cfg.body))
+	}
 
 	goCtx := context.Background()
-	if cfg.body != "" {
-		goCtx = context.WithValue(goCtx, bodyKey{}, cfg.body)
-	}
 
 	return &FakeTransport{
 		ctx:      request.NewContext(goCtx, reqOpts...),
@@ -110,9 +110,17 @@ func WithHeader(key, value string) Option {
 	return func(c *config) { c.header.Set(key, value) }
 }
 
-// WithQueryParam sets a query parameter.
+// WithQueryParam sets a query parameter, replacing any existing value
+// for the same key.
 func WithQueryParam(key, value string) Option {
 	return func(c *config) { c.query.Set(key, value) }
+}
+
+// WithQueryParamAdd appends a value to a query parameter, preserving
+// existing values for the same key. Use this for multi-valued query
+// parameters.
+func WithQueryParamAdd(key, value string) Option {
+	return func(c *config) { c.query.Add(key, value) }
 }
 
 // WithPathParam sets a path parameter.
@@ -183,6 +191,20 @@ func (ft *FakeTransport) ResponseHeaders() http.Header {
 	return ft.recorder.Header()
 }
 
+// Recorder returns the underlying httptest.ResponseRecorder. This is
+// exposed for adapters that need direct access to the recorder (e.g.
+// the internal endpoint Transport adapter). Mutating the recorder
+// directly bypasses the committed flag.
+func (ft *FakeTransport) Recorder() *httptest.ResponseRecorder {
+	return ft.recorder
+}
+
+// MarkCommitted marks the transport as committed without writing a
+// response. Used by adapters that write directly to the recorder.
+func (ft *FakeTransport) MarkCommitted() {
+	ft.committed = true
+}
+
 // Committed reports whether the response has been written.
 func (ft *FakeTransport) Committed() bool {
 	return ft.committed
@@ -190,13 +212,5 @@ func (ft *FakeTransport) Committed() bool {
 
 // Body returns the request body string, or "" if none was set.
 func (ft *FakeTransport) Body() string {
-	v := ft.ctx.Context().Value(bodyKey{})
-	if v == nil {
-		return ""
-	}
-	s, _ := v.(string)
-	return s
+	return ft.ctx.Body()
 }
-
-// bodyKey is an unexported context key for the request body.
-type bodyKey struct{}
