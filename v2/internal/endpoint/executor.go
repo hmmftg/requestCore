@@ -1,7 +1,6 @@
 package endpoint
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
@@ -9,6 +8,7 @@ import (
 
 	"github.com/hmmftg/requestCore/v2/binding"
 	"github.com/hmmftg/requestCore/v2/operation"
+	"github.com/hmmftg/requestCore/v2/renderers"
 	"github.com/hmmftg/requestCore/v2/request"
 	"github.com/hmmftg/requestCore/v2/response"
 	"github.com/hmmftg/requestCore/v2/telemetry"
@@ -20,6 +20,7 @@ type Executor struct {
 	Registry      operation.Registry
 	Telemetry     telemetry.Sink
 	ProblemMapper *response.MapperRegistry
+	Encoder       Encoder
 }
 
 // ExecutorOption configures an Executor at construction time.
@@ -35,20 +36,37 @@ func WithTelemetrySink(s telemetry.Sink) ExecutorOption {
 	return func(e *Executor) { e.Telemetry = s }
 }
 
+// WithNopTelemetry sets the telemetry sink to NopSink, suppressing all
+// telemetry output. This is intended for tests and benchmarks.
+func WithNopTelemetry() ExecutorOption {
+	return func(e *Executor) { e.Telemetry = telemetry.NopSink{} }
+}
+
 // WithProblemMapper sets the problem mapper registry.
 func WithProblemMapper(m *response.MapperRegistry) ExecutorOption {
 	return func(e *Executor) { e.ProblemMapper = m }
 }
 
+// WithExecutorEncoder sets the default encoder for the executor.
+// Endpoints without an explicit Encoder use this. If nil, JSONRenderer
+// is used.
+func WithExecutorEncoder(enc Encoder) ExecutorOption {
+	return func(e *Executor) { e.Encoder = enc }
+}
+
 // NewExecutor creates a new Executor with the given options. Defaults:
-// - Registry: operation.NewDefaultRegistry()
-// - Telemetry: telemetry.NopSink{}
+// - Registry: operation.NewRegistry()
+// - Telemetry: telemetry.NewSlogSink(nil) (observable by default)
 // - ProblemMapper: response.DefaultMapperRegistry()
+// - Encoder: renderers.JSONRenderer{}
+//
+// Tests and benchmarks should use WithNopTelemetry() to suppress output.
 func NewExecutor(opts ...ExecutorOption) *Executor {
 	e := &Executor{
 		Registry:      operation.NewRegistry(),
-		Telemetry:     telemetry.NopSink{},
+		Telemetry:     telemetry.NewSlogSink(nil),
 		ProblemMapper: response.DefaultMapperRegistry(),
+		Encoder:       renderers.JSONRenderer{},
 	}
 	for _, opt := range opts {
 		opt(e)
@@ -102,7 +120,7 @@ func Execute[Req, Resp any](e *Executor, ctx *request.Context, ep *Endpoint[Req,
 	if ep.Config.BindingPlan.Mode != binding.ModeNone {
 		if err := binding.Bind(ctx, ep.Config.BindingPlan, &req); err != nil {
 			problem := e.mapBindError(err)
-			werr := e.writeProblem(transport, problem)
+			werr := e.writeProblem(ctx, transport, problem)
 			finalErr := err
 			if werr != nil {
 				finalErr = fmt.Errorf("%w (problem write failed: %v)", err, werr)
@@ -121,7 +139,7 @@ func Execute[Req, Resp any](e *Executor, ctx *request.Context, ep *Endpoint[Req,
 				"Validation Internal Error",
 				"VALIDATION_INTERNAL",
 			)
-			werr := e.writeProblem(transport, problem)
+			werr := e.writeProblem(ctx, transport, problem)
 			finalErr := err
 			if werr != nil {
 				finalErr = fmt.Errorf("%w (problem write failed: %v)", err, werr)
@@ -135,7 +153,7 @@ func Execute[Req, Resp any](e *Executor, ctx *request.Context, ep *Endpoint[Req,
 				"Validation Failed",
 				violations,
 			)
-			werr := e.writeProblem(transport, problem)
+			werr := e.writeProblem(ctx, transport, problem)
 			finalErr := error(problem)
 			if werr != nil {
 				finalErr = fmt.Errorf("%w (problem write failed: %v)", problem, werr)
@@ -156,7 +174,7 @@ func Execute[Req, Resp any](e *Executor, ctx *request.Context, ep *Endpoint[Req,
 				"INTERNAL",
 			)
 		}
-		werr := e.writeProblem(transport, problem)
+		werr := e.writeProblem(ctx, transport, problem)
 		finalErr := err
 		if werr != nil {
 			finalErr = fmt.Errorf("%w (problem write failed: %v)", err, werr)
@@ -165,21 +183,33 @@ func Execute[Req, Resp any](e *Executor, ctx *request.Context, ep *Endpoint[Req,
 		return zero, finalErr
 	}
 
-	// 4. Encode
-	body, err := json.Marshal(resp)
+	// 4. Encode — use endpoint encoder if set, otherwise executor default.
+	encoder := ep.Config.Encoder
+	if encoder == nil {
+		encoder = e.Encoder
+	}
+	if encoder == nil {
+		encoder = renderers.JSONRenderer{}
+	}
+	body, err := encoder.Encode(resp)
 	if err != nil {
 		problem := response.NewProblemWithCode(
 			http.StatusInternalServerError,
 			"Response Encoding Error",
 			"ENCODE_ERROR",
 		)
-		werr := e.writeProblem(transport, problem)
+		werr := e.writeProblem(ctx, transport, problem)
 		finalErr := err
 		if werr != nil {
 			finalErr = fmt.Errorf("%w (problem write failed: %v)", err, werr)
 		}
 		e.emit(ep.Config.Operation.ID, ep.Config.Operation.Method, ep.Config.Operation.Pattern, ctx, telemetry.EventFailure, problem.Status, finalErr, start)
 		return zero, finalErr
+	}
+	// Derive content type from the encoder if the endpoint didn't
+	// specify one explicitly.
+	if contentType == "application/json" && ep.Config.SuccessContentType == "" {
+		contentType = encoder.ContentType()
 	}
 
 	// Compute final success status and headers from the response state.
@@ -195,43 +225,17 @@ func Execute[Req, Resp any](e *Executor, ctx *request.Context, ep *Endpoint[Req,
 		finalContentType = ct
 	}
 
-	// 5-9. Commit lifecycle via the response state machine.
-	cm := response.NewCommitMachine()
-	if err := cm.Prepare(finalStatus); err != nil {
-		return zero, err
-	}
-	if err := cm.RunHooks(ctx.BeforeCommitHooks()); err != nil {
-		problem := response.NewProblemWithCode(
-			http.StatusInternalServerError,
-			"Pre-commit Hook Failed",
-			"HOOK_ERROR",
-		)
-		werr := e.writeProblem(transport, problem)
-		finalErr := err
-		if werr != nil {
-			finalErr = fmt.Errorf("%w (problem write failed: %v)", err, werr)
+	// 5-9. Commit lifecycle via the centralized commit coordinator.
+	// The coordinator runs hooks exactly once, snapshots headers after
+	// hooks, writes through the transport, and manages the commit state
+	// machine. Both success and error paths flow through it.
+	coordinator := response.NewCommitCoordinator()
+	if err := coordinator.CommitSuccess(ctx, transport, finalStatus, finalContentType, body); err != nil {
+		// If the coordinator wrote a Problem (hook failure), the
+		// transport is already committed. Emit failure telemetry.
+		if coordinator.State() == response.StateFailed {
+			e.emit(ep.Config.Operation.ID, ep.Config.Operation.Method, ep.Config.Operation.Pattern, ctx, telemetry.EventFailure, http.StatusInternalServerError, err, start)
 		}
-		e.emit(ep.Config.Operation.ID, ep.Config.Operation.Method, ep.Config.Operation.Pattern, ctx, telemetry.EventFailure, problem.Status, finalErr, start)
-		return zero, finalErr
-	}
-	if err := cm.MarkDurable(); err != nil {
-		return zero, err
-	}
-
-	// Write the success response to the transport BEFORE committing.
-	// A transport failure transitions the commit machine to Failed
-	// and is reported via telemetry; the machine does not report
-	// success.
-	if werr := transport.WriteResponse(finalStatus, finalContentType, finalHeaders, body); werr != nil {
-		_ = cm.Fail(werr)
-		e.emit(ep.Config.Operation.ID, ep.Config.Operation.Method, ep.Config.Operation.Pattern, ctx, telemetry.EventFailure, http.StatusInternalServerError, werr, start)
-		return zero, werr
-	}
-
-	if err := cm.Commit(finalStatus); err != nil {
-		return zero, err
-	}
-	if err := cm.Observe(); err != nil {
 		return zero, err
 	}
 
@@ -266,25 +270,15 @@ func (e *Executor) mapBindError(err error) *response.Problem {
 	)
 }
 
-// writeProblem writes a Problem response to the transport as JSON. It
-// returns any transport or encoding error so callers can propagate it
-// alongside the original domain error. If the transport is already
-// committed, no write is attempted and nil is returned.
-func (e *Executor) writeProblem(transport Transport, problem *response.Problem) error {
-	if transport.Committed() {
-		return nil
-	}
-	body, err := json.Marshal(problem)
-	if err != nil {
-		// Last resort: write a minimal 500.
-		return transport.WriteResponse(
-			http.StatusInternalServerError,
-			"application/json",
-			nil,
-			[]byte(`{"title":"Internal Server Error","status":500}`),
-		)
-	}
-	return transport.WriteResponse(problem.Status, response.ProblemContentType, nil, body)
+// writeProblem writes a Problem response to the transport via the
+// commit coordinator, preserving response headers from the context
+// (especially Set-Cookie). It returns any transport or encoding error
+// so callers can propagate it alongside the original domain error. If
+// the transport is already committed, no write is attempted and nil is
+// returned.
+func (e *Executor) writeProblem(ctx *request.Context, transport Transport, problem *response.Problem) error {
+	coordinator := response.NewCommitCoordinator()
+	return coordinator.CommitProblem(ctx, transport, problem)
 }
 
 // emit sends a telemetry event if a sink is configured.

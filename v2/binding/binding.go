@@ -157,22 +157,21 @@ func bindJSON(ctx *request.Context, plan Plan, target any) error {
 		}
 	}
 
-	body := ctx.Body()
-	if body == "" {
+	body, err := ctx.BodyBytes(plan.MaxBodyBytes)
+	if err != nil {
+		return &BindingError{
+			Status:  http.StatusRequestEntityTooLarge,
+			Cause:   ErrBodyTooLarge,
+			Message: err.Error(),
+		}
+	}
+	if len(body) == 0 {
 		// Empty body: leave target at zero value. This is valid for
 		// requests with no body (e.g. POST with no content).
 		return nil
 	}
 
-	if plan.MaxBodyBytes > 0 && int64(len(body)) > plan.MaxBodyBytes {
-		return &BindingError{
-			Status:  http.StatusRequestEntityTooLarge,
-			Cause:   ErrBodyTooLarge,
-			Message: fmt.Sprintf("body size %d exceeds limit %d", len(body), plan.MaxBodyBytes),
-		}
-	}
-
-	dec := json.NewDecoder(strings.NewReader(body))
+	dec := json.NewDecoder(strings.NewReader(string(body)))
 	if plan.DisallowUnknownFields {
 		dec.DisallowUnknownFields()
 	}
@@ -246,18 +245,18 @@ func bindForm(ctx *request.Context, plan Plan, target any) error {
 		}
 	}
 
-	body := ctx.Body()
-	if body == "" {
-		return nil
-	}
-	if plan.MaxBodyBytes > 0 && int64(len(body)) > plan.MaxBodyBytes {
+	body, err := ctx.BodyBytes(plan.MaxBodyBytes)
+	if err != nil {
 		return &BindingError{
 			Status:  http.StatusRequestEntityTooLarge,
 			Cause:   ErrBodyTooLarge,
-			Message: fmt.Sprintf("form size %d exceeds limit %d", len(body), plan.MaxBodyBytes),
+			Message: err.Error(),
 		}
 	}
-	vals, err := url.ParseQuery(body)
+	if len(body) == 0 {
+		return nil
+	}
+	vals, err := url.ParseQuery(string(body))
 	if err != nil {
 		return &BindingError{
 			Status:  http.StatusBadRequest,

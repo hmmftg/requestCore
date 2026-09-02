@@ -26,11 +26,19 @@ type Matcher func(err error) bool
 //
 // Unknown errors always become sanitized 500 problems. Causes are
 // never serialized by default.
+//
+// Once frozen, Register and SetFallback return ErrRegistryFrozen. The
+// registry should be frozen before serving to prevent runtime mutation.
 type MapperRegistry struct {
 	mu       sync.RWMutex
 	entries  []mapperEntry
 	fallback Mapper
+	frozen   bool
 }
+
+// ErrRegistryFrozen is returned when attempting to register or modify
+// a frozen MapperRegistry.
+var ErrRegistryFrozen = errors.New("response: mapper registry is frozen")
 
 type mapperEntry struct {
 	matcher Matcher
@@ -77,19 +85,42 @@ func (r *MapperRegistry) Register(matcher Matcher, mapper Mapper) error {
 	}
 	r.mu.Lock()
 	defer r.mu.Unlock()
+	if r.frozen {
+		return ErrRegistryFrozen
+	}
 	r.entries = append(r.entries, mapperEntry{matcher: matcher, mapper: mapper})
 	return nil
 }
 
 // SetFallback sets the fallback mapper invoked when no registered
 // mapper matches. If nil is passed, the default sanitizer is used.
-func (r *MapperRegistry) SetFallback(mapper Mapper) {
+// Returns ErrRegistryFrozen if the registry is frozen.
+func (r *MapperRegistry) SetFallback(mapper Mapper) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
+	if r.frozen {
+		return ErrRegistryFrozen
+	}
 	if mapper == nil {
 		mapper = defaultSanitizerMapper
 	}
 	r.fallback = mapper
+	return nil
+}
+
+// Freeze prevents further registration or fallback changes. Called
+// after startup before serving requests.
+func (r *MapperRegistry) Freeze() {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.frozen = true
+}
+
+// Frozen reports whether the registry is frozen.
+func (r *MapperRegistry) Frozen() bool {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	return r.frozen
 }
 
 // Map converts an error into a Problem. It checks registered mappers
@@ -109,7 +140,8 @@ func (r *MapperRegistry) Map(err error) *Problem {
 	}
 
 	r.mu.RLock()
-	entries := r.entries
+	// Snapshot entries to avoid concurrent mutation during iteration.
+	entries := append([]mapperEntry(nil), r.entries...)
 	fallback := r.fallback
 	r.mu.RUnlock()
 

@@ -30,6 +30,12 @@ type Registry interface {
 	// if the operation has empty required fields.
 	Register(op Operation) error
 
+	// Unregister removes an operation by ID. This is used for rollback
+	// when a router registration fails after the operation was
+	// registered. Returns ErrRegistryFrozen if the registry is frozen.
+	// It is a no-op (returns nil) if the ID is not found.
+	Unregister(id string) error
+
 	// Get retrieves an operation by its ID. Returns the operation and
 	// true if found, or a zero Operation and false if not found.
 	Get(id string) (Operation, bool)
@@ -48,9 +54,9 @@ type Registry interface {
 // DefaultRegistry is the default Registry implementation. It is safe
 // for concurrent use during registration and lookup.
 type DefaultRegistry struct {
-	mu       sync.RWMutex
-	ops      map[string]Operation
-	frozen   bool
+	mu     sync.RWMutex
+	ops    map[string]Operation
+	frozen bool
 }
 
 // NewRegistry creates a new empty DefaultRegistry.
@@ -77,7 +83,19 @@ func (r *DefaultRegistry) Register(op Operation) error {
 	return nil
 }
 
-// Get retrieves an operation by its ID.
+// Unregister removes an operation by ID. This is used for rollback when
+// a router registration fails after the operation was registered. It is
+// a no-op if the ID is not found. Returns ErrRegistryFrozen if the
+// registry is frozen.
+func (r *DefaultRegistry) Unregister(id string) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if r.frozen {
+		return ErrRegistryFrozen
+	}
+	delete(r.ops, id)
+	return nil
+}
 func (r *DefaultRegistry) Get(id string) (Operation, bool) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()

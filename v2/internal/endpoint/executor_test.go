@@ -19,7 +19,7 @@ import (
 // newTestExecutor creates an executor with a fresh registry and the
 // default problem mapper.
 func newTestExecutor() *Executor {
-	return NewExecutor(WithRegistry(operation.NewRegistry()))
+	return NewExecutor(WithRegistry(operation.NewRegistry()), WithNopTelemetry())
 }
 
 // makeCreateUserEndpoint builds a standard create-user endpoint with

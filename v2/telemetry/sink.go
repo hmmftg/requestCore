@@ -3,9 +3,11 @@
 //
 // A Sink receives typed lifecycle and business events. The public
 // SlogSink records events via slog WITHOUT including request or
-// response bodies by default. Enterprise AddLog compatibility is
-// handled separately by compat/v1 in later tranches; this package does
-// not replace webFramework.AddLog.
+// response bodies by default. The production slog handler ingests these
+// records into Splunk, preserving the canonical <operation>-req /
+// <operation>-req-failed outcome keys. v1 projects continue to use
+// webFramework.AddLog; v2 projects use telemetry.SlogSink as the
+// observability path.
 //
 // telemetry imports only the Go standard library. It does not import
 // request, response, handlers, app, or any v1 package.

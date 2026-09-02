@@ -15,7 +15,7 @@ import (
 // endpoint with no binding and no validation (handler + encode +
 // commit lifecycle only).
 func BenchmarkEndpointDirectSuccess(b *testing.B) {
-	exec := NewExecutor(WithRegistry(operation.NewRegistry()))
+	exec := NewExecutor(WithRegistry(operation.NewRegistry()), WithNopTelemetry())
 	ep := New[PingReq, PingResp](
 		func(ctx *request.Context, req PingReq) (PingResp, error) {
 			return PingResp{Message: "pong"}, nil
@@ -33,7 +33,7 @@ func BenchmarkEndpointDirectSuccess(b *testing.B) {
 // BenchmarkEndpointDirectProblem measures the cost of executing an
 // endpoint that returns a mapped problem (handler error path).
 func BenchmarkEndpointDirectProblem(b *testing.B) {
-	exec := NewExecutor(WithRegistry(operation.NewRegistry()))
+	exec := NewExecutor(WithRegistry(operation.NewRegistry()), WithNopTelemetry())
 	ep := New[problemReq, problemResp](
 		func(ctx *request.Context, req problemReq) (problemResp, error) {
 			return problemResp{}, errBenchmark
@@ -54,7 +54,7 @@ func BenchmarkEndpointDirectProblem(b *testing.B) {
 // BenchmarkEndpointBindJSON measures the cost of JSON binding only
 // (no validation, handler returns immediately).
 func BenchmarkEndpointBindJSON(b *testing.B) {
-	exec := NewExecutor(WithRegistry(operation.NewRegistry()))
+	exec := NewExecutor(WithRegistry(operation.NewRegistry()), WithNopTelemetry())
 	ep := New[CreateUserReq, CreateUserResp](
 		func(ctx *request.Context, req CreateUserReq) (CreateUserResp, error) {
 			return CreateUserResp{ID: "1", Name: req.Name, Email: req.Email}, nil
@@ -75,7 +75,7 @@ func BenchmarkEndpointBindJSON(b *testing.B) {
 // BenchmarkEndpointBindAndValidate measures the cost of JSON binding
 // plus validation.
 func BenchmarkEndpointBindAndValidate(b *testing.B) {
-	exec := NewExecutor(WithRegistry(operation.NewRegistry()))
+	exec := NewExecutor(WithRegistry(operation.NewRegistry()), WithNopTelemetry())
 	ep := New[CreateUserReq, CreateUserResp](
 		func(ctx *request.Context, req CreateUserReq) (CreateUserResp, error) {
 			return CreateUserResp{ID: "1", Name: req.Name, Email: req.Email}, nil
@@ -97,7 +97,7 @@ func BenchmarkEndpointBindAndValidate(b *testing.B) {
 // BenchmarkEndpointRenderJSON measures the cost of encoding a response
 // to JSON (handler returns a populated struct, encode + write).
 func BenchmarkEndpointRenderJSON(b *testing.B) {
-	exec := NewExecutor(WithRegistry(operation.NewRegistry()))
+	exec := NewExecutor(WithRegistry(operation.NewRegistry()), WithNopTelemetry())
 	ep := New[PingReq, PingResp](
 		func(ctx *request.Context, req PingReq) (PingResp, error) {
 			return PingResp{Message: "pong"}, nil

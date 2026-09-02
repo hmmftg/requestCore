@@ -36,6 +36,12 @@ type Context struct {
 	// framework-specific request body reader).
 	body string
 
+	// bodySource provides lazy, bounded, single-read access to the
+	// request body. When non-nil, it takes precedence over the body
+	// string for binding. Adapters that have access to the raw request
+	// body reader supply a BodySource instead of eagerly buffering.
+	bodySource BodySource
+
 	// Response state
 	response *ResponseState
 
@@ -47,11 +53,19 @@ type Context struct {
 	// Native request-side data (e.g. *http.Request for net/http/chi)
 	native any
 
-	// Typed key-value store
+	// sharedState is pointer-owned so that WithContext-derived contexts
+	// safely share typed values and before-commit hooks without copying
+	// mutexes around shared maps.
+	shared *sharedState
+}
+
+// sharedState holds mutable state that is shared across a Context and
+// all contexts derived from it via WithContext. It is protected by its
+// own mutexes and is safe for concurrent use.
+type sharedState struct {
 	valuesMu sync.RWMutex
 	values   map[uint64]any
 
-	// Before-commit hooks
 	hooksMu  sync.Mutex
 	hooks    []func() error
 	hooksRan bool
@@ -67,7 +81,7 @@ func NewContext(goCtx context.Context, opts ...Option) *Context {
 	c := &Context{
 		ctx:      goCtx,
 		response: NewResponseState(),
-		values:   make(map[uint64]any),
+		shared:   &sharedState{values: make(map[uint64]any)},
 	}
 	for _, opt := range opts {
 		opt(c)
@@ -126,6 +140,14 @@ func WithBody(body string) Option {
 	return func(c *Context) { c.body = body }
 }
 
+// WithBodySource sets a lazy BodySource for the request body. When set,
+// it takes precedence over the body string for binding. Adapters that
+// have access to the raw request body reader should use this instead of
+// WithBody to avoid eager buffering.
+func WithBodySource(bs BodySource) Option {
+	return func(c *Context) { c.bodySource = bs }
+}
+
 // Context returns the underlying Go context for cancellation and tracing.
 func (c *Context) Context() context.Context {
 	if c.ctx == nil {
@@ -148,12 +170,14 @@ func (c *Context) WithContext(goCtx context.Context) *Context {
 		pathParams:   c.pathParams,
 		cookies:      c.cookies,
 		remoteAddr:   c.remoteAddr,
+		body:         c.body,
+		bodySource:   c.bodySource,
 		response:     c.response,
 		principal:    c.principal,
 		requestID:    c.requestID,
 		traceID:      c.traceID,
 		native:       c.native,
-		values:       c.values,
+		shared:       c.shared,
 	}
 	return nc
 }
@@ -244,9 +268,34 @@ func (c *Context) Cookies() []*http.Cookie {
 func (c *Context) RemoteAddr() string { return c.remoteAddr }
 
 // Body returns the raw request body as a string, or "" if no body
-// was set. Adapters populate this from the framework-specific request
-// body reader. The binding package uses this for JSON and form decoding.
-func (c *Context) Body() string { return c.body }
+// was set. If a BodySource is configured, it is read once (with no
+// limit) and cached; subsequent calls return the cached value.
+// The binding package uses BodyBytes for bounded reads.
+func (c *Context) Body() string {
+	if c.bodySource != nil {
+		data, err := c.bodySource.Read(0)
+		if err != nil || data == nil {
+			return ""
+		}
+		return string(data)
+	}
+	return c.body
+}
+
+// BodyBytes returns the raw request body bytes, reading from the
+// BodySource if configured with the given maxBytes limit, or from the
+// body string if no source is set. A maxBytes of 0 means no limit.
+// If the body exceeds maxBytes, ErrBodyTooLarge is returned.
+func (c *Context) BodyBytes(maxBytes int64) ([]byte, error) {
+	if c.bodySource != nil {
+		return c.bodySource.Read(maxBytes)
+	}
+	data := []byte(c.body)
+	if maxBytes > 0 && int64(len(data)) > maxBytes {
+		return nil, ErrBodyTooLarge
+	}
+	return data, nil
+}
 
 // Response returns the canonical response metadata. Handlers mutate
 // status and headers through this object before returning their
@@ -287,19 +336,19 @@ func (c *Context) SetTraceID(id string) { c.traceID = id }
 
 // setTyped stores a value under a typed key ID.
 func (c *Context) setTyped(id uint64, value any) {
-	c.valuesMu.Lock()
-	defer c.valuesMu.Unlock()
-	if c.values == nil {
-		c.values = make(map[uint64]any)
+	c.shared.valuesMu.Lock()
+	defer c.shared.valuesMu.Unlock()
+	if c.shared.values == nil {
+		c.shared.values = make(map[uint64]any)
 	}
-	c.values[id] = value
+	c.shared.values[id] = value
 }
 
 // getTyped retrieves a value by typed key ID.
 func (c *Context) getTyped(id uint64) (any, bool) {
-	c.valuesMu.RLock()
-	defer c.valuesMu.RUnlock()
-	v, ok := c.values[id]
+	c.shared.valuesMu.RLock()
+	defer c.shared.valuesMu.RUnlock()
+	v, ok := c.shared.values[id]
 	return v, ok
 }
 
@@ -310,9 +359,9 @@ func (c *Context) AddBeforeCommitHook(hook func() error) {
 	if hook == nil {
 		return
 	}
-	c.hooksMu.Lock()
-	defer c.hooksMu.Unlock()
-	c.hooks = append(c.hooks, hook)
+	c.shared.hooksMu.Lock()
+	defer c.shared.hooksMu.Unlock()
+	c.shared.hooks = append(c.shared.hooks, hook)
 }
 
 // RunBeforeCommitHooks invokes all registered before-commit hooks in
@@ -320,14 +369,14 @@ func (c *Context) AddBeforeCommitHook(hook func() error) {
 // subsequent calls return nil without re-running them. All hooks are
 // run even if one fails; the first error is returned.
 func (c *Context) RunBeforeCommitHooks() error {
-	c.hooksMu.Lock()
-	if c.hooksRan {
-		c.hooksMu.Unlock()
+	c.shared.hooksMu.Lock()
+	if c.shared.hooksRan {
+		c.shared.hooksMu.Unlock()
 		return nil
 	}
-	c.hooksRan = true
-	hooks := append([]func() error(nil), c.hooks...)
-	c.hooksMu.Unlock()
+	c.shared.hooksRan = true
+	hooks := append([]func() error(nil), c.shared.hooks...)
+	c.shared.hooksMu.Unlock()
 	var firstErr error
 	for _, h := range hooks {
 		if err := h(); err != nil && firstErr == nil {
@@ -341,7 +390,7 @@ func (c *Context) RunBeforeCommitHooks() error {
 // is intended for executors that run hooks via a state machine. The
 // returned slice is a copy; mutating it does not affect the context.
 func (c *Context) BeforeCommitHooks() []func() error {
-	c.hooksMu.Lock()
-	defer c.hooksMu.Unlock()
-	return append([]func() error(nil), c.hooks...)
+	c.shared.hooksMu.Lock()
+	defer c.shared.hooksMu.Unlock()
+	return append([]func() error(nil), c.shared.hooks...)
 }

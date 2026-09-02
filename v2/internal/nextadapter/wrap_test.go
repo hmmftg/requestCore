@@ -29,7 +29,7 @@ import (
 // newTestExecutor creates an executor with a fresh registry and the
 // default problem mapper.
 func newTestExecutor() *endpoint.Executor {
-	return endpoint.NewExecutor(endpoint.WithRegistry(operation.NewRegistry()))
+	return endpoint.NewExecutor(endpoint.WithRegistry(operation.NewRegistry()), endpoint.WithNopTelemetry())
 }
 
 // --- fixture types ---

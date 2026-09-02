@@ -27,6 +27,11 @@ func (h *captureHandler) Enabled(_ context.Context, level slog.Level) bool {
 func (h *captureHandler) Handle(_ context.Context, r slog.Record) error {
 	attrs := make([]slog.Attr, 0, r.NumAttrs())
 	r.Attrs(func(a slog.Attr) bool {
+		// Resolve LogValuer values to mimic real slog handlers.
+		rv := a.Value.Resolve()
+		if rv.Any() != nil {
+			a = slog.Any(a.Key, rv.Any())
+		}
 		attrs = append(attrs, a)
 		return true
 	})

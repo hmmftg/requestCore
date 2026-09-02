@@ -20,7 +20,7 @@ import (
 // successful request through chi and the new executor.
 func BenchmarkNextAdapter_ChiSuccess(b *testing.B) {
 	router := v2libChi.NewRouter()
-	exec := endpoint.NewExecutor(endpoint.WithRegistry(operation.NewRegistry()))
+	exec := endpoint.NewExecutor(endpoint.WithRegistry(operation.NewRegistry()), endpoint.WithNopTelemetry())
 	ep := endpoint.New[pingReq, pingResp](
 		func(ctx *request.Context, req pingReq) (pingResp, error) {
 			return pingResp{Message: "pong"}, nil
@@ -43,7 +43,7 @@ func BenchmarkNextAdapter_ChiSuccess(b *testing.B) {
 // successful request through net/http ServeMux and the new executor.
 func BenchmarkNextAdapter_NetHTTPSuccess(b *testing.B) {
 	router := v2libNetHttp.NewRouter()
-	exec := endpoint.NewExecutor(endpoint.WithRegistry(operation.NewRegistry()))
+	exec := endpoint.NewExecutor(endpoint.WithRegistry(operation.NewRegistry()), endpoint.WithNopTelemetry())
 	ep := endpoint.New[pingReq, pingResp](
 		func(ctx *request.Context, req pingReq) (pingResp, error) {
 			return pingResp{Message: "pong"}, nil
@@ -66,7 +66,7 @@ func BenchmarkNextAdapter_NetHTTPSuccess(b *testing.B) {
 // binding plus validation through chi and the new executor.
 func BenchmarkNextAdapter_ChiJSONBindValidate(b *testing.B) {
 	router := v2libChi.NewRouter()
-	exec := endpoint.NewExecutor(endpoint.WithRegistry(operation.NewRegistry()))
+	exec := endpoint.NewExecutor(endpoint.WithRegistry(operation.NewRegistry()), endpoint.WithNopTelemetry())
 	ep := endpoint.New[createUserReq, createUserResp](
 		func(ctx *request.Context, req createUserReq) (createUserResp, error) {
 			return createUserResp{ID: "1", Name: req.Name, Email: req.Email}, nil

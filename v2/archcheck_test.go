@@ -112,6 +112,7 @@ var allowedDeps = map[string]map[string]bool{
 		"github.com/hmmftg/requestCore/v2/binding":               true,
 		"github.com/hmmftg/requestCore/v2/validation":            true,
 		"github.com/hmmftg/requestCore/v2/telemetry":             true,
+		"github.com/hmmftg/requestCore/v2/renderers":             true,
 	},
 	"github.com/hmmftg/requestCore/v2/internal/nextadapter": {
 		"github.com/hmmftg/requestCore/v2/binding":           true,
