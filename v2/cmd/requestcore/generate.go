@@ -18,11 +18,8 @@ func generateHandler(name string) error {
 package handlers
 
 import (
-	"log/slog"
-
-	"github.com/hmmftg/requestCore/libRequest"
 	"github.com/hmmftg/requestCore/v2/handlers"
-	"github.com/hmmftg/requestCore/webFramework"
+	"github.com/hmmftg/requestCore/v2/request"
 )
 
 // {PASCAL}Req is the request body for the {NAME} handler.
@@ -39,20 +36,17 @@ type {PASCAL}Resp struct {
 // Register it via:
 //
 //	handlers.PostEndpoint[{PASCAL}Req, {PASCAL}Resp](
-//	    router, core, respHandler, "/{NAME}",
+//	    router, exec, "/{NAME}",
 //	    {PASCAL}Handler,
 //	)
 //
 // or for a GET endpoint:
 //
 //	handlers.GetEndpoint[{PASCAL}Req, {PASCAL}Resp](
-//	    router, core, respHandler, "/{NAME}",
+//	    router, exec, "/{NAME}",
 //	    {PASCAL}Handler,
 //	)
-func {PASCAL}Handler(req *{PASCAL}Req, trx *handlers.HandlerRequest[{PASCAL}Req, {PASCAL}Resp]) ({PASCAL}Resp, error) {
-	// Log to the Splunk transaction pipeline via webFramework.AddLog.
-	webFramework.AddLog(trx.W, "{NAME}-req", slog.String("status", "processing"))
-
+func {PASCAL}Handler(ctx *request.Context, req {PASCAL}Req) ({PASCAL}Resp, error) {
 	// TODO: implement handler logic.
 
 	return {PASCAL}Resp{}, nil
@@ -60,11 +54,11 @@ func {PASCAL}Handler(req *{PASCAL}Req, trx *handlers.HandlerRequest[{PASCAL}Req,
 
 // {PASCAL}Endpoint returns a typed Endpoint for the {NAME} handler.
 // Use this with handlers.RegisterEndpoint for custom HTTP methods or
-// when you need to attach lifecycle hooks.
+// when you need advanced configuration via the Inner() method.
 func {PASCAL}Endpoint() *handlers.Endpoint[{PASCAL}Req, {PASCAL}Resp] {
-	return handlers.NewEndpoint[{PASCAL}Req, {PASCAL}Resp](
+	return handlers.Post[{PASCAL}Req, {PASCAL}Resp](
 		"{NAME}",
-		libRequest.JSON,
+		"/{NAME}",
 		{PASCAL}Handler,
 	)
 }`
@@ -101,8 +95,8 @@ func generateResource(name string) error {
 package resources
 
 import (
-	"github.com/hmmftg/requestCore/libRequest"
 	"github.com/hmmftg/requestCore/v2/handlers"
+	"github.com/hmmftg/requestCore/v2/request"
 	"github.com/hmmftg/requestCore/v2/resources"
 )
 
@@ -119,10 +113,10 @@ type {PASCAL}ListResp struct {
 
 // List returns a list of {NAME}.
 func (r *{PASCAL}Resource) List() handlers.EndpointRuntime {
-	return handlers.NewEndpoint[{PASCAL}ListReq, {PASCAL}ListResp](
+	return handlers.Get[{PASCAL}ListReq, {PASCAL}ListResp](
 		"list-{NAME}",
-		libRequest.NoBinding,
-		func(req *{PASCAL}ListReq, trx *handlers.HandlerRequest[{PASCAL}ListReq, {PASCAL}ListResp]) ({PASCAL}ListResp, error) {
+		"/{NAME}",
+		func(ctx *request.Context, req {PASCAL}ListReq) ({PASCAL}ListResp, error) {
 			return {PASCAL}ListResp{Items: []map[string]any{}}, nil
 		},
 	)
@@ -138,11 +132,11 @@ type {PASCAL}ShowResp struct {
 
 // Show returns a single {NAME} by ID.
 func (r *{PASCAL}Resource) Show() handlers.EndpointRuntime {
-	return handlers.NewEndpoint[{PASCAL}ShowReq, {PASCAL}ShowResp](
+	return handlers.Get[{PASCAL}ShowReq, {PASCAL}ShowResp](
 		"show-{NAME}",
-		libRequest.NoBinding,
-		func(req *{PASCAL}ShowReq, trx *handlers.HandlerRequest[{PASCAL}ShowReq, {PASCAL}ShowResp]) ({PASCAL}ShowResp, error) {
-			id, err := resources.GetParsedID[string](trx.V2, "id")
+		"/{NAME}/{id}",
+		func(ctx *request.Context, req {PASCAL}ShowReq) ({PASCAL}ShowResp, error) {
+			id, err := resources.GetParsedID[string](ctx, "id")
 			if err != nil {
 				return {PASCAL}ShowResp{}, err
 			}
@@ -161,10 +155,10 @@ type {PASCAL}NewResp struct {
 
 // New returns the form for creating a new {NAME}.
 func (r *{PASCAL}Resource) New() handlers.EndpointRuntime {
-	return handlers.NewEndpoint[{PASCAL}NewReq, {PASCAL}NewResp](
+	return handlers.Get[{PASCAL}NewReq, {PASCAL}NewResp](
 		"new-{NAME}",
-		libRequest.NoBinding,
-		func(req *{PASCAL}NewReq, trx *handlers.HandlerRequest[{PASCAL}NewReq, {PASCAL}NewResp]) ({PASCAL}NewResp, error) {
+		"/{NAME}/new",
+		func(ctx *request.Context, req {PASCAL}NewReq) ({PASCAL}NewResp, error) {
 			return {PASCAL}NewResp{Form: "new-{NAME}"}, nil
 		},
 	)
@@ -182,10 +176,10 @@ type {PASCAL}CreateResp struct {
 
 // Create creates a new {NAME}.
 func (r *{PASCAL}Resource) Create() handlers.EndpointRuntime {
-	return handlers.NewEndpoint[{PASCAL}CreateReq, {PASCAL}CreateResp](
+	return handlers.Post[{PASCAL}CreateReq, {PASCAL}CreateResp](
 		"create-{NAME}",
-		libRequest.JSON,
-		func(req *{PASCAL}CreateReq, trx *handlers.HandlerRequest[{PASCAL}CreateReq, {PASCAL}CreateResp]) ({PASCAL}CreateResp, error) {
+		"/{NAME}",
+		func(ctx *request.Context, req {PASCAL}CreateReq) ({PASCAL}CreateResp, error) {
 			return {PASCAL}CreateResp{Created: true}, nil
 		},
 	)
@@ -201,11 +195,11 @@ type {PASCAL}EditResp struct {
 
 // Edit returns the form for editing a {NAME} by ID.
 func (r *{PASCAL}Resource) Edit() handlers.EndpointRuntime {
-	return handlers.NewEndpoint[{PASCAL}EditReq, {PASCAL}EditResp](
+	return handlers.Get[{PASCAL}EditReq, {PASCAL}EditResp](
 		"edit-{NAME}",
-		libRequest.NoBinding,
-		func(req *{PASCAL}EditReq, trx *handlers.HandlerRequest[{PASCAL}EditReq, {PASCAL}EditResp]) ({PASCAL}EditResp, error) {
-			id, err := resources.GetParsedID[string](trx.V2, "id")
+		"/{NAME}/{id}/edit",
+		func(ctx *request.Context, req {PASCAL}EditReq) ({PASCAL}EditResp, error) {
+			id, err := resources.GetParsedID[string](ctx, "id")
 			if err != nil {
 				return {PASCAL}EditResp{}, err
 			}
@@ -227,11 +221,11 @@ type {PASCAL}UpdateResp struct {
 
 // Update replaces a {NAME} by ID.
 func (r *{PASCAL}Resource) Update() handlers.EndpointRuntime {
-	return handlers.NewEndpoint[{PASCAL}UpdateReq, {PASCAL}UpdateResp](
+	return handlers.Put[{PASCAL}UpdateReq, {PASCAL}UpdateResp](
 		"update-{NAME}",
-		libRequest.JSON,
-		func(req *{PASCAL}UpdateReq, trx *handlers.HandlerRequest[{PASCAL}UpdateReq, {PASCAL}UpdateResp]) ({PASCAL}UpdateResp, error) {
-			id, err := resources.GetParsedID[string](trx.V2, "id")
+		"/{NAME}/{id}",
+		func(ctx *request.Context, req {PASCAL}UpdateReq) ({PASCAL}UpdateResp, error) {
+			id, err := resources.GetParsedID[string](ctx, "id")
 			if err != nil {
 				return {PASCAL}UpdateResp{}, err
 			}
@@ -251,11 +245,11 @@ type {PASCAL}DestroyResp struct {
 
 // Destroy deletes a {NAME} by ID.
 func (r *{PASCAL}Resource) Destroy() handlers.EndpointRuntime {
-	return handlers.NewEndpoint[{PASCAL}DestroyReq, {PASCAL}DestroyResp](
+	return handlers.Delete[{PASCAL}DestroyReq, {PASCAL}DestroyResp](
 		"delete-{NAME}",
-		libRequest.NoBinding,
-		func(req *{PASCAL}DestroyReq, trx *handlers.HandlerRequest[{PASCAL}DestroyReq, {PASCAL}DestroyResp]) ({PASCAL}DestroyResp, error) {
-			id, err := resources.GetParsedID[string](trx.V2, "id")
+		"/{NAME}/{id}",
+		func(ctx *request.Context, req {PASCAL}DestroyReq) ({PASCAL}DestroyResp, error) {
+			id, err := resources.GetParsedID[string](ctx, "id")
 			if err != nil {
 				return {PASCAL}DestroyResp{}, err
 			}
@@ -294,17 +288,17 @@ func generateMiddleware(name string) error {
 package middleware
 
 import (
+	"github.com/hmmftg/requestCore/v2/request"
 	"github.com/hmmftg/requestCore/v2/routing"
-	v2wf "github.com/hmmftg/requestCore/v2/webFramework"
 )
 
 // {PASCAL}Middleware is a v2 middleware that [describe what it does].
 func {PASCAL}Middleware() routing.Middleware {
 	return func(next routing.Handler) routing.Handler {
-		return func(ctx *v2wf.RequestContext) error {
+		return func(ctx *request.Context, transport routing.Transport) error {
 			// Pre-processing: runs before the handler
 
-			err := next(ctx)
+			err := next(ctx, transport)
 
 			// Post-processing: runs after the handler
 

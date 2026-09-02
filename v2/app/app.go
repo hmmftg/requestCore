@@ -17,6 +17,8 @@ import (
 	"github.com/hmmftg/requestCore"
 	"github.com/hmmftg/requestCore/response"
 
+	"github.com/hmmftg/requestCore/v2/endpoint"
+	"github.com/hmmftg/requestCore/v2/operation"
 	"github.com/hmmftg/requestCore/v2/renderers"
 	"github.com/hmmftg/requestCore/v2/request"
 	v2response "github.com/hmmftg/requestCore/v2/response"
@@ -77,12 +79,14 @@ type Config struct {
 }
 
 // App is the v2 application instance. It composes the router,
-// response handler, worker pool, scheduler, and session manager.
+// endpoint executor, response handler, worker pool, scheduler, and
+// session manager.
 type App struct {
 	Router      routing.Router
 	RespHandler *v2response.Handler
 	Registry    v2response.Registry
 	Renderer    renderers.Renderer
+	Executor    *endpoint.Executor
 	Worker      workers.Worker
 	Scheduler   *workers.Scheduler
 	Sessions    *session.Manager
@@ -125,6 +129,15 @@ func Bootstrap(config Config) (*App, error) {
 	registry := v2response.NewRegistry(nil)
 	registry.SetFallback(v2response.LegacyFallback(config.LegacyHandler))
 	respHandler := v2response.NewHandler(registry, config.Renderer, config.LegacyHandler)
+
+	// Create endpoint executor with the default problem mapper and
+	// operation registry. The executor runs the canonical lifecycle
+	// (bind → validate → execute → encode → commit → observe) and
+	// provides telemetry via its configured telemetry.Sink.
+	executor := endpoint.NewExecutor(
+		endpoint.WithRegistry(operation.NewRegistry()),
+		endpoint.WithProblemMapper(v2response.DefaultMapperRegistry()),
+	)
 
 	// Create worker pool
 	worker := workers.NewInProcessWorker(config.WorkerConfig)
@@ -170,6 +183,7 @@ func Bootstrap(config Config) (*App, error) {
 		RespHandler:      respHandler,
 		Registry:         registry,
 		Renderer:         config.Renderer,
+		Executor:         executor,
 		Worker:           worker,
 		Scheduler:        scheduler,
 		Sessions:         sessionMgr,
@@ -240,16 +254,9 @@ func defaultMethodNotAllowed(h *v2response.Handler) routing.Handler {
 // handler. It maps errors to RFC 9457 Problems and writes them through
 // the transport.
 func makeErrorHandler(h *v2response.Handler) routing.ErrorHandler {
+	mapper := v2response.DefaultMapperRegistry()
 	return func(ctx *request.Context, transport routing.Transport, err error) {
-		// Use the response problem mapper to convert the error.
-		problem := v2response.NewProblemWithCode(
-			http.StatusInternalServerError,
-			"Internal Server Error",
-			"INTERNAL",
-		)
-		// Write the problem as JSON.
-		body := []byte(`{"error":"internal","message":"Internal Server Error"}`)
-		_ = transport.WriteResponse(problem.Status, "application/json", nil, body)
+		_ = v2response.WriteProblemFromError(ctx, transport, mapper, err)
 	}
 }
 

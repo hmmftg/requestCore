@@ -1,392 +1,307 @@
 package handlers
 
 import (
+	"encoding/json"
 	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
 
-	"log/slog"
-
-	"github.com/gin-gonic/gin"
-
-	"github.com/hmmftg/requestCore/libRequest"
-	v2libGin "github.com/hmmftg/requestCore/v2/libGin"
-	v2wf "github.com/hmmftg/requestCore/v2/webFramework"
+	"github.com/hmmftg/requestCore/v2/endpoint"
+	"github.com/hmmftg/requestCore/v2/operation"
+	"github.com/hmmftg/requestCore/v2/request"
+	"github.com/hmmftg/requestCore/v2/telemetry"
 )
 
-// TestAddLog_FailurePathEmitsReqFailed verifies that when a handler
-// returns an error, the lifecycle emits a mandatory AddLog entry with
-// the "<title>-req-failed" key into the Splunk transaction pipeline.
-func TestAddLog_FailurePathEmitsReqFailed(t *testing.T) {
-	t.Skip("Phase 6: handlers bridge needs full v2wf.RequestContext — will be rewritten when handlers are migrated to *request.Context")
-	gin.SetMode(gin.TestMode)
-	engine := gin.New()
-	router := v2libGin.NewRouter(engine)
-	respHandler := testRespHandler()
+// capturingSink is a telemetry.Sink that captures events for test
+// assertions. It implements telemetry.Sink.
+type capturingSink struct {
+	events []telemetry.Event
+}
 
-	var capturedParser v2wf.RequestParser
-	e := NewEndpoint[struct{}, TestResp]("addlog-fail", libRequest.NoBinding,
-		func(req *struct{}, trx *HandlerRequest[struct{}, TestResp]) (TestResp, error) {
-			capturedParser = trx.V2.Parser
-			return TestResp{}, errors.New("handler failure")
+func (s *capturingSink) Record(e telemetry.Event) {
+	s.events = append(s.events, e)
+}
+
+// TestTelemetry_SuccessPathEmitsStartAndSuccess verifies that the
+// executor emits start and success telemetry events on the happy path.
+// The canonical event names are <operation>-req for success.
+func TestTelemetry_SuccessPathEmitsStartAndSuccess(t *testing.T) {
+	sink := &capturingSink{}
+	exec := endpoint.NewExecutor(
+		endpoint.WithRegistry(operation.NewRegistry()),
+		endpoint.WithTelemetrySink(sink),
+	)
+	router := testRouter()
+
+	ep := Get[struct{}, TestResp]("telemetry-ok", "/telemetry-ok",
+		func(ctx *request.Context, req struct{}) (TestResp, error) {
+			return TestResp{Status: "ok"}, nil
 		},
-	).WithPath("/fail")
-	if err := RegisterEndpoint(router, nil, respHandler, "GET", "/fail", e); err != nil {
+	)
+	if err := RegisterEndpoint(router, exec, ep); err != nil {
 		t.Fatalf("RegisterEndpoint: %v", err)
 	}
 
-	w := httptest.NewRecorder()
-	req := httptest.NewRequest("GET", "/fail", nil)
-	engine.ServeHTTP(w, req)
+	srv := httptest.NewServer(router.Native().(http.Handler))
+	defer srv.Close()
 
-	if w.Code == http.StatusOK {
+	resp, err := http.Get(srv.URL + "/telemetry-ok")
+	if err != nil {
+		t.Fatalf("GET: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("expected 200, got %d", resp.StatusCode)
+	}
+
+	// Verify telemetry events were emitted.
+	if len(sink.events) < 2 {
+		t.Fatalf("expected at least 2 telemetry events, got %d", len(sink.events))
+	}
+
+	// First event should be a start event.
+	if sink.events[0].Type != telemetry.EventStart {
+		t.Fatalf("first event type = %v, want EventStart", sink.events[0].Type)
+	}
+	if sink.events[0].Operation != "telemetry-ok" {
+		t.Fatalf("first event operation = %q, want %q", sink.events[0].Operation, "telemetry-ok")
+	}
+
+	// Last event should be a success event.
+	last := sink.events[len(sink.events)-1]
+	if last.Type != telemetry.EventSuccess {
+		t.Fatalf("last event type = %v, want EventSuccess", last.Type)
+	}
+	if last.Operation != "telemetry-ok" {
+		t.Fatalf("last event operation = %q, want %q", last.Operation, "telemetry-ok")
+	}
+	if last.Status != http.StatusOK {
+		t.Fatalf("last event status = %d, want %d", last.Status, http.StatusOK)
+	}
+	if last.Err != nil {
+		t.Fatalf("last event err = %v, want nil", last.Err)
+	}
+}
+
+// TestTelemetry_FailurePathEmitsFailure verifies that a handler error
+// emits a failure telemetry event with the error.
+func TestTelemetry_FailurePathEmitsFailure(t *testing.T) {
+	sink := &capturingSink{}
+	exec := endpoint.NewExecutor(
+		endpoint.WithRegistry(operation.NewRegistry()),
+		endpoint.WithTelemetrySink(sink),
+	)
+	router := testRouter()
+
+	ep := Get[struct{}, TestResp]("telemetry-fail", "/telemetry-fail",
+		func(ctx *request.Context, req struct{}) (TestResp, error) {
+			return TestResp{}, errors.New("handler failure")
+		},
+	)
+	if err := RegisterEndpoint(router, exec, ep); err != nil {
+		t.Fatalf("RegisterEndpoint: %v", err)
+	}
+
+	srv := httptest.NewServer(router.Native().(http.Handler))
+	defer srv.Close()
+
+	resp, err := http.Get(srv.URL + "/telemetry-fail")
+	if err != nil {
+		t.Fatalf("GET: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode == http.StatusOK {
 		t.Fatalf("expected non-200 status, got 200")
 	}
 
-	// Verify the AddLog failure entry was emitted with the
-	// "addlog-fail-req-failed" key.
-	if capturedParser == nil {
-		t.Fatal("expected parser to be captured")
-	}
-	key := "LOG_ARRAY_addlog-fail-req-failed"
-	v := capturedParser.GetLocal(key)
-	if v == nil {
-		t.Fatalf("expected AddLog entry for %q, got nil", key)
-	}
-	arr, ok := v.([]slog.Attr)
-	if !ok {
-		t.Fatalf("expected []slog.Attr, got %T", v)
-	}
-	if len(arr) == 0 {
-		t.Fatal("expected at least one log attr in failure array")
-	}
-}
-
-// TestAddLog_PanicPathEmitsReqFailed verifies that when a handler
-// panics, the lifecycle emits a mandatory AddLog entry with the
-// "<title>-req-failed" key.
-func TestAddLog_PanicPathEmitsReqFailed(t *testing.T) {
-	t.Skip("Phase 6: handlers bridge needs full v2wf.RequestContext — will be rewritten when handlers are migrated to *request.Context")
-	gin.SetMode(gin.TestMode)
-	engine := gin.New()
-	router := v2libGin.NewRouter(engine)
-	respHandler := testRespHandler()
-
-	var capturedParser v2wf.RequestParser
-	e := NewEndpoint[struct{}, TestResp]("addlog-panic", libRequest.NoBinding,
-		func(req *struct{}, trx *HandlerRequest[struct{}, TestResp]) (TestResp, error) {
-			capturedParser = trx.V2.Parser
-			panic("boom")
-		},
-	).WithPath("/panic")
-	if err := RegisterEndpoint(router, nil, respHandler, "GET", "/panic", e); err != nil {
-		t.Fatalf("RegisterEndpoint: %v", err)
-	}
-
-	w := httptest.NewRecorder()
-	req := httptest.NewRequest("GET", "/panic", nil)
-	engine.ServeHTTP(w, req)
-
-	if w.Code != http.StatusInternalServerError {
-		t.Fatalf("expected 500, got %d", w.Code)
-	}
-
-	if capturedParser == nil {
-		t.Fatal("expected parser to be captured")
-	}
-	key := "LOG_ARRAY_addlog-panic-req-failed"
-	v := capturedParser.GetLocal(key)
-	if v == nil {
-		t.Fatalf("expected AddLog entry for %q, got nil", key)
-	}
-}
-
-// TestAddLog_SuccessPathEmitsHandlerLog verifies that a successful
-// handler emits AddLog entries under the HandlerLogTag.
-func TestAddLog_SuccessPathEmitsHandlerLog(t *testing.T) {
-	t.Skip("Phase 6: handlers bridge needs full v2wf.RequestContext — will be rewritten when handlers are migrated to *request.Context")
-	gin.SetMode(gin.TestMode)
-	engine := gin.New()
-	router := v2libGin.NewRouter(engine)
-	respHandler := testRespHandler()
-
-	var capturedParser v2wf.RequestParser
-	e := NewEndpoint[struct{}, TestResp]("addlog-ok", libRequest.NoBinding,
-		func(req *struct{}, trx *HandlerRequest[struct{}, TestResp]) (TestResp, error) {
-			capturedParser = trx.V2.Parser
-			return TestResp{Status: "ok"}, nil
-		},
-	).WithPath("/ok")
-	if err := RegisterEndpoint(router, nil, respHandler, "GET", "/ok", e); err != nil {
-		t.Fatalf("RegisterEndpoint: %v", err)
-	}
-
-	w := httptest.NewRecorder()
-	req := httptest.NewRequest("GET", "/ok", nil)
-	engine.ServeHTTP(w, req)
-
-	if w.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d", w.Code)
-	}
-
-	if capturedParser == nil {
-		t.Fatal("expected parser to be captured")
-	}
-	// The handler log tag array should contain entries.
-	key := "LOG_ARRAY_handler"
-	v := capturedParser.GetLocal(key)
-	if v == nil {
-		t.Fatalf("expected AddLog entries for %q, got nil", key)
-	}
-	arr, ok := v.([]slog.Attr)
-	if !ok {
-		t.Fatalf("expected []slog.Attr, got %T", v)
-	}
-	if len(arr) == 0 {
-		t.Fatal("expected at least one handler log attr")
-	}
-}
-
-// TestAddLog_SuccessPathEmitsTitleReq verifies that a successful handler
-// emits the mandatory <title>-req AddLog entry containing the parsed
-// response, per the enterprise AddLog convention.
-func TestAddLog_SuccessPathEmitsTitleReq(t *testing.T) {
-	t.Skip("Phase 6: handlers bridge needs full v2wf.RequestContext — will be rewritten when handlers are migrated to *request.Context")
-	gin.SetMode(gin.TestMode)
-	engine := gin.New()
-	router := v2libGin.NewRouter(engine)
-	respHandler := testRespHandler()
-
-	var capturedParser v2wf.RequestParser
-	e := NewEndpoint[struct{}, TestResp]("addlog-title-req", libRequest.NoBinding,
-		func(req *struct{}, trx *HandlerRequest[struct{}, TestResp]) (TestResp, error) {
-			capturedParser = trx.V2.Parser
-			return TestResp{Status: "ok"}, nil
-		},
-	).WithPath("/title-req")
-	if err := RegisterEndpoint(router, nil, respHandler, "GET", "/title-req", e); err != nil {
-		t.Fatalf("RegisterEndpoint: %v", err)
-	}
-
-	w := httptest.NewRecorder()
-	req := httptest.NewRequest("GET", "/title-req", nil)
-	engine.ServeHTTP(w, req)
-
-	if w.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d", w.Code)
-	}
-	if capturedParser == nil {
-		t.Fatal("expected parser to be captured")
-	}
-	key := "LOG_ARRAY_addlog-title-req-req"
-	v := capturedParser.GetLocal(key)
-	if v == nil {
-		t.Fatalf("expected <title>-req AddLog entry for %q, got nil", key)
-	}
-	arr, ok := v.([]slog.Attr)
-	if !ok {
-		t.Fatalf("expected []slog.Attr, got %T", v)
-	}
-	if len(arr) == 0 {
-		t.Fatal("expected at least one attr in <title>-req array")
-	}
-}
-
-// maskedResp implements slog.LogValuer to test the AddLog masking
-// projection. The returned HTTP response is the raw struct; AddLog
-// receives the LogValue projection.
-type maskedResp struct {
-	Status   string `json:"status"`
-	Secret   string `json:"secret"`
-	loggedAs slog.Value
-}
-
-func (m maskedResp) LogValue() slog.Value {
-	return slog.GroupValue(
-		slog.String("status", m.Status),
-		slog.String("secret", "<masked>"),
-	)
-}
-
-// TestAddLog_SuccessPathLogValuerMasking verifies that when the response
-// implements slog.LogValuer, the <title>-req AddLog entry receives the
-// LogValue projection rather than the raw response, and the returned HTTP
-// response body is unaffected.
-func TestAddLog_SuccessPathLogValuerMasking(t *testing.T) {
-	t.Skip("Phase 6: handlers bridge needs full v2wf.RequestContext — will be rewritten when handlers are migrated to *request.Context")
-	gin.SetMode(gin.TestMode)
-	engine := gin.New()
-	router := v2libGin.NewRouter(engine)
-	respHandler := testRespHandler()
-
-	var capturedParser v2wf.RequestParser
-	e := NewEndpoint[struct{}, maskedResp]("addlog-mask", libRequest.NoBinding,
-		func(req *struct{}, trx *HandlerRequest[struct{}, maskedResp]) (maskedResp, error) {
-			capturedParser = trx.V2.Parser
-			return maskedResp{Status: "ok", Secret: "topsecret"}, nil
-		},
-	).WithPath("/mask")
-	if err := RegisterEndpoint(router, nil, respHandler, "GET", "/mask", e); err != nil {
-		t.Fatalf("RegisterEndpoint: %v", err)
-	}
-
-	w := httptest.NewRecorder()
-	req := httptest.NewRequest("GET", "/mask", nil)
-	engine.ServeHTTP(w, req)
-
-	if w.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d", w.Code)
-	}
-	// The HTTP response body must contain the raw secret (unmodified).
-	body := w.Body.String()
-	if !strings.Contains(body, "topsecret") {
-		t.Fatalf("expected raw secret in HTTP response body, got: %s", body)
-	}
-	if capturedParser == nil {
-		t.Fatal("expected parser to be captured")
-	}
-	// The <title>-req AddLog entry should contain the LogValue projection.
-	key := "LOG_ARRAY_addlog-mask-req"
-	v := capturedParser.GetLocal(key)
-	if v == nil {
-		t.Fatalf("expected <title>-req AddLog entry for %q, got nil", key)
-	}
-	arr, ok := v.([]slog.Attr)
-	if !ok {
-		t.Fatalf("expected []slog.Attr, got %T", v)
-	}
-	if len(arr) == 0 {
-		t.Fatal("expected at least one attr in <title>-req array")
-	}
-	// The response attr should be a slog.Value (the LogValue projection),
-	// not the raw struct. Verify it does not contain "topsecret" when
-	// rendered. The attr value kind will be KindGroup from LogValue.
-	respAttr := arr[len(arr)-1]
-	if respAttr.Key != "response" {
-		// Find the response attr.
-		found := false
-		for _, a := range arr {
-			if a.Key == "response" {
-				respAttr = a
-				found = true
-				break
-			}
-		}
-		if !found {
-			t.Fatalf("expected 'response' attr in <title>-req array, got: %+v", arr)
-		}
-	}
-	// The LogValue projection should not contain the raw secret string.
-	rendered := respAttr.Value.String()
-	if strings.Contains(rendered, "topsecret") {
-		t.Fatalf("expected masked projection without raw secret, got: %s", rendered)
-	}
-}
-
-// panickingLogValuer implements slog.LogValuer but panics in LogValue.
-type panickingLogValuer struct {
-	Status string `json:"status"`
-}
-
-func (panickingLogValuer) LogValue() slog.Value {
-	panic("logvalue boom")
-}
-
-// TestAddLog_SuccessPathLogValuerPanic verifies that a panic in LogValue
-// is recovered and the raw response is never logged as a fallback.
-func TestAddLog_SuccessPathLogValuerPanic(t *testing.T) {
-	t.Skip("Phase 6: handlers bridge needs full v2wf.RequestContext — will be rewritten when handlers are migrated to *request.Context")
-	gin.SetMode(gin.TestMode)
-	engine := gin.New()
-	router := v2libGin.NewRouter(engine)
-	respHandler := testRespHandler()
-
-	var capturedParser v2wf.RequestParser
-	e := NewEndpoint[struct{}, panickingLogValuer]("addlog-panic-lv", libRequest.NoBinding,
-		func(req *struct{}, trx *HandlerRequest[struct{}, panickingLogValuer]) (panickingLogValuer, error) {
-			capturedParser = trx.V2.Parser
-			return panickingLogValuer{Status: "ok"}, nil
-		},
-	).WithPath("/panic-lv")
-	if err := RegisterEndpoint(router, nil, respHandler, "GET", "/panic-lv", e); err != nil {
-		t.Fatalf("RegisterEndpoint: %v", err)
-	}
-
-	w := httptest.NewRecorder()
-	req := httptest.NewRequest("GET", "/panic-lv", nil)
-	engine.ServeHTTP(w, req)
-
-	if w.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d", w.Code)
-	}
-	if capturedParser == nil {
-		t.Fatal("expected parser to be captured")
-	}
-	key := "LOG_ARRAY_addlog-panic-lv-req"
-	v := capturedParser.GetLocal(key)
-	if v == nil {
-		t.Fatalf("expected <title>-req AddLog entry for %q, got nil", key)
-	}
-	arr, ok := v.([]slog.Attr)
-	if !ok {
-		t.Fatalf("expected []slog.Attr, got %T", v)
-	}
-	// The masking-failure placeholder should be present, not the raw struct.
-	found := false
-	for _, a := range arr {
-		if a.Key == "response" {
-			rendered := a.Value.String()
-			if strings.Contains(rendered, "Status") || strings.Contains(rendered, "ok") {
-				t.Fatalf("expected masked panic placeholder, got raw value: %s", rendered)
-			}
-			found = true
+	// Find the failure event.
+	var failureEvent *telemetry.Event
+	for i := range sink.events {
+		if sink.events[i].Type == telemetry.EventFailure {
+			failureEvent = &sink.events[i]
 			break
 		}
 	}
-	if !found {
-		t.Fatalf("expected 'response' attr in <title>-req array, got: %+v", arr)
+	if failureEvent == nil {
+		t.Fatal("expected a failure telemetry event, got none")
+	}
+	if failureEvent.Operation != "telemetry-fail" {
+		t.Fatalf("failure event operation = %q, want %q", failureEvent.Operation, "telemetry-fail")
+	}
+	if failureEvent.Err == nil {
+		t.Fatal("expected non-nil error in failure event")
 	}
 }
 
-// TestAddLog_InitializerFailureEmitsReqFailed verifies that an
-// initializer failure emits the req-failed AddLog entry.
-func TestAddLog_InitializerFailureEmitsReqFailed(t *testing.T) {
-	t.Skip("Phase 6: handlers bridge needs full v2wf.RequestContext — will be rewritten when handlers are migrated to *request.Context")
-	gin.SetMode(gin.TestMode)
-	engine := gin.New()
-	router := v2libGin.NewRouter(engine)
-	respHandler := testRespHandler()
+// TestTelemetry_PanicPathEmitsFailure verifies that a handler panic
+// emits a failure telemetry event.
+func TestTelemetry_PanicPathEmitsFailure(t *testing.T) {
+	sink := &capturingSink{}
+	exec := endpoint.NewExecutor(
+		endpoint.WithRegistry(operation.NewRegistry()),
+		endpoint.WithTelemetrySink(sink),
+	)
+	router := testRouter()
 
-	var capturedParser v2wf.RequestParser
-	e := NewEndpoint[struct{}, TestResp]("addlog-init-fail", libRequest.NoBinding,
-		func(req *struct{}, trx *HandlerRequest[struct{}, TestResp]) (TestResp, error) {
-			capturedParser = trx.V2.Parser
-			return TestResp{}, errors.New("handler should not run")
+	ep := Get[struct{}, TestResp]("telemetry-panic", "/telemetry-panic",
+		func(ctx *request.Context, req struct{}) (TestResp, error) {
+			panic("boom")
 		},
-	).WithPath("/init-fail").WithInitializer(func(trx *HandlerRequest[struct{}, TestResp]) error {
-		capturedParser = trx.V2.Parser
-		return errors.New("initializer failed")
-	})
-	if err := RegisterEndpoint(router, nil, respHandler, "GET", "/init-fail", e); err != nil {
+	)
+	if err := RegisterEndpoint(router, exec, ep); err != nil {
 		t.Fatalf("RegisterEndpoint: %v", err)
 	}
 
-	w := httptest.NewRecorder()
-	req := httptest.NewRequest("GET", "/init-fail", nil)
-	engine.ServeHTTP(w, req)
+	srv := httptest.NewServer(router.Native().(http.Handler))
+	defer srv.Close()
 
-	if w.Code == http.StatusOK {
+	resp, err := http.Get(srv.URL + "/telemetry-panic")
+	if err != nil {
+		t.Fatalf("GET: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusInternalServerError {
+		t.Fatalf("expected 500, got %d", resp.StatusCode)
+	}
+
+	// Find the failure event.
+	var failureEvent *telemetry.Event
+	for i := range sink.events {
+		if sink.events[i].Type == telemetry.EventFailure {
+			failureEvent = &sink.events[i]
+			break
+		}
+	}
+	if failureEvent == nil {
+		t.Fatal("expected a failure telemetry event for panic, got none")
+	}
+}
+
+// TestTelemetry_BindErrorEmitsFailure verifies that a binding error
+// emits a failure telemetry event.
+func TestTelemetry_BindErrorEmitsFailure(t *testing.T) {
+	sink := &capturingSink{}
+	exec := endpoint.NewExecutor(
+		endpoint.WithRegistry(operation.NewRegistry()),
+		endpoint.WithTelemetrySink(sink),
+	)
+	router := testRouter()
+
+	ep := Post[CreateReq, CreateResp]("telemetry-bind-err", "/telemetry-bind-err",
+		func(ctx *request.Context, req CreateReq) (CreateResp, error) {
+			return CreateResp{ID: "1", Name: req.Name}, nil
+		},
+	)
+	if err := RegisterEndpoint(router, exec, ep); err != nil {
+		t.Fatalf("RegisterEndpoint: %v", err)
+	}
+
+	srv := httptest.NewServer(router.Native().(http.Handler))
+	defer srv.Close()
+
+	// Send invalid JSON to trigger a binding error.
+	resp, err := http.Post(srv.URL+"/telemetry-bind-err", "application/json", strings.NewReader(`{invalid`))
+	if err != nil {
+		t.Fatalf("POST: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode == http.StatusOK {
 		t.Fatalf("expected non-200 status, got 200")
 	}
 
-	if capturedParser == nil {
-		t.Fatal("expected parser to be captured")
+	// Find the failure event.
+	var failureEvent *telemetry.Event
+	for i := range sink.events {
+		if sink.events[i].Type == telemetry.EventFailure {
+			failureEvent = &sink.events[i]
+			break
+		}
 	}
-	key := "LOG_ARRAY_addlog-init-fail-req-failed"
-	v := capturedParser.GetLocal(key)
-	if v == nil {
-		t.Fatalf("expected AddLog entry for %q, got nil", key)
+	if failureEvent == nil {
+		t.Fatal("expected a failure telemetry event for bind error, got none")
+	}
+}
+
+// TestTelemetry_NopSinkDoesNotPanic verifies that a nil sink (default
+// executor) does not panic during request processing.
+func TestTelemetry_NopSinkDoesNotPanic(t *testing.T) {
+	exec := testExecutor() // uses WithNopTelemetry
+	router := testRouter()
+
+	ep := Get[struct{}, TestResp]("nop-sink", "/nop-sink",
+		func(ctx *request.Context, req struct{}) (TestResp, error) {
+			return TestResp{Status: "ok"}, nil
+		},
+	)
+	if err := RegisterEndpoint(router, exec, ep); err != nil {
+		t.Fatalf("RegisterEndpoint: %v", err)
+	}
+
+	srv := httptest.NewServer(router.Native().(http.Handler))
+	defer srv.Close()
+
+	resp, err := http.Get(srv.URL + "/nop-sink")
+	if err != nil {
+		t.Fatalf("GET: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("expected 200, got %d", resp.StatusCode)
+	}
+}
+
+// TestTelemetry_SuccessResponseBodyNotInEvent verifies that the
+// telemetry event does not include raw response bodies. The Event
+// struct has no body field; only the Err field carries data on failure.
+func TestTelemetry_SuccessResponseBodyNotInEvent(t *testing.T) {
+	sink := &capturingSink{}
+	exec := endpoint.NewExecutor(
+		endpoint.WithRegistry(operation.NewRegistry()),
+		endpoint.WithTelemetrySink(sink),
+	)
+	router := testRouter()
+
+	ep := Get[struct{}, TestResp]("no-body-leak", "/no-body-leak",
+		func(ctx *request.Context, req struct{}) (TestResp, error) {
+			return TestResp{Status: "secret-value"}, nil
+		},
+	)
+	if err := RegisterEndpoint(router, exec, ep); err != nil {
+		t.Fatalf("RegisterEndpoint: %v", err)
+	}
+
+	srv := httptest.NewServer(router.Native().(http.Handler))
+	defer srv.Close()
+
+	resp, err := http.Get(srv.URL + "/no-body-leak")
+	if err != nil {
+		t.Fatalf("GET: %v", err)
+	}
+	defer resp.Body.Close()
+
+	// The HTTP response body should contain the secret (it's the
+	// actual response, not telemetry).
+	var result TestResp
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if result.Status != "secret-value" {
+		t.Fatalf("expected 'secret-value' in response, got %q", result.Status)
+	}
+
+	// Verify no telemetry event contains the secret in any field.
+	for _, e := range sink.events {
+		// The Event struct has no body field, but check Err for
+		// safety — on success Err is nil.
+		if e.Err != nil && strings.Contains(e.Err.Error(), "secret-value") {
+			t.Fatalf("telemetry event error contains response body: %v", e.Err)
+		}
 	}
 }

@@ -1,31 +1,27 @@
 // Package main is a v2 requestCore example application using chi.
 //
-// It demonstrates the generics-first v2 API:
+// It demonstrates the canonical v2 API:
 //   - Framework-neutral bootstrap with app.Bootstrap
-//   - Typed endpoint registration with handlers.GetEndpoint / PostEndpoint
-//   - Lifecycle hooks (WithInitializer, WithFinalizer, WithPersistence)
+//   - Typed endpoint registration with handlers.Get / Post / RegisterEndpoint
 //   - Resource registration with ResourceBuilder fluent API (7 CRUD operations)
 //   - Typed session access with session.GetTyped[T] / SetTyped[T]
 //   - Session middleware on a route group
-//   - Background workers with webFramework.AddLog observability
+//   - Background workers
 package main
 
 import (
 	"context"
 	"errors"
 	"log"
-	"log/slog"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
 
-	"github.com/hmmftg/requestCore/libRequest"
-	"github.com/hmmftg/requestCore/webFramework"
-
 	"github.com/hmmftg/requestCore/v2/app"
 	"github.com/hmmftg/requestCore/v2/handlers"
 	"github.com/hmmftg/requestCore/v2/renderers"
+	"github.com/hmmftg/requestCore/v2/request"
 	"github.com/hmmftg/requestCore/v2/resources"
 	"github.com/hmmftg/requestCore/v2/session"
 	"github.com/hmmftg/requestCore/v2/workers"
@@ -54,9 +50,8 @@ func main() {
 
 	// --- Typed GET endpoint ---
 	err = handlers.GetEndpoint[struct{}, HealthResp](
-		application.Router, nil, application.RespHandler, "/health",
-		func(req *struct{}, trx *handlers.HandlerRequest[struct{}, HealthResp]) (HealthResp, error) {
-			webFramework.AddLog(trx.W, "health-check", slog.String("status", "healthy"))
+		application.Router, application.Executor, "/health",
+		func(ctx *request.Context, req struct{}) (HealthResp, error) {
 			return HealthResp{Status: "healthy", Time: time.Now().Format(time.RFC3339)}, nil
 		},
 	)
@@ -64,18 +59,14 @@ func main() {
 		log.Fatalf("Register health: %v", err)
 	}
 
-	// --- Typed POST endpoint with lifecycle hooks and background worker ---
-	createEndpoint := handlers.NewEndpoint[CreateUserReq, CreateUserResp](
-		"create-user", libRequest.JSON,
-		func(req *CreateUserReq, trx *handlers.HandlerRequest[CreateUserReq, CreateUserResp]) (CreateUserResp, error) {
-			webFramework.AddLog(trx.W, "create-user-req", slog.String("name", req.Name))
-
+	// --- Typed POST endpoint with background worker ---
+	createEndpoint := handlers.Post[CreateUserReq, CreateUserResp](
+		"create-user", "/users",
+		func(ctx *request.Context, req CreateUserReq) (CreateUserResp, error) {
 			// Submit a background job to send welcome email.
 			_ = application.Worker.Submit(context.Background(), workers.Job{
 				Name: "send-welcome-email",
 				Handler: func(ctx *workers.JobContext) error {
-					webFramework.AddLog(ctx.WebFramework, "send-welcome-email-req",
-						slog.String("recipient", req.Name))
 					log.Printf("Sending welcome email to %s", req.Name)
 					time.Sleep(100 * time.Millisecond)
 					return nil
@@ -88,25 +79,10 @@ func main() {
 
 			return CreateUserResp{ID: "1", Name: req.Name, Created: true}, nil
 		},
-	).
-		WithPath("/users").
-		WithInitializer(func(trx *handlers.HandlerRequest[CreateUserReq, CreateUserResp]) error {
-			// Runs after parsing, before the handler. Compile-time typed.
-			webFramework.AddLog(trx.W, "create-user-init", slog.String("status", "initializing"))
-			if trx.Request.Name == "" {
-				return errors.New("name is required")
-			}
-			return nil
-		}).
-		WithFinalizer(func(trx *handlers.HandlerRequest[CreateUserReq, CreateUserResp]) {
-			// Always runs, even on panic. Best-effort.
-			webFramework.AddLog(trx.W, "create-user-fin",
-				slog.String("duration", trx.Duration.String()))
-		})
+	)
 
 	if err := handlers.RegisterEndpoint(
-		application.Router, nil, application.RespHandler,
-		"POST", "/users", createEndpoint,
+		application.Router, application.Executor, createEndpoint,
 	); err != nil {
 		log.Fatalf("Register create user: %v", err)
 	}
@@ -114,7 +90,7 @@ func main() {
 	// --- CRUD resource via ResourceBuilder fluent API ---
 	err = resources.NewResource[string]("/items").
 		EnablePatch().
-		Register(application.Router, nil, application.RespHandler, &ItemResource{})
+		Register(application.Router, application.Executor, &ItemResource{})
 	if err != nil {
 		log.Fatalf("Register items resource: %v", err)
 	}
@@ -126,14 +102,15 @@ func main() {
 	api := application.Register("/api", sessionMw)
 
 	err = handlers.GetEndpoint[struct{}, ProfileResp](
-		api, nil, application.RespHandler, "/profile",
-		func(req *struct{}, trx *handlers.HandlerRequest[struct{}, ProfileResp]) (ProfileResp, error) {
+		api, application.Executor, "/profile",
+		func(ctx *request.Context, req struct{}) (ProfileResp, error) {
 			// Typed session access — no runtime type assertions.
-			if trx.V2.Session == nil {
+			principal := ctx.Principal()
+			if principal == nil {
 				return ProfileResp{}, errors.New("no session")
 			}
 
-			sess, ok := trx.V2.Session.(*session.Session)
+			sess, ok := principal.(*session.Session)
 			if !ok {
 				return ProfileResp{}, errors.New("session type assertion failed")
 			}
@@ -147,8 +124,6 @@ func main() {
 				visits = 0
 			}
 
-			webFramework.AddLog(trx.W, "profile-req", slog.Int("visits", visits))
-
 			return ProfileResp{Name: "guest", Visits: visits}, nil
 		},
 	)
@@ -158,13 +133,8 @@ func main() {
 
 	// --- Typed POST endpoint ---
 	err = handlers.PostEndpoint[EchoReq, EchoResp](
-		application.Router, nil, application.RespHandler, "/echo",
-		func(req *EchoReq, trx *handlers.HandlerRequest[EchoReq, EchoResp]) (EchoResp, error) {
-			webFramework.AddLog(trx.W, "echo-req", slog.String("message", req.Message))
-			// The framework renders the response automatically via the
-			// configured renderer. For explicit typed rendering outside
-			// the endpoint lifecycle, use OKTyped:
-			//   application.RespHandler.OKTyped(trx.V2, EchoResp{...})
+		application.Router, application.Executor, "/echo",
+		func(ctx *request.Context, req EchoReq) (EchoResp, error) {
 			return EchoResp{Message: req.Message}, nil
 		},
 	)
@@ -184,10 +154,10 @@ func main() {
 	log.Printf("Starting server on :%s", port)
 	log.Printf("Endpoints:")
 	log.Printf("  GET  /health          - Health check (typed GET)")
-	log.Printf("  POST /users           - Create user (lifecycle hooks + worker)")
+	log.Printf("  POST /users           - Create user (worker)")
 	log.Printf("  GET  /items           - List items (resource)")
 	log.Printf("  GET  /items/{id}      - Show item")
-	log.Printf("  POST /items           - Create item (WithPersistence)")
+	log.Printf("  POST /items           - Create item")
 	log.Printf("  PUT  /items/{id}      - Update item")
 	log.Printf("  PATCH /items/{id}     - Patch item (alias)")
 	log.Printf("  DELETE /items/{id}    - Delete item")
@@ -246,8 +216,8 @@ type ItemResp struct {
 type ItemResource struct{}
 
 func (r *ItemResource) List() handlers.EndpointRuntime {
-	return handlers.NewEndpoint[struct{}, []ItemResp]("list-items", libRequest.NoBinding,
-		func(req *struct{}, trx *handlers.HandlerRequest[struct{}, []ItemResp]) ([]ItemResp, error) {
+	return handlers.Get[struct{}, []ItemResp]("list-items", "/items",
+		func(ctx *request.Context, req struct{}) ([]ItemResp, error) {
 			return []ItemResp{
 				{ID: "1", Name: "Item 1"},
 				{ID: "2", Name: "Item 2"},
@@ -257,9 +227,9 @@ func (r *ItemResource) List() handlers.EndpointRuntime {
 }
 
 func (r *ItemResource) Show() handlers.EndpointRuntime {
-	return handlers.NewEndpoint[struct{}, ItemResp]("show-item", libRequest.NoBinding,
-		func(req *struct{}, trx *handlers.HandlerRequest[struct{}, ItemResp]) (ItemResp, error) {
-			id, err := resources.GetParsedID[string](trx.V2, "id")
+	return handlers.Get[struct{}, ItemResp]("show-item", "/items/{id}",
+		func(ctx *request.Context, req struct{}) (ItemResp, error) {
+			id, err := resources.GetParsedID[string](ctx, "id")
 			if err != nil {
 				return ItemResp{}, err
 			}
@@ -269,36 +239,25 @@ func (r *ItemResource) Show() handlers.EndpointRuntime {
 }
 
 func (r *ItemResource) New() handlers.EndpointRuntime {
-	return handlers.NewEndpoint[struct{}, map[string]any]("new-item", libRequest.NoBinding,
-		func(req *struct{}, trx *handlers.HandlerRequest[struct{}, map[string]any]) (map[string]any, error) {
+	return handlers.Get[struct{}, map[string]any]("new-item", "/items/new",
+		func(ctx *request.Context, req struct{}) (map[string]any, error) {
 			return map[string]any{"form": "item-form"}, nil
 		},
 	)
 }
 
-// Create demonstrates WithPersistence on a resource endpoint.
 func (r *ItemResource) Create() handlers.EndpointRuntime {
-	return handlers.NewEndpoint[ItemResp, ItemResp]("create-item", libRequest.JSON,
-		func(req *ItemResp, trx *handlers.HandlerRequest[ItemResp, ItemResp]) (ItemResp, error) {
-			webFramework.AddLog(trx.W, "create-item-req", slog.String("name", req.Name))
+	return handlers.Post[ItemResp, ItemResp]("create-item", "/items",
+		func(ctx *request.Context, req ItemResp) (ItemResp, error) {
 			return ItemResp{ID: req.ID, Name: req.Name}, nil
 		},
-	).WithPersistence(handlers.NewPersister[ItemResp, ItemResp](
-		func(path string, trx *handlers.HandlerRequest[ItemResp, ItemResp]) error {
-			webFramework.AddLog(trx.W, "create-item-insert", slog.String("path", path))
-			return nil
-		},
-		func(path string, trx *handlers.HandlerRequest[ItemResp, ItemResp]) error {
-			webFramework.AddLog(trx.W, "create-item-update", slog.String("path", path))
-			return nil
-		},
-	))
+	)
 }
 
 func (r *ItemResource) Edit() handlers.EndpointRuntime {
-	return handlers.NewEndpoint[struct{}, ItemResp]("edit-item", libRequest.NoBinding,
-		func(req *struct{}, trx *handlers.HandlerRequest[struct{}, ItemResp]) (ItemResp, error) {
-			id, err := resources.GetParsedID[string](trx.V2, "id")
+	return handlers.Get[struct{}, ItemResp]("edit-item", "/items/{id}/edit",
+		func(ctx *request.Context, req struct{}) (ItemResp, error) {
+			id, err := resources.GetParsedID[string](ctx, "id")
 			if err != nil {
 				return ItemResp{}, err
 			}
@@ -308,22 +267,22 @@ func (r *ItemResource) Edit() handlers.EndpointRuntime {
 }
 
 func (r *ItemResource) Update() handlers.EndpointRuntime {
-	return handlers.NewEndpoint[ItemResp, ItemResp]("update-item", libRequest.JSON,
-		func(req *ItemResp, trx *handlers.HandlerRequest[ItemResp, ItemResp]) (ItemResp, error) {
-			id, err := resources.GetParsedID[string](trx.V2, "id")
+	return handlers.Put[ItemResp, ItemResp]("update-item", "/items/{id}",
+		func(ctx *request.Context, req ItemResp) (ItemResp, error) {
+			id, err := resources.GetParsedID[string](ctx, "id")
 			if err != nil {
 				return ItemResp{}, err
 			}
 			req.ID = id
-			return *req, nil
+			return req, nil
 		},
 	)
 }
 
 func (r *ItemResource) Destroy() handlers.EndpointRuntime {
-	return handlers.NewEndpoint[struct{}, map[string]any]("delete-item", libRequest.NoBinding,
-		func(req *struct{}, trx *handlers.HandlerRequest[struct{}, map[string]any]) (map[string]any, error) {
-			id, err := resources.GetParsedID[string](trx.V2, "id")
+	return handlers.Delete[struct{}, map[string]any]("destroy-item", "/items/{id}",
+		func(ctx *request.Context, req struct{}) (map[string]any, error) {
+			id, err := resources.GetParsedID[string](ctx, "id")
 			if err != nil {
 				return nil, err
 			}

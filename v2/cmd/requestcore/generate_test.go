@@ -41,10 +41,9 @@ func TestGenerateHandler_GoldenContent(t *testing.T) {
 		{"request type", "UserProfileReq"},
 		{"response type", "UserProfileResp"},
 		{"handler function", "UserProfileHandler"},
-		{"HandlerRequest generic", "handlers.HandlerRequest[UserProfileReq, UserProfileResp]"},
-		{"NewEndpoint", "handlers.NewEndpoint[UserProfileReq, UserProfileResp]"},
-		{"AddLog import", "webFramework.AddLog"},
-		{"libRequest import", "libRequest.JSON"},
+		{"canonical handler signature", "ctx *request.Context, req UserProfileReq"},
+		{"Post constructor", "handlers.Post[UserProfileReq, UserProfileResp]"},
+		{"request import", "v2/request"},
 	}
 	for _, c := range checks {
 		if !strings.Contains(s, c.substr) {
@@ -52,10 +51,15 @@ func TestGenerateHandler_GoldenContent(t *testing.T) {
 		}
 	}
 
-	// Must NOT reference the obsolete HandlerInterface or HandlerParameters.
+	// Must NOT reference the obsolete HandlerInterface, HandlerParameters,
+	// or the old alpha lifecycle types.
 	forbidden := []string{
 		"HandlerInterface",
 		"HandlerParameters",
+		"HandlerRequest",
+		"webFramework.AddLog",
+		"libRequest.JSON",
+		"libRequest.NoBinding",
 		"Parameters()",
 		"Initializer()",
 		"Finalizer()",
@@ -93,7 +97,7 @@ func TestGenerateResource_GoldenContent(t *testing.T) {
 	}
 	s := string(content)
 
-	// Read operations should use NoBinding.
+	// Read operations should use handlers.Get (no body binding).
 	readOps := []string{
 		`"list-todo-item"`,
 		`"show-todo-item"`,
@@ -107,14 +111,19 @@ func TestGenerateResource_GoldenContent(t *testing.T) {
 			t.Errorf("expected generated resource to contain %q", op)
 			continue
 		}
-		// Check the few lines after the title for NoBinding.
-		region := s[idx : idx+200]
-		if !strings.Contains(region, "libRequest.NoBinding") {
-			t.Errorf("operation %q should use libRequest.NoBinding", op)
+		// The constructor (handlers.Get/Delete) appears before the
+		// operation ID string in the template. Search backwards.
+		start := idx - 200
+		if start < 0 {
+			start = 0
+		}
+		region := s[start : idx+200]
+		if !strings.Contains(region, "handlers.Get") && !strings.Contains(region, "handlers.Delete") {
+			t.Errorf("operation %q should use handlers.Get or handlers.Delete", op)
 		}
 	}
 
-	// Write operations should use JSON.
+	// Write operations should use handlers.Post or handlers.Put (JSON binding).
 	writeOps := []string{
 		`"create-todo-item"`,
 		`"update-todo-item"`,
@@ -125,9 +134,13 @@ func TestGenerateResource_GoldenContent(t *testing.T) {
 			t.Errorf("expected generated resource to contain %q", op)
 			continue
 		}
-		region := s[idx : idx+200]
-		if !strings.Contains(region, "libRequest.JSON") {
-			t.Errorf("operation %q should use libRequest.JSON", op)
+		start := idx - 200
+		if start < 0 {
+			start = 0
+		}
+		region := s[start : idx+200]
+		if !strings.Contains(region, "handlers.Post") && !strings.Contains(region, "handlers.Put") {
+			t.Errorf("operation %q should use handlers.Post or handlers.Put", op)
 		}
 	}
 }
@@ -159,7 +172,8 @@ func TestGenerateMiddleware_GoldenContent(t *testing.T) {
 	checks := []string{
 		"RequestLoggerMiddleware",
 		"routing.Middleware",
-		"v2wf.RequestContext",
+		"request.Context",
+		"routing.Transport",
 	}
 	for _, c := range checks {
 		if !strings.Contains(s, c) {
