@@ -4,11 +4,12 @@ import (
 	"context"
 	"errors"
 	"log/slog"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
 
-	"github.com/hmmftg/requestCore/webFramework"
+	"github.com/hmmftg/requestCore/v2/telemetry"
 )
 
 func TestInProcessWorker_Success(t *testing.T) {
@@ -374,57 +375,33 @@ func TestInProcessWorker_InvalidJob(t *testing.T) {
 	}
 }
 
-func TestInProcessWorker_TransactionSink(t *testing.T) {
+// capturingSink is a test telemetry sink that records events.
+type capturingSink struct {
+	mu     sync.Mutex
+	events []telemetry.Event
+}
+
+func (s *capturingSink) Record(e telemetry.Event) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.events = append(s.events, e)
+}
+
+func (s *capturingSink) Events() []telemetry.Event {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.events
+}
+
+// TestInProcessWorker_TelemetrySuccess verifies that the sink receives
+// an EventSuccess with operation "worker-<name>-req" on success.
+func TestInProcessWorker_TelemetrySuccess(t *testing.T) {
+	sink := &capturingSink{}
 	w := NewInProcessWorker(Config{
 		WorkerCount: 1,
 		QueueSize:   10,
-	})
-	defer func() {
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-		defer cancel()
-		_ = w.Shutdown(ctx)
-	}()
-	err := w.Submit(context.Background(), Job{
-		Name: "sink-test",
-		Handler: func(ctx *JobContext) error {
-			// The WebFramework should have a non-nil Parser for AddLog calls.
-			if ctx.WebFramework.Parser == nil {
-				return errors.New("nil Parser")
-			}
-			// Simulate an AddLog call via the background parser.
-			ctx.WebFramework.Parser.SetLocal("test", "value")
-			if v := ctx.WebFramework.Parser.GetLocal("test"); v != "value" {
-				return errors.New("SetLocal/GetLocal failed")
-			}
-			return nil
-		},
-	})
-	if err != nil {
-		t.Fatalf("Submit: %v", err)
-	}
-	time.Sleep(100 * time.Millisecond)
-	stats := w.Stats()
-	if stats.Succeeded != 1 {
-		t.Fatalf("expected 1 succeeded, got %d", stats.Succeeded)
-	}
-}
-
-// attrKeys returns the keys of a slice of slog.Attr for debugging.
-func attrKeys(attrs []slog.Attr) []string {
-	keys := make([]string, len(attrs))
-	for i, a := range attrs {
-		keys[i] = a.Key
-	}
-	return keys
-}
-
-// TestInProcessWorker_RealAddLog verifies that webFramework.AddLog calls
-// made inside a job handler are collected into the transaction sink
-// via CollectLogArrays, proving the real Splunk pipeline works.
-func TestInProcessWorker_RealAddLog(t *testing.T) {
-	w := NewInProcessWorker(Config{
-		WorkerCount: 1,
-		QueueSize:   10,
+		Logger:      slog.New(slog.NewTextHandler(&discardHandler{}, &slog.HandlerOptions{Level: slog.LevelError})),
+		Sink:        sink,
 	})
 	defer func() {
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -432,47 +409,100 @@ func TestInProcessWorker_RealAddLog(t *testing.T) {
 		_ = w.Shutdown(ctx)
 	}()
 
-	var sinkEntries []slog.Attr
-	var gotEntries atomic.Bool
-
 	err := w.Submit(context.Background(), Job{
-		Name: "addlog-test",
+		Name: "telemetry-ok",
 		Handler: func(ctx *JobContext) error {
-			// Use the real webFramework.AddLog pipeline.
-			webFramework.AddLog(ctx.WebFramework, webFramework.HandlerLogTag,
-				slog.String("test-key", "test-value"))
-			// Collect logs from the parser into the transaction sink.
-			webFramework.CollectLogArrays(ctx.WebFramework, webFramework.HandlerLogTag)
-			// Verify entries were collected.
-			entries := ctx.transactionSink.Entries()
-			if len(entries) == 0 {
-				return errors.New("no entries collected in sink")
-			}
-			sinkEntries = entries
-			gotEntries.Store(true)
+			ctx.Logger.Info("working", slog.String("step", "done"))
 			return nil
 		},
 	})
 	if err != nil {
 		t.Fatalf("Submit: %v", err)
 	}
+
 	time.Sleep(100 * time.Millisecond)
-	if !gotEntries.Load() {
-		t.Fatal("expected AddLog entries to be collected in sink")
+
+	events := sink.Events()
+	if len(events) != 1 {
+		t.Fatalf("expected 1 event, got %d", len(events))
 	}
-	// CollectLogArrays wraps the array as slog.Any("handler", arr),
-	// so the sink should contain an entry with key "handler".
-	found := false
-	for _, e := range sinkEntries {
-		if e.Key == webFramework.HandlerLogTag {
-			found = true
-			break
+	ev := events[0]
+	if ev.Type != telemetry.EventSuccess {
+		t.Fatalf("expected EventSuccess, got %v", ev.Type)
+	}
+	if ev.Operation != "worker-telemetry-ok-req" {
+		t.Fatalf("expected operation 'worker-telemetry-ok-req', got %q", ev.Operation)
+	}
+	if ev.Status != 200 {
+		t.Fatalf("expected status 200, got %d", ev.Status)
+	}
+	if ev.Err != nil {
+		t.Fatalf("expected nil error, got %v", ev.Err)
+	}
+	// Verify collected attributes from the job logger are present.
+	foundStep := false
+	for _, a := range ev.Attrs {
+		if a.Key == "step" && a.Value.String() == "done" {
+			foundStep = true
 		}
 	}
-	if !found {
-		t.Fatalf("expected '%s' attribute in sink entries, got keys: %v", webFramework.HandlerLogTag, attrKeys(sinkEntries))
+	if !foundStep {
+		t.Fatal("expected 'step' attribute from job logger in event attrs")
 	}
 }
+
+// TestInProcessWorker_TelemetryFailure verifies that the sink receives
+// an EventFailure with the error and operation "worker-<name>-req-failed".
+func TestInProcessWorker_TelemetryFailure(t *testing.T) {
+	sink := &capturingSink{}
+	w := NewInProcessWorker(Config{
+		WorkerCount: 1,
+		QueueSize:   10,
+		Logger:      slog.New(slog.NewTextHandler(&discardHandler{}, &slog.HandlerOptions{Level: slog.LevelError})),
+		Sink:        sink,
+	})
+	defer func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		_ = w.Shutdown(ctx)
+	}()
+
+	jobErr := errors.New("job failed")
+	err := w.Submit(context.Background(), Job{
+		Name: "telemetry-fail",
+		Handler: func(ctx *JobContext) error {
+			return jobErr
+		},
+	})
+	if err != nil {
+		t.Fatalf("Submit: %v", err)
+	}
+
+	time.Sleep(100 * time.Millisecond)
+
+	events := sink.Events()
+	if len(events) != 1 {
+		t.Fatalf("expected 1 event, got %d", len(events))
+	}
+	ev := events[0]
+	if ev.Type != telemetry.EventFailure {
+		t.Fatalf("expected EventFailure, got %v", ev.Type)
+	}
+	if ev.Operation != "worker-telemetry-fail-req-failed" {
+		t.Fatalf("expected operation 'worker-telemetry-fail-req-failed', got %q", ev.Operation)
+	}
+	if ev.Status != 500 {
+		t.Fatalf("expected status 500, got %d", ev.Status)
+	}
+	if ev.Err == nil || ev.Err.Error() != "job failed" {
+		t.Fatalf("expected error 'job failed', got %v", ev.Err)
+	}
+}
+
+// discardHandler is an io.Writer that discards all output.
+type discardHandler struct{}
+
+func (discardHandler) Write(p []byte) (int, error) { return len(p), nil }
 
 // TestInProcessWorker_ContextValuePropagation verifies that context
 // values from the submission context survive into the job handler

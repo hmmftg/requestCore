@@ -8,7 +8,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/hmmftg/requestCore/webFramework"
+	"github.com/hmmftg/requestCore/v2/telemetry"
 )
 
 // ScheduledJob defines a periodic background task run by a Scheduler.
@@ -16,9 +16,9 @@ import (
 // asynchronously), a ScheduledJob runs its Handler at a fixed Interval
 // until the Scheduler is shut down.
 //
-// Each tick of the scheduler creates a fresh JobContext with a
-// BackgroundParser and TransactionSink, providing the same mandatory
-// webFramework.AddLog observability as InProcessWorker jobs.
+// Each tick of the scheduler creates a fresh JobContext with a scoped
+// *slog.Logger and TransactionSink, providing the same telemetry.Sink
+// observability as InProcessWorker jobs.
 type ScheduledJob struct {
 	// Name identifies the job for logging and tracing.
 	Name string
@@ -39,20 +39,35 @@ type ScheduledJob struct {
 
 // SchedulerStats holds per-job statistics for a Scheduler.
 type SchedulerStats struct {
-	Ticks      int64
-	Succeeded  int64
-	Failed     int64
-	LastRun    time.Time
-	LastErr    string
-	InFlight   bool
-	NextRun    time.Time
+	Ticks     int64
+	Succeeded int64
+	Failed    int64
+	LastRun   time.Time
+	LastErr   string
+	InFlight  bool
+	NextRun   time.Time
 }
 
-// Scheduler runs periodic background tasks with mandatory
-// webFramework.AddLog observability. Each tick of each scheduled job
-// receives a job-owned webFramework.WebFramework backed by a
-// concurrency-safe BackgroundParser, ensuring that AddLog calls flow
-// into the Splunk transaction pipeline.
+// SchedulerConfig configures a Scheduler.
+type SchedulerConfig struct {
+	// Logger is the base logger for scheduled job ticks. Each tick
+	// receives a scoped logger backed by a TransactionSink that tees
+	// to this logger. If nil, slog.Default() is used.
+	Logger *slog.Logger
+
+	// Sink is the telemetry sink for recording tick lifecycle events.
+	// If nil, telemetry.NopSink{} is used (no observability).
+	Sink telemetry.Sink
+
+	// Clock is the clock source for deterministic testing.
+	// If nil, time.Now is used.
+	Clock func() time.Time
+}
+
+// Scheduler runs periodic background tasks with telemetry.Sink
+// observability. Each tick of each scheduled job receives a job-scoped
+// *slog.Logger backed by a concurrency-safe TransactionSink, ensuring
+// that log attributes flow into the telemetry pipeline.
 //
 // The Scheduler is designed for long-running poller loops (e.g.
 // periodic data sync, health checks, cache refresh) that run at fixed
@@ -76,25 +91,43 @@ type Scheduler struct {
 
 	// clock is the clock source for deterministic testing.
 	clock func() time.Time
+
+	// logger is the base logger for tick-scoped loggers.
+	logger *slog.Logger
+
+	// sink is the telemetry sink for recording tick lifecycle events.
+	sink telemetry.Sink
 }
 
 // scheduledJobEntry holds the runtime state for a registered job.
 type scheduledJobEntry struct {
-	job      ScheduledJob
-	ticker   *time.Ticker
-	stopCh   chan struct{}
-	stats    SchedulerStats
-	statsMu  sync.Mutex
-	clock    func() time.Time
+	job     ScheduledJob
+	ticker  *time.Ticker
+	stopCh  chan struct{}
+	stats   SchedulerStats
+	statsMu sync.Mutex
+	clock   func() time.Time
 }
 
-// NewScheduler creates a new Scheduler. Jobs can be registered via
-// Schedule before or after Start is called.
-func NewScheduler() *Scheduler {
+// NewScheduler creates a new Scheduler with the given configuration.
+// Jobs can be registered via Schedule before or after Start is called.
+func NewScheduler(config SchedulerConfig) *Scheduler {
+	if config.Logger == nil {
+		config.Logger = slog.Default()
+	}
+	if config.Sink == nil {
+		config.Sink = telemetry.NopSink{}
+	}
+	clock := config.Clock
+	if clock == nil {
+		clock = time.Now
+	}
 	return &Scheduler{
 		jobs:     make(map[string]*scheduledJobEntry),
 		shutDone: make(chan struct{}),
-		clock:    time.Now,
+		clock:    clock,
+		logger:   config.Logger,
+		sink:     config.Sink,
 	}
 }
 
@@ -210,34 +243,26 @@ func (s *Scheduler) executeTick(entry *scheduledJobEntry) {
 
 	var lastErr error
 	for attempt := 1; attempt <= opts.MaxAttempts; attempt++ {
-		sink := NewTransactionSink()
-		bgParser := newBackgroundParser(sink, jobCtx)
-
-		wf := webFramework.WebFramework{
-			Parser: bgParser,
-			Ctx:    jobCtx,
-		}
+		// Build the tick-scoped logger and transaction sink.
+		txSink := NewTransactionSink(s.logger)
+		jobLogger := slog.New(txSink)
 
 		jctx := &JobContext{
 			Context:         jobCtx,
-			WebFramework:    wf,
+			Logger:          jobLogger,
+			Sink:            s.sink,
 			JobName:         job.Name,
 			Attempt:         attempt,
 			Attributes:      opts.Attributes,
-			transactionSink: sink,
+			transactionSink: txSink,
 		}
 
 		start := s.clock()
 		err := s.runWithObservability(jctx, job.Handler)
 		elapsed := s.clock().Sub(start)
 
-		// Collect logs from the parser into the transaction sink.
-		webFramework.CollectLogArrays(wf, webFramework.HandlerLogTag)
-		webFramework.CollectLogTags(wf, webFramework.HandlerLogTag)
-		webFramework.CollectLogArrays(wf, CallAPILogEntry)
-
-		// Flush the transaction sink with mandatory AddLog entries.
-		s.flushTransaction(jctx, err, elapsed)
+		// Record the telemetry event for this tick attempt.
+		s.recordEvent(jctx, err, elapsed)
 
 		if err == nil {
 			atomic.AddInt64(&entry.stats.Ticks, 1)
@@ -267,6 +292,38 @@ func (s *Scheduler) executeTick(entry *scheduledJobEntry) {
 	if opts.OnFailure != nil {
 		s.runOnFailure(opts.OnFailure, lastErr, opts.MaxAttempts)
 	}
+}
+
+// recordEvent emits a telemetry.Event for the completed tick attempt.
+// Success events use EventSuccess with status 200 and operation
+// "worker-<name>-req". Failure events use EventFailure with the error
+// and operation "worker-<name>-req-failed". Collected transaction sink
+// attributes are included in the event.
+func (s *Scheduler) recordEvent(ctx *JobContext, err error, elapsed time.Duration) {
+	operation := "worker-" + ctx.JobName + "-req"
+	eventType := telemetry.EventSuccess
+	status := 200
+	if err != nil {
+		operation = "worker-" + ctx.JobName + "-req-failed"
+		eventType = telemetry.EventFailure
+		status = 500
+	}
+
+	attrs := make([]slog.Attr, 0, 4)
+	attrs = append(attrs, slog.Int("attempt", ctx.Attempt))
+	attrs = append(attrs, slog.String("elapsed", elapsed.String()))
+	if ctx.transactionSink != nil {
+		attrs = append(attrs, ctx.transactionSink.Entries()...)
+	}
+
+	s.sink.Record(telemetry.Event{
+		Type:      eventType,
+		Operation: operation,
+		Status:    status,
+		Duration:  elapsed,
+		Err:       err,
+		Attrs:     attrs,
+	})
 }
 
 // updateStats updates the per-job stats after a tick.
@@ -304,44 +361,6 @@ func (s *Scheduler) runOnFailure(fn func(error, int), err error, attempts int) {
 		}
 	}()
 	fn(err, attempts)
-}
-
-// flushTransaction emits the mandatory worker-<name>-req (success) or
-// worker-<name>-req-failed (failure) log entry for a scheduled job tick.
-// This mirrors InProcessWorker.flushTransaction.
-func (s *Scheduler) flushTransaction(ctx *JobContext, err error, elapsed time.Duration) {
-	if ctx.transactionSink == nil {
-		return
-	}
-
-	key := "worker-" + ctx.JobName + "-req"
-	if err != nil {
-		key = "worker-" + ctx.JobName + "-req-failed"
-	}
-
-	outcomeAttrs := make([]slog.Attr, 0, 4)
-	outcomeAttrs = append(outcomeAttrs, slog.Int("attempt", ctx.Attempt))
-	outcomeAttrs = append(outcomeAttrs, slog.String("elapsed", elapsed.String()))
-	if err != nil {
-		outcomeAttrs = append(outcomeAttrs, slog.String("error", err.Error()))
-		outcomeAttrs = append(outcomeAttrs, slog.String("state", "failed"))
-	} else {
-		outcomeAttrs = append(outcomeAttrs, slog.String("state", "succeeded"))
-	}
-
-	if ctx.WebFramework.Parser != nil {
-		for _, attr := range outcomeAttrs {
-			webFramework.AddLog(ctx.WebFramework, key, attr)
-		}
-		webFramework.CollectLogArrays(ctx.WebFramework, key)
-	}
-
-	entries := ctx.transactionSink.Entries()
-	attrs := make([]slog.Attr, 0, len(entries)+len(outcomeAttrs))
-	attrs = append(attrs, outcomeAttrs...)
-	attrs = append(attrs, entries...)
-
-	slog.LogAttrs(context.Background(), slog.LevelInfo, key, attrs...)
 }
 
 // Shutdown stops all scheduled jobs, waits for in-flight ticks to

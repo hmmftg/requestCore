@@ -10,6 +10,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"sync"
 	"time"
@@ -24,6 +25,7 @@ import (
 	v2response "github.com/hmmftg/requestCore/v2/response"
 	"github.com/hmmftg/requestCore/v2/routing"
 	"github.com/hmmftg/requestCore/v2/session"
+	"github.com/hmmftg/requestCore/v2/telemetry"
 	"github.com/hmmftg/requestCore/v2/workers"
 )
 
@@ -76,6 +78,15 @@ type Config struct {
 	// MethodNotAllowed is the handler for disallowed methods.
 	// If nil, a default 405 JSON response is used.
 	MethodNotAllowed routing.Handler
+
+	// Logger is the base logger for worker and scheduler jobs.
+	// If nil, slog.Default() is used.
+	Logger *slog.Logger
+
+	// TelemetrySink is the telemetry sink for worker and scheduler
+	// lifecycle events. If nil, the executor's sink is used; if the
+	// executor's sink is also nil, telemetry.NopSink{} is used.
+	TelemetrySink telemetry.Sink
 }
 
 // App is the v2 application instance. It composes the router,
@@ -139,11 +150,30 @@ func Bootstrap(config Config) (*App, error) {
 		endpoint.WithProblemMapper(v2response.DefaultMapperRegistry()),
 	)
 
-	// Create worker pool
-	worker := workers.NewInProcessWorker(config.WorkerConfig)
+	// Determine the telemetry sink for workers and scheduler. Prefer
+	// the explicitly configured sink; fall back to the executor's sink.
+	workerSink := config.TelemetrySink
+	if workerSink == nil {
+		workerSink = executor.Telemetry
+	}
 
-	// Create scheduler for periodic background tasks
-	scheduler := workers.NewScheduler()
+	// Determine the base logger for workers and scheduler.
+	workerLogger := config.Logger
+	if workerLogger == nil {
+		workerLogger = slog.Default()
+	}
+
+	// Create worker pool with telemetry observability.
+	workerConfig := config.WorkerConfig
+	workerConfig.Logger = workerLogger
+	workerConfig.Sink = workerSink
+	worker := workers.NewInProcessWorker(workerConfig)
+
+	// Create scheduler for periodic background tasks with telemetry.
+	scheduler := workers.NewScheduler(workers.SchedulerConfig{
+		Logger: workerLogger,
+		Sink:   workerSink,
+	})
 
 	// Create session manager
 	sessionMgr := session.NewManager(config.SessionStore)

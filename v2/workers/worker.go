@@ -1,11 +1,11 @@
 // Package workers provides a bounded in-process worker pool with retry,
-// tracing, and mandatory observability through webFramework.AddLog.
+// tracing, and mandatory observability through telemetry.Sink.
 //
 // Workers run outside HTTP request contexts, so each job receives a
-// job-owned webFramework.WebFramework backed by a concurrency-safe
-// BackgroundParser. This ensures that webFramework.AddLog calls
-// (including those from external API calls via handlers.CallAPI) flow
-// into the Splunk transaction pipeline.
+// job-scoped *slog.Logger and a telemetry.Sink for recording lifecycle
+// events. The TransactionSink collects slog attributes emitted during a
+// job attempt via a slog.Handler, teeing them to the configured logger
+// while accumulating them for inclusion in the final telemetry event.
 package workers
 
 import (
@@ -18,12 +18,12 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/hmmftg/requestCore/webFramework"
+	"github.com/hmmftg/requestCore/v2/telemetry"
 )
 
 // JobHandler is the function executed by a worker job.
-// The JobContext provides a context and a job-owned webFramework.WebFramework
-// for mandatory AddLog calls.
+// The JobContext provides a context, a scoped *slog.Logger, and a
+// telemetry.Sink for recording lifecycle events.
 type JobHandler func(*JobContext) error
 
 // JobContext provides the execution context for a worker job.
@@ -31,11 +31,13 @@ type JobContext struct {
 	// Context carries cancellation and tracing.
 	Context context.Context
 
-	// WebFramework is a job-owned root webFramework.WebFramework with a
-	// BackgroundParser that supports webFramework.AddLog calls. This
-	// ensures that external API calls and critical business events
-	// within jobs are logged to the Splunk transaction pipeline.
-	WebFramework webFramework.WebFramework
+	// Logger is a job-scoped *slog.Logger backed by a TransactionSink
+	// handler. Logs emitted through this logger are collected for the
+	// transaction pipeline and tee'd to the configured logger.
+	Logger *slog.Logger
+
+	// Sink is the telemetry sink for recording lifecycle events.
+	Sink telemetry.Sink
 
 	// JobName is the name of the job.
 	JobName string
@@ -46,45 +48,104 @@ type JobContext struct {
 	// Attributes are tracing attributes for the job.
 	Attributes map[string]string
 
-	// transactionSink collects AddLog entries for this job attempt.
-	// It is flushed after each attempt to emit the mandatory
-	// worker-<name>-req / worker-<name>-req-failed log entries.
+	// transactionSink collects slog attributes emitted during a job
+	// attempt via its slog.Handler interface. It is read after each
+	// attempt to include collected attributes in the telemetry event.
 	transactionSink *TransactionSink
 }
 
-// TransactionSink collects AddLog entries emitted during a job attempt
-// and flushes them as a single transaction log entry after the attempt
-// completes. This ensures worker observability even when the job handler
-// does not explicitly collect logs.
-type TransactionSink struct {
+// transactionSinkState holds the shared collection state for a
+// TransactionSink and all handlers derived from it via WithAttrs.
+type transactionSinkState struct {
 	mu      sync.Mutex
 	entries []slog.Attr
 }
 
-// NewTransactionSink creates a new empty TransactionSink.
-func NewTransactionSink() *TransactionSink {
-	return &TransactionSink{}
+// TransactionSink is a concurrency-safe slog.Handler that collects
+// attributes from log records emitted during a job attempt and tees
+// each record to an underlying logger handler. It replaces the v1
+// BackgroundParser bridge: instead of storing AddLog entries in parser
+// locals, it collects them through the standard slog.Handler interface.
+//
+// All handlers derived from a TransactionSink via WithAttrs share the
+// same collection state, so attributes logged through child loggers
+// (e.g. logger.With("key", "val")) are visible in Entries().
+type TransactionSink struct {
+	state *transactionSinkState
+	pre   []slog.Attr
+	tee   slog.Handler
 }
 
-// Add appends a log attribute to the sink.
-func (s *TransactionSink) Add(attr slog.Attr) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	s.entries = append(s.entries, attr)
+// NewTransactionSink creates a new TransactionSink that tees records to
+// the given logger. If logger is nil, slog.Default() is used.
+func NewTransactionSink(logger *slog.Logger) *TransactionSink {
+	if logger == nil {
+		logger = slog.Default()
+	}
+	return &TransactionSink{
+		state: &transactionSinkState{},
+		tee:   logger.Handler(),
+	}
 }
 
-// Entries returns a copy of the collected log attributes.
+// Handle implements slog.Handler. It collects the record's attributes
+// (plus any pre-attributes from WithAttrs) into the shared state and
+// tees the record to the underlying logger handler if it is enabled
+// for the record's level.
+func (s *TransactionSink) Handle(ctx context.Context, r slog.Record) error {
+	s.state.mu.Lock()
+	for _, a := range s.pre {
+		s.state.entries = append(s.state.entries, a)
+	}
+	r.Attrs(func(attr slog.Attr) bool {
+		s.state.entries = append(s.state.entries, attr)
+		return true
+	})
+	s.state.mu.Unlock()
+	// Only tee to the underlying handler if it is enabled for this level.
+	if s.tee.Enabled(ctx, r.Level) {
+		return s.tee.Handle(ctx, r.Clone())
+	}
+	return nil
+}
+
+// WithAttrs returns a new TransactionSink that shares the same
+// collection state but prepends the given attributes to each record.
+func (s *TransactionSink) WithAttrs(attrs []slog.Attr) slog.Handler {
+	return &TransactionSink{
+		state: s.state,
+		pre:   append(append([]slog.Attr{}, s.pre...), attrs...),
+		tee:   s.tee,
+	}
+}
+
+// WithGroup returns the receiver unchanged. Group nesting is not
+// supported for attribute collection.
+func (s *TransactionSink) WithGroup(name string) slog.Handler {
+	return s
+}
+
+// Enabled implements slog.Handler. It always returns true so that
+// attributes are collected regardless of the underlying logger's level
+// filtering. The tee to the underlying handler is gated separately in
+// Handle.
+func (s *TransactionSink) Enabled(ctx context.Context, level slog.Level) bool {
+	return true
+}
+
+// Entries returns a copy of the collected log attributes from all
+// handlers sharing this sink's state.
 func (s *TransactionSink) Entries() []slog.Attr {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	return slices.Clone(s.entries)
+	s.state.mu.Lock()
+	defer s.state.mu.Unlock()
+	return slices.Clone(s.state.entries)
 }
 
-// Reset clears the sink.
+// Reset clears the collected log attributes.
 func (s *TransactionSink) Reset() {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	s.entries = nil
+	s.state.mu.Lock()
+	defer s.state.mu.Unlock()
+	s.state.entries = nil
 }
 
 // Job defines a unit of asynchronous work.
@@ -177,6 +238,15 @@ type Config struct {
 	// JitterSource is the jitter source for deterministic testing.
 	// If nil, a package-level locked random source is used.
 	JitterSource func(max int64) int64
+
+	// Logger is the base logger for worker jobs. Each job receives a
+	// scoped logger backed by a TransactionSink that tees to this logger.
+	// If nil, slog.Default() is used.
+	Logger *slog.Logger
+
+	// Sink is the telemetry sink for recording job lifecycle events.
+	// If nil, telemetry.NopSink{} is used (no observability).
+	Sink telemetry.Sink
 }
 
 // DefaultConfig returns a Config with sensible defaults.
@@ -213,11 +283,6 @@ func (errShutdown) Is(target error) bool {
 // ErrInvalidJob is returned when a job has an empty name or nil handler.
 var ErrInvalidJob = errors.New("workers: invalid job (empty name or nil handler)")
 
-// CallAPILogEntry mirrors the v1 handlers.CallAPILogEntry constant so
-// worker jobs can collect API-call log arrays in the finalizer without
-// importing the v1 handlers package directly.
-const CallAPILogEntry string = "ApiCall"
-
 // jobEnvelope carries a Job and its submission context through the queue
 // so that context values and tracing survive into the worker goroutine.
 type jobEnvelope struct {
@@ -243,6 +308,12 @@ type InProcessWorker struct {
 	// clock and jitter sources for deterministic testing.
 	clock        func() time.Time
 	jitterSource func(max int64) int64
+
+	// logger is the base logger for job-scoped loggers.
+	logger *slog.Logger
+
+	// sink is the telemetry sink for recording job lifecycle events.
+	sink telemetry.Sink
 }
 
 // NewInProcessWorker creates a new InProcessWorker with the given configuration.
@@ -253,12 +324,20 @@ func NewInProcessWorker(config Config) *InProcessWorker {
 	if config.QueueSize <= 0 {
 		config.QueueSize = 100
 	}
+	if config.Logger == nil {
+		config.Logger = slog.Default()
+	}
+	if config.Sink == nil {
+		config.Sink = telemetry.NopSink{}
+	}
 	w := &InProcessWorker{
 		config:       config,
 		queue:        make(chan jobEnvelope, config.QueueSize),
 		shutDone:     make(chan struct{}),
 		clock:        config.Clock,
 		jitterSource: config.JitterSource,
+		logger:       config.Logger,
+		sink:         config.Sink,
 	}
 	if w.clock == nil {
 		w.clock = time.Now
@@ -318,35 +397,26 @@ func (w *InProcessWorker) executeJob(env jobEnvelope) {
 
 	var lastErr error
 	for attempt := 1; attempt <= opts.MaxAttempts; attempt++ {
-		// Build the job context with a BackgroundParser and TransactionSink.
-		sink := NewTransactionSink()
-		bgParser := newBackgroundParser(sink, jobCtx)
-
-		wf := webFramework.WebFramework{
-			Parser: bgParser,
-			Ctx:    jobCtx,
-		}
+		// Build the job-scoped logger and transaction sink.
+		txSink := NewTransactionSink(w.logger)
+		jobLogger := slog.New(txSink)
 
 		jctx := &JobContext{
 			Context:         jobCtx,
-			WebFramework:    wf,
+			Logger:          jobLogger,
+			Sink:            w.sink,
 			JobName:         job.Name,
 			Attempt:         attempt,
 			Attributes:      opts.Attributes,
-			transactionSink: sink,
+			transactionSink: txSink,
 		}
 
 		start := w.clock()
 		err := w.runWithObservability(jctx, job.Handler)
 		elapsed := w.clock().Sub(start)
 
-		// Collect logs from the parser into the transaction sink.
-		webFramework.CollectLogArrays(wf, webFramework.HandlerLogTag)
-		webFramework.CollectLogTags(wf, webFramework.HandlerLogTag)
-		webFramework.CollectLogArrays(wf, CallAPILogEntry)
-
-		// Flush the transaction sink with mandatory AddLog entries.
-		w.flushTransaction(jctx, err, elapsed)
+		// Record the telemetry event for this attempt.
+		w.recordEvent(jctx, err, elapsed)
 
 		if err == nil {
 			atomic.AddInt64(&w.stats.Succeeded, 1)
@@ -378,60 +448,36 @@ func (w *InProcessWorker) executeJob(env jobEnvelope) {
 	}
 }
 
-// flushTransaction emits the mandatory worker-<name>-req (success) or
-// worker-<name>-req-failed (failure) log entry with attempt, elapsed time,
-// terminal state, and collected transaction attributes.
-//
-// The outcome entry is emitted through webFramework.AddLog on the job-owned
-// WebFramework so it flows into the Splunk transaction pipeline alongside
-// the handler's own AddLog entries. The entry is then collected into the
-// transaction sink via CollectLogArrays and also emitted via slog as a
-// supplementary log for environments without a Splunk-connected handler.
-func (w *InProcessWorker) flushTransaction(ctx *JobContext, err error, elapsed time.Duration) {
-	if ctx.transactionSink == nil {
-		return
-	}
-
-	key := "worker-" + ctx.JobName + "-req"
+// recordEvent emits a telemetry.Event for the completed job attempt.
+// Success events use EventSuccess with status 200 and operation
+// "worker-<name>-req". Failure events use EventFailure with the error
+// and operation "worker-<name>-req-failed". Collected transaction sink
+// attributes are included in the event.
+func (w *InProcessWorker) recordEvent(ctx *JobContext, err error, elapsed time.Duration) {
+	operation := "worker-" + ctx.JobName + "-req"
+	eventType := telemetry.EventSuccess
+	status := 200
 	if err != nil {
-		key = "worker-" + ctx.JobName + "-req-failed"
+		operation = "worker-" + ctx.JobName + "-req-failed"
+		eventType = telemetry.EventFailure
+		status = 500
 	}
 
-	// Build the outcome attributes.
-	outcomeAttrs := make([]slog.Attr, 0, 4)
-	outcomeAttrs = append(outcomeAttrs, slog.Int("attempt", ctx.Attempt))
-	outcomeAttrs = append(outcomeAttrs, slog.String("elapsed", elapsed.String()))
-	if err != nil {
-		outcomeAttrs = append(outcomeAttrs, slog.String("error", err.Error()))
-		outcomeAttrs = append(outcomeAttrs, slog.String("state", "failed"))
-	} else {
-		outcomeAttrs = append(outcomeAttrs, slog.String("state", "succeeded"))
+	attrs := make([]slog.Attr, 0, 4)
+	attrs = append(attrs, slog.Int("attempt", ctx.Attempt))
+	attrs = append(attrs, slog.String("elapsed", elapsed.String()))
+	if ctx.transactionSink != nil {
+		attrs = append(attrs, ctx.transactionSink.Entries()...)
 	}
 
-	// Emit the outcome entry through the real webFramework.AddLog pipeline
-	// so it flows into the Splunk transaction pipeline. This satisfies the
-	// mandatory AddLog requirement for worker transaction boundaries.
-	if ctx.WebFramework.Parser != nil {
-		for _, attr := range outcomeAttrs {
-			webFramework.AddLog(ctx.WebFramework, key, attr)
-		}
-		// Collect the outcome entry into the transaction sink.
-		webFramework.CollectLogArrays(ctx.WebFramework, key)
-	}
-
-	// Read all sink entries (handler AddLog entries + outcome entry).
-	entries := ctx.transactionSink.Entries()
-
-	// Build the full attribute list for the supplementary slog emission.
-	attrs := make([]slog.Attr, 0, len(entries)+len(outcomeAttrs))
-	attrs = append(attrs, outcomeAttrs...)
-	attrs = append(attrs, entries...)
-
-	// Emit via slog as a supplementary log. The real AddLog entry is
-	// already in the pipeline via the AddLog calls above; this slog
-	// emission ensures observability in environments without a
-	// Splunk-connected slog handler.
-	slog.LogAttrs(context.Background(), slog.LevelInfo, key, attrs...)
+	w.sink.Record(telemetry.Event{
+		Type:      eventType,
+		Operation: operation,
+		Status:    status,
+		Duration:  elapsed,
+		Err:       err,
+		Attrs:     attrs,
+	})
 }
 
 func (w *InProcessWorker) runWithObservability(ctx *JobContext, handler JobHandler) (err error) {

@@ -3,15 +3,18 @@ package workers
 import (
 	"context"
 	"errors"
+	"log/slog"
 	"sync/atomic"
 	"testing"
 	"time"
+
+	"github.com/hmmftg/requestCore/v2/telemetry"
 )
 
 // TestScheduler_BasicTick verifies that a scheduled job's handler
 // runs at the configured interval.
 func TestScheduler_BasicTick(t *testing.T) {
-	sched := NewScheduler()
+	sched := NewScheduler(SchedulerConfig{})
 
 	var ticks int64
 	err := sched.Schedule(ScheduledJob{
@@ -45,7 +48,7 @@ func TestScheduler_BasicTick(t *testing.T) {
 // TestScheduler_GracefulShutdown verifies that Shutdown stops all
 // tickers and waits for in-flight ticks to complete.
 func TestScheduler_GracefulShutdown(t *testing.T) {
-	sched := NewScheduler()
+	sched := NewScheduler(SchedulerConfig{})
 
 	var ticks int64
 	err := sched.Schedule(ScheduledJob{
@@ -81,7 +84,7 @@ func TestScheduler_GracefulShutdown(t *testing.T) {
 // TestScheduler_PanicRecovery verifies that a panic in the handler
 // does not kill the scheduler goroutine.
 func TestScheduler_PanicRecovery(t *testing.T) {
-	sched := NewScheduler()
+	sched := NewScheduler(SchedulerConfig{})
 
 	var ticks int64
 	err := sched.Schedule(ScheduledJob{
@@ -123,7 +126,7 @@ func TestScheduler_PanicRecovery(t *testing.T) {
 // TestScheduler_MultipleJobs verifies that multiple scheduled jobs
 // run independently.
 func TestScheduler_MultipleJobs(t *testing.T) {
-	sched := NewScheduler()
+	sched := NewScheduler(SchedulerConfig{})
 
 	var ticksA, ticksB int64
 	if err := sched.Schedule(ScheduledJob{
@@ -164,10 +167,14 @@ func TestScheduler_MultipleJobs(t *testing.T) {
 	}
 }
 
-// TestScheduler_Observability verifies that AddLog entries are emitted
-// per tick (the transaction sink collects entries).
+// TestScheduler_Observability verifies that telemetry events are emitted
+// per tick (the sink receives EventSuccess with the correct operation).
 func TestScheduler_Observability(t *testing.T) {
-	sched := NewScheduler()
+	sink := &capturingSink{}
+	sched := NewScheduler(SchedulerConfig{
+		Logger: slog.New(slog.NewTextHandler(&discardHandler{}, &slog.HandlerOptions{Level: slog.LevelError})),
+		Sink:   sink,
+	})
 
 	var ticks int64
 	err := sched.Schedule(ScheduledJob{
@@ -175,9 +182,9 @@ func TestScheduler_Observability(t *testing.T) {
 		Interval: 10 * time.Millisecond,
 		Handler: func(ctx *JobContext) error {
 			atomic.AddInt64(&ticks, 1)
-			// The WebFramework should have a non-nil parser for AddLog.
-			if ctx.WebFramework.Parser == nil {
-				return errors.New("parser is nil")
+			// The Logger should be non-nil for scoped logging.
+			if ctx.Logger == nil {
+				return errors.New("logger is nil")
 			}
 			return nil
 		},
@@ -204,11 +211,28 @@ func TestScheduler_Observability(t *testing.T) {
 	if stats["test-obs"].Succeeded == 0 {
 		t.Fatal("expected at least 1 succeeded tick")
 	}
+
+	// Verify the telemetry sink received success events with the
+	// correct operation name.
+	events := sink.Events()
+	if len(events) == 0 {
+		t.Fatal("expected at least 1 telemetry event")
+	}
+	foundSuccess := false
+	for _, ev := range events {
+		if ev.Type == telemetry.EventSuccess && ev.Operation == "worker-test-obs-req" {
+			foundSuccess = true
+			break
+		}
+	}
+	if !foundSuccess {
+		t.Fatalf("expected EventSuccess with operation 'worker-test-obs-req', got %d events", len(events))
+	}
 }
 
 // TestScheduler_Stats verifies that Stats returns per-job statistics.
 func TestScheduler_Stats(t *testing.T) {
-	sched := NewScheduler()
+	sched := NewScheduler(SchedulerConfig{})
 
 	err := sched.Schedule(ScheduledJob{
 		Name:     "test-stats",
@@ -240,7 +264,7 @@ func TestScheduler_Stats(t *testing.T) {
 
 // TestScheduler_InvalidJob verifies that Schedule rejects invalid jobs.
 func TestScheduler_InvalidJob(t *testing.T) {
-	sched := NewScheduler()
+	sched := NewScheduler(SchedulerConfig{})
 
 	// Empty name.
 	if err := sched.Schedule(ScheduledJob{
@@ -273,7 +297,7 @@ func TestScheduler_InvalidJob(t *testing.T) {
 // TestScheduler_DuplicateName verifies that Schedule rejects duplicate
 // job names.
 func TestScheduler_DuplicateName(t *testing.T) {
-	sched := NewScheduler()
+	sched := NewScheduler(SchedulerConfig{})
 
 	job := ScheduledJob{
 		Name:     "dup",
@@ -291,7 +315,7 @@ func TestScheduler_DuplicateName(t *testing.T) {
 // TestScheduler_ShutdownIdempotent verifies that Shutdown can be called
 // multiple times safely.
 func TestScheduler_ShutdownIdempotent(t *testing.T) {
-	sched := NewScheduler()
+	sched := NewScheduler(SchedulerConfig{})
 
 	_ = sched.Schedule(ScheduledJob{
 		Name:     "test-idem",
@@ -313,7 +337,7 @@ func TestScheduler_ShutdownIdempotent(t *testing.T) {
 // TestScheduler_ScheduleAfterShutdown verifies that Schedule returns
 // ErrShutdown after Shutdown has been called.
 func TestScheduler_ScheduleAfterShutdown(t *testing.T) {
-	sched := NewScheduler()
+	sched := NewScheduler(SchedulerConfig{})
 	sched.Start()
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -333,7 +357,7 @@ func TestScheduler_ScheduleAfterShutdown(t *testing.T) {
 // TestScheduler_RetryOnFailure verifies that retry logic applies
 // within a single tick when the handler returns an error.
 func TestScheduler_RetryOnFailure(t *testing.T) {
-	sched := NewScheduler()
+	sched := NewScheduler(SchedulerConfig{})
 
 	var attempts int64
 	var succeeded int64
