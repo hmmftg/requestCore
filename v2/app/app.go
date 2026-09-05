@@ -95,6 +95,12 @@ type Config struct {
 	// saga features are disabled.
 	SagaStore saga.SagaStore
 
+	// SagaRegistry maps saga names to step definitions for crash
+	// recovery. If non-nil, ResumeAll can execute and compensate
+	// steps with real functions. If nil, only already-completed steps
+	// can be skipped during resume.
+	SagaRegistry *saga.SagaRegistry
+
 	// OutboxStore persists outbox records for reliable event
 	// delivery. If nil, outbox relay is disabled.
 	OutboxStore saga.OutboxStore
@@ -250,6 +256,7 @@ func Bootstrap(config Config) (*App, error) {
 		sagaOrch = saga.NewOrchestrator(
 			saga.WithStore(config.SagaStore),
 			saga.WithSink(config.TelemetrySink),
+			saga.WithRegistry(config.SagaRegistry),
 		)
 
 		resumeInterval := config.SagaResumeInterval

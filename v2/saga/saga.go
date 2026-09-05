@@ -46,10 +46,11 @@ type Saga struct {
 // Orchestrator runs saga executions with telemetry and optional durable
 // state persistence for crash recovery.
 type Orchestrator struct {
-	store   SagaStore
-	sink    telemetry.Sink
-	timeout time.Duration
-	clock   func() time.Time
+	store    SagaStore
+	sink     telemetry.Sink
+	timeout  time.Duration
+	clock    func() time.Time
+	registry *SagaRegistry
 }
 
 // OrchestratorOption configures an Orchestrator at construction time.
@@ -71,6 +72,14 @@ func WithSink(s telemetry.Sink) OrchestratorOption {
 // the context is cancelled and compensation begins. Zero means no timeout.
 func WithTimeout(d time.Duration) OrchestratorOption {
 	return func(o *Orchestrator) { o.timeout = d }
+}
+
+// WithRegistry sets the saga registry for looking up step definitions
+// during crash recovery. Without a registry, ResumeAll can only skip
+// already-completed steps but cannot execute or compensate pending
+// steps because the real step functions are not available.
+func WithRegistry(r *SagaRegistry) OrchestratorOption {
+	return func(o *Orchestrator) { o.registry = r }
 }
 
 // withClock sets the clock source for deterministic testing.
@@ -100,6 +109,11 @@ func (o *Orchestrator) Execute(ctx context.Context, saga *Saga) error {
 // ResumeAll loads all incomplete sagas from the store and resumes them
 // from their last persisted step state. This is intended to be called
 // on startup or periodically via a workers.ScheduledJob.
+//
+// If a SagaRegistry is configured, step definitions (Execute/Compensate
+// functions) are looked up by saga name. Without a registry, only
+// already-completed steps can be skipped; pending steps cannot be
+// executed because the real functions are unavailable.
 func (o *Orchestrator) ResumeAll(ctx context.Context) error {
 	if o.store == nil {
 		return nil
@@ -121,11 +135,7 @@ func (o *Orchestrator) ResumeAll(ctx context.Context) error {
 			continue
 		}
 
-		saga := &Saga{
-			ID:    st.ID,
-			Name:  st.SagaName,
-			Steps: o.reconstructSteps(st),
-		}
+		saga := o.reconstructSaga(st)
 
 		_ = o.executeWithState(ctx, saga, st)
 
@@ -135,20 +145,42 @@ func (o *Orchestrator) ResumeAll(ctx context.Context) error {
 	return nil
 }
 
-// reconstructSteps builds a Saga.Steps slice from persisted state.
-// The actual step functions must be registered by the application;
-// this method returns placeholder steps that will be replaced by the
-// caller. In practice, ResumeAll is called with a saga registry that
-// maps saga names to Saga definitions with real step functions.
-//
-// For now, this is a placeholder that returns empty steps. The full
-// implementation will use a saga registry (future enhancement).
-func (o *Orchestrator) reconstructSteps(st *SagaState) []Step {
-	steps := make([]Step, len(st.Steps))
-	for i, ss := range st.Steps {
-		steps[i] = Step{Name: ss.Name}
+// reconstructSaga builds a Saga from persisted state. If a registry
+// is configured, it looks up the real step definitions by saga name
+// and merges them with the persisted step names. Without a registry,
+// steps have nil Execute/Compensate functions, meaning only already-
+// completed steps can be skipped during resume.
+func (o *Orchestrator) reconstructSaga(st *SagaState) *Saga {
+	saga := &Saga{
+		ID:   st.ID,
+		Name: st.SagaName,
 	}
-	return steps
+
+	if o.registry != nil {
+		if def := o.registry.Lookup(st.SagaName); def != nil {
+			saga.Steps = make([]Step, len(st.Steps))
+			for i, ss := range st.Steps {
+				found := false
+				for _, defStep := range def.Steps {
+					if defStep.Name == ss.Name {
+						saga.Steps[i] = defStep
+						found = true
+						break
+					}
+				}
+				if !found {
+					saga.Steps[i] = Step{Name: ss.Name}
+				}
+			}
+			return saga
+		}
+	}
+
+	saga.Steps = make([]Step, len(st.Steps))
+	for i, ss := range st.Steps {
+		saga.Steps[i] = Step{Name: ss.Name}
+	}
+	return saga
 }
 
 // executeWithState runs the saga execution loop. If resumeState is
@@ -303,6 +335,7 @@ func (o *Orchestrator) compensate(ctx context.Context, saga *Saga, st *SagaState
 		}
 
 		st.Steps[i].Status = StepCompensating
+		st.Steps[i].IdempotencyKey = MakeIdempotencyKey(saga.ID, step.Name, "compensate")
 		st.UpdatedAt = o.clock()
 
 		start := o.clock()

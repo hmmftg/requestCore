@@ -32,8 +32,7 @@ func NewMemoryStore() *MemoryStore {
 func (m *MemoryStore) Save(_ context.Context, st *SagaState) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	cp := *st
-	m.sagas[st.ID] = &cp
+	m.sagas[st.ID] = deepCopySagaState(st)
 	return nil
 }
 
@@ -45,8 +44,7 @@ func (m *MemoryStore) Load(_ context.Context, sagaID string) (*SagaState, error)
 	if !ok {
 		return nil, fmt.Errorf("saga: not found: %s", sagaID)
 	}
-	cp := *st
-	return &cp, nil
+	return deepCopySagaState(st), nil
 }
 
 // UpdateStepAndOutbox atomically updates a step's state and appends
@@ -84,8 +82,7 @@ func (m *MemoryStore) ListIncomplete(_ context.Context) ([]*SagaState, error) {
 	var result []*SagaState
 	for _, st := range m.sagas {
 		if st.Status == SagaRunning || st.Status == SagaCompensating {
-			cp := *st
-			result = append(result, &cp)
+			result = append(result, deepCopySagaState(st))
 		}
 	}
 	return result, nil
