@@ -141,7 +141,7 @@ jobs:
 
           require (
             github.com/hmmftg/requestCore v0.0.0
-            github.com/hmmftg/requestCore/v2 v0.0.0
+            github.com/hmmftg/requestCore/v2 v2.0.0
           )
           GOMOD
           # Use local replace directives pointing at the checked-out repo

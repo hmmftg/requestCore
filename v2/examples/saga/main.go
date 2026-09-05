@@ -70,7 +70,7 @@ func main() {
 	if err := orch.Execute(context.Background(), s); err != nil {
 		log.Fatalf("happy path failed: %v", err)
 	}
-	fmt.Println("Saga completed successfully!\n")
+	fmt.Print("Saga completed successfully!\n\n")
 
 	failingSaga := &saga.Saga{
 		ID:   "checkout-fail-" + fmt.Sprint(time.Now().UnixMilli()),
@@ -117,7 +117,7 @@ func main() {
 	if err != nil {
 		fmt.Printf("Saga failed as expected: %v\n", err)
 	}
-	fmt.Println("Compensation completed!\n")
+	fmt.Print("Compensation completed!\n\n")
 
 	st, _ := store.Load(context.Background(), failingSaga.ID)
 	fmt.Printf("Final saga status: %s\n", st.Status)
