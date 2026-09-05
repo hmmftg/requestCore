@@ -157,6 +157,13 @@ func (c *Context) Context() context.Context {
 	return c.ctx
 }
 
+// SetContext updates the underlying Go context. This is used by tracing
+// middleware to inject span contexts so handlers can access the active
+// span via trace.SpanFromContext.
+func (c *Context) SetContext(goCtx context.Context) {
+	c.ctx = goCtx
+}
+
 // WithContext returns a new Context with the given Go context, copying
 // all other state. This is used by middleware that needs to derive a
 // child context (e.g. for deadlines).

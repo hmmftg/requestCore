@@ -53,6 +53,12 @@ import (
 	"github.com/hmmftg/requestCore/v2/routing"
 )
 
+// parsedIDKey is the typed key for storing the parsed resource ID on
+// the request context. The IDParser injected by resources.Register
+// stores the parsed ID here so handlers can retrieve it via
+// GetParsedIDFromContext without re-parsing.
+var parsedIDKey = request.NewTypedKey()
+
 // Resource defines the seven standard CRUD operations for a resource.
 // Each operation returns an EndpointRuntime — a type-erased interface
 // that can be registered on a router. Operations returning nil are not
@@ -215,6 +221,7 @@ func Register[ID cmp.Ordered](router routing.RouteGroup, config Config[ID]) erro
 	// Edit: GET /{resource}/{id}/edit
 	if op := config.Resource.Edit(); op != nil {
 		setEndpointPath(op, basePath+"/{"+idParam+"}/edit")
+		setEndpointIDParser(op, config, idParam)
 		if err := handlers.RegisterRuntime(router, config.Executor, op); err != nil {
 			return err
 		}
@@ -262,6 +269,7 @@ func Register[ID cmp.Ordered](router routing.RouteGroup, config Config[ID]) erro
 	// Show: GET /{resource}/{id}
 	if op := config.Resource.Show(); op != nil {
 		setEndpointPath(op, idPath)
+		setEndpointIDParser(op, config, idParam)
 		if err := handlers.RegisterRuntime(router, config.Executor, op); err != nil {
 			return err
 		}
@@ -274,6 +282,7 @@ func Register[ID cmp.Ordered](router routing.RouteGroup, config Config[ID]) erro
 	// Update: PUT /{resource}/{id}
 	if op := config.Resource.Update(); op != nil {
 		setEndpointPath(op, idPath)
+		setEndpointIDParser(op, config, idParam)
 		if err := handlers.RegisterRuntime(router, config.Executor, op); err != nil {
 			return err
 		}
@@ -295,6 +304,7 @@ func Register[ID cmp.Ordered](router routing.RouteGroup, config Config[ID]) erro
 	// Destroy: DELETE /{resource}/{id}
 	if op := config.Resource.Destroy(); op != nil {
 		setEndpointPath(op, idPath)
+		setEndpointIDParser(op, config, idParam)
 		if err := handlers.RegisterRuntime(router, config.Executor, op); err != nil {
 			return err
 		}
@@ -363,6 +373,30 @@ func setEndpointPath(ep handlers.EndpointRuntime, path string) {
 	if setter, ok := ep.(handlers.ConfigurableEndpoint); ok {
 		setter.SetPath(path)
 	}
+}
+
+// setEndpointIDParser injects an ID parser into an endpoint if it
+// implements ConfigurableEndpoint. The parser runs after binding and
+// before validation, storing the parsed ID on the request context so
+// handlers can retrieve it via GetParsedIDFromContext.
+func setEndpointIDParser[ID cmp.Ordered](ep handlers.EndpointRuntime, config Config[ID], idParam string) {
+	setter, ok := ep.(handlers.ConfigurableEndpoint)
+	if !ok {
+		return
+	}
+	parser := func(ctx *request.Context) error {
+		raw := ctx.PathParam(idParam)
+		if raw == "" {
+			return fmt.Errorf("resources: path parameter %q not found", idParam)
+		}
+		id, err := parseID(config, raw)
+		if err != nil {
+			return err
+		}
+		ctx.Set(parsedIDKey, any(id))
+		return nil
+	}
+	setter.SetIDParser(parser)
 }
 
 // parseID converts a string URL parameter to the ID type.
@@ -442,6 +476,22 @@ func GetParsedID[ID cmp.Ordered](ctx *request.Context, idParam string) (ID, erro
 		}
 	}
 	return zero, fmt.Errorf("resources: invalid id parameter: %s", raw)
+}
+
+// GetParsedIDFromContext retrieves a pre-parsed ID from the request
+// context. This is set by the IDParser injected by resources.Register
+// for endpoints with path parameters (Show, Edit, Update, Destroy).
+//
+// If the ID was not pre-parsed (e.g. the endpoint was registered
+// outside of resources.Register), this falls back to GetParsedID with
+// the given idParam.
+func GetParsedIDFromContext[ID cmp.Ordered](ctx *request.Context, idParam string) (ID, error) {
+	if v, ok := ctx.Get(parsedIDKey); ok {
+		if id, ok := v.(ID); ok {
+			return id, nil
+		}
+	}
+	return GetParsedID[ID](ctx, idParam)
 }
 
 // ResourceBuilder provides a fluent API for constructing and registering

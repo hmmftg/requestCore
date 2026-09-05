@@ -12,15 +12,23 @@ import (
 	"github.com/hmmftg/requestCore/v2/request"
 	"github.com/hmmftg/requestCore/v2/response"
 	"github.com/hmmftg/requestCore/v2/telemetry"
+	otel "go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/codes"
+	oteltrace "go.opentelemetry.io/otel/trace"
 )
 
 // Executor runs the full endpoint lifecycle: bind → validate →
-// execute → encode → prepare → hooks → durable → commit → observe.
+// (ID parse) → (tracer.StartSpan) → (persister.BeforeExecute) →
+// (initializer) → execute → encode → (tracer.SetAttrs) → prepare →
+// hooks → durable → commit → (persister.AfterCommit) → (finalizer) →
+// (tracer.EndSpan) → observe.
 type Executor struct {
 	Registry      operation.Registry
 	Telemetry     telemetry.Sink
 	ProblemMapper *response.MapperRegistry
 	Encoder       Encoder
+	Tracer        oteltrace.Tracer
 }
 
 // ExecutorOption configures an Executor at construction time.
@@ -52,6 +60,13 @@ func WithProblemMapper(m *response.MapperRegistry) ExecutorOption {
 // is used.
 func WithExecutorEncoder(enc Encoder) ExecutorOption {
 	return func(e *Executor) { e.Encoder = enc }
+}
+
+// WithExecutorTracer sets the default OpenTelemetry tracer for the
+// executor. Endpoints without an explicit Tracer use this. If nil,
+// a no-op tracer is used.
+func WithExecutorTracer(t oteltrace.Tracer) ExecutorOption {
+	return func(e *Executor) { e.Tracer = t }
 }
 
 // NewExecutor creates a new Executor with the given options. Defaults:
@@ -91,17 +106,22 @@ func Register[Req, Resp any](e *Executor, ep *Endpoint[Req, Resp]) error {
 // Telemetry events are emitted on every branch (start, success,
 // failure).
 //
-// Commit ordering on the success path is:
-// Prepare → RunHooks → MarkDurable → transport.WriteResponse →
-// Commit → Observe. The commit machine only transitions to Committed
-// after the transport write succeeds; a transport failure transitions
-// it to Failed.
+// Full lifecycle:
+//
+//	bind → validate → (ID parse) → (span start) →
+//	(persister.BeforeExecute) → (initializer) →
+//	execute → encode → (span attrs) → prepare → hooks → durable →
+//	commit → (persister.AfterCommit) → (finalizer) → (span end) →
+//	observe.
 //
 // Execute is a generic standalone function because Go does not allow
 // generic methods on non-generic types.
 func Execute[Req, Resp any](e *Executor, ctx *request.Context, ep *Endpoint[Req, Resp], transport Transport) (Resp, error) {
 	start := time.Now()
 	var zero Resp
+	opID := ep.Config.Operation.ID
+	method := ep.Config.Operation.Method
+	pattern := ep.Config.Operation.Pattern
 
 	successStatus := ep.Config.SuccessStatus
 	if successStatus == 0 {
@@ -113,20 +133,68 @@ func Execute[Req, Resp any](e *Executor, ctx *request.Context, ep *Endpoint[Req,
 	}
 
 	// Emit start event.
-	e.emit(ep.Config.Operation.ID, ep.Config.Operation.Method, ep.Config.Operation.Pattern, ctx, telemetry.EventStart, 0, nil, start)
+	e.emit(opID, method, pattern, ctx, telemetry.EventStart, 0, nil, start)
+
+	// --- Tracing: start span ---
+	var span oteltrace.Span
+	spanCtx := ctx.Context()
+	if ep.Config.EnableTracing {
+		tracer := ep.Config.Tracer
+		if tracer == nil {
+			tracer = e.Tracer
+		}
+		if tracer == nil {
+			tracer = otel.GetTracerProvider().Tracer("requestcore/v2")
+		}
+		spanName := ep.Config.TracingSpanName
+		if spanName == "" {
+			spanName = opID
+		}
+		spanCtx, span = tracer.Start(spanCtx, spanName,
+			oteltrace.WithAttributes(
+				attribute.String("operation.id", opID),
+				attribute.String("operation.method", method),
+				attribute.String("operation.pattern", pattern),
+			),
+		)
+		// Update the context's inner context so handlers see the span.
+		ctx.SetContext(spanCtx)
+		if span.SpanContext().HasTraceID() {
+			ctx.SetTraceID(span.SpanContext().TraceID().String())
+		}
+	}
+	defer func() {
+		if span != nil {
+			span.End()
+		}
+	}()
+
+	// Declare req early so the fail closure can reference it.
+	var req Req
+
+	// Helper for error path: write problem, emit failure, run finalizer.
+	fail := func(err error, problem *response.Problem) (Resp, error) {
+		if span != nil && problem != nil {
+			span.SetAttributes(attribute.Int("http.status_code", problem.Status))
+			span.RecordError(err)
+			span.SetStatus(codes.Error, err.Error())
+		}
+		werr := e.writeProblem(ctx, transport, problem)
+		finalErr := err
+		if werr != nil {
+			finalErr = fmt.Errorf("%w (problem write failed: %v)", err, werr)
+		}
+		e.emit(opID, method, pattern, ctx, telemetry.EventFailure, problem.Status, finalErr, start)
+		// Run finalizer on error path.
+		e.runFinalizer(ctx, ep, &req, &zero, finalErr)
+		return zero, finalErr
+	}
 
 	// 1. Bind
-	var req Req
 	if ep.Config.BindingPlan.Mode != binding.ModeNone {
 		if err := binding.Bind(ctx, ep.Config.BindingPlan, &req); err != nil {
 			problem := e.mapBindError(err)
-			werr := e.writeProblem(ctx, transport, problem)
-			finalErr := err
-			if werr != nil {
-				finalErr = fmt.Errorf("%w (problem write failed: %v)", err, werr)
-			}
-			e.emit(ep.Config.Operation.ID, ep.Config.Operation.Method, ep.Config.Operation.Pattern, ctx, telemetry.EventFailure, problem.Status, finalErr, start)
-			return zero, finalErr
+			return fail(err, problem)
 		}
 	}
 
@@ -139,13 +207,7 @@ func Execute[Req, Resp any](e *Executor, ctx *request.Context, ep *Endpoint[Req,
 				"Validation Internal Error",
 				"VALIDATION_INTERNAL",
 			)
-			werr := e.writeProblem(ctx, transport, problem)
-			finalErr := err
-			if werr != nil {
-				finalErr = fmt.Errorf("%w (problem write failed: %v)", err, werr)
-			}
-			e.emit(ep.Config.Operation.ID, ep.Config.Operation.Method, ep.Config.Operation.Pattern, ctx, telemetry.EventFailure, problem.Status, finalErr, start)
-			return zero, finalErr
+			return fail(err, problem)
 		}
 		if len(violations) > 0 {
 			problem := response.NewValidationProblem(
@@ -153,17 +215,53 @@ func Execute[Req, Resp any](e *Executor, ctx *request.Context, ep *Endpoint[Req,
 				"Validation Failed",
 				violations,
 			)
-			werr := e.writeProblem(ctx, transport, problem)
-			finalErr := error(problem)
-			if werr != nil {
-				finalErr = fmt.Errorf("%w (problem write failed: %v)", problem, werr)
-			}
-			e.emit(ep.Config.Operation.ID, ep.Config.Operation.Method, ep.Config.Operation.Pattern, ctx, telemetry.EventFailure, problem.Status, finalErr, start)
-			return zero, finalErr
+			return fail(error(problem), problem)
 		}
 	}
 
-	// 3. Execute handler (with panic recovery)
+	// 2b. ID Parser (after binding, before handler)
+	if ep.Config.IDParser != nil {
+		if err := ep.Config.IDParser(ctx); err != nil {
+			problem := response.NewProblemWithCode(
+				http.StatusBadRequest,
+				"Invalid ID Parameter",
+				"INVALID_ID",
+			)
+			return fail(err, problem)
+		}
+	}
+
+	// 3. Persister.BeforeExecute (after validation/ID parse, before handler)
+	if ep.Persister != nil {
+		if err := ep.Persister.BeforeExecute(ctx, &req); err != nil {
+			problem := e.ProblemMapper.Map(err)
+			if problem == nil {
+				problem = response.NewProblemWithCode(
+					http.StatusInternalServerError,
+					"Persistence Error",
+					"PERSISTENCE_ERROR",
+				)
+			}
+			return fail(err, problem)
+		}
+	}
+
+	// 4. Initializer (after persistence, before handler)
+	if ep.Initializer != nil {
+		if err := ep.Initializer(ctx, &req); err != nil {
+			problem := e.ProblemMapper.Map(err)
+			if problem == nil {
+				problem = response.NewProblemWithCode(
+					http.StatusInternalServerError,
+					"Initialization Error",
+					"INIT_ERROR",
+				)
+			}
+			return fail(err, problem)
+		}
+	}
+
+	// 5. Execute handler (with panic recovery)
 	resp, err := executeHandler(ctx, ep, &req)
 	if err != nil {
 		problem := e.ProblemMapper.Map(err)
@@ -174,16 +272,10 @@ func Execute[Req, Resp any](e *Executor, ctx *request.Context, ep *Endpoint[Req,
 				"INTERNAL",
 			)
 		}
-		werr := e.writeProblem(ctx, transport, problem)
-		finalErr := err
-		if werr != nil {
-			finalErr = fmt.Errorf("%w (problem write failed: %v)", err, werr)
-		}
-		e.emit(ep.Config.Operation.ID, ep.Config.Operation.Method, ep.Config.Operation.Pattern, ctx, telemetry.EventFailure, problem.Status, finalErr, start)
-		return zero, finalErr
+		return fail(err, problem)
 	}
 
-	// 4. Encode — use endpoint encoder if set, otherwise executor default.
+	// 6. Encode
 	encoder := ep.Config.Encoder
 	if encoder == nil {
 		encoder = e.Encoder
@@ -198,23 +290,13 @@ func Execute[Req, Resp any](e *Executor, ctx *request.Context, ep *Endpoint[Req,
 			"Response Encoding Error",
 			"ENCODE_ERROR",
 		)
-		werr := e.writeProblem(ctx, transport, problem)
-		finalErr := err
-		if werr != nil {
-			finalErr = fmt.Errorf("%w (problem write failed: %v)", err, werr)
-		}
-		e.emit(ep.Config.Operation.ID, ep.Config.Operation.Method, ep.Config.Operation.Pattern, ctx, telemetry.EventFailure, problem.Status, finalErr, start)
-		return zero, finalErr
+		return fail(err, problem)
 	}
-	// Derive content type from the encoder if the endpoint didn't
-	// specify one explicitly.
 	if contentType == "application/json" && ep.Config.SuccessContentType == "" {
 		contentType = encoder.ContentType()
 	}
 
-	// Compute final success status and headers from the response state.
-	// The endpoint-configured status wins unless the handler explicitly
-	// set a status via ctx.Response().SetStatus.
+	// Compute final success status and headers.
 	finalStatus := successStatus
 	if ctx.Response().StatusSet() {
 		finalStatus = ctx.Response().Status()
@@ -225,29 +307,69 @@ func Execute[Req, Resp any](e *Executor, ctx *request.Context, ep *Endpoint[Req,
 		finalContentType = ct
 	}
 
-	// 5-9. Commit lifecycle via the centralized commit coordinator.
-	// The coordinator runs hooks exactly once, snapshots headers after
-	// hooks, writes through the transport, and manages the commit state
-	// machine. Both success and error paths flow through it.
+	// 7-11. Commit lifecycle via the centralized commit coordinator.
 	coordinator := response.NewCommitCoordinator()
 	if err := coordinator.CommitSuccess(ctx, transport, finalStatus, finalContentType, body); err != nil {
-		// If the coordinator wrote a Problem (hook failure), the
-		// transport is already committed. Emit failure telemetry.
 		if coordinator.State() == response.StateFailed {
-			e.emit(ep.Config.Operation.ID, ep.Config.Operation.Method, ep.Config.Operation.Pattern, ctx, telemetry.EventFailure, http.StatusInternalServerError, err, start)
+			if span != nil {
+				span.RecordError(err)
+				span.SetStatus(codes.Error, err.Error())
+			}
+			e.emit(opID, method, pattern, ctx, telemetry.EventFailure, http.StatusInternalServerError, err, start)
+			e.runFinalizer(ctx, ep, &req, &zero, err)
 		}
 		return zero, err
 	}
 
-	e.emit(ep.Config.Operation.ID, ep.Config.Operation.Method, ep.Config.Operation.Pattern, ctx, telemetry.EventSuccess, finalStatus, nil, start)
+	// 12. Persister.AfterCommit (best-effort, errors logged not propagated)
+	if ep.Persister != nil {
+		if perr := ep.Persister.AfterCommit(ctx, &req, &resp, nil); perr != nil {
+			e.emit(opID, method, pattern, ctx, telemetry.EventBusiness, finalStatus, perr, start)
+		}
+	}
+
+	// 13. Finalizer (after commit, success path)
+	e.runFinalizer(ctx, ep, &req, &resp, nil)
+
+	// Tracing: set success attributes
+	if span != nil {
+		span.SetAttributes(attribute.Int("http.status_code", finalStatus))
+		span.SetStatus(codes.Ok, "")
+	}
+
+	e.emit(opID, method, pattern, ctx, telemetry.EventSuccess, finalStatus, nil, start)
 	return resp, nil
 }
 
-// executeHandler runs the handler with panic recovery.
+// runFinalizer runs the finalizer hook if set. Errors are logged via
+// telemetry but not propagated. This is called on both success and
+// error paths.
+func (e *Executor) runFinalizer[Req, Resp any](ctx *request.Context, ep *Endpoint[Req, Resp], req *Req, resp *Resp, err error) {
+	if ep.Finalizer == nil {
+		return
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			e.emit(ep.Config.Operation.ID, ep.Config.Operation.Method, ep.Config.Operation.Pattern, ctx, telemetry.EventBusiness, 0, fmt.Errorf("finalizer panic: %v", r), time.Now())
+		}
+	}()
+	ep.Finalizer(ctx, req, resp, err)
+}
+
+// executeHandler runs the handler with panic recovery. If a custom
+// RecoveryHandler is configured, it is called with the panic value.
 func executeHandler[Req, Resp any](ctx *request.Context, ep *Endpoint[Req, Resp], req *Req) (resp Resp, err error) {
 	defer func() {
 		if r := recover(); r != nil {
-			err = fmt.Errorf("handler panic: %v", r)
+			if ep.Config.RecoveryHandler != nil {
+				if recErr := ep.Config.RecoveryHandler(r); recErr != nil {
+					err = recErr
+				} else {
+					err = fmt.Errorf("handler panic: %v", r)
+				}
+			} else {
+				err = fmt.Errorf("handler panic: %v", r)
+			}
 		}
 	}()
 	return ep.Handler(ctx, *req)

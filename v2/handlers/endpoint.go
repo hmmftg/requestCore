@@ -20,6 +20,8 @@ package handlers
 import (
 	"fmt"
 
+	oteltrace "go.opentelemetry.io/otel/trace"
+
 	"github.com/hmmftg/requestCore/v2/adapter"
 	"github.com/hmmftg/requestCore/v2/binding"
 	"github.com/hmmftg/requestCore/v2/endpoint"
@@ -55,12 +57,14 @@ type EndpointRuntime interface {
 	Pattern() string
 }
 
-// ConfigurableEndpoint extends EndpointRuntime with path configuration.
-// It is used by resources.Register to set paths on endpoints returned
-// by Resource[ID] without needing to know the concrete Req/Resp types.
+// ConfigurableEndpoint extends EndpointRuntime with path and ID-parser
+// configuration. It is used by resources.Register to set paths and
+// inject ID parsers on endpoints returned by Resource[ID] without
+// needing to know the concrete Req/Resp types.
 type ConfigurableEndpoint interface {
 	EndpointRuntime
 	SetPath(path string)
+	SetIDParser(fn func(ctx *request.Context) error)
 }
 
 // New creates a typed Endpoint from a handler function with the given
@@ -138,6 +142,63 @@ func (e *Endpoint[Req, Resp]) SetPath(path string) {
 	op := e.inner.Config.Operation
 	op.Pattern = path
 	e.inner.Config.Operation = op
+}
+
+// SetIDParser sets the ID parser function on the endpoint. Satisfies
+// ConfigurableEndpoint for interface-based access from resources.Register.
+// The ID parser runs after binding and before validation.
+func (e *Endpoint[Req, Resp]) SetIDParser(fn func(ctx *request.Context) error) {
+	e.inner.Config.IDParser = fn
+}
+
+// --- Lifecycle configuration methods ---
+
+// WithInitializer sets the initializer hook. The initializer runs
+// after validation and before the handler. Returns the same endpoint
+// for chaining.
+func (e *Endpoint[Req, Resp]) WithInitializer(fn func(ctx *request.Context, req *Req) error) *Endpoint[Req, Resp] {
+	e.inner.WithInitializer(fn)
+	return e
+}
+
+// WithFinalizer sets the finalizer hook. The finalizer runs after the
+// response is committed (or after an error). Returns the same endpoint
+// for chaining.
+func (e *Endpoint[Req, Resp]) WithFinalizer(fn func(ctx *request.Context, req *Req, resp *Resp, err error)) *Endpoint[Req, Resp] {
+	e.inner.WithFinalizer(fn)
+	return e
+}
+
+// WithPersister sets the persister. BeforeExecute runs before the
+// handler; AfterCommit runs after the response is committed.
+// Returns the same endpoint for chaining.
+func (e *Endpoint[Req, Resp]) WithPersister(p endpoint.Persister[Req, Resp]) *Endpoint[Req, Resp] {
+	e.inner.WithPersister(p)
+	return e
+}
+
+// WithTracing enables OpenTelemetry tracing for this endpoint. The
+// span name defaults to the operation ID if empty. Returns the same
+// endpoint for chaining.
+func (e *Endpoint[Req, Resp]) WithTracing(spanName string) *Endpoint[Req, Resp] {
+	e.inner.Config.EnableTracing = true
+	e.inner.Config.TracingSpanName = spanName
+	return e
+}
+
+// WithTracer sets a specific OpenTelemetry tracer for this endpoint,
+// overriding the executor's default. Returns the same endpoint for
+// chaining.
+func (e *Endpoint[Req, Resp]) WithTracer(t oteltrace.Tracer) *Endpoint[Req, Resp] {
+	e.inner.Config.Tracer = t
+	return e
+}
+
+// WithRecoveryHandler sets a custom panic recovery handler. Returns
+// the same endpoint for chaining.
+func (e *Endpoint[Req, Resp]) WithRecoveryHandler(fn func(panicVal any) error) *Endpoint[Req, Resp] {
+	e.inner.Config.RecoveryHandler = fn
+	return e
 }
 
 // RuntimeHandler produces a routing.Handler closure that runs the full

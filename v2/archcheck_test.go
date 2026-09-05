@@ -67,6 +67,10 @@ var allowedDeps = map[string]map[string]bool{
 		"github.com/hmmftg/requestCore/v2/validation":            true,
 		"github.com/hmmftg/requestCore/v2/telemetry":             true,
 		"github.com/hmmftg/requestCore/v2/renderers":             true,
+		"go.opentelemetry.io/otel":                               true,
+		"go.opentelemetry.io/otel/attribute":                     true,
+		"go.opentelemetry.io/otel/codes":                         true,
+		"go.opentelemetry.io/otel/trace":                         true,
 	},
 	"github.com/hmmftg/requestCore/v2/adapter": {
 		"github.com/hmmftg/requestCore/v2/endpoint": true,

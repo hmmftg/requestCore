@@ -10,8 +10,9 @@ Requires **Go 1.27+**.
 > The API described here is the canonical kernel API and will remain the
 > basis for the first stable v2 release, but minor refinements may still
 > occur before a tag is cut. See [MIGRATION.md](MIGRATION.md) for the
-> migration guide and the list of deferred Tranche 5 features. v1 (the
-> root module) remains supported and stable.
+> migration guide and the Tranche 5 lifecycle features (persistence,
+> tracing, initializers, finalizers, recovery callbacks, ID parsers).
+> v1 (the root module) remains supported and stable.
 
 v2 builds on the root [requestCore](../README.md) module with a canonical,
 stdlib-first kernel: typed endpoints, a framework-neutral routing contract,
@@ -381,8 +382,9 @@ tests only.
 ## Migration from v1
 
 See [MIGRATION.md](MIGRATION.md) for the complete v1-to-v2 migration guide,
-including breaking changes from the alpha API and deferred Tranche 5
-features.
+including breaking changes from the alpha API and the Tranche 5 lifecycle
+features (persistence, tracing, initializers, finalizers, recovery callbacks,
+ID parsers).
 
 ---
 

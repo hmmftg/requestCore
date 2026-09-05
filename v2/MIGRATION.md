@@ -7,8 +7,9 @@ kernel API**.
 > **Status:** v2 has **no released tags** and is under active development.
 > The canonical kernel API described here is the basis for the first stable
 > v2 release. v1 (the root module) remains supported and stable. See
-> [Deferred Tranche 5 Features](#deferred-tranche-5-features) for
-> capabilities not yet ported to the v2 kernel.
+> [Tranche 5 Lifecycle Features](#tranche-5-lifecycle-features) for
+> the lifecycle hooks (persistence, tracing, initializers, finalizers,
+> recovery callbacks, ID parsers) added in Tranche 5.
 
 ## Overview
 
@@ -33,7 +34,7 @@ responses, and `telemetry.Sink` observability.
 | Routing | Framework-specific | `routing.Router` / `routing.RouteGroup` with canonical `{id}` syntax |
 | Handler descriptor | `BaseHandler` returns `any` | `handlers.Endpoint[Req, Resp]` wrapping `endpoint.Endpoint[Req, Resp]` |
 | Lifecycle | Manual / v1 hooks | `endpoint.Executor`: bind → validate → execute → encode → commit → observe |
-| Lifecycle hooks | N/A | **Deferred to Tranche 5** (initializers, finalizers, persistence) |
+| Lifecycle hooks | N/A | **Available** (initializers, finalizers, persistence, tracing, recovery) |
 | Response writing | `response.WebHanlder` | `routing.Transport` + `endpoint.Executor` commit; renderer encoders |
 | Errors | `ErrorResponse` / status resolver | `response.Problem` (RFC 9457) via `response.MapperRegistry` |
 | Response helpers | `OK(any)` | Handler returns `(Resp, error)`; executor encodes and commits |
@@ -52,10 +53,11 @@ these breaking changes:
 - **`HandlerRequest[Req, Resp]` removed.** Handlers no longer receive a
   `*HandlerRequest`. The canonical signature is
   `func(ctx *request.Context, req Req) (Resp, error)`.
-- **`WithInitializer` / `WithFinalizer` / `WithPersistence` removed.**
-  Typed lifecycle hooks are deferred to Tranche 5. Use the
-  `endpoint.Executor` lifecycle and before-commit hooks on
-  `request.Context` (`ctx.AddBeforeCommitHook`) for pre-commit work.
+- **`WithInitializer` / `WithFinalizer` / `WithPersistence` replaced.**
+  Typed lifecycle hooks are now available via
+  `endpoint.Endpoint.WithInitializer`, `.WithFinalizer`, and
+  `.WithPersister`. See the [Tranche 5 Lifecycle Features](#tranche-5-lifecycle-features)
+  section below.
 - **`OKTyped[Resp]` / `OKWithStatusTyped[Resp]` removed.** Handlers return
   `(Resp, error)` directly; the executor encodes and commits the response.
   Set a custom success status via `endpoint.WithSuccessStatus`.
@@ -477,30 +479,40 @@ if err := application.Shutdown(ctx); err != nil {
 scheduler, returning the first non-nil error. `http.ErrServerClosed` is
 treated as a clean termination.
 
-## Deferred Tranche 5 Features
+## Tranche 5 Lifecycle Features
 
-The following capabilities are **not yet** part of the canonical v2 kernel
-and are deferred to Tranche 5. Until then, use v1 for these concerns or
-implement them in application code:
+The following capabilities are now part of the canonical v2 kernel
+(added in Tranche 5):
 
-- **Persistence** — typed persisters and the v1 `request` table audit
-  trail are not yet ported. The v2 executor lifecycle does not include a
-  persistence hook.
-- **Tracing** — OpenTelemetry trace propagation/integration is not yet
-  wired into the v2 executor. The `request.Context` carries `TraceID` but
-  no span management is provided.
-- **Initializers** — the `WithInitializer` typed pre-handler hook from
-  the alpha API is removed. Use `ctx.AddBeforeCommitHook` for pre-commit
-  work, or perform initialization inside the handler function.
-- **Finalizers** — the `WithFinalizer` typed always-run hook from the
-  alpha API is removed. Use `defer` inside the handler function, or wait
-  for the Tranche 5 finalizer hook.
-- **Recovery callbacks** — panic recovery with custom callbacks is not
-  yet exposed on the v2 executor. The scheduler recovers panics per tick;
-  the executor path will gain configurable recovery in Tranche 5.
-- **ID parsers** — `resources.ResourceBuilder.WithIDParser` exists for
-  custom ID parsing, but richer ID parser infrastructure (registry,
-  shared parsers) is deferred to Tranche 5.
+- **Persistence** — `endpoint.Persister[Req, Resp]` interface with
+  `BeforeExecute(ctx, req) error` (runs after initializer, before
+  handler; failure aborts) and `AfterCommit(ctx, req, resp, err) error`
+  (runs after commit; best-effort, errors logged not propagated).
+  Use `endpoint.FuncPersister` for function-based persistence.
+- **Tracing** — OpenTelemetry span management is wired into the v2
+  executor. Enable per-endpoint with `WithTracing(spanName)` or
+  `handlers.Endpoint.WithTracing(spanName)`. The executor starts a span
+  before the handler, sets attributes (operation ID, method, pattern,
+  status), records errors, and ends the span after observation. The
+  span context is available to handlers via
+  `oteltrace.SpanFromContext(ctx.Context())`.
+- **Initializers** — `endpoint.Endpoint.WithInitializer(fn)` sets a
+  typed pre-handler hook: `func(ctx *request.Context, req *Req) error`.
+  Runs after validation and BeforeExecute. Failure aborts with a mapped
+  Problem.
+- **Finalizers** — `endpoint.Endpoint.WithFinalizer(fn)` sets a typed
+  always-run hook: `func(ctx *request.Context, req *Req, resp *Resp, err error)`.
+  Runs on both success and error paths, after commit. Errors and panics
+  are recovered and logged, not propagated.
+- **Recovery callbacks** — `WithRecoveryHandler(fn func(panicVal any) error)`
+  sets a custom panic recovery handler. If it returns an error, that
+  error is mapped to a Problem. If it returns nil, a generic "handler
+  panic" error is used.
+- **ID parsers** — `resources.Register` now injects an ID parser into
+  endpoints with path parameters (Show, Edit, Update, Destroy). The
+  parser runs after binding, stores the parsed ID on the context, and
+  handlers retrieve it via `resources.GetParsedIDFromContext[ID](ctx, idParam)`.
+  Custom ID parsers are configured via `Config[ID].IDParser`.
 
 ## FAQ / Troubleshooting
 
@@ -534,8 +546,8 @@ Worker jobs run outside HTTP request contexts and do not automatically
 insert rows into the v1 `request` persistence table. Worker observability
 is via `telemetry.Sink` (slog → Splunk), not via the persistence audit
 trail. If your worker jobs need audit-trail persistence, call your
-persistence layer manually inside the job handler. This is a known design
-tradeoff that will be revisited in Tranche 5.
+persistence layer manually inside the job handler, or use the
+`endpoint.Persister` interface for endpoint-level persistence.
 
 ### No tags published yet
 

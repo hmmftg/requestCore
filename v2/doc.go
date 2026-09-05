@@ -15,7 +15,9 @@
 //   - response — Problems (RFC 9457), mapper registry, commit
 //     coordinator, no-content/redirect helpers.
 //   - endpoint — typed endpoint and executor; the canonical lifecycle
-//     (bind → validate → execute → encode → commit → observe).
+//     (bind → validate → ID parse → trace start → persist before →
+//     initialize → execute → encode → commit → persist after →
+//     finalize → trace end → observe).
 //   - routing — handler/middleware/router and response-transport
 //     contracts; imports request only.
 //   - adapter — adapts typed endpoints and mapped errors to routing
@@ -61,6 +63,26 @@
 //   - **Application bootstrap** — [app.Bootstrap] composes the
 //     executor, router, worker pool, scheduler, and session manager
 //     with Problem-based error handling.
+//
+// # Lifecycle Features (Tranche 5)
+//
+// The v2 kernel supports typed lifecycle hooks on
+// [endpoint.Endpoint[Req, Resp]]:
+//
+//   - **Initializers** — [endpoint.Endpoint.WithInitializer] sets a
+//     typed pre-handler hook that runs after validation.
+//   - **Finalizers** — [endpoint.Endpoint.WithFinalizer] sets a typed
+//     always-run hook that runs after commit (success or error).
+//   - **Persistence** — [endpoint.Persister[Req, Resp]] interface with
+//     BeforeExecute (pre-handler, aborts on error) and AfterCommit
+//     (post-commit, best-effort).
+//   - **Tracing** — OpenTelemetry span management via
+//     [endpoint.WithTracing] and [endpoint.WithTracer].
+//   - **Recovery callbacks** — [endpoint.WithRecoveryHandler] for
+//     custom panic recovery that maps panics to domain errors.
+//   - **ID parsers** — [endpoint.WithIDParser] for pre-handler path
+//     parameter validation, injected automatically by
+//     [resources.Register].
 //
 // # Migration from v1
 //

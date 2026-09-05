@@ -137,6 +137,29 @@ func main() {
 		log.Fatalf("Register echo: %v", err)
 	}
 
+	// --- Lifecycle endpoint (Tranche 5: initializer, finalizer, tracing, persistence) ---
+	lifecycleEp := handlers.Post[LifecycleReq, LifecycleResp](
+		"lifecycle-demo", "/lifecycle",
+		func(ctx *request.Context, req LifecycleReq) (LifecycleResp, error) {
+			log.Printf("handler: processing %s", req.Action)
+			return LifecycleResp{Action: req.Action, Processed: true}, nil
+		},
+	).
+		WithInitializer(func(ctx *request.Context, req *LifecycleReq) error {
+			log.Printf("initializer: validating action %s", req.Action)
+			return nil
+		}).
+		WithFinalizer(func(ctx *request.Context, req *LifecycleReq, resp *LifecycleResp, err error) {
+			log.Printf("finalizer: action=%s err=%v", req.Action, err)
+		}).
+		WithTracing("lifecycle-demo-span")
+
+	if err := handlers.RegisterEndpoint(
+		application.Router, application.Executor, lifecycleEp,
+	); err != nil {
+		log.Fatalf("Register lifecycle: %v", err)
+	}
+
 	// Start the server.
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
@@ -160,6 +183,7 @@ func main() {
 	log.Printf("  GET  /items/{id}/edit - Edit item form")
 	log.Printf("  GET  /api/profile     - Profile (typed session access)")
 	log.Printf("  POST /echo            - Echo (typed POST)")
+	log.Printf("  POST /lifecycle       - Lifecycle demo (initializer, finalizer, tracing)")
 
 	if err := application.StartWithContext(ctx, ":"+port); err != nil {
 		log.Fatalf("Server: %v", err)
@@ -199,6 +223,17 @@ type EchoResp struct {
 type ProfileResp struct {
 	Name   string `json:"name"`
 	Visits int    `json:"visits"`
+}
+
+// LifecycleReq is the request body for the lifecycle demo endpoint.
+type LifecycleReq struct {
+	Action string `json:"action"`
+}
+
+// LifecycleResp is the response for the lifecycle demo endpoint.
+type LifecycleResp struct {
+	Action    string `json:"action"`
+	Processed bool   `json:"processed"`
 }
 
 // ItemResp is the response for item endpoints.
