@@ -88,6 +88,10 @@ var allowedDeps = map[string]map[string]bool{
 		"github.com/hmmftg/requestCore/v2/routing":           true,
 		"github.com/hmmftg/requestCore/v2/telemetry":         true,
 	},
+	"github.com/hmmftg/requestCore/v2/saga": {
+		"github.com/hmmftg/requestCore/v2/telemetry": true,
+		"github.com/hmmftg/requestCore/v2/workers":   true,
+	},
 }
 
 // goListPackage represents the relevant fields from `go list -json`.

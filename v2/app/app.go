@@ -21,6 +21,7 @@ import (
 	"github.com/hmmftg/requestCore/v2/request"
 	"github.com/hmmftg/requestCore/v2/response"
 	"github.com/hmmftg/requestCore/v2/routing"
+	"github.com/hmmftg/requestCore/v2/saga"
 	"github.com/hmmftg/requestCore/v2/session"
 	"github.com/hmmftg/requestCore/v2/telemetry"
 	"github.com/hmmftg/requestCore/v2/workers"
@@ -89,6 +90,26 @@ type Config struct {
 	// TelemetrySink is the telemetry sink for worker and scheduler
 	// lifecycle events. If nil, telemetry.NewSlogSink(Logger) is used.
 	TelemetrySink telemetry.Sink
+
+	// SagaStore persists saga state for crash recovery. If nil,
+	// saga features are disabled.
+	SagaStore saga.SagaStore
+
+	// OutboxStore persists outbox records for reliable event
+	// delivery. If nil, outbox relay is disabled.
+	OutboxStore saga.OutboxStore
+
+	// Broker publishes outbox events to an external system. If nil,
+	// saga.NopBroker is used.
+	Broker saga.Broker
+
+	// SagaResumeInterval is the interval at which incomplete sagas
+	// are resumed. Default: 30s.
+	SagaResumeInterval time.Duration
+
+	// OutboxRelayInterval is the interval at which pending outbox
+	// records are published. Default: 5s.
+	OutboxRelayInterval time.Duration
 }
 
 // App is the v2 application instance. It composes the router,
@@ -103,6 +124,8 @@ type App struct {
 	Worker            workers.Worker
 	Scheduler         *workers.Scheduler
 	Sessions          *session.Manager
+	Saga              *saga.Orchestrator
+	OutboxRelay       *saga.OutboxRelay
 	Middlewares       []routing.Middleware
 
 	// nativeServer holds the underlying framework server (e.g. *http.Server,
@@ -221,6 +244,43 @@ func Bootstrap(config Config) (*App, error) {
 		router.MethodNotAllowed(defaultMethodNotAllowed())
 	}
 
+	// Wire saga orchestrator if a store is configured.
+	var sagaOrch *saga.Orchestrator
+	if config.SagaStore != nil {
+		sagaOrch = saga.NewOrchestrator(
+			saga.WithStore(config.SagaStore),
+			saga.WithSink(config.TelemetrySink),
+		)
+
+		resumeInterval := config.SagaResumeInterval
+		if resumeInterval <= 0 {
+			resumeInterval = 30 * time.Second
+		}
+
+		if err := scheduler.Schedule(saga.ScheduledResumeJob(sagaOrch, resumeInterval)); err != nil {
+			return nil, fmt.Errorf("app: failed to schedule saga resume: %w", err)
+		}
+	}
+
+	// Wire outbox relay if an outbox store is configured.
+	var relay *saga.OutboxRelay
+	if config.OutboxStore != nil {
+		relay = saga.NewOutboxRelay(
+			config.OutboxStore,
+			config.Broker,
+			saga.WithRelaySink(config.TelemetrySink),
+		)
+
+		relayInterval := config.OutboxRelayInterval
+		if relayInterval <= 0 {
+			relayInterval = 5 * time.Second
+		}
+
+		if err := scheduler.Schedule(relay.ScheduledJob(relayInterval)); err != nil {
+			return nil, fmt.Errorf("app: failed to schedule outbox relay: %w", err)
+		}
+	}
+
 	return &App{
 		Router:            router,
 		Renderer:          config.Renderer,
@@ -230,6 +290,8 @@ func Bootstrap(config Config) (*App, error) {
 		Worker:            worker,
 		Scheduler:         scheduler,
 		Sessions:          sessionMgr,
+		Saga:              sagaOrch,
+		OutboxRelay:       relay,
 		Middlewares:       config.Middlewares,
 		serverRegistered:  make(chan struct{}),
 	}, nil
