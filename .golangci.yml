@@ -9,17 +9,11 @@ linters:
     - errcheck
     - govet
     - ineffassign
+    - staticcheck
+    - unused
     - gosec
     - misspell
     - revive
-  # staticcheck and unused are disabled because honnef.co/go/tools@v0.7.0
-  # (pinned by golangci-lint v2.12.2) panics on Go 1.27 AST changes
-  # in the buildir pass (*ast.KeyValueExpr).
-  # Re-enable once golangci-lint ships a version with honnef.co/go/tools
-  # >= v0.8.0 with Go 1.27 support.
-  disable:
-    - staticcheck
-    - unused
   settings:
     gosec:
       excludes:
