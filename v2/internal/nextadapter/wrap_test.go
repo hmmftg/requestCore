@@ -564,7 +564,7 @@ func TestWrap_SuccessEmitsTelemetryEvent(t *testing.T) {
 	// Verify a success telemetry event was emitted for the "ping" operation.
 	foundSuccess := false
 	for _, e := range sink.events {
-		if e.Operation == "ping" && e.Type == telemetry.EventSuccess {
+		if e.Operation == "ping-req" && e.Type == telemetry.EventSuccess {
 			foundSuccess = true
 			if e.Status != http.StatusOK {
 				t.Errorf("success event status = %d, want 200", e.Status)
@@ -598,7 +598,7 @@ func TestWrap_FailureEmitsTelemetryEvent(t *testing.T) {
 	// Verify a failure telemetry event was emitted for the "testFail" operation.
 	foundFailure := false
 	for _, e := range sink.events {
-		if e.Operation == "testFail" && e.Type == telemetry.EventFailure {
+		if e.Operation == "testFail-req-failed" && e.Type == telemetry.EventFailure {
 			foundFailure = true
 			if e.Err == nil {
 				t.Error("expected error in failure telemetry event")

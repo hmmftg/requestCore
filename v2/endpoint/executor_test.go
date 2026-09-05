@@ -279,6 +279,67 @@ func TestExecute_TelemetryEmitted(t *testing.T) {
 	}
 }
 
+func TestExecute_TelemetryCanonicalOperationKeys(t *testing.T) {
+	sink := &capturingSink{}
+	exec := NewExecutor(
+		WithRegistry(operation.NewRegistry()),
+		WithTelemetrySink(sink),
+	)
+	ep := New[PingReq, PingResp](
+		func(ctx *request.Context, req PingReq) (PingResp, error) {
+			return PingResp{Message: "pong"}, nil
+		},
+		WithOperation(operation.Operation{ID: "ping", Method: "GET", Pattern: "/ping"}),
+	)
+	ft := faketransport.New("GET", "/ping")
+	transport := &FakeTransportAdapter{FT: ft}
+
+	_, err := Execute(exec, ft.Context(), ep, transport)
+	if err != nil {
+		t.Fatalf("Execute failed: %v", err)
+	}
+	if len(sink.events) != 2 {
+		t.Fatalf("expected 2 events, got %d", len(sink.events))
+	}
+	if sink.events[0].Operation != "ping-req" {
+		t.Errorf("start event operation = %q, want %q", sink.events[0].Operation, "ping-req")
+	}
+	if sink.events[1].Operation != "ping-req" {
+		t.Errorf("success event operation = %q, want %q", sink.events[1].Operation, "ping-req")
+	}
+}
+
+func TestExecute_TelemetryCanonicalFailureKey(t *testing.T) {
+	sink := &capturingSink{}
+	exec := NewExecutor(
+		WithRegistry(operation.NewRegistry()),
+		WithTelemetrySink(sink),
+	)
+	ep := New[problemReq, problemResp](
+		func(ctx *request.Context, req problemReq) (problemResp, error) {
+			return problemResp{}, errors.New("fail")
+		},
+		WithOperation(operation.Operation{ID: "testFail", Method: "POST", Pattern: "/fail"}),
+		WithBindingPlan(binding.DefaultJSONPlan),
+	)
+	ft := faketransport.New("POST", "/fail", faketransport.WithBody(`{"mode":"ok"}`))
+	transport := &FakeTransportAdapter{FT: ft}
+
+	_, err := Execute(exec, ft.Context(), ep, transport)
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	if len(sink.events) != 2 {
+		t.Fatalf("expected 2 events, got %d", len(sink.events))
+	}
+	if sink.events[0].Operation != "testFail-req" {
+		t.Errorf("start event operation = %q, want %q", sink.events[0].Operation, "testFail-req")
+	}
+	if sink.events[1].Operation != "testFail-req-failed" {
+		t.Errorf("failure event operation = %q, want %q", sink.events[1].Operation, "testFail-req-failed")
+	}
+}
+
 func TestExecute_TelemetryOnFailure(t *testing.T) {
 	sink := &capturingSink{}
 	exec := NewExecutor(

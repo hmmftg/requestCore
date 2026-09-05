@@ -66,8 +66,8 @@ func TestTelemetry_SuccessPathEmitsStartAndSuccess(t *testing.T) {
 	if sink.events[0].Type != telemetry.EventStart {
 		t.Fatalf("first event type = %v, want EventStart", sink.events[0].Type)
 	}
-	if sink.events[0].Operation != "telemetry-ok" {
-		t.Fatalf("first event operation = %q, want %q", sink.events[0].Operation, "telemetry-ok")
+	if sink.events[0].Operation != "telemetry-ok-req" {
+		t.Fatalf("first event operation = %q, want %q", sink.events[0].Operation, "telemetry-ok-req")
 	}
 
 	// Last event should be a success event.
@@ -75,8 +75,8 @@ func TestTelemetry_SuccessPathEmitsStartAndSuccess(t *testing.T) {
 	if last.Type != telemetry.EventSuccess {
 		t.Fatalf("last event type = %v, want EventSuccess", last.Type)
 	}
-	if last.Operation != "telemetry-ok" {
-		t.Fatalf("last event operation = %q, want %q", last.Operation, "telemetry-ok")
+	if last.Operation != "telemetry-ok-req" {
+		t.Fatalf("last event operation = %q, want %q", last.Operation, "telemetry-ok-req")
 	}
 	if last.Status != http.StatusOK {
 		t.Fatalf("last event status = %d, want %d", last.Status, http.StatusOK)
@@ -129,8 +129,8 @@ func TestTelemetry_FailurePathEmitsFailure(t *testing.T) {
 	if failureEvent == nil {
 		t.Fatal("expected a failure telemetry event, got none")
 	}
-	if failureEvent.Operation != "telemetry-fail" {
-		t.Fatalf("failure event operation = %q, want %q", failureEvent.Operation, "telemetry-fail")
+	if failureEvent.Operation != "telemetry-fail-req-failed" {
+		t.Fatalf("failure event operation = %q, want %q", failureEvent.Operation, "telemetry-fail-req-failed")
 	}
 	if failureEvent.Err == nil {
 		t.Fatal("expected non-nil error in failure event")

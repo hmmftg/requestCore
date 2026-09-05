@@ -132,8 +132,8 @@ func Execute[Req, Resp any](e *Executor, ctx *request.Context, ep *Endpoint[Req,
 		contentType = "application/json"
 	}
 
-	// Emit start event.
-	e.emit(opID, method, pattern, ctx, telemetry.EventStart, 0, nil, start)
+	// Emit start event with canonical <opID>-req operation key.
+	e.emit(opID+"-req", method, pattern, ctx, telemetry.EventStart, 0, nil, start)
 
 	// --- Tracing: start span ---
 	var span oteltrace.Span
@@ -184,7 +184,7 @@ func Execute[Req, Resp any](e *Executor, ctx *request.Context, ep *Endpoint[Req,
 		if werr != nil {
 			finalErr = fmt.Errorf("%w (problem write failed: %v)", err, werr)
 		}
-		e.emit(opID, method, pattern, ctx, telemetry.EventFailure, problem.Status, finalErr, start)
+		e.emit(opID+"-req-failed", method, pattern, ctx, telemetry.EventFailure, problem.Status, finalErr, start)
 		// Run finalizer on error path.
 		e.runFinalizer(ctx, ep, &req, &zero, finalErr)
 		return zero, finalErr
@@ -315,7 +315,7 @@ func Execute[Req, Resp any](e *Executor, ctx *request.Context, ep *Endpoint[Req,
 				span.RecordError(err)
 				span.SetStatus(codes.Error, err.Error())
 			}
-			e.emit(opID, method, pattern, ctx, telemetry.EventFailure, http.StatusInternalServerError, err, start)
+			e.emit(opID+"-req-failed", method, pattern, ctx, telemetry.EventFailure, http.StatusInternalServerError, err, start)
 			e.runFinalizer(ctx, ep, &req, &zero, err)
 		}
 		return zero, err
@@ -324,7 +324,7 @@ func Execute[Req, Resp any](e *Executor, ctx *request.Context, ep *Endpoint[Req,
 	// 12. Persister.AfterCommit (best-effort, errors logged not propagated)
 	if ep.Persister != nil {
 		if perr := ep.Persister.AfterCommit(ctx, &req, &resp, nil); perr != nil {
-			e.emit(opID, method, pattern, ctx, telemetry.EventBusiness, finalStatus, perr, start)
+			e.emit(opID+"-req", method, pattern, ctx, telemetry.EventBusiness, finalStatus, perr, start)
 		}
 	}
 
@@ -337,7 +337,7 @@ func Execute[Req, Resp any](e *Executor, ctx *request.Context, ep *Endpoint[Req,
 		span.SetStatus(codes.Ok, "")
 	}
 
-	e.emit(opID, method, pattern, ctx, telemetry.EventSuccess, finalStatus, nil, start)
+	e.emit(opID+"-req", method, pattern, ctx, telemetry.EventSuccess, finalStatus, nil, start)
 	return resp, nil
 }
 
@@ -350,7 +350,7 @@ func (e *Executor) runFinalizer[Req, Resp any](ctx *request.Context, ep *Endpoin
 	}
 	defer func() {
 		if r := recover(); r != nil {
-			e.emit(ep.Config.Operation.ID, ep.Config.Operation.Method, ep.Config.Operation.Pattern, ctx, telemetry.EventBusiness, 0, fmt.Errorf("finalizer panic: %v", r), time.Now())
+			e.emit(ep.Config.Operation.ID+"-req", ep.Config.Operation.Method, ep.Config.Operation.Pattern, ctx, telemetry.EventBusiness, 0, fmt.Errorf("finalizer panic: %v", r), time.Now())
 		}
 	}()
 	ep.Finalizer(ctx, req, resp, err)

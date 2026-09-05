@@ -13,7 +13,10 @@ package requestcore_test
 
 import (
 	"encoding/json"
+	"io/fs"
+	"os"
 	"os/exec"
+	"path/filepath"
 	"sort"
 	"strings"
 	"testing"
@@ -296,16 +299,35 @@ func TestArchitecture_NoAlphaSurface(t *testing.T) {
 		}
 	}
 
-	// Check for alpha surface identifiers in .go files.
-	// Use grep to search all .go files (excluding this test file).
-	cmd := exec.Command("grep", "-rn", "--include=*.go",
-		"-e", strings.Join(alphaSurfaceIdentifiers, " -e "),
-		".")
-	cmd.Dir = "."
-	// Exclude this test file from the search.
-	cmd.Args = append(cmd.Args[:len(cmd.Args)-1], "--exclude=archcheck_test.go", ".")
-	out, _ := cmd.CombinedOutput()
-	if len(out) > 0 {
-		t.Errorf("alpha surface identifiers found in v2 source files:\n%s", string(out))
+	// Check for alpha surface identifiers in .go files using a
+	// cross-platform Go implementation (the original used Unix `grep`
+	// which is unavailable on Windows).
+	err = filepath.WalkDir(".", func(path string, d fs.DirEntry, walkErr error) error {
+		if walkErr != nil {
+			return walkErr
+		}
+		if d.IsDir() {
+			return nil
+		}
+		if !strings.HasSuffix(path, ".go") {
+			return nil
+		}
+		if strings.HasSuffix(path, "_test.go") {
+			return nil
+		}
+		data, readErr := os.ReadFile(path)
+		if readErr != nil {
+			return readErr
+		}
+		src := string(data)
+		for _, ident := range alphaSurfaceIdentifiers {
+			if strings.Contains(src, ident) {
+				t.Errorf("alpha surface identifier %q found in %s", ident, path)
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("walk: %v", err)
 	}
 }
