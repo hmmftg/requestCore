@@ -95,6 +95,15 @@ var allowedDeps = map[string]map[string]bool{
 		"github.com/hmmftg/requestCore/v2/telemetry": true,
 		"github.com/hmmftg/requestCore/v2/workers":   true,
 	},
+	"github.com/hmmftg/requestCore/v2/remotecall": {
+		"github.com/hmmftg/requestCore/v2/response":                     true,
+		"github.com/hmmftg/requestCore/v2/telemetry":                    true,
+		"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp": true,
+	},
+	"github.com/hmmftg/requestCore/v2/internal/restyadapter": {
+		"github.com/hmmftg/requestCore/v2/remotecall": true,
+		"resty.dev/v3": true,
+	},
 }
 
 // goListPackage represents the relevant fields from `go list -json`.
@@ -329,5 +338,95 @@ func TestArchitecture_NoAlphaSurface(t *testing.T) {
 	})
 	if err != nil {
 		t.Fatalf("walk: %v", err)
+	}
+}
+
+// TestArchitecture_NoRestyOutsideAdapter verifies that no v2 package outside
+// internal/restyadapter imports resty.dev/v3. This enforces the invariant
+// that Resty is an implementation detail hidden behind the adapter boundary.
+func TestArchitecture_NoRestyOutsideAdapter(t *testing.T) {
+	pkgs, err := listV2Packages()
+	if err != nil {
+		t.Fatalf("go list: %v", err)
+	}
+
+	adapterPkg := "github.com/hmmftg/requestCore/v2/internal/restyadapter"
+	for _, pkg := range pkgs {
+		if pkg.ImportPath == adapterPkg {
+			continue
+		}
+		for _, imp := range pkg.Imports {
+			if imp == "resty.dev/v3" || strings.HasPrefix(imp, "resty.dev/v3/") {
+				t.Errorf("package %s imports resty.dev/v3 (only internal/restyadapter may): %s", pkg.ImportPath, imp)
+			}
+		}
+	}
+
+	// Also check for resty identifier usage in non-adapter .go files.
+	err = filepath.WalkDir(".", func(path string, d fs.DirEntry, walkErr error) error {
+		if walkErr != nil {
+			return walkErr
+		}
+		if d.IsDir() {
+			return nil
+		}
+		if !strings.HasSuffix(path, ".go") {
+			return nil
+		}
+		if strings.HasSuffix(path, "_test.go") {
+			return nil
+		}
+		// Skip the adapter package itself.
+		if strings.HasPrefix(path, "internal"+string(filepath.Separator)+"restyadapter") {
+			return nil
+		}
+		data, readErr := os.ReadFile(path)
+		if readErr != nil {
+			return readErr
+		}
+		src := string(data)
+		if strings.Contains(src, "resty.") {
+			t.Errorf("resty identifier found in non-adapter file %s", path)
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("walk: %v", err)
+	}
+}
+
+// TestArchitecture_RemoteCallDeps verifies that remotecall does not import
+// internal/restyadapter (dependency direction: adapter imports remotecall,
+// never the reverse).
+func TestArchitecture_RemoteCallDeps(t *testing.T) {
+	pkgs, err := listV2Packages()
+	if err != nil {
+		t.Fatalf("go list: %v", err)
+	}
+
+	adapterPkg := "github.com/hmmftg/requestCore/v2/internal/restyadapter"
+	for _, pkg := range pkgs {
+		if pkg.ImportPath != adapterPkg {
+			continue
+		}
+		for _, imp := range pkg.Imports {
+			if imp == "github.com/hmmftg/requestCore/v2/remotecall" {
+				// This is the correct direction: adapter imports remotecall.
+				return
+			}
+		}
+		t.Errorf("internal/restyadapter does not import remotecall (expected: adapter imports remotecall)")
+	}
+
+	// Verify remotecall does NOT import restyadapter.
+	for _, pkg := range pkgs {
+		if pkg.ImportPath != "github.com/hmmftg/requestCore/v2/remotecall" {
+			continue
+		}
+		for _, imp := range pkg.Imports {
+			if imp == adapterPkg {
+				t.Errorf("remotecall imports internal/restyadapter (dependency direction violated)")
+			}
+		}
 	}
 }
