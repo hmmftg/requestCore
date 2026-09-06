@@ -22,6 +22,12 @@ client := remotecall.NewRemoteClient(
         RetryableMethods: map[string]bool{"GET": true},
         RetryOnStatus:    map[int]bool{502: true, 503: true},
         RetryOnTransport: true,
+        Backoff: &remotecall.BackoffPolicy{
+            InitialDelay: 2 * time.Second,
+            MaxDelay:     5 * time.Minute,
+            Multiplier:   2.0,
+            JitterFactor: 0.2, // ±20% jitter
+        },
     }),
     remotecall.WithCircuitBreaker(remotecall.CircuitBreakerPolicy{
         FailureThreshold: 5,
@@ -87,6 +93,51 @@ v2 uses `telemetry.Sink` instead of `webFramework.AddLog`. Context is first-clas
 
 ### 7. Form bodies must be `url.Values`
 When `BodyType == Form`, `Body` must have dynamic type `url.Values`. Other map types are rejected at preflight.
+
+### 8. Backoff and jitter
+v2 supports declarative backoff via `BackoffPolicy` on `RetryPolicy`. The adapter translates it into a Resty `RetryDelayStrategyFunc`. Supports exponential backoff (`Multiplier`), max delay cap (`MaxDelay`), and jitter (`JitterFactor` 0.0–1.0).
+
+**Cartino reversal worker example** (2s initial, 5min max, factor 2, ±20% jitter):
+```go
+Backoff: &remotecall.BackoffPolicy{
+    InitialDelay: 2 * time.Second,
+    MaxDelay:     5 * time.Minute,
+    Multiplier:   2.0,
+    JitterFactor: 0.2,
+}
+```
+
+### 9. Retry on response body content
+v2 supports retry decisions based on response body content via `RetryOnBody` callback. This covers Galaxy's `ExceptionDetail.Key == "SERVICE_UNAVAILABLE"` pattern:
+```go
+RetryOnBody: func(statusCode int, body []byte) bool {
+    return statusCode == 200 && strings.Contains(string(body), "SERVICE_UNAVAILABLE")
+},
+```
+
+### 10. Rate-limit retry with Retry-After
+v2 supports honoring the `Retry-After` HTTP header for custom status codes via `HonorRetryAfter`. Resty's built-in behavior only honors `Retry-After` for 429/503. When `HonorRetryAfter` is true, the adapter extends this to all status codes in `RetryOnStatus`:
+```go
+Retry: &remotecall.RetryPolicy{
+    MaxRetries:       1,
+    RetryableMethods: map[string]bool{"GET": true},
+    RetryOnStatus:    map[int]bool{406: true, 330: true},
+    HonorRetryAfter:  true,
+},
+```
+
+For Keyhan's `time.Sleep(1 * time.Second)` pattern, either use `HonorRetryAfter` with a server-side `Retry-After: 1` header, or use a `BackoffPolicy` with `InitialDelay: 1 * time.Second`.
+
+## Gap Resolution Status
+
+| Gap | Status | Solution |
+|-----|--------|----------|
+| Backoff/jitter control | **Resolved** | `BackoffPolicy` struct on `RetryPolicy` |
+| Retry-on-error-key (body content) | **Resolved** | `RetryOnBody` callback on `RetryPolicy` |
+| Rate-limit retry with sleep | **Resolved** | `HonorRetryAfter` + `BackoffPolicy` for fixed delay |
+| External-call persistence | **Manual via `OnAttempt`** | Wire `OnAttempt` hook + `telemetry.Sink` |
+| OAuth2/token refresh | **External `AuthProvider`** | Implement custom `AuthProvider` |
+| Alpha maturity | **Pending** | Awaiting v2.0.0 stable + resty v3 stable release |
 
 ## Not Supported in v2
 
