@@ -3,7 +3,6 @@ package remotecall_test
 import (
 	"context"
 	"errors"
-	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -35,10 +34,10 @@ func newRetryTestClient(t *testing.T, httpClient *http.Client) *remotecall.Remot
 func TestRetry_MaxRetriesSemantics(t *testing.T) {
 	var attemptCount int32
 
-	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		atomic.AddInt32(&attemptCount, 1)
 		w.WriteHeader(503)
-		fmt.Fprint(w, `{"error":"unavailable"}`)
+		_, _ = w.Write([]byte(`{"error":"unavailable"}`))
 	}))
 	defer ts.Close()
 
@@ -69,7 +68,7 @@ func TestRetry_MaxRetriesSemantics(t *testing.T) {
 func TestRetry_MaxRetriesZero(t *testing.T) {
 	var attemptCount int32
 
-	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		atomic.AddInt32(&attemptCount, 1)
 		w.WriteHeader(503)
 	}))
@@ -102,7 +101,7 @@ func TestRetry_MaxRetriesZero(t *testing.T) {
 func TestRetry_ContextCancellationNeverRetried(t *testing.T) {
 	var attemptCount int32
 
-	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		atomic.AddInt32(&attemptCount, 1)
 		time.Sleep(2 * time.Second)
 		w.WriteHeader(200)
@@ -188,7 +187,7 @@ func TestRetry_PerCallOverridesDefault(t *testing.T) {
 func TestRetry_PerCallDisablesDefault(t *testing.T) {
 	var attemptCount int32
 
-	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		atomic.AddInt32(&attemptCount, 1)
 		w.WriteHeader(503)
 	}))
@@ -230,7 +229,7 @@ func TestRetry_PerCallDisablesDefault(t *testing.T) {
 func TestRetry_NoRetryByDefault(t *testing.T) {
 	var attemptCount int32
 
-	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		atomic.AddInt32(&attemptCount, 1)
 		w.WriteHeader(503)
 	}))
@@ -258,7 +257,7 @@ func TestRetry_NoRetryByDefault(t *testing.T) {
 func TestRetry_BreakerOneOutcomePerCall(t *testing.T) {
 	var attemptCount int32
 
-	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		atomic.AddInt32(&attemptCount, 1)
 		w.WriteHeader(503)
 	}))
@@ -307,7 +306,7 @@ func TestRetry_BreakerOneOutcomePerCall(t *testing.T) {
 func TestRetry_LastAttemptSucceeds(t *testing.T) {
 	var attemptCount int32
 
-	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		count := atomic.AddInt32(&attemptCount, 1)
 		if count < 3 {
 			w.WriteHeader(503)
@@ -315,7 +314,7 @@ func TestRetry_LastAttemptSucceeds(t *testing.T) {
 		}
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(200)
-		fmt.Fprint(w, `{"message":"success"}`)
+		_, _ = w.Write([]byte(`{"message":"success"}`))
 	}))
 	defer ts.Close()
 
@@ -345,7 +344,7 @@ func TestRetry_LastAttemptSucceeds(t *testing.T) {
 }
 
 func TestRetry_ConcurrentSharedHTTPClient(t *testing.T) {
-	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(503)
 	}))
 	defer ts.Close()
@@ -417,11 +416,12 @@ func TestRetry_BackoffPolicy(t *testing.T) {
 	var attemptCount int32
 	var firstAttemptTime, secondAttemptTime time.Time
 
-	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		count := atomic.AddInt32(&attemptCount, 1)
-		if count == 1 {
+		switch count {
+		case 1:
 			firstAttemptTime = time.Now()
-		} else if count == 2 {
+		case 2:
 			secondAttemptTime = time.Now()
 		}
 		w.WriteHeader(503)
@@ -464,7 +464,7 @@ func TestRetry_BackoffPolicy(t *testing.T) {
 func TestRetry_BackoffPolicyWithJitter(t *testing.T) {
 	var attemptCount int32
 
-	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		atomic.AddInt32(&attemptCount, 1)
 		w.WriteHeader(503)
 	}))
@@ -492,7 +492,8 @@ func TestRetry_BackoffPolicyWithJitter(t *testing.T) {
 	})
 
 	// With jitter, we just verify the retries happen (3 attempts)
-	if got := atomic.LoadInt32(&attemptCount); got != 3 {
+	switch got := atomic.LoadInt32(&attemptCount); {
+	case got != 3:
 		t.Errorf("expected 3 attempts with jitter backoff, got %d", got)
 	}
 }
@@ -500,17 +501,17 @@ func TestRetry_BackoffPolicyWithJitter(t *testing.T) {
 func TestRetry_RetryOnBody(t *testing.T) {
 	var attemptCount int32
 
-	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		count := atomic.AddInt32(&attemptCount, 1)
 		if count < 3 {
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(200) // HTTP 200 but body says retry
-			fmt.Fprint(w, `{"ExceptionDetail":{"Key":"SERVICE_UNAVAILABLE"}}`)
+			_, _ = w.Write([]byte(`{"ExceptionDetail":{"Key":"SERVICE_UNAVAILABLE"}}`))
 			return
 		}
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(200)
-		fmt.Fprint(w, `{"message":"success"}`)
+		_, _ = w.Write([]byte(`{"message":"success"}`))
 	}))
 	defer ts.Close()
 
@@ -551,11 +552,11 @@ func TestRetry_RetryOnBody(t *testing.T) {
 func TestRetry_RetryOnBody_StopsWhenFalse(t *testing.T) {
 	var attemptCount int32
 
-	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		atomic.AddInt32(&attemptCount, 1)
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(200)
-		fmt.Fprint(w, `{"ExceptionDetail":{"Key":"SERVICE_UNAVAILABLE"}}`)
+		_, _ = w.Write([]byte(`{"ExceptionDetail":{"Key":"SERVICE_UNAVAILABLE"}}`))
 	}))
 	defer ts.Close()
 
@@ -571,7 +572,7 @@ func TestRetry_RetryOnBody_StopsWhenFalse(t *testing.T) {
 		Retry: &remotecall.RetryPolicy{
 			MaxRetries:       2,
 			RetryableMethods: map[string]bool{"GET": true},
-			RetryOnBody: func(statusCode int, body []byte) bool {
+			RetryOnBody: func(_ int, _ []byte) bool {
 				return false // never retry on body
 			},
 			Backoff: &remotecall.BackoffPolicy{
@@ -595,7 +596,7 @@ func TestRetry_HonorRetryAfter(t *testing.T) {
 	var attemptCount int32
 	var firstAttemptTime, secondAttemptTime time.Time
 
-	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		count := atomic.AddInt32(&attemptCount, 1)
 		if count == 1 {
 			firstAttemptTime = time.Now()
@@ -607,7 +608,7 @@ func TestRetry_HonorRetryAfter(t *testing.T) {
 		secondAttemptTime = time.Now()
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(200)
-		fmt.Fprint(w, `{"message":"success"}`)
+		_, _ = w.Write([]byte(`{"message":"success"}`))
 	}))
 	defer ts.Close()
 
@@ -649,7 +650,7 @@ func TestRetry_HonorRetryAfter(t *testing.T) {
 func TestRetry_HonorRetryAfter_Disabled(t *testing.T) {
 	var attemptCount int32
 
-	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		count := atomic.AddInt32(&attemptCount, 1)
 		if count == 1 {
 			// 406 with Retry-After: 60 — but HonorRetryAfter is false
@@ -659,7 +660,7 @@ func TestRetry_HonorRetryAfter_Disabled(t *testing.T) {
 		}
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(200)
-		fmt.Fprint(w, `{"message":"success"}`)
+		_, _ = w.Write([]byte(`{"message":"success"}`))
 	}))
 	defer ts.Close()
 
@@ -703,7 +704,7 @@ func TestRetry_HonorRetryAfter_Disabled(t *testing.T) {
 func TestRetry_RetryableMethodsBlocksNonListed(t *testing.T) {
 	var attemptCount int32
 
-	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		atomic.AddInt32(&attemptCount, 1)
 		w.WriteHeader(503)
 	}))
@@ -733,7 +734,7 @@ func TestRetry_RetryableMethodsBlocksNonListed(t *testing.T) {
 func TestRetry_RetryableMethodsCaseInsensitive(t *testing.T) {
 	var attemptCount int32
 
-	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		count := atomic.AddInt32(&attemptCount, 1)
 		if count < 3 {
 			w.WriteHeader(503)
@@ -741,7 +742,7 @@ func TestRetry_RetryableMethodsCaseInsensitive(t *testing.T) {
 		}
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(200)
-		fmt.Fprint(w, `{"message":"success"}`)
+		_, _ = w.Write([]byte(`{"message":"success"}`))
 	}))
 	defer ts.Close()
 

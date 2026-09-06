@@ -113,7 +113,7 @@ func applyRetryPolicy(r *resty.Request, policy *remotecall.RetryPolicy) {
 
 	// Add retry condition for status codes
 	if len(policy.RetryOnStatus) > 0 {
-		r.AddRetryConditions(func(resp *resty.Response, err error) bool {
+		r.AddRetryConditions(func(resp *resty.Response, _ error) bool {
 			if resp != nil && statusSet[resp.StatusCode()] {
 				return true
 			}
@@ -123,7 +123,7 @@ func applyRetryPolicy(r *resty.Request, policy *remotecall.RetryPolicy) {
 
 	// Add retry condition for body inspection
 	if policy.RetryOnBody != nil {
-		r.AddRetryConditions(func(resp *resty.Response, err error) bool {
+		r.AddRetryConditions(func(resp *resty.Response, _ error) bool {
 			if resp == nil {
 				return false
 			}
@@ -189,7 +189,7 @@ func buildDelayStrategy(
 	honorRetryAfter bool,
 	retryStatusSet map[int]bool,
 ) resty.RetryDelayStrategyFunc {
-	return func(resp *resty.Response, err error) (time.Duration, error) {
+	return func(resp *resty.Response, _ error) (time.Duration, error) {
 		// Honor Retry-After header for custom status codes when enabled.
 		if honorRetryAfter && resp != nil {
 			if retryStatusSet[resp.StatusCode()] {
@@ -217,7 +217,7 @@ func buildDelayStrategy(
 		// Apply jitter: ±jitterFactor * delay
 		if jitterFactor > 0 {
 			jitterRange := delay * jitterFactor
-			jitter := (rand.Float64()*2 - 1) * jitterRange
+			jitter := (rand.Float64()*2 - 1) * jitterRange //nolint:gosec // jitter uses non-crypto RNG by design
 			delay += jitter
 			if delay < 0 {
 				delay = 0
