@@ -155,13 +155,18 @@ func TestInProcessWorker_QueueFull(t *testing.T) {
 
 	// Fill the queue with a blocking job
 	block := make(chan struct{})
+	blockStarted := make(chan struct{})
 	w.Submit(context.Background(), Job{
 		Name: "blocker",
 		Handler: func(ctx *JobContext) error {
+			close(blockStarted)
 			<-block
 			return nil
 		},
 	})
+
+	// Wait for the worker to pick up "blocker" so the queue has space
+	<-blockStarted
 
 	// Fill the queue buffer
 	w.Submit(context.Background(), Job{
