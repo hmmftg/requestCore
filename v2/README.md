@@ -70,6 +70,8 @@ import (
     "github.com/hmmftg/requestCore/v2/request"
 )
 
+type HealthReq struct{}
+
 type HealthResp struct {
     Status string `json:"status"`
 }
@@ -85,9 +87,9 @@ func main() {
     defer application.Close()
 
     // Register a typed GET endpoint using the canonical handler signature.
-    err = handlers.GetEndpoint[struct{}, HealthResp](
+    err = handlers.GetEndpoint[HealthReq, HealthResp](
         application.Router, application.Executor, "/health",
-        func(ctx *request.Context, req struct{}) (HealthResp, error) {
+        func(ctx *request.Context, req HealthReq) (HealthResp, error) {
             return HealthResp{Status: "healthy"}, nil
         },
     )
