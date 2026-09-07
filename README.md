@@ -526,25 +526,54 @@ a **generics-first** API. It requires **Go 1.27+** for generic methods.
 ### Quick example
 
 ```go
+package main
+
 import (
+    "context"
+    "log"
+    "os/signal"
+    "syscall"
+
     "github.com/hmmftg/requestCore/v2/app"
     "github.com/hmmftg/requestCore/v2/handlers"
     "github.com/hmmftg/requestCore/v2/renderers"
+    "github.com/hmmftg/requestCore/v2/request"
 )
 
-application, _ := app.Bootstrap(app.Config{
-    Framework: app.FrameworkChi,
-    Renderer:  renderers.JSONRenderer{},
-})
-defer application.Close()
+type HealthReq struct{}
 
-// Typed GET endpoint — compile-time type safety
-handlers.GetEndpoint[struct{}, HealthResp](
-    application.Router, nil, application.RespHandler, "/health",
-    func(req *struct{}, trx *handlers.HandlerRequest[struct{}, HealthResp]) (HealthResp, error) {
-        return HealthResp{Status: "ok"}, nil
-    },
-)
+type HealthResp struct {
+    Status string `json:"status"`
+}
+
+func main() {
+    application, err := app.Bootstrap(app.Config{
+        Framework: app.FrameworkChi,
+        Renderer:  renderers.JSONRenderer{},
+    })
+    if err != nil {
+        log.Fatal(err)
+    }
+    defer application.Close()
+
+    // Register a typed GET endpoint using the canonical handler signature.
+    err = handlers.GetEndpoint[HealthReq, HealthResp](
+        application.Router, application.Executor, "/health",
+        func(ctx *request.Context, req HealthReq) (HealthResp, error) {
+            return HealthResp{Status: "healthy"}, nil
+        },
+    )
+    if err != nil {
+        log.Fatal(err)
+    }
+
+    ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+    defer stop()
+
+    if err := application.StartWithContext(ctx, ":8080"); err != nil {
+        log.Fatal(err)
+    }
+}
 ```
 
 ### Documentation
