@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"net/http"
 	"time"
 
 	"go.opentelemetry.io/otel/attribute"
@@ -34,6 +35,15 @@ type HandlerParameters[Req, Resp any] struct {
 	// Tracing parameters
 	EnableTracing   bool
 	TracingSpanName string
+	// SuccessStatus is the HTTP status code for successful responses.
+	// Defaults to 0, which means use the responder's default (200).
+	// Set to 201, 204, etc. for endpoints that need non-200 success
+	// statuses. This is opt-in and does not change default behavior.
+	SuccessStatus int
+	// SuccessHeaders are static response headers applied to successful
+	// responses. Applied before the response body is written. This is
+	// opt-in and does not change default behavior.
+	SuccessHeaders map[string]string
 }
 
 // HandlerInterface is the interface that request handlers must implement.
@@ -142,20 +152,52 @@ func respondError[Req, Resp any](core requestCore.RequestCoreInterface, trx *Han
 	trx.SetOutcome(err, response.LastHTTPStatus(trx.W))
 }
 
-func respondOK[Req, Resp any](core requestCore.RequestCoreInterface, trx *HandlerRequest[Req, Resp], resp Resp) {
-	core.Responder().OK(trx.W, resp)
+func respondOK[Req, Resp any](core requestCore.RequestCoreInterface, trx *HandlerRequest[Req, Resp], resp Resp, params HandlerParameters[Req, Resp]) {
+	responder := core.Responder()
+	if params.SuccessStatus != 0 || len(params.SuccessHeaders) > 0 {
+		if sa, ok := responder.(response.StatusAwareResponder); ok {
+			status := params.SuccessStatus
+			if status == 0 {
+				status = http.StatusOK
+			}
+			sa.OKWithStatusAndHeaders(trx.W, status, params.SuccessHeaders, resp)
+			trx.SetOutcome(nil, response.LastHTTPStatus(trx.W))
+			trx.RespSent = true
+			return
+		}
+	}
+	responder.OK(trx.W, resp)
 	trx.SetOutcome(nil, response.LastHTTPStatus(trx.W))
 	trx.RespSent = true
 }
 
-func respondOKWithReceipt[Req, Resp any](core requestCore.RequestCoreInterface, trx *HandlerRequest[Req, Resp], resp Resp, receipt *response.Receipt) {
-	core.Responder().OKWithReceipt(trx.W, resp, receipt)
+func respondOKWithReceipt[Req, Resp any](core requestCore.RequestCoreInterface, trx *HandlerRequest[Req, Resp], resp Resp, receipt *response.Receipt, params HandlerParameters[Req, Resp]) {
+	responder := core.Responder()
+	if params.SuccessStatus != 0 || len(params.SuccessHeaders) > 0 {
+		if sa, ok := responder.(response.StatusAwareResponder); ok {
+			status := params.SuccessStatus
+			if status == 0 {
+				status = http.StatusOK
+			}
+			sa.OKWithStatusAndHeaders(trx.W, status, params.SuccessHeaders, resp)
+			trx.SetOutcome(nil, response.LastHTTPStatus(trx.W))
+			trx.RespSent = true
+			return
+		}
+	}
+	responder.OKWithReceipt(trx.W, resp, receipt)
 	trx.SetOutcome(nil, response.LastHTTPStatus(trx.W))
 	trx.RespSent = true
 }
 
-func respondOKWithAttachment[Req, Resp any](core requestCore.RequestCoreInterface, trx *HandlerRequest[Req, Resp], attachment *response.FileResponse) {
-	core.Responder().OKWithAttachment(trx.W, attachment)
+func respondOKWithAttachment[Req, Resp any](core requestCore.RequestCoreInterface, trx *HandlerRequest[Req, Resp], attachment *response.FileResponse, params HandlerParameters[Req, Resp]) {
+	responder := core.Responder()
+	if len(params.SuccessHeaders) > 0 {
+		for k, v := range params.SuccessHeaders {
+			trx.W.Parser.SetRespHeader(k, v)
+		}
+	}
+	responder.OKWithAttachment(trx.W, attachment)
 	trx.SetOutcome(nil, response.LastHTTPStatus(trx.W))
 	trx.RespSent = true
 }
@@ -247,7 +289,7 @@ func BaseHandler[Req any, Resp any, Handler HandlerInterface[Req, Resp]](
 				return
 			}
 
-			respondOK(core, &trx, trx.Response)
+			respondOK(core, &trx, trx.Response, params)
 			return
 		}
 
@@ -291,7 +333,7 @@ func BaseHandler[Req any, Resp any, Handler HandlerInterface[Req, Resp]](
 			if receipt != nil {
 				rc, ok := receipt.(*response.Receipt)
 				if ok {
-					respondOKWithReceipt(core, &trx, trx.Response, rc)
+					respondOKWithReceipt(core, &trx, trx.Response, rc, params)
 				} else {
 					slog.Error("registered as handler with receipt, but receipt local was", slog.Any("receipt", fmt.Sprintf("%t", receipt)))
 				}
@@ -305,7 +347,7 @@ func BaseHandler[Req any, Resp any, Handler HandlerInterface[Req, Resp]](
 			if attachment != nil {
 				rc, ok := attachment.(*response.FileResponse)
 				if ok {
-					respondOKWithAttachment(core, &trx, rc)
+					respondOKWithAttachment(core, &trx, rc, params)
 				} else {
 					slog.Error("registered as handler with attachment, but attachment local was", slog.Any("receipt", fmt.Sprintf("%t", attachment)))
 				}
@@ -315,7 +357,7 @@ func BaseHandler[Req any, Resp any, Handler HandlerInterface[Req, Resp]](
 		}
 
 		if !trx.RespSent {
-			respondOK(core, &trx, trx.Response)
+			respondOK(core, &trx, trx.Response, params)
 		}
 	}
 }
