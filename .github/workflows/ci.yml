@@ -182,3 +182,58 @@ jobs:
       - name: Build with vendor mode
         working-directory: /tmp/consumer-test
         run: go build -mod=vendor ./...
+
+  # Verifies that a downstream consumer can build against the root
+  # module using the real unsuffixed import path
+  # (github.com/hmmftg/requestCore) with Go 1.27, without v2 or the
+  # workspace. This guards the stable-v1 import-path contract.
+  root-consumer:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+      - name: Force standalone root module
+        run: |
+          if [ -f go.work ]; then rm go.work; fi
+          if [ -f go.work.sum ]; then rm go.work.sum; fi
+      - name: Tidy root module
+        run: go mod tidy
+      - name: Create root-only consumer module
+        run: |
+          mkdir -p /tmp/root-consumer
+          cd /tmp/root-consumer
+          cat > go.mod <<'GOMOD'
+          module root-consumer
+
+          go 1.27.0
+
+          require github.com/hmmftg/requestCore v0.0.0
+          GOMOD
+          echo "replace github.com/hmmftg/requestCore => $GITHUB_WORKSPACE" >> go.mod
+      - name: Create consumer main.go
+        run: |
+          cd /tmp/root-consumer
+          cat > main.go <<'GOFILE'
+          package main
+
+          import (
+            _ "github.com/hmmftg/requestCore/webFramework"
+            _ "github.com/hmmftg/requestCore/handlers"
+            _ "github.com/hmmftg/requestCore/response"
+            _ "github.com/hmmftg/requestCore/libRequest"
+          )
+
+          func main() {}
+          GOFILE
+      - name: Tidy consumer
+        working-directory: /tmp/root-consumer
+        run: go mod tidy
+      - name: Build consumer
+        working-directory: /tmp/root-consumer
+        run: go build ./...
+      - name: Vet consumer
+        working-directory: /tmp/root-consumer
+        run: go vet ./...

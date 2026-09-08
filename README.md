@@ -205,6 +205,25 @@ The repository is centered around a thin root façade and multiple focused subpa
 
 ---
 
+## Release Lines
+
+This repository contains **two independent Go modules** with separate
+release streams:
+
+| Module | Import path | Tags | Status |
+|---|---|---|---|
+| Root (v1) | `github.com/hmmftg/requestCore` | `v0.x.y`, `v1.x.y` | Stable (v1.0 line) |
+| v2 | `github.com/hmmftg/requestCore/v2` | `v2/v2.x.y` | Alpha prerelease |
+
+- The root module is the stable v1 line. Upgrade from `v0.28.1` using
+  [MIGRATION.md](MIGRATION.md).
+- The v2 module is a separate module under `v2/` with its own `go.mod`,
+  tags, and [release workflow](.github/workflows/release-v2.yml). See
+  [v2/README.md](v2/README.md) and [v2/MIGRATION.md](v2/MIGRATION.md).
+- v2-only commits do not trigger root module versioning.
+
+---
+
 ## Installation
 
 ```bash
@@ -476,6 +495,7 @@ requestCore/
 
 Additional documentation included in the repository:
 
+- `MIGRATION.md` — v0.28.1 → v1.x upgrade guide
 - `OPENTELEMETRY_INTEGRATION.md`
 - `NETHTTP_IMPLEMENTATION_COMPLETE.md`
 - `DYNAMIC_HEADERS_GUIDE.md`
