@@ -19,10 +19,15 @@ import (
 func StatusPreservingBuilder[Resp any](statusCode int, rawResp []byte, headers map[string]string) (*Resp, error) {
 	if statusCode < 200 || statusCode >= 300 {
 		_, innerErr := DefaultBuilderfunc[Resp](statusCode, rawResp, headers)
+		hdr := make(http.Header)
+		for k, v := range headers {
+			hdr.Set(k, v)
+		}
 		return nil, &RemoteCallError{
-			Status: statusCode,
-			Body:   rawResp,
-			Err:    innerErr,
+			Status:  statusCode,
+			Body:    rawResp,
+			Headers: hdr,
+			Err:     innerErr,
 		}
 	}
 	if statusCode == http.StatusNoContent || len(rawResp) == 0 {

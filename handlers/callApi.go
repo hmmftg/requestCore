@@ -327,10 +327,15 @@ func executeSingleAttempt[Req any, Resp any](
 	param.Builder = func(stat int, rawResp []byte, headers map[string]string) (*Resp, error) {
 		actualStatus = stat
 		if stat < 200 || stat >= 300 {
+			hdr := make(http.Header)
+			for k, v := range headers {
+				hdr.Set(k, v)
+			}
 			return nil, &libCallApi.RemoteCallError{
-				Status: stat,
-				Body:   rawResp,
-				Err:    fmt.Errorf("HTTP %d", stat),
+				Status:  stat,
+				Body:    rawResp,
+				Headers: hdr,
+				Err:     fmt.Errorf("HTTP %d", stat),
 			}
 		}
 		return originalBuilder(stat, rawResp, headers)

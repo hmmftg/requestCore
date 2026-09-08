@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -470,5 +471,178 @@ func TestDeriveStatusCode(t *testing.T) {
 			got := libRetry.DeriveStatusCode(tc.resp, tc.err)
 			assert.Equal(t, got, tc.want)
 		})
+	}
+}
+
+func TestWithRetry_HonorRetryAfter_DeltaSeconds(t *testing.T) {
+	var sleepDurations []time.Duration
+	var mu sync.Mutex
+
+	policy := &libRetry.RetryPolicy{
+		MaxRetries:       1,
+		RetryOnStatus:    map[int]bool{503: true},
+		HonorRetryAfter:  true,
+		MaxRetryAfterDelay: 60 * time.Second,
+		Backoff:          1 * time.Millisecond,
+		Sleep: func(_ context.Context, d time.Duration) bool {
+			mu.Lock()
+			sleepDurations = append(sleepDurations, d)
+			mu.Unlock()
+			return true
+		},
+	}
+
+	result := libRetry.WithRetry(policy, func(attempt int) (*testResp, int, error) {
+		if attempt == 1 {
+			h := make(http.Header)
+			h.Set("Retry-After", "5")
+			return nil, 503, &libCallApi.RemoteCallError{
+				Status:  503,
+				Headers: h,
+				Err:     errors.New("503"),
+			}
+		}
+		return &testResp{Data: "ok"}, 200, nil
+	})
+
+	assert.NilError(t, result.Error)
+	assert.Equal(t, result.Attempts, 2)
+
+	mu.Lock()
+	defer mu.Unlock()
+	if len(sleepDurations) != 1 {
+		t.Fatalf("expected 1 sleep call, got %d", len(sleepDurations))
+	}
+	// Retry-After: 5 should cause a 5-second delay, not the 1ms backoff
+	if sleepDurations[0] != 5*time.Second {
+		t.Errorf("expected 5s delay from Retry-After, got %v", sleepDurations[0])
+	}
+}
+
+func TestWithRetry_HonorRetryAfter_Clamped(t *testing.T) {
+	var sleepDurations []time.Duration
+	var mu sync.Mutex
+
+	policy := &libRetry.RetryPolicy{
+		MaxRetries:         1,
+		RetryOnStatus:      map[int]bool{503: true},
+		HonorRetryAfter:    true,
+		MaxRetryAfterDelay: 10 * time.Second,
+		Backoff:            1 * time.Millisecond,
+		Sleep: func(_ context.Context, d time.Duration) bool {
+			mu.Lock()
+			sleepDurations = append(sleepDurations, d)
+			mu.Unlock()
+			return true
+		},
+	}
+
+	result := libRetry.WithRetry(policy, func(attempt int) (*testResp, int, error) {
+		if attempt == 1 {
+			h := make(http.Header)
+			h.Set("Retry-After", "3600") // 1 hour, should be clamped to 10s
+			return nil, 503, &libCallApi.RemoteCallError{
+				Status:  503,
+				Headers: h,
+				Err:     errors.New("503"),
+			}
+		}
+		return &testResp{Data: "ok"}, 200, nil
+	})
+
+	assert.NilError(t, result.Error)
+
+	mu.Lock()
+	defer mu.Unlock()
+	if len(sleepDurations) != 1 {
+		t.Fatalf("expected 1 sleep call, got %d", len(sleepDurations))
+	}
+	// Should be clamped to MaxRetryAfterDelay (10s), not 3600s
+	if sleepDurations[0] != 10*time.Second {
+		t.Errorf("expected 10s (clamped), got %v", sleepDurations[0])
+	}
+}
+
+func TestWithRetry_HonorRetryAfter_Disabled(t *testing.T) {
+	var sleepDurations []time.Duration
+	var mu sync.Mutex
+
+	policy := &libRetry.RetryPolicy{
+		MaxRetries:      1,
+		RetryOnStatus:   map[int]bool{503: true},
+		HonorRetryAfter: false, // disabled
+		Backoff:         5 * time.Millisecond,
+		Sleep: func(_ context.Context, d time.Duration) bool {
+			mu.Lock()
+			sleepDurations = append(sleepDurations, d)
+			mu.Unlock()
+			return true
+		},
+	}
+
+	result := libRetry.WithRetry(policy, func(attempt int) (*testResp, int, error) {
+		if attempt == 1 {
+			h := make(http.Header)
+			h.Set("Retry-After", "60")
+			return nil, 503, &libCallApi.RemoteCallError{
+				Status:  503,
+				Headers: h,
+				Err:     errors.New("503"),
+			}
+		}
+		return &testResp{Data: "ok"}, 200, nil
+	})
+
+	assert.NilError(t, result.Error)
+
+	mu.Lock()
+	defer mu.Unlock()
+	if len(sleepDurations) != 1 {
+		t.Fatalf("expected 1 sleep call, got %d", len(sleepDurations))
+	}
+	// Without HonorRetryAfter, the fixed Backoff (5ms) should be used
+	if sleepDurations[0] != 5*time.Millisecond {
+		t.Errorf("expected 5ms (fixed backoff), got %v", sleepDurations[0])
+	}
+}
+
+func TestWithRetry_HonorRetryAfter_NoHeader(t *testing.T) {
+	var sleepDurations []time.Duration
+	var mu sync.Mutex
+
+	policy := &libRetry.RetryPolicy{
+		MaxRetries:      1,
+		RetryOnStatus:   map[int]bool{503: true},
+		HonorRetryAfter: true,
+		Backoff:         5 * time.Millisecond,
+		Sleep: func(_ context.Context, d time.Duration) bool {
+			mu.Lock()
+			sleepDurations = append(sleepDurations, d)
+			mu.Unlock()
+			return true
+		},
+	}
+
+	result := libRetry.WithRetry(policy, func(attempt int) (*testResp, int, error) {
+		if attempt == 1 {
+			// No Retry-After header
+			return nil, 503, &libCallApi.RemoteCallError{
+				Status: 503,
+				Err:    errors.New("503"),
+			}
+		}
+		return &testResp{Data: "ok"}, 200, nil
+	})
+
+	assert.NilError(t, result.Error)
+
+	mu.Lock()
+	defer mu.Unlock()
+	if len(sleepDurations) != 1 {
+		t.Fatalf("expected 1 sleep call, got %d", len(sleepDurations))
+	}
+	// Without Retry-After header, the fixed Backoff (5ms) should be used
+	if sleepDurations[0] != 5*time.Millisecond {
+		t.Errorf("expected 5ms (fixed backoff, no Retry-After), got %v", sleepDurations[0])
 	}
 }
