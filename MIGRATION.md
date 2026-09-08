@@ -82,9 +82,15 @@ They do not change default behavior:
   relation link serialization.
 - **Retry-After** — `httpsemantics` parser/formatter for delta-seconds
   and HTTP-date forms; opt-in `HonorRetryAfter` in `RetryPolicy`.
+- **W3C Trace Context** — `httpsemantics` helpers for inbound
+  extraction and outbound injection of `traceparent`/`tracestate`
+  headers via the globally configured OpenTelemetry propagator.
 - **Idempotency contracts** — `idempotency` package with store interfaces
   and in-memory test store. Application owns persistence and replay
   policy.
+- **Cross-version conformance** — `conformance` package with shared
+  data-only HTTP conformance vectors for testing v1 and v2 against the
+  same RFC requirements.
 
 ## How to Upgrade
 
