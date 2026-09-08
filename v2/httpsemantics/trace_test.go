@@ -21,7 +21,11 @@ func TestInjectExtractW3CTraceContext_RoundTrip(t *testing.T) {
 
 	// Create a real tracer with a valid span context
 	tp := trace.NewTracerProvider()
-	defer tp.Shutdown(context.Background())
+	defer func() {
+		if err := tp.Shutdown(context.Background()); err != nil {
+			t.Logf("tracer provider shutdown error: %v", err)
+		}
+	}()
 	otel.SetTracerProvider(tp)
 	defer otel.SetTracerProvider(trace.NewTracerProvider()) // restore noop
 
@@ -80,7 +84,11 @@ func TestInjectW3CTraceContextToMap_RoundTrip(t *testing.T) {
 	))
 
 	tp := trace.NewTracerProvider()
-	defer tp.Shutdown(context.Background())
+	defer func() {
+		if err := tp.Shutdown(context.Background()); err != nil {
+			t.Logf("tracer provider shutdown error: %v", err)
+		}
+	}()
 	otel.SetTracerProvider(tp)
 	defer otel.SetTracerProvider(trace.NewTracerProvider()) // restore noop
 

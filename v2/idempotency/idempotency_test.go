@@ -363,9 +363,10 @@ func TestMemoryStore_ConcurrentReserve(t *testing.T) {
 		go func() {
 			defer wg.Done()
 			_, err := s.Reserve("concurrent-key", fp, 1*time.Hour)
-			if err == nil {
+			switch err {
+			case nil:
 				successes.Add(1)
-			} else if err == ErrConflict {
+			case ErrConflict:
 				conflicts.Add(1)
 			}
 		}()

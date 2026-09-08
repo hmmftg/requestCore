@@ -96,13 +96,13 @@ func TestPreconditionConformance(t *testing.T) {
 	for _, tc := range conformance.PreconditionVectors {
 		t.Run(tc.Name, func(t *testing.T) {
 			result := httpsemantics.EvaluatePreconditions(httpsemantics.PreconditionInput{
-				IfMatch:            tc.IfMatch,
-				IfNoneMatch:        tc.IfNoneMatch,
-				IfModifiedSince:    tc.IfModifiedSince,
-				IfUnmodifiedSince:  tc.IfUnmodifiedSince,
-				ResourceETag:       tc.ResourceETag,
-				ResourceModified:   tc.ResourceModified,
-				IsSafeMethod:       tc.IsSafeMethod,
+				IfMatch:           tc.IfMatch,
+				IfNoneMatch:       tc.IfNoneMatch,
+				IfModifiedSince:   tc.IfModifiedSince,
+				IfUnmodifiedSince: tc.IfUnmodifiedSince,
+				ResourceETag:      tc.ResourceETag,
+				ResourceModified:  tc.ResourceModified,
+				IsSafeMethod:      tc.IsSafeMethod,
 			})
 			if int(result) != tc.WantResult {
 				t.Errorf("result = %d, want %d", result, tc.WantResult)
@@ -276,9 +276,10 @@ func TestMemoryStoreRaceConformance(t *testing.T) {
 		go func() {
 			defer wg.Done()
 			_, err := store.Reserve("race-key", fp, 1*time.Hour)
-			if err == nil {
+			switch err {
+			case nil:
 				successes.Add(1)
-			} else if err == idempotency.ErrConflict {
+			case idempotency.ErrConflict:
 				conflicts.Add(1)
 			}
 		}()

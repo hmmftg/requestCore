@@ -191,8 +191,8 @@ func TestEvaluatePreconditions_IfModifiedSince_NotModified(t *testing.T) {
 	since := time.Date(2024, 6, 1, 12, 0, 0, 0, time.UTC).Format(http.TimeFormat)
 	result := EvaluatePreconditions(PreconditionInput{
 		IfModifiedSince:  since,
-		ResourceModified:  modTime,
-		IsSafeMethod:      true,
+		ResourceModified: modTime,
+		IsSafeMethod:     true,
 	})
 	if result != PreconditionNotModified {
 		t.Errorf("result = %v, want PreconditionNotModified", result)
@@ -204,8 +204,8 @@ func TestEvaluatePreconditions_IfModifiedSince_Modified(t *testing.T) {
 	since := time.Date(2024, 1, 1, 12, 0, 0, 0, time.UTC).Format(http.TimeFormat)
 	result := EvaluatePreconditions(PreconditionInput{
 		IfModifiedSince:  since,
-		ResourceModified:  modTime,
-		IsSafeMethod:      true,
+		ResourceModified: modTime,
+		IsSafeMethod:     true,
 	})
 	if result != PreconditionProceed {
 		t.Errorf("result = %v, want PreconditionProceed", result)
@@ -217,8 +217,8 @@ func TestEvaluatePreconditions_IfUnmodifiedSince_Modified(t *testing.T) {
 	since := time.Date(2024, 1, 1, 12, 0, 0, 0, time.UTC).Format(http.TimeFormat)
 	result := EvaluatePreconditions(PreconditionInput{
 		IfUnmodifiedSince: since,
-		ResourceModified:   modTime,
-		IsSafeMethod:       true,
+		ResourceModified:  modTime,
+		IsSafeMethod:      true,
 	})
 	if result != PreconditionFailed {
 		t.Errorf("result = %v, want PreconditionFailed", result)

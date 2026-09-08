@@ -1,6 +1,7 @@
 package response
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"net/http"
@@ -14,7 +15,7 @@ import (
 // body suppression, and mapper sanitization.
 
 func TestWriteSuccess_201WithLocation(t *testing.T) {
-	ctx := request.NewContext(nil)
+	ctx := request.NewContext(context.TODO())
 	transport := &helpersTransport{}
 
 	ctx.Response().AddHeader("Location", "/resources/42")
@@ -34,7 +35,7 @@ func TestWriteSuccess_201WithLocation(t *testing.T) {
 }
 
 func TestWriteSuccess_204NoBody(t *testing.T) {
-	ctx := request.NewContext(nil)
+	ctx := request.NewContext(context.TODO())
 	transport := &helpersTransport{}
 
 	// 204 should suppress the body even if one is provided
@@ -50,7 +51,7 @@ func TestWriteSuccess_204NoBody(t *testing.T) {
 }
 
 func TestNoContent_NoBody(t *testing.T) {
-	ctx := request.NewContext(nil)
+	ctx := request.NewContext(context.TODO())
 	transport := &helpersTransport{}
 
 	if err := NoContent(ctx, transport); err != nil {
@@ -65,7 +66,7 @@ func TestNoContent_NoBody(t *testing.T) {
 }
 
 func TestWriteSuccess_HEADSuppressesBody(t *testing.T) {
-	ctx := request.NewContext(nil)
+	ctx := request.NewContext(context.TODO())
 	transport := &helpersTransport{}
 
 	// Simulate HEAD request by suppressing the body via response state
@@ -114,7 +115,7 @@ func TestMapperSanitization_UnknownError(t *testing.T) {
 func TestMapperSanitization_CauseNeverSerialized(t *testing.T) {
 	r := NewMapperRegistry()
 	_ = r.Register(
-		func(err error) bool { return true },
+		func(_ error) bool { return true },
 		func(err error) *Problem {
 			return NewProblem(http.StatusConflict, "Conflict").
 				WithDetail("duplicate resource").

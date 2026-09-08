@@ -80,9 +80,9 @@ var RetryAfterVectors = []RetryAfterVector{
 
 // ETagVector tests RFC 9110 ETag parsing and comparison.
 type ETagVector struct {
-	Name    string
-	Input   string
-	WantWeak bool
+	Name      string
+	Input     string
+	WantWeak  bool
 	WantValue string
 	WantError bool
 }
@@ -97,15 +97,15 @@ var ETagVectors = []ETagVector{
 
 // PreconditionVector tests RFC 9110 precondition evaluation.
 type PreconditionVector struct {
-	Name             string
-	IfMatch          string
-	IfNoneMatch      string
-	IfModifiedSince  string
+	Name              string
+	IfMatch           string
+	IfNoneMatch       string
+	IfModifiedSince   string
 	IfUnmodifiedSince string
-	ResourceETag     string
-	ResourceModified time.Time
-	IsSafeMethod     bool
-	WantResult       int // 0=Proceed, 1=NotModified, 2=Failed
+	ResourceETag      string
+	ResourceModified  time.Time
+	IsSafeMethod      bool
+	WantResult        int // 0=Proceed, 1=NotModified, 2=Failed
 }
 
 // PreconditionVectors is the shared set of precondition test vectors.
@@ -154,8 +154,8 @@ var PreconditionVectors = []PreconditionVector{
 
 // IdempotencyKeyVector tests idempotency key validation.
 type IdempotencyKeyVector struct {
-	Name     string
-	Key      string
+	Name      string
+	Key       string
 	WantError bool
 }
 
@@ -172,23 +172,23 @@ var IdempotencyKeyVectors = []IdempotencyKeyVector{
 // SecurityVector tests that sensitive data is not leaked in responses
 // or telemetry.
 type SecurityVector struct {
-	Name           string
-	SensitiveData  string
-	CheckInJSON    bool
+	Name          string
+	SensitiveData string
+	CheckInJSON   bool
 }
 
 // SecurityVectors is the shared set of security test vectors.
 var SecurityVectors = []SecurityVector{
 	{Name: "password", SensitiveData: "password=hunter2", CheckInJSON: true},
 	{Name: "token", SensitiveData: "token=abc123", CheckInJSON: true},
-	{Name: "connection_string", SensitiveData: "postgres://user:pass@host:5432/db", CheckInJSON: true},
+	{Name: "connection_string", SensitiveData: "postgres://user:pass@host:5432/db", CheckInJSON: true}, //nolint:gosec // synthetic test fixture, not real credentials
 	{Name: "internal_error", SensitiveData: "database password is secret123", CheckInJSON: true},
 }
 
 // NoBodyStatusVector tests that no-body statuses suppress the response body.
 type NoBodyStatusVector struct {
-	Name   string
-	Status int
+	Name       string
+	Status     int
 	WantNoBody bool
 }
 
@@ -202,12 +202,12 @@ var NoBodyStatusVectors = []NoBodyStatusVector{
 
 // PaginationLinkVector tests RFC 8288 pagination link generation.
 type PaginationLinkVector struct {
-	Name           string
-	Page           int
-	PageSize       int
-	TotalItems     int
-	WantRels       []string // expected rel types
-	WantNoRels     []string // rel types that should NOT be present
+	Name       string
+	Page       int
+	PageSize   int
+	TotalItems int
+	WantRels   []string // expected rel types
+	WantNoRels []string // rel types that should NOT be present
 }
 
 // PaginationLinkVectors is the shared set of pagination link test vectors.
