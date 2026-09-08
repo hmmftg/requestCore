@@ -102,6 +102,25 @@ func (m WebHanlder) OK(w webFramework.WebFramework, resp any) {
 	m.Respond(http.StatusOK, 0, "OK", resp, false, w)
 }
 
+// OKWithStatus sends a successful JSON response with the given HTTP
+// status and data. The status must be a valid 2xx code. For 204 and
+// 205, the response body is suppressed (no JSON is written). This is
+// an additive, opt-in method; the default OK continues to use 200.
+func (m WebHanlder) OKWithStatus(w webFramework.WebFramework, status int, resp any) {
+	m.Respond(status, 0, "OK", resp, false, w)
+}
+
+// OKWithStatusAndHeaders sends a successful JSON response with the
+// given HTTP status, static response headers, and data. Headers are
+// applied before the body is written. For 204 and 205, the body is
+// suppressed but headers are still applied.
+func (m WebHanlder) OKWithStatusAndHeaders(w webFramework.WebFramework, status int, headers map[string]string, resp any) {
+	for k, v := range headers {
+		w.Parser.SetRespHeader(k, v)
+	}
+	m.Respond(status, 0, "OK", resp, false, w)
+}
+
 // OKWithReceipt sends a successful JSON response with an optional printable receipt.
 func (m WebHanlder) OKWithReceipt(w webFramework.WebFramework, resp any, receipt *Receipt) {
 	m.RespondWithReceipt(http.StatusOK, 0, "OK", resp, receipt, false, w)
@@ -150,7 +169,9 @@ func (m WebHanlder) respond(data RespData, abort bool, w webFramework.WebFramewo
 
 	w.Parser.SetLocal(LastHTTPStatusLocal, data.Code)
 	webFramework.AddLogTag(w, webFramework.HandlerLogTag, slog.Int("status", data.Code))
-	if data.Code == http.StatusOK {
+	if data.Status == 0 {
+		// Success path: status 0 means success. This allows any 2xx
+		// HTTP status to be used for success responses, not just 200.
 		resp.Description = m.MessageDesc[data.Message]
 		switch data.Type {
 		case FileAttachment:
@@ -159,12 +180,24 @@ func (m WebHanlder) respond(data RespData, abort bool, w webFramework.WebFramewo
 			resp.PrintReceipt = data.PrintData
 			fallthrough
 		case JSON:
-			resp.Result = data.JSON
-
-			err := w.Parser.SendJSONRespBody(data.Code, resp)
-			if err != nil {
-				webFramework.AddLog(w, webFramework.HandlerLogTag,
-					slog.Group("error in SendJSONRespBody", slog.Any("error", err)))
+			// Suppress body for 204 No Content and 205 Reset Content
+			// per RFC 9110. A 204/205 response must not have a body.
+			if data.Code == http.StatusNoContent || data.Code == http.StatusResetContent {
+				// Send only the status code without a body. Use
+				// SendJSONRespBody with nil to set the status without
+				// writing JSON content.
+				err := w.Parser.SendJSONRespBody(data.Code, nil)
+				if err != nil {
+					webFramework.AddLog(w, webFramework.HandlerLogTag,
+						slog.Group("error in SendJSONRespBody", slog.Any("error", err)))
+				}
+			} else {
+				resp.Result = data.JSON
+				err := w.Parser.SendJSONRespBody(data.Code, resp)
+				if err != nil {
+					webFramework.AddLog(w, webFramework.HandlerLogTag,
+						slog.Group("error in SendJSONRespBody", slog.Any("error", err)))
+				}
 			}
 		}
 	} else {

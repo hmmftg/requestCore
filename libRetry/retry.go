@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/hmmftg/requestCore/httpsemantics"
 	"github.com/hmmftg/requestCore/libCallApi"
 	"github.com/hmmftg/requestCore/libError"
 )
@@ -107,6 +108,26 @@ type RetryPolicy struct {
 	// a timer-based implementation is used that exits early on context
 	// cancellation. Useful for deterministic testing.
 	Sleep func(ctx context.Context, d time.Duration) bool
+
+	// HonorRetryAfter enables honoring the Retry-After header from
+	// 429 (Too Many Requests) and 503 (Service Unavailable) responses.
+	// When enabled, the retry loop parses the Retry-After header from
+	// the RemoteCallError's Headers and waits for the indicated
+	// duration (clamped to MaxRetryAfterDelay) instead of using the
+	// fixed Backoff. If the header is absent, the fixed Backoff is
+	// used. Default is false (fixed backoff only).
+	HonorRetryAfter bool
+
+	// MaxRetryAfterDelay caps the delay applied when honoring
+	// Retry-After headers. If 0, no cap is applied. This prevents
+	// denial-of-service via excessively large Retry-After values.
+	// Typical values: 30s to 5m.
+	MaxRetryAfterDelay time.Duration
+
+	// Now is an optional function returning the current time, used
+	// for Retry-After HTTP-date evaluation. If nil, time.Now is used.
+	// Useful for deterministic testing.
+	Now func() time.Time
 }
 
 // RetryResult holds the outcome of a retry sequence.
@@ -196,7 +217,13 @@ func WithRetry[Resp any](policy *RetryPolicy, attempt AttemptFunc[Resp]) RetryRe
 		if err == nil {
 			// Success — but check if the response indicates a retryable status
 			if shouldRetryResponse(policy, resp, status) && attemptNum < maxAttempts {
-				if !sleepFn(ctx, policy.Backoff) {
+				delay := policy.Backoff
+				if policy.HonorRetryAfter {
+					if d, ok := extractRetryAfterDelay(policy, nil); ok {
+						delay = d
+					}
+				}
+				if !sleepFn(ctx, delay) {
 					// Context cancelled during backoff
 					result.Error = ctx.Err()
 					return result
@@ -216,7 +243,13 @@ func WithRetry[Resp any](policy *RetryPolicy, attempt AttemptFunc[Resp]) RetryRe
 		}
 
 		// Backoff before next attempt
-		if !sleepFn(ctx, policy.Backoff) {
+		delay := policy.Backoff
+		if policy.HonorRetryAfter {
+			if d, ok := extractRetryAfterDelay(policy, err); ok {
+				delay = d
+			}
+		}
+		if !sleepFn(ctx, delay) {
 			result.Error = ctx.Err()
 			return result
 		}
@@ -294,4 +327,47 @@ func FormatAttemptTitle(base string, attempt int) string {
 		return base
 	}
 	return fmt.Sprintf("%s-retry-%d", base, attempt-1)
+}
+
+// extractRetryAfterDelay attempts to extract a Retry-After delay from
+// an error (via RemoteCallError.Headers). Returns the delay and true
+// if a valid Retry-After was found; otherwise returns 0 and false.
+//
+// The delay is clamped to MaxRetryAfterDelay if non-zero.
+func extractRetryAfterDelay(policy *RetryPolicy, err error) (time.Duration, bool) {
+	var headers http.Header
+
+	// Try to get headers from RemoteCallError
+	if err != nil {
+		var rce *libCallApi.RemoteCallError
+		if errors.As(err, &rce) && rce.Headers != nil {
+			headers = rce.Headers
+		}
+	}
+
+	if headers == nil {
+		return 0, false
+	}
+
+	retryAfterStr := headers.Get("Retry-After")
+	if retryAfterStr == "" {
+		return 0, false
+	}
+
+	ra, err := httpsemantics.ParseRetryAfter(retryAfterStr)
+	if err != nil {
+		return 0, false
+	}
+
+	now := time.Now()
+	if policy.Now != nil {
+		now = policy.Now()
+	}
+
+	delay := ra.Duration(now)
+	if policy.MaxRetryAfterDelay > 0 && delay > policy.MaxRetryAfterDelay {
+		delay = policy.MaxRetryAfterDelay
+	}
+
+	return delay, true
 }

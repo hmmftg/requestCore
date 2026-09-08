@@ -10,9 +10,10 @@ import (
 // from a non-2xx remote API call. It implements error and Unwrap so that callers
 // can use errors.As to extract the status code and body for routing decisions.
 type RemoteCallError struct {
-	Status int    // HTTP status code from the remote response
-	Body   []byte // Raw response body for debugging
-	Err    error  // Underlying error (e.g. libError.NewWithDescription)
+	Status  int          // HTTP status code from the remote response
+	Body    []byte       // Raw response body for debugging
+	Headers http.Header  // Non-sensitive response headers (e.g. Retry-After)
+	Err     error        // Underlying error (e.g. libError.NewWithDescription)
 }
 
 // Error returns a human-readable description of the remote call error.

@@ -6,13 +6,15 @@
 A **generics-first**, framework-agnostic HTTP application toolkit for Go.
 Requires **Go 1.27+**.
 
-> **Status:** v2 has **no released tags** and is under active development.
-> The API described here is the canonical kernel API and will remain the
-> basis for the first stable v2 release, but minor refinements may still
-> occur before a tag is cut. See [MIGRATION.md](MIGRATION.md) for the
-> migration guide and the Tranche 5 lifecycle features (persistence,
-> tracing, initializers, finalizers, recovery callbacks, ID parsers).
-> v1 (the root module) remains supported and stable.
+> **Status:** v2 is in **alpha** prerelease (`v2/v2.0.0-alpha.N` tags)
+> and under active development. The API described here is the canonical
+> kernel API and will remain the basis for the first stable v2 release,
+> but minor refinements may still occur before a stable tag is cut. See
+> [MIGRATION.md](MIGRATION.md) for the migration guide and the Tranche 5
+> lifecycle features (persistence, tracing, initializers, finalizers,
+> recovery callbacks, ID parsers). v1 (the root module) remains
+> supported and stable; see the root [MIGRATION.md](../MIGRATION.md) for
+> the v0.28.1 → v1.x upgrade guide.
 
 v2 builds on the root [requestCore](../README.md) module with a canonical,
 stdlib-first kernel: typed endpoints, a framework-neutral routing contract,

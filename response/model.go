@@ -16,6 +16,18 @@ type ResponseHandler interface {
 	Error(w webFramework.WebFramework, err error)
 }
 
+// StatusAwareResponder is an optional interface that responders can
+// implement to support configurable success statuses and response
+// headers. WebHanlder implements this interface. Custom ResponseHandler
+// implementations are not required to implement it; callers that need
+// status-aware responses should type-assert to this interface.
+//
+//revive:disable-next-line:exported
+type StatusAwareResponder interface {
+	OKWithStatus(w webFramework.WebFramework, status int, resp any)
+	OKWithStatusAndHeaders(w webFramework.WebFramework, status int, headers map[string]string, resp any)
+}
+
 // RespType identifies the kind of response payload to send.
 type RespType int
 
