@@ -1,0 +1,31 @@
+cff-version: 1.2.0
+message: "If you use requestCore in your work, please cite it using the metadata below."
+title: "requestCore: Framework-agnostic Go request lifecycle"
+abstract: "A Go library for handling RESTful requests with a framework-agnostic core and adapters for Gin, Fiber, and net/http. Provides a unified request/context layer, query execution abstractions, response handling, logging, tracing, and testing utilities."
+authors:
+  - given-names: "Hamid"
+    family-names: "Malek Mohammadi"
+keywords:
+  - go
+  - http
+  - rest-api
+  - web-framework
+  - gin
+  - fiber
+  - net-http
+  - observability
+  - opentelemetry
+  - middleware
+license: MIT
+repository-code: "https://github.com/hmmftg/requestCore"
+version: "1.0"
+date-released: "2026-08-10"
+preferred-citation:
+  type: software
+  authors:
+    - given-names: "Hamid"
+      family-names: "Malek Mohammadi"
+  title: "requestCore: Framework-agnostic Go request lifecycle"
+  year: 2026
+  publisher: "GitHub"
+  url: "https://github.com/hmmftg/requestCore"

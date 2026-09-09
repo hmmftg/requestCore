@@ -1,4 +1,8 @@
+<div align="center">
+
 # requestCore
+
+### Framework-agnostic Go request lifecycle — one handler API across Gin, Fiber, and net/http
 
 [![Go Reference](https://pkg.go.dev/badge/github.com/hmmftg/requestCore.svg)](https://pkg.go.dev/github.com/hmmftg/requestCore)
 [![Release](https://img.shields.io/github/v/release/hmmftg/requestCore)](https://github.com/hmmftg/requestCore/releases)
@@ -7,6 +11,12 @@
 [![CI](https://github.com/hmmftg/requestCore/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/hmmftg/requestCore/actions/workflows/ci.yml)
 [![golangci-lint](https://github.com/hmmftg/requestCore/actions/workflows/lint.yml/badge.svg?branch=main)](https://github.com/hmmftg/requestCore/actions/workflows/lint.yml)
 [![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/hmmftg/requestCore)
+
+**[Quick Start](#quick-start) · [Examples](#see-it-in-action) · [Why](#why-requestcore) · [Features](#features) · [Docs](#documentation) · [Contributing](#contributing) · [Roadmap](#roadmap)**
+
+</div>
+
+---
 
 `requestCore` is a Go library for handling RESTful requests with a **framework-agnostic core** and adapters for **Gin**, **Fiber**, and **net/http**. It provides a unified request/context layer, query execution abstractions, response handling, logging, tracing, and testing utilities.
 
@@ -18,7 +28,7 @@ It is designed to reduce boilerplate around request processing while keeping the
 
 ### The problem
 
-Backend services repeat the same cross-cutting work: parsing requests consistently, logging/tracing, duplicate detection, DB execution, and uniform error responses — often locked to one web framework.
+Every backend service repeats the same cross-cutting work on every request: parse the input consistently, log and trace the call, detect duplicates, run the query, and return a uniform error response. Most teams hand-write this once per framework — and pay for it again when they adopt or migrate to a second one. The result is boilerplate that is locked to Gin, Fiber, or chi and can't move.
 
 ### What requestCore gives you
 
@@ -48,13 +58,44 @@ Backend services repeat the same cross-cutting work: parsing requests consistent
 | Middleware-only stack | Lightweight | Request persistence, duplicate detection, query runner, handler orchestration |
 | Rolling your own | Full control | Reusable, tested abstractions already in this repo |
 
-### See it in action
+---
+
+## See it in action
 
 Runnable examples: [examples/](examples/)
 
 - [chi + net/http](examples/chi-hello/) — recommended starting point
 - [Gin](examples/gin-hello/)
 - [Fiber](examples/fiber-hello/)
+
+Each example exposes the same three routes (`/health`, `/users/{id}`, `/echo`) so you can see the same handler code run unchanged across frameworks.
+
+> **Demo asset (TODO):** an architecture diagram or asciinema cast showing the same handler running under chi, Gin, and Fiber would belong here. Not yet produced — contributions welcome (see [Contributing](#contributing)).
+
+---
+
+## Quick start
+
+Pick a runnable example:
+
+```bash
+go run ./examples/chi-hello
+curl http://localhost:8080/users/42
+```
+
+For the full request lifecycle (DB, persistence, handlers), see [examples/README.md](examples/README.md) and the [handlers](handlers/) package.
+
+### Installation
+
+```bash
+go get github.com/hmmftg/requestCore
+```
+
+Then import the package in your project:
+
+```go
+import "github.com/hmmftg/requestCore"
+```
 
 ---
 
@@ -108,24 +149,9 @@ Runnable examples: [examples/](examples/)
 
 ---
 
-## Project goals
-
-`requestCore` is intended to provide a reusable foundation for handling request-oriented backend workflows such as:
-
-- request parsing and normalization
-- request logging and tracing
-- request persistence and duplicate checking
-- database query execution
-- consistent response generation
-- integration with multiple HTTP frameworks
-
-The codebase is organized around small interfaces and adapter packages rather than a single large runtime framework.
-
----
-
 ## Architecture overview
 
-The repository is centered around a thin root façade and multiple focused subpackages:
+The repository is centered around a thin root façade and multiple focused subpackages, organized around small interfaces and adapter packages rather than a single large runtime framework.
 
 ### Root façade
 - `requestCore.go`
@@ -181,6 +207,46 @@ The repository is centered around a thin root façade and multiple focused subpa
 - `swagger`
 - `testingtools`
 
+### Package reference
+
+| Package | Responsibility |
+|---|---|
+| `requestCore.go` | Root façade exposing the main interfaces |
+| `libContext` | Detects and normalizes framework context (Gin, Fiber, net/http, testing); integrates tracing metadata and user identity extraction |
+| `libRequest` | Request operations: initialization, duplicate checking, request insertion, updates with context, no-log initialization path |
+| `libQuery` | Database/query layer with multiple DB modes: Oracle, PostgreSQL, SQLite, MySQL, Mock DB |
+| `response` | Response generation and error handling utilities |
+| `libLogger` | Logging utilities, including `slog` and Splunk-oriented integrations |
+| `libTracing` | OpenTelemetry-related tracing and instrumentation helpers |
+| `libValidate` | Input validation helpers |
+| `libCallApi` | Utilities for calling external APIs and handling auth/multi-call scenarios |
+| `libCrypto` | Cryptographic and security primitives |
+| `handlers` | Reusable handler implementations for request, query, DML, pagination, recovery, and API call flows |
+| `testingtools` | Test helpers, mocks, and simulation utilities |
+
+#### `libCallApi` remote API auth
+
+Remote APIs can authenticate with OAuth2 (`client_credentials`, `refresh_token`, optional `password` grant) or fall back to BasicAuth when `grant-type` is not configured.
+
+Example `param.yaml`:
+
+```yaml
+remoteApis:
+  partner-api:
+    domain: https://api.partner.com
+    name: partner-api
+    auth:
+      grant-type: client_credentials
+      auth-uri: https://auth.partner.com/oauth/token
+      client-id: partner-client
+```
+
+Secure values (existing pattern):
+
+- `remote-api#partner-api#client-secret`
+- `remote-api#partner-api#client-id`
+- `remote-api#partner-api#auth-uri` (alias: `auth-url`)
+
 ---
 
 ## Supported web frameworks
@@ -221,143 +287,6 @@ release streams:
   tags, and [release workflow](.github/workflows/release-v2.yml). See
   [v2/README.md](v2/README.md) and [v2/MIGRATION.md](v2/MIGRATION.md).
 - v2-only commits do not trigger root module versioning.
-
----
-
-## Installation
-
-```bash
-go get github.com/hmmftg/requestCore
-```
-
-Then import the package in your project:
-
-```go
-import "github.com/hmmftg/requestCore"
-```
-
-See [examples/](examples/) for runnable demos.
-
----
-
-## Quick start
-
-Pick a runnable example:
-
-```bash
-go run ./examples/chi-hello
-curl http://localhost:8080/users/42
-```
-
-For the full request lifecycle (DB, persistence, handlers), see [examples/README.md](examples/README.md) and the [handlers](handlers/) package.
-
----
-
-## Package map
-
-### `requestCore.go`
-Root façade exposing the main interfaces.
-
-### `libContext`
-Detects and normalizes framework context, including:
-
-- Gin
-- Fiber
-- net/http
-- testing
-
-Also integrates tracing metadata and user identity extraction.
-
-### `libRequest`
-Request operations such as:
-
-- initialization
-- duplicate checking
-- request insertion
-- updates with context
-- no-log initialization path
-
-### `libQuery`
-Database/query layer with support for multiple DB modes, including:
-
-- Oracle
-- PostgreSQL
-- SQLite
-- MySQL
-- Mock DB
-
-### `response`
-Response generation and error handling utilities.
-
-### `libLogger`
-Logging utilities, including `slog` and Splunk-oriented integrations.
-
-### `libTracing`
-OpenTelemetry-related tracing and instrumentation helpers.
-
-### `libValidate`
-Input validation helpers.
-
-### `libCallApi`
-Utilities for calling external APIs and handling auth/multi-call scenarios.
-
-Remote APIs can authenticate with OAuth2 (`client_credentials`, `refresh_token`, optional `password` grant) or fall back to BasicAuth when `grant-type` is not configured.
-
-Example `param.yaml`:
-
-```yaml
-remoteApis:
-  partner-api:
-    domain: https://api.partner.com
-    name: partner-api
-    auth:
-      grant-type: client_credentials
-      auth-uri: https://auth.partner.com/oauth/token
-      client-id: partner-client
-```
-
-Secure values (existing pattern):
-
-- `remote-api#partner-api#client-secret`
-- `remote-api#partner-api#client-id`
-- `remote-api#partner-api#auth-uri` (alias: `auth-url`)
-
-### `libCrypto`
-Cryptographic and security primitives.
-
-### `handlers`
-Reusable handler implementations for request, query, DML, pagination, recovery, and API call flows.
-
-### `testingtools`
-Test helpers, mocks, and simulation utilities.
-
----
-
-## Observability
-
-`requestCore` is observability-friendly and includes support for:
-
-- trace context extraction
-- OpenTelemetry integration
-- framework-aware logging
-- structured logs via `slog`
-- framework-specific logging adapters
-
-This makes it suitable for services that need request-level visibility without hard-coding observability into business logic.
-
----
-
-## Database support
-
-The query layer supports multiple DB modes, including:
-
-- Oracle
-- PostgreSQL
-- SQLite
-- MySQL
-- Mock DB
-
-This makes the library suitable for heterogeneous environments and for testing without a real database.
 
 ---
 
@@ -451,9 +380,37 @@ This minimizes risk for existing users while allowing pgx-native optimization wh
 
 ---
 
+## Observability
+
+`requestCore` is observability-friendly and includes support for:
+
+- trace context extraction
+- OpenTelemetry integration
+- framework-aware logging
+- structured logs via `slog`
+- framework-specific logging adapters
+
+This makes it suitable for services that need request-level visibility without hard-coding observability into business logic.
+
+---
+
+## Database support
+
+The query layer supports multiple DB modes, including:
+
+- Oracle
+- PostgreSQL
+- SQLite
+- MySQL
+- Mock DB
+
+This makes the library suitable for heterogeneous environments and for testing without a real database.
+
+---
+
 ## Design principles
 
-`requestCore` appears to follow these principles:
+`requestCore` follows these principles:
 
 - **composition over inheritance**
 - **framework portability**
@@ -493,35 +450,21 @@ requestCore/
 
 ## Documentation
 
-Additional documentation included in the repository:
+Guides live in [`docs/`](docs/):
 
-- `MIGRATION.md` — v0.28.1 → v1.x upgrade guide
-- `OPENTELEMETRY_INTEGRATION.md`
-- `NETHTTP_IMPLEMENTATION_COMPLETE.md`
-- `DYNAMIC_HEADERS_GUIDE.md`
-- `VERSIONING.md`
-- `VERSIONING_SETUP.md`
-- `SETUP_COMPLETE.md`
+- [docs/MIGRATION.md](MIGRATION.md) — v0.28.1 → v1.x upgrade guide (kept at root for import-path discoverability)
+- [docs/OPENTELEMETRY_INTEGRATION.md](docs/OPENTELEMETRY_INTEGRATION.md)
+- [docs/NETHTTP_IMPLEMENTATION_COMPLETE.md](docs/NETHTTP_IMPLEMENTATION_COMPLETE.md)
+- [docs/DYNAMIC_HEADERS_GUIDE.md](docs/DYNAMIC_HEADERS_GUIDE.md)
+- [docs/VERSIONING.md](docs/VERSIONING.md)
+- [docs/VERSIONING_SETUP.md](docs/VERSIONING_SETUP.md)
+- [docs/SETUP_COMPLETE.md](docs/SETUP_COMPLETE.md)
 
 ---
+
 ## Articles
 
-- [Framework-Portable HTTP Handlers in Go with requestCore](articles/framework-portable-http-handlers-in-go-with-requestcore.md) — also on [Medium](https://medium.com/...)
-
----
-
-## Contributing
-
-Contributions are welcome.
-
-Suggested areas for contribution:
-
-- framework adapters
-- documentation
-- observability enhancements
-- request lifecycle helpers
-- database integrations
-- tests and examples
+- [Framework-Portable HTTP Handlers in Go with requestCore](articles/framework-portable-http-handlers-in-go-with-requestcore.md)
 
 ---
 
@@ -605,8 +548,79 @@ func main() {
 
 ---
 
-## License
+## Roadmap
 
-See `LICENSE` for license information.
+This is a living document; items move as priorities shift.
+
+- **v2 stabilization** — take the v2 generics-first kernel from alpha to a stable tag
+- **More framework adapters** — Echo, standard library router, and others by community request
+- **Documentation site** — consolidate the guides under `docs/` into a rendered site (mkdocs or GitHub Pages)
+- **Demo assets** — architecture diagram and an asciinema cast of the cross-framework examples
+- **Benchmark suite** — publish comparable cross-framework overhead numbers (none exist yet)
+- **More database integrations** — expand the `libQuery` DB mode matrix
+
+See [CHANGELOG.md](CHANGELOG.md) for release history.
 
 ---
+
+## Contributing
+
+Contributions are welcome — see [CONTRIBUTING.md](CONTRIBUTING.md) for setup, testing, lint, and commit conventions.
+
+Suggested areas for contribution:
+
+- framework adapters
+- documentation
+- observability enhancements
+- request lifecycle helpers
+- database integrations
+- tests and examples
+
+---
+
+## Community
+
+Questions, ideas, or use cases? Open a [GitHub Discussion](https://github.com/hmmftg/requestCore/discussions) — that's the place for Q&A and announcements. Bugs and feature requests go in [Issues](https://github.com/hmmftg/requestCore/issues).
+
+> **Note:** Discussions must be enabled in repository Settings → General → Features. See [CONTRIBUTING.md](CONTRIBUTING.md) for the manual setup checklist.
+
+---
+
+## Citation
+
+If requestCore is useful in your work, please cite it:
+
+```bibtex
+@software{malek_mohammadi_2026_requestcore,
+  author       = {Hamid Malek Mohammadi},
+  title        = {requestCore: Framework-agnostic Go request lifecycle},
+  year         = {2026},
+  publisher    = {GitHub},
+  url          = {https://github.com/hmmftg/requestCore},
+  license      = {MIT}
+}
+```
+
+See also [CITATION.cff](CITATION.cff) (renders a "Cite this repository" button on GitHub).
+
+---
+
+## Security
+
+Reporting a vulnerability? Please see [SECURITY.md](SECURITY.md). Do not open a public issue for security reports.
+
+---
+
+## License
+
+[MIT](LICENSE) — Copyright (c) 2026 Hamid Malek Mohammadi.
+
+---
+
+<div align="center">
+
+**Repository topics:** `go` · `http` · `rest-api` · `gin` · `fiber` · `chi` · `net-http` · `web-framework` · `middleware` · `observability` · `opentelemetry` · `sqlc` · `request-handling`
+
+*(Paste these into GitHub repo Settings → Topics to improve discoverability.)*
+
+</div>
