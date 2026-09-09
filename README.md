@@ -615,12 +615,4 @@ Reporting a vulnerability? Please see [SECURITY.md](SECURITY.md). Do not open a 
 
 [MIT](LICENSE) — Copyright (c) 2026 Hamid Malek Mohammadi.
 
----
-
-<div align="center">
-
-**Repository topics:** `go` · `http` · `rest-api` · `gin` · `fiber` · `chi` · `net-http` · `web-framework` · `middleware` · `observability` · `opentelemetry` · `sqlc` · `request-handling`
-
-*(Paste these into GitHub repo Settings → Topics to improve discoverability.)*
-
 </div>
