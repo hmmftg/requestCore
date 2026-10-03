@@ -48,7 +48,11 @@ func (c FiberParser) GetHeaderValue(name string) string {
 }
 
 // GetBody parses the request body into the target struct.
+// Returns webFramework.ErrEmptyBody when the request body is empty.
 func (c FiberParser) GetBody(target any) error {
+	if len(c.Ctx.Body()) == 0 {
+		return webFramework.ErrEmptyBody
+	}
 	return c.Ctx.BodyParser(target)
 }
 

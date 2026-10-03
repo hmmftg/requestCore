@@ -2,6 +2,7 @@ package libFiber
 
 import (
 	"encoding/json"
+	"errors"
 	"testing"
 
 	"github.com/gofiber/fiber/v2"
@@ -50,6 +51,42 @@ func TestGetBody(t *testing.T) {
 		if string(b) != v.DesiredJSON {
 			t.Fatal(v.Name, "want:", v.DesiredJSON, "got:", string(b))
 		}
+	}
+}
+
+func TestGetBody_Empty(t *testing.T) {
+	type SampleType struct {
+		ID string `json:"id"`
+	}
+	var target SampleType
+	app := fiber.New()
+	c := app.AcquireCtx(&fasthttp.RequestCtx{})
+	c.Request().Header.SetContentType(fiber.MIMEApplicationJSON)
+	defer app.ReleaseCtx(c)
+	ctx := InitContext(c)
+	err := ctx.GetBody(&target)
+	if !errors.Is(err, webFramework.ErrEmptyBody) {
+		t.Fatalf("want ErrEmptyBody, got %v", err)
+	}
+}
+
+func TestGetBody_MalformedNotEmptyBody(t *testing.T) {
+	type SampleType struct {
+		ID string `json:"id"`
+	}
+	var target SampleType
+	app := fiber.New()
+	c := app.AcquireCtx(&fasthttp.RequestCtx{})
+	c.Request().Header.SetContentType(fiber.MIMEApplicationJSON)
+	c.Request().SetBody([]byte(`{invalid`))
+	defer app.ReleaseCtx(c)
+	ctx := InitContext(c)
+	err := ctx.GetBody(&target)
+	if err == nil {
+		t.Fatal("expected error for malformed body")
+	}
+	if errors.Is(err, webFramework.ErrEmptyBody) {
+		t.Fatalf("malformed body must not map to ErrEmptyBody, got %v", err)
 	}
 }
 

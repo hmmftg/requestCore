@@ -81,9 +81,10 @@ func (c NetHTTPParser) GetHTTPHeader() http.Header {
 }
 
 // GetBody reads and unmarshals the request body into the target.
+// Returns webFramework.ErrEmptyBody when the request body is absent or empty.
 func (c NetHTTPParser) GetBody(target any) error {
 	if c.Request.Body == nil {
-		return nil
+		return webFramework.ErrEmptyBody
 	}
 
 	body, err := io.ReadAll(c.Request.Body)
@@ -92,7 +93,7 @@ func (c NetHTTPParser) GetBody(target any) error {
 	}
 
 	if len(body) == 0 {
-		return nil
+		return webFramework.ErrEmptyBody
 	}
 
 	return json.Unmarshal(body, target)

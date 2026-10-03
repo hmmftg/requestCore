@@ -81,12 +81,31 @@ func (t TestingParser) GetPath() string {
 
 func setTarget(target any, value any) {
 	targetPtr := reflect.ValueOf(target)
-	targetPtr.Set(reflect.ValueOf(value))
+	if targetPtr.Kind() != reflect.Ptr || targetPtr.IsNil() {
+		return
+	}
+	targetVal := targetPtr.Elem()
+	if !targetVal.CanSet() {
+		return
+	}
+	v := reflect.ValueOf(value)
+	if !v.IsValid() {
+		return
+	}
+	if v.Type().AssignableTo(targetVal.Type()) {
+		targetVal.Set(v)
+		return
+	}
+	if v.Kind() == reflect.Ptr && !v.IsNil() && v.Elem().Type().AssignableTo(targetVal.Type()) {
+		targetVal.Set(v.Elem())
+	}
 }
 
 // GetHeader populates the target struct with the test header value.
 func (t TestingParser) GetHeader(target webFramework.HeaderInterface) error {
-	setTarget(target, t.Header)
+	if t.Header != nil {
+		setTarget(target, t.Header)
+	}
 	return t.HeaderError
 }
 
@@ -110,20 +129,41 @@ func (t TestingParser) GetHTTPHeader() http.Header {
 }
 
 // GetBody populates the target with the test request body.
+// Returns webFramework.ErrEmptyBody when the test body fixture is nil or
+// empty and no explicit BodyError is configured.
 func (t TestingParser) GetBody(target any) error {
+	if t.BodyError != nil {
+		return t.BodyError
+	}
+	switch body := t.Body.(type) {
+	case nil:
+		return webFramework.ErrEmptyBody
+	case string:
+		if len(body) == 0 {
+			return webFramework.ErrEmptyBody
+		}
+	case []byte:
+		if len(body) == 0 {
+			return webFramework.ErrEmptyBody
+		}
+	}
 	setTarget(target, t.Body)
-	return t.BodyError
+	return nil
 }
 
 // GetURI populates the target with the test URI parameters.
 func (t TestingParser) GetURI(target any) error {
-	setTarget(target, t.Uri)
+	if t.Uri != nil {
+		setTarget(target, t.Uri)
+	}
 	return t.UriError
 }
 
 // GetURLQuery populates the target with the test URL query parameters.
 func (t TestingParser) GetURLQuery(target any) error {
-	setTarget(target, t.UrlQuery)
+	if t.UrlQuery != nil {
+		setTarget(target, t.UrlQuery)
+	}
 	return t.UrlQueryError
 }
 

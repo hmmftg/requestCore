@@ -1,10 +1,12 @@
 package libContext
 
 import (
+	"errors"
 	"net/http/httptest"
 	"testing"
 
 	"github.com/hmmftg/requestCore/libNetHttp"
+	"github.com/hmmftg/requestCore/webFramework"
 )
 
 func TestInitNetHTTPContext(t *testing.T) {
@@ -42,6 +44,89 @@ func TestInitNetHTTPContext(t *testing.T) {
 		t.Errorf("Expected User-Id header to be test-user, got %s", parser.GetHeaderValue("User-Id"))
 	}
 }
+
+func TestTestingParserGetBody(t *testing.T) {
+	type SampleBody struct {
+		ID string `json:"id"`
+	}
+
+	t.Run("nil body returns ErrEmptyBody", func(t *testing.T) {
+		parser := TestingParser{}
+		var target SampleBody
+		err := parser.GetBody(&target)
+		if !errors.Is(err, webFramework.ErrEmptyBody) {
+			t.Fatalf("want ErrEmptyBody, got %v", err)
+		}
+	})
+
+	for name, body := range map[string]any{
+		"empty string returns ErrEmptyBody":     "",
+		"empty byte slice returns ErrEmptyBody": []byte{},
+	} {
+		t.Run(name, func(t *testing.T) {
+			parser := TestingParser{Body: body}
+			var target SampleBody
+			err := parser.GetBody(&target)
+			if !errors.Is(err, webFramework.ErrEmptyBody) {
+				t.Fatalf("want ErrEmptyBody, got %v", err)
+			}
+		})
+	}
+
+	t.Run("configured BodyError takes precedence", func(t *testing.T) {
+		parser := TestingParser{BodyError: errors.New("boom")}
+		var target SampleBody
+		err := parser.GetBody(&target)
+		if err == nil || err.Error() != "boom" {
+			t.Fatalf("want configured BodyError, got %v", err)
+		}
+	})
+
+	t.Run("body fixture populates target", func(t *testing.T) {
+		parser := TestingParser{Body: SampleBody{ID: "42"}}
+		var target SampleBody
+		if err := parser.GetBody(&target); err != nil {
+			t.Fatal(err)
+		}
+		if target.ID != "42" {
+			t.Fatalf("want id 42, got %q", target.ID)
+		}
+	})
+}
+
+func TestTestingParserNilFixtures(t *testing.T) {
+	// nil header fixture must not panic; a non-nil fixture must bind.
+	bound := RequestHeaderStub{}
+	parser := TestingParser{Header: &RequestHeaderStub{ID: "7"}}
+	if err := parser.GetHeader(&bound); err != nil {
+		t.Fatal(err)
+	}
+	if bound.ID != "7" {
+		t.Fatalf("want id 7, got %q", bound.ID)
+	}
+	parser = TestingParser{}
+	if err := parser.GetHeader(&RequestHeaderStub{}); err != nil {
+		t.Fatal(err)
+	}
+	var target map[string]string
+	if err := parser.GetURI(&target); err != nil {
+		t.Fatal(err)
+	}
+}
+
+type RequestHeaderStub struct {
+	ID string
+}
+
+func (h *RequestHeaderStub) GetID() string      { return h.ID }
+func (h *RequestHeaderStub) GetUser() string    { return h.ID }
+func (h *RequestHeaderStub) GetProgram() string { return h.ID }
+func (h *RequestHeaderStub) GetModule() string  { return h.ID }
+func (h *RequestHeaderStub) GetMethod() string  { return h.ID }
+func (h *RequestHeaderStub) SetUser(string)     {}
+func (h *RequestHeaderStub) SetProgram(string)  {}
+func (h *RequestHeaderStub) SetModule(string)   {}
+func (h *RequestHeaderStub) SetMethod(string)   {}
 
 func TestInitNetHTTPContextWithUnknownUser(t *testing.T) {
 	// Create a test request

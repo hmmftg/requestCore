@@ -3,9 +3,14 @@ package libNetHttp
 import (
 	"context"
 	"encoding/json"
+	"errors"
+	"io"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
+
+	"github.com/hmmftg/requestCore/webFramework"
 )
 
 func TestNetHTTPParser(t *testing.T) {
@@ -84,6 +89,55 @@ func TestSetContext_PropagatesToGetContext(t *testing.T) {
 	got := parser.GetContext()
 	if v, ok := got.Value(key).(string); !ok || v != "test-value" {
 		t.Errorf("GetContext did not observe value set via SetContext: got %v, want test-value", got.Value(key))
+	}
+}
+
+func TestGetBody(t *testing.T) {
+	type SampleType struct {
+		ID string `json:"id"`
+	}
+	type TestCase struct {
+		Name         string
+		Body         io.ReadCloser
+		WantErrEmpty bool
+		WantOtherErr bool
+		WantID       string
+	}
+	table := []TestCase{
+		{Name: "nil body", Body: nil, WantErrEmpty: true},
+		{Name: "empty body", Body: io.NopCloser(strings.NewReader("")), WantErrEmpty: true},
+		{Name: "malformed body", Body: io.NopCloser(strings.NewReader(`{invalid`)), WantOtherErr: true},
+		{Name: "valid body", Body: io.NopCloser(strings.NewReader(`{"id":"1"}`)), WantID: "1"},
+	}
+	for _, v := range table {
+		t.Run(v.Name, func(t *testing.T) {
+			req := httptest.NewRequest("POST", "/test", nil)
+			req.Body = v.Body
+			parser := InitContext(req, httptest.NewRecorder())
+
+			var target SampleType
+			err := parser.GetBody(&target)
+			switch {
+			case v.WantErrEmpty:
+				if !errors.Is(err, webFramework.ErrEmptyBody) {
+					t.Fatalf("want ErrEmptyBody, got %v", err)
+				}
+			case v.WantOtherErr:
+				if err == nil {
+					t.Fatal("expected error")
+				}
+				if errors.Is(err, webFramework.ErrEmptyBody) {
+					t.Fatalf("malformed body must not map to ErrEmptyBody, got %v", err)
+				}
+			default:
+				if err != nil {
+					t.Fatal(err)
+				}
+				if target.ID != v.WantID {
+					t.Fatalf("want id %q, got %q", v.WantID, target.ID)
+				}
+			}
+		})
 	}
 }
 

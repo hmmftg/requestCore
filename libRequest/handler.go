@@ -51,6 +51,10 @@ const (
 	URI
 	// URIAndPagination indicates URI parameter and pagination binding.
 	URIAndPagination
+	// JSONOptional indicates JSON body binding where an empty body is accepted.
+	JSONOptional
+	// JSONWithURIOptional indicates optional JSON body and URI parameter binding.
+	JSONWithURIOptional
 )
 
 // PaginationLocalTag is the local-storage key for pagination data.
@@ -149,6 +153,27 @@ func parseRequest[Req any](params ParseParams) (*ParseResult[Req], error) {
 			err = libError.NewWithDescription(status.BadRequest, desc, "%s[GetPaginationQuery](fails)", params.Name)
 		} else {
 			params.W.Parser.SetLocal(PaginationLocalTag, pagination)
+		}
+		errURI := params.W.Parser.GetURI(&request)
+		if errURI != nil {
+			desc = fmt.Sprintf(ErrorInGetRequest, "URI")
+			err = libError.NewWithDescription(status.BadRequest, desc, "%s[GetURI](fails)", params.Name)
+		}
+	case JSONOptional:
+		err = params.W.Parser.GetBody(&request)
+		if errors.Is(err, webFramework.ErrEmptyBody) {
+			err = nil
+		} else if err != nil {
+			desc = fmt.Sprintf(ErrorInGetRequest, "BODY")
+			err = libError.NewWithDescription(status.BadRequest, desc, "%s[GetBody](fails)", params.Name)
+		}
+	case JSONWithURIOptional:
+		err = params.W.Parser.GetBody(&request)
+		if errors.Is(err, webFramework.ErrEmptyBody) {
+			err = nil
+		} else if err != nil {
+			desc = fmt.Sprintf(ErrorInGetRequest, "BODY")
+			err = libError.NewWithDescription(status.BadRequest, desc, "%s[GetBody](fails)", params.Name)
 		}
 		errURI := params.W.Parser.GetURI(&request)
 		if errURI != nil {
