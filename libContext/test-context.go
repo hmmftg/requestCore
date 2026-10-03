@@ -132,14 +132,23 @@ func (t TestingParser) GetHTTPHeader() http.Header {
 // Returns webFramework.ErrEmptyBody when the test body fixture is nil or
 // empty and no explicit BodyError is configured.
 func (t TestingParser) GetBody(target any) error {
-	if t.Body == nil {
-		if t.BodyError != nil {
-			return t.BodyError
-		}
+	if t.BodyError != nil {
+		return t.BodyError
+	}
+	switch body := t.Body.(type) {
+	case nil:
 		return webFramework.ErrEmptyBody
+	case string:
+		if len(body) == 0 {
+			return webFramework.ErrEmptyBody
+		}
+	case []byte:
+		if len(body) == 0 {
+			return webFramework.ErrEmptyBody
+		}
 	}
 	setTarget(target, t.Body)
-	return t.BodyError
+	return nil
 }
 
 // GetURI populates the target with the test URI parameters.

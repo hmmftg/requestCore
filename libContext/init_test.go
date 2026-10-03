@@ -59,6 +59,20 @@ func TestTestingParserGetBody(t *testing.T) {
 		}
 	})
 
+	for name, body := range map[string]any{
+		"empty string returns ErrEmptyBody":     "",
+		"empty byte slice returns ErrEmptyBody": []byte{},
+	} {
+		t.Run(name, func(t *testing.T) {
+			parser := TestingParser{Body: body}
+			var target SampleBody
+			err := parser.GetBody(&target)
+			if !errors.Is(err, webFramework.ErrEmptyBody) {
+				t.Fatalf("want ErrEmptyBody, got %v", err)
+			}
+		})
+	}
+
 	t.Run("configured BodyError takes precedence", func(t *testing.T) {
 		parser := TestingParser{BodyError: errors.New("boom")}
 		var target SampleBody
