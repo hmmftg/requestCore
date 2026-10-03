@@ -592,8 +592,13 @@ func TestCookieStore_EncryptionTamperedToken(t *testing.T) {
 		t.Fatalf("Save: %v", err)
 	}
 
-	// Tamper with the token by flipping a character.
-	tampered := token[:len(token)-5] + "X" + token[len(token)-4:]
+	// Tamper with the token by replacing a character. The replacement must
+	// differ from the original character, otherwise the token is unchanged.
+	replacement := "X"
+	if token[len(token)-5] == 'X' {
+		replacement = "Y"
+	}
+	tampered := token[:len(token)-5] + replacement + token[len(token)-4:]
 	_, err = store.Load(context.Background(), tampered)
 	if err == nil {
 		t.Fatal("expected error loading tampered encrypted token")
