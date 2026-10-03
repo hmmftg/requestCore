@@ -316,6 +316,57 @@ This allows consistent visibility across request pipelines.
 
 ---
 
+# Request body binding modes
+
+`HandlerParameters[Req, Resp].Body` selects how `libRequest` binds the incoming
+request into `Req`:
+
+| Mode | Body | URI params | Empty body |
+|---|---|---|---|
+| `libRequest.NoBinding` | — | — | accepted (nothing bound) |
+| `libRequest.JSON` | required JSON | — | 400 `ERROR_IN_GET_REQUEST_BODY` |
+| `libRequest.JSONWithURI` | required JSON | bound (mandatory) | 400 `ERROR_IN_GET_REQUEST_BODY` |
+| `libRequest.JSONOptional` | optional JSON | — | accepted; zero-valued `Req` |
+| `libRequest.JSONWithURIOptional` | optional JSON | bound (mandatory) | accepted; `Req` has URI fields only |
+| `libRequest.Query` | query params | — | n/a |
+| `libRequest.QueryWithURI` | query params | bound | n/a |
+| `libRequest.QueryWithPagination` | query + pagination | — | n/a |
+| `libRequest.URI` | — | bound (mandatory) | n/a |
+| `libRequest.URIAndPagination` | — | bound + pagination | n/a |
+
+The optional modes are for endpoints whose contract allows `Content-Length: 0` —
+e.g. `POST /api/card/:cardNumber/harim` takes all required input from the path and
+only reads `cvv2`/`expiry` when a body is present:
+
+```go
+handlers.HandlerParameters[Req, Resp]{
+    Body: libRequest.JSONWithURIOptional, // body optional; URI params still bound
+}
+```
+
+Notes:
+
+- **Validation still runs.** An absent body produces a zero-valued `Req`, which is
+  then passed through `libValidate.ValidateStruct` like any other request. Fields
+  that are truly optional should use `validate:"omitempty"` (or no `required` tag);
+  an empty body against a `required` body field fails with `VALIDATION_FAILED` (400).
+- **URI binding stays mandatory** in `JSONWithURIOptional`.
+- **Malformed bodies are still rejected** — only absent/empty bodies are tolerated;
+  a JSON syntax error is a 400.
+
+## `ErrEmptyBody` contract for `RequestParser` implementers
+
+Custom `webFramework.RequestParser` implementations must return
+`webFramework.ErrEmptyBody` (wrapping is allowed; callers use `errors.Is`) from
+`GetBody` when the request has no body or a zero-length body. Returning `nil` for
+an empty body is wrong: it makes an absent body indistinguishable from a
+successful bind, and the optional modes rely on the sentinel. The built-in
+parsers (`libGin`, `libFiber`, `libNetHttp`) and test fakes
+(`webFramework.FakeParser`, `libContext.TestingParser`) already honor the
+contract.
+
+---
+
 # Request persistence (optional)
 
 Handlers support optional request/result persistence via `RequestPersister[Req, Resp]` on generic `HandlerParameters[Req, Resp]`.

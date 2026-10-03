@@ -3,6 +3,8 @@ package libGin
 
 import (
 	"context"
+	"errors"
+	"io"
 	"log/slog"
 	"net/http"
 
@@ -47,8 +49,13 @@ func (c GinParser) GetRawURLQuery() string {
 }
 
 // GetBody binds the JSON request body to the given target.
+// Returns webFramework.ErrEmptyBody when the request body is empty.
 func (c GinParser) GetBody(target any) error {
-	return c.Ctx.ShouldBindJSON(target)
+	err := c.Ctx.ShouldBindJSON(target)
+	if errors.Is(err, io.EOF) {
+		return webFramework.ErrEmptyBody
+	}
+	return err
 }
 
 // GetURI binds URI parameters to the given target.

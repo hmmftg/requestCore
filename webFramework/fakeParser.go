@@ -19,6 +19,7 @@ type FakeParser struct {
 	ReqHeader   map[string]string
 	RespHeader  map[string]string
 	Body        any
+	BodyError   error
 	URI         any
 	URLQuery    any
 	RawUrlQuery string
@@ -53,9 +54,26 @@ func (f FakeParser) GetHTTPHeader() http.Header {
 	return f.HttpHeader
 }
 
-// GetBody is a no-op that always returns nil for the fake parser.
+// GetBody returns the configured fake body error, or ErrEmptyBody when
+// the fake body is nil or empty. A non-empty body is a no-op that
+// returns nil, matching the fake parser's historical behavior.
 func (f FakeParser) GetBody(target any) error {
 	_ = target
+	if f.BodyError != nil {
+		return f.BodyError
+	}
+	switch body := f.Body.(type) {
+	case nil:
+		return ErrEmptyBody
+	case string:
+		if len(body) == 0 {
+			return ErrEmptyBody
+		}
+	case []byte:
+		if len(body) == 0 {
+			return ErrEmptyBody
+		}
+	}
 	return nil
 }
 

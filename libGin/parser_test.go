@@ -2,6 +2,7 @@ package libGin
 
 import (
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -46,6 +47,35 @@ func TestGetBody(t *testing.T) {
 		if string(b) != v.DesiredJSON {
 			t.Fatal("want:", v.DesiredJSON, "got:", string(b))
 		}
+	}
+}
+
+func TestGetBody_Empty(t *testing.T) {
+	type SampleType struct {
+		ID string `json:"id"`
+	}
+	var target SampleType
+	c := gin.Context{Request: &http.Request{Body: io.NopCloser(strings.NewReader(""))}}
+	ctx := InitContext(&c)
+	err := ctx.GetBody(&target)
+	if !errors.Is(err, webFramework.ErrEmptyBody) {
+		t.Fatalf("want ErrEmptyBody, got %v", err)
+	}
+}
+
+func TestGetBody_MalformedNotEmptyBody(t *testing.T) {
+	type SampleType struct {
+		ID string `json:"id"`
+	}
+	var target SampleType
+	c := gin.Context{Request: &http.Request{Body: io.NopCloser(strings.NewReader(`{invalid`))}}
+	ctx := InitContext(&c)
+	err := ctx.GetBody(&target)
+	if err == nil {
+		t.Fatal("expected error for malformed body")
+	}
+	if errors.Is(err, webFramework.ErrEmptyBody) {
+		t.Fatalf("malformed body must not map to ErrEmptyBody, got %v", err)
 	}
 }
 

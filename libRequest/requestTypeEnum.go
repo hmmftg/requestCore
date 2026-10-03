@@ -8,11 +8,11 @@ import (
 	"strings"
 )
 
-const _TypeName = "NoBindingJSONJSONWithURIQueryQueryWithURIQueryWithPaginationURIURIAndPagination"
+const _TypeName = "NoBindingJSONJSONWithURIQueryQueryWithURIQueryWithPaginationURIURIAndPaginationJSONOptionalJSONWithURIOptional"
 
-var _TypeIndex = [...]uint8{0, 9, 13, 24, 29, 41, 60, 63, 79}
+var _TypeIndex = [...]uint8{0, 9, 13, 24, 29, 41, 60, 63, 79, 91, 110}
 
-const _TypeLowerName = "nobindingjsonjsonwithuriqueryquerywithuriquerywithpaginationuriuriandpagination"
+const _TypeLowerName = "nobindingjsonjsonwithuriqueryquerywithuriquerywithpaginationuriuriandpaginationjsonoptionaljsonwithurioptional"
 
 func (i Type) String() string {
 	if i < 0 || i >= Type(len(_TypeIndex)-1) {
@@ -33,27 +33,36 @@ func _TypeNoOp() {
 	_ = x[QueryWithPagination-(5)]
 	_ = x[URI-(6)]
 	_ = x[URIAndPagination-(7)]
+	_ = x[JSONOptional-(8)]
+	_ = x[JSONWithURIOptional-(9)]
 }
 
-var _TypeValues = []Type{NoBinding, JSON, JSONWithURI, Query, QueryWithURI, QueryWithPagination, URI, URIAndPagination}
+var _TypeValues = []Type{NoBinding, JSON, JSONWithURI, Query, QueryWithURI, QueryWithPagination, URI, URIAndPagination, JSONOptional, JSONWithURIOptional}
 
 var _TypeNameToValueMap = map[string]Type{
-	_TypeName[0:9]:        NoBinding,
-	_TypeLowerName[0:9]:   NoBinding,
-	_TypeName[9:13]:       JSON,
-	_TypeLowerName[9:13]:  JSON,
-	_TypeName[13:24]:      JSONWithURI,
-	_TypeLowerName[13:24]: JSONWithURI,
-	_TypeName[24:29]:      Query,
-	_TypeLowerName[24:29]: Query,
-	_TypeName[29:41]:      QueryWithURI,
-	_TypeLowerName[29:41]: QueryWithURI,
-	_TypeName[41:60]:      QueryWithPagination,
-	_TypeLowerName[41:60]: QueryWithPagination,
-	_TypeName[60:63]:      URI,
-	_TypeLowerName[60:63]: URI,
-	_TypeName[63:79]:      URIAndPagination,
-	_TypeLowerName[63:79]: URIAndPagination,
+	_TypeName[0:9]:    NoBinding,
+	_TypeName[9:13]:   JSON,
+	_TypeName[13:24]:  JSONWithURI,
+	_TypeName[24:29]:  Query,
+	_TypeName[29:41]:  QueryWithURI,
+	_TypeName[41:60]:  QueryWithPagination,
+	_TypeName[60:63]:  URI,
+	_TypeName[63:79]:  URIAndPagination,
+	_TypeName[79:91]:  JSONOptional,
+	_TypeName[91:110]: JSONWithURIOptional,
+}
+
+var _TypeLowerNameToValueMap = map[string]Type{
+	_TypeLowerName[0:9]:    NoBinding,
+	_TypeLowerName[9:13]:   JSON,
+	_TypeLowerName[13:24]:  JSONWithURI,
+	_TypeLowerName[24:29]:  Query,
+	_TypeLowerName[29:41]:  QueryWithURI,
+	_TypeLowerName[41:60]:  QueryWithPagination,
+	_TypeLowerName[60:63]:  URI,
+	_TypeLowerName[63:79]:  URIAndPagination,
+	_TypeLowerName[79:91]:  JSONOptional,
+	_TypeLowerName[91:110]: JSONWithURIOptional,
 }
 
 var _TypeNames = []string{
@@ -65,6 +74,8 @@ var _TypeNames = []string{
 	_TypeName[41:60],
 	_TypeName[60:63],
 	_TypeName[63:79],
+	_TypeName[79:91],
+	_TypeName[91:110],
 }
 
 // TypeString retrieves an enum value from the enum constants string name.
@@ -74,7 +85,7 @@ func TypeString(s string) (Type, error) {
 		return val, nil
 	}
 
-	if val, ok := _TypeNameToValueMap[strings.ToLower(s)]; ok {
+	if val, ok := _TypeLowerNameToValueMap[strings.ToLower(s)]; ok {
 		return val, nil
 	}
 	return 0, fmt.Errorf("%s does not belong to Type values", s)
